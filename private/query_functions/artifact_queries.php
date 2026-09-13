@@ -330,7 +330,7 @@ use PHPMailer\PHPMailer\Exception;
     $stmt = mysqli_prepare($db,
       "SELECT types.objectType AS type_name, games.*
       FROM games
-      JOIN types ON games.type_id = types.id
+      LEFT JOIN types ON games.type_id = types.id
       WHERE games.id = ?"
     );
     mysqli_stmt_bind_param($stmt, "i", $id);

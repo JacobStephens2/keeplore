@@ -43,6 +43,14 @@ Formerly **Artifact Manager** — see [docs/keeplore-app-name.md](docs/keeplore-
 - List items ordered by next due date to prioritize what to use next
 - Default and per-item interval settings
 
+### Proposal Outcomes
+
+- Record explicit declines or occasions when something else was chosen for any item
+- Optionally include participants, a note, and the alternative selected
+- Edit or delete proposal history from the item's page
+- Compare separate outcome counts from Analysis, with date filters and collection scope
+- Keep proposal history separate from actual uses and interact-by dates
+
 ### Player & Playgroup Management
 
 - Player profiles with priority and menu ordering
@@ -157,6 +165,22 @@ chmod 777 logs/ cache/
 ```bash
 ./vendor/bin/phpunit
 ```
+
+Proposal integration tests use a disposable MySQL database per test. With a local MySQL
+server available, run:
+
+```bash
+KEEPLORE_TEST_DB_HOST=127.0.0.1 KEEPLORE_TEST_DB_PORT=3306 \
+  KEEPLORE_TEST_DB_USER=root vendor/bin/phpunit
+```
+
+Set `KEEPLORE_TEST_DB_PASSWORD` if needed. The test account needs permission to create and
+drop databases prefixed `keeplore_test_`. Without `KEEPLORE_TEST_DB_HOST`, integration tests
+are skipped; CI supplies MySQL and runs them. No application database credentials are used.
+
+Before deploying proposal outcomes, apply
+[`database/migrations/add-proposal-outcomes.sql`](database/migrations/add-proposal-outcomes.sql)
+to the application database. It only creates the two proposal tables and can be rerun.
 
 ## Acknowledgments
 

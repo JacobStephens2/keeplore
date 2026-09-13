@@ -190,6 +190,9 @@
     <p class="section-label">Insights</p>
     <h1>Analysis</h1>
     <p class="page-lede">How often you interact, what leads the list, and where the queue is thin.</p>
+    <?php if (!is_guest()) { ?>
+      <p><a href="<?php echo url_for('/proposals/index.php'); ?>">Proposal outcomes — compare explicit declines and items passed over</a></p>
+    <?php } ?>
   </header>
   <div class="dashboard">
     <section class="dashboard-hero">

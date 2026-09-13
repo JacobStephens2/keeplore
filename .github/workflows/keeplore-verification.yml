@@ -17,6 +17,21 @@ jobs:
   keeplore-verification:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      KEEPLORE_TEST_DB_HOST: 127.0.0.1
+      KEEPLORE_TEST_DB_USER: root
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,6 +40,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
+          extensions: mysqli, mbstring
 
       - name: Lint every PHP file the Release will serve
         run: |
