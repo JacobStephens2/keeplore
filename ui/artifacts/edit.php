@@ -4,7 +4,15 @@
   if(!isset($_GET['id'])) {
     redirect_to(url_for('/artifacts/index.php'));
   }
-  $id = $_GET['id'];
+  $id = filter_var($_GET['id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+  if ($id === false) {
+    error_404();
+  }
+
+  $artifact = find_artifact_by_id($id);
+  if (!$artifact || (int) $artifact['user_id'] !== (int) $_SESSION['user_id']) {
+    error_404();
+  }
 
   $user_id = $_SESSION['user_id'];
   $stmt = mysqli_prepare($db, "SELECT default_use_interval FROM users WHERE id = ?");
@@ -61,6 +69,7 @@
   include(SHARED_PATH . '/header.php'); 
 ?>
 
+<link rel="stylesheet" href="<?php echo url_for('/proposals/proposals.css'); ?>">
 <main>
 
   <div id="editArtifact" class="object edit">
@@ -73,6 +82,10 @@
         href="<?php echo url_for('/uses/record-new.php?artifact_id=' . h(u($id))); ?>"
         >
         Record Use
+      </a>
+
+      <a class="back-link" href="<?php echo url_for('/proposals/edit.php?item_id=' . h(u($id))); ?>">
+        Record proposal outcome
       </a>
 
       <button id="editFormDisplayButton" type="button">
@@ -253,6 +266,8 @@
       <?php } ?>
     </table>
   </section>
+
+  <?php include(SHARED_PATH . '/proposal_history.php'); ?>
 
   <p id="deleteArtifact">
     <a class="action" href="<?php echo url_for('/artifacts/delete.php?id=' . h(u($_REQUEST['id']))); ?>">

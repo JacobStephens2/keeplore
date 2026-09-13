@@ -168,6 +168,36 @@ Junction table linking `uses` to `players` (many-to-many). Records which players
 
 ---
 
+### `proposal_outcomes` and `proposal_outcome_players`
+
+Proposal history is separate from use history and legacy aversions. Apply
+[`add-proposal-outcomes.sql`](../database/migrations/add-proposal-outcomes.sql)
+before deploying the proposal pages. The migration creates new tables and is safe to rerun.
+
+`proposal_outcomes` stores one observation per item proposal:
+
+| Column | Type | Meaning |
+|---|---|---|
+| `id` | INT UNSIGNED, AUTO_INCREMENT | Proposal record ID |
+| `user_id` | INT | Recording account |
+| `item_id` | INT | Proposed item, `games.id` |
+| `proposal_date` | DATE | Date of the proposal |
+| `outcome` | ENUM | `explicit_decline` or `chose_something_else` |
+| `note` | TEXT | Optional reason or circumstances, empty when omitted |
+| `chosen_item_id` | INT, nullable | Optional existing alternative, `games.id` |
+| `chosen_item_name` | VARCHAR(255) | Alternative's name when recorded, or a freely entered name |
+
+`proposal_outcome_players` has a composite primary key `(proposal_id, player_id)`.
+Its foreign key to the proposal cascades deletions. Each participant is recorded at most
+once per proposal. Counts aggregate proposal rows directly, without joining participants.
+
+The module validates ownership of proposed items, alternatives, and participants. References
+to legacy item/player tables follow the existing application-level ownership convention;
+the migration does not add constraints to those tables. A stored alternative name survives
+removal of the alternative from the collection. Proposal writes never update uses or responses.
+
+---
+
 ### `types`
 
 Lookup table for artifact categories/types.
