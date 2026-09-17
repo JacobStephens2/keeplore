@@ -40,6 +40,7 @@ Aligned to the Digital Curator style board and live CSS tokens in `ui/style.css`
 | Accent | `#33b1e4` | `#4cc3f0` | Focus rings / tiny highlights only, both modes |
 | Surface / low / lowest / high | `#eef1f3` / `#f7f9fb` / `#ffffff` / `#e0e3e5` | `#151d33` / `#111830` / `#1a2342` / `#232c4d` | Same stacking order, darkened |
 | Page bg / shade | `#f8fafc` / `#eaedef` | `#0c1222` / `#0a0f1e` | Gradient endpoints |
+| Panel / strong | `rgba(247,249,251,0.82/0.92)` | `rgba(23,30,57,0.82/0.92)` | Dashboard hero, surface panels, forms, zebra rows — never hardcode panel white |
 | Text / soft | `#1b2230` / `#5f6777` | `#e9edf5` / `#a6b0c4` | |
 | Outline / strong | `rgba(100,116,139,0.16/0.3)` | `rgba(148,163,184,0.2/0.38)` | Ghost-border opacities preserved |
 | Danger / success | `#b63d2f` / `#2e6d51` | `#e0705f` / `#45b483` | Brightened for dark surfaces |
