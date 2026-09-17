@@ -467,6 +467,11 @@ use PHPMailer\PHPMailer\Exception;
     $type_id = $artifact['type'];
     $type_name = get_type_name($type_id);
 
+    $kept = normalize_kept_value($artifact['is_kept']);
+    $secondary = normalize_secondary_membership($artifact['is_in_secondary_collection'] ?? null);
+    $digital = normalize_format_flag($artifact['is_digital'] ?? null);
+    $physical = normalize_format_flag($artifact['is_physical'] ?? null);
+
     $sql = "INSERT INTO games (
         Title,
         Notes,
@@ -496,7 +501,7 @@ use PHPMailer\PHPMailer\Exception;
       $artifact['Acq'],
       $type_id,
       $type_name,
-      normalize_kept_value($artifact['is_kept']),
+      $kept,
       $artifact['Candidate'],
       $artifact['CandidateGroupDate'],
       $artifact['UsedRecUserCt'],
@@ -507,9 +512,9 @@ use PHPMailer\PHPMailer\Exception;
       $artifact['MxP'],
       $_SESSION['user_id'],
       $artifact['interaction_frequency_days'],
-      normalize_secondary_membership($artifact['is_in_secondary_collection'] ?? null),
-      normalize_format_flag($artifact['is_digital'] ?? null),
-      normalize_format_flag($artifact['is_physical'] ?? null)
+      $secondary,
+      $digital,
+      $physical
     );
     $result = mysqli_stmt_execute($stmt);
     mysqli_stmt_close($stmt);
