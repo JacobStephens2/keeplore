@@ -231,6 +231,10 @@ mysqli_stmt_close($stmt);
     <p>Reset password</p>
   </a>
 
+  <a href="<?php echo url_for('/settings/agent-keys.php'); ?>">
+    <p>Agent API keys</p>
+  </a>
+
 
 </main>
 

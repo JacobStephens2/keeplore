@@ -303,6 +303,26 @@ Legacy usage tracking table for `objects`. Superseded by `uses` and `responses`.
 
 ---
 
+### `agent_api_keys`
+
+Per-agent per-user keys for remote agent HTTP access (spec #10, ADR 0002).
+Only the SHA-256 hash is stored; the plaintext secret is shown once at
+creation. A key scopes its holder to one user's reads plus the kept toggle.
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | INT, AUTO_INCREMENT | NO | Primary key |
+| `user_id` | INT | NO | Owning user (application-level scoping, no FK) |
+| `agent_name` | VARCHAR(100) | NO | Human label for the key |
+| `key_hash` | VARCHAR(255) | NO | SHA-256 hex of the secret (unique) |
+| `created_at` | DATETIME | NO | Creation timestamp (defaults to `CURRENT_TIMESTAMP`) |
+| `last_used_at` | DATETIME | YES | Last successful use |
+| `revoked_at` | DATETIME | YES | Set on revocation; revoked keys are rejected |
+
+**Primary key:** `id`
+
+---
+
 ### `rate_limits`
 
 Tracks API and login request attempts for rate limiting. Rows are automatically cleaned up when they expire beyond the configured time window.

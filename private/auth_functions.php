@@ -71,8 +71,21 @@ function log_in_user($user, $remember = false) {
   return true;
 }
 
+function request_authorization_header() {
+  if (isset($_SERVER['HTTP_AUTHORIZATION']) && $_SERVER['HTTP_AUTHORIZATION'] !== '') {
+    return $_SERVER['HTTP_AUTHORIZATION'];
+  }
+  if (function_exists('apache_request_headers')) {
+    $headers = apache_request_headers();
+    if (isset($headers['Authorization'])) {
+      return $headers['Authorization'];
+    }
+  }
+  return null;
+}
+
 function authenticate() {
-  $headers = apache_request_headers();
+  $authorization = request_authorization_header();
   $response = new stdClass;
 
   if (isset($_COOKIE["access_token"])) {
@@ -81,6 +94,7 @@ function authenticate() {
       $key  = JWT_SECRET;
       $decodedJWT = JWT::decode($jwt, new Key($key, 'HS256'));
       $decodedJWT->authenticated = true;
+      $decodedJWT->auth_type = 'session';
       return $decodedJWT;
 
     } catch (Exception $e) {
@@ -89,15 +103,51 @@ function authenticate() {
       return $response;
     }
   } else {
-    if (isset($headers['Authorization']) && hash_equals(ARTIFACTS_API_KEY, $headers['Authorization'])) {
+    // Per-agent per-user keys (spec #10, ticket #18): a Bearer token scoped
+    // to one user's reads plus the kept toggle.
+    if ($authorization !== null && strncasecmp($authorization, 'Bearer ', 7) === 0) {
+      $agent_key = find_agent_key_by_token_or_null(trim(substr($authorization, 7)));
+      if ($agent_key !== false) {
+        $response->message = 'Your agent key is valid.';
+        $response->authenticated = true;
+        $response->auth_type = 'agent_key';
+        $response->user_id = (int) $agent_key['user_id'];
+        $response->agent_key_id = (int) $agent_key['id'];
+        $response->agent_name = $agent_key['agent_name'];
+        return $response;
+      }
+      $response->message = 'You have not been authenticated';
+      $response->authenticated = false;
+      return $response;
+    }
+    if ($authorization !== null && hash_equals(ARTIFACTS_API_KEY, $authorization)) {
       $response->message = 'Your API Key is valid.';
       $response->authenticated = true;
+      $response->auth_type = 'api_key';
       return $response;
     } else {
       $response->message = 'You have not been authenticated';
       return $response;
     }
   }
+}
+
+// Looks up a Bearer agent token when a database connection is available;
+// returns false without one (e.g. unit tests) or when unknown/revoked.
+function find_agent_key_by_token_or_null($token) {
+  if ($token === '') {
+    return false;
+  }
+  $conn = null;
+  if (isset($GLOBALS['db']) && $GLOBALS['db'] instanceof mysqli) {
+    $conn = $GLOBALS['db'];
+  } elseif (isset($GLOBALS['database']) && $GLOBALS['database'] instanceof mysqli) {
+    $conn = $GLOBALS['database'];
+  }
+  if ($conn === null || !function_exists('find_agent_key_by_token')) {
+    return false;
+  }
+  return find_agent_key_by_token($conn, $token);
 }
 
 // Performs all actions necessary to log out an admin

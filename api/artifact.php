@@ -61,6 +61,8 @@
       break;
 
     case 'POST':
+      // Agent keys permit reads plus the kept toggle only.
+      deny_agent_key_writes($authentication_response);
       // Create a new artifact
       $requestBody = json_decode(file_get_contents('php://input'));
 
@@ -119,6 +121,8 @@
       break;
 
     case 'PUT':
+      // Agent keys permit reads plus the kept toggle only.
+      deny_agent_key_writes($authentication_response);
       // Update an existing artifact
       $requestBody = json_decode(file_get_contents('php://input'));
 
@@ -195,6 +199,8 @@
       break;
 
     case 'DELETE':
+      // Agent keys permit reads plus the kept toggle only.
+      deny_agent_key_writes($authentication_response);
       // Delete an artifact by ID, scoped to authenticated user
       if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
         http_response_code(400);

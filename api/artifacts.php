@@ -29,7 +29,18 @@
   $requestBody = json_decode(
     file_get_contents('php://input')
   );
-    
+
+  if ($requestBody === null) {
+    $requestBody = new stdClass;
+  }
+
+  // Agent keys are scoped to their own user: ignore any requested userid so
+  // one agent cannot read another user's collection.
+  $is_agent_key = isset($authentication_response->auth_type) && $authentication_response->auth_type === 'agent_key';
+  if ($is_agent_key) {
+    $requestBody->userid = $authentication_response->user_id;
+  }
+
   $per_page = isset($requestBody->per_page) ? (int) $requestBody->per_page : 50;
 
   // Determine pagination mode: cursor-based or offset-based
@@ -77,12 +88,25 @@
         $page,
         $per_page
       );
+    } elseif ($is_agent_key) {
+      // Agents always read their own user's collection, first page.
+      $result = Artifact::list_artifacts_by_user_paginated(
+        $authentication_response->user_id,
+        $per_page,
+        null
+      );
+      $response->artifacts = $result['data'];
+      $response->next_cursor = $result['next_cursor'];
+      $response->has_more = $result['has_more'];
+      $response->per_page = $per_page;
     } else {
       $artifacts = Artifact::list_artifacts($page, $per_page);
     }
-    $response->artifacts = $artifacts;
-    $response->page = $page;
-    $response->per_page = $per_page;
+    if (!isset($response->artifacts)) {
+      $response->artifacts = $artifacts;
+      $response->page = $page;
+      $response->per_page = $per_page;
+    }
   }
 
   echo json_encode($response);
