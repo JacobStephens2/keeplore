@@ -14,6 +14,12 @@ CREATE TABLE games (
     is_in_secondary_collection TINYINT DEFAULT 0,
     is_digital TINYINT DEFAULT NULL,
     is_physical TINYINT DEFAULT NULL,
+    mnp INT DEFAULT NULL,
+    mxp INT DEFAULT NULL,
+    mnt INT DEFAULT NULL,
+    mxt INT DEFAULT NULL,
+    UsedRecUserCt INT DEFAULT NULL,
+    type VARCHAR(100) DEFAULT NULL,
     to_get_rid_of TINYINT DEFAULT 0,
     Acq DATE DEFAULT '2026-01-01',
     interaction_frequency_days INT DEFAULT 90
