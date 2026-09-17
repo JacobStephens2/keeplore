@@ -27,6 +27,26 @@ Aligned to the Digital Curator style board and live CSS tokens in `ui/style.css`
 
 **Naming:** "Tertiary" always means dark teal (`#002939`). Cyan is always **Accent**. Do not call the cyan "tertiary" in docs or code.
 
+### Dark mode mapping (issue #7)
+
+`html[data-theme="dark"]` in `ui/style.css` re-maps every token above so roles survive the mode change; no component may introduce a dark-only hex outside that block (plus the `offline.html` fallback, which mirrors these values). Light stays the `:root` default.
+
+| Token | Light | Dark | Note |
+| --- | --- | --- | --- |
+| Primary | `#30395c` | `#9db1d9` | Still the wordmark/links slot, lightened for dark surfaces |
+| Primary soft | `#3d4668` | `#b3c3e2` | |
+| Secondary | `#64748b` | `#9aa7bd` | |
+| Tertiary | `#002939` | `#9fd8e8` | Still the muted-teal chip slot, not the cyan highlight; Accent keeps that role (`#4cc3f0` in dark) |
+| Accent | `#33b1e4` | `#4cc3f0` | Focus rings / tiny highlights only, both modes |
+| Surface / low / lowest / high | `#eef1f3` / `#f7f9fb` / `#ffffff` / `#e0e3e5` | `#151d33` / `#111830` / `#1a2342` / `#232c4d` | Same stacking order, darkened |
+| Page bg / shade | `#f8fafc` / `#eaedef` | `#0c1222` / `#0a0f1e` | Gradient endpoints |
+| Text / soft | `#1b2230` / `#5f6777` | `#e9edf5` / `#a6b0c4` | |
+| Outline / strong | `rgba(100,116,139,0.16/0.3)` | `rgba(148,163,184,0.2/0.38)` | Ghost-border opacities preserved |
+| Danger / success | `#b63d2f` / `#2e6d51` | `#e0705f` / `#45b483` | Brightened for dark surfaces |
+| Shadow | `0 12px 32px rgba(25,28,30,0.06)` | `0 12px 32px rgba(0,0,0,0.45)` | Ambient, never pure-black-on-light |
+
+_Amendment to the naming rule above: "Tertiary always means dark teal" holds for the light theme and the style board; in dark mode the tertiary **slot** maps to a light teal so teal chips stay teal. Roles are stable across modes; hexes are per-mode. The style board PNG shows light only._
+
 ### Core Visual Rules
 *   **The "No-Line" Rule**: Explicitly prohibit the use of 1px solid borders for sectioning. Structural boundaries must be defined solely through background color shifts. For example, a `surface-container-low` section sitting directly on a `surface` background creates a natural, modern edge without the visual noise of a stroke.
 *   **Surface Hierarchy & Nesting**: Treat the UI as physical layers. An application should feel like stacked sheets of fine vellum. Use `surface-container-low` for the main canvas, and `surface-container-lowest` for cards to create a subtle "lift."
