@@ -1,4 +1,14 @@
-<?php if ( ! isset($page_title) ) { $page_title = 'Keeplore'; } ?>
+<?php
+  if ( ! isset($page_title) ) { $page_title = 'Keeplore'; }
+  if ( ! isset($page_description) ) {
+    $page_description = 'Know what you own. Use what you keep. Interact-by dates for the items that earn their place.';
+  }
+  if ( ! isset($document_title) ) {
+    $document_title = $page_title === 'Keeplore' ? 'Keeplore' : ($page_title . ' - Keeplore');
+  }
+  $keeplore_is_public = !is_logged_in() && !is_guest();
+  $keeplore_body_class = $keeplore_is_public ? 'public-mode' : (is_guest() ? 'guest-mode' : 'signed-in-mode');
+?>
 
 <!DOCTYPE html>
 
@@ -6,13 +16,13 @@
   <head>
     
     <title>
-      <?php echo h($page_title); ?> - Keeplore
+      <?php echo h($document_title); ?>
     </title>
 
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#30395c">
-    <meta name="description" content="Keeplore — know what you own. Use what you keep. Self-hosted 90/90 rule tracker for physical possessions.">
+    <meta name="description" content="<?php echo h($page_description); ?>">
     <meta name="application-name" content="Keeplore">
     <meta name="apple-mobile-web-app-title" content="Keeplore">
     <meta name="mobile-web-app-capable" content="yes">
@@ -25,8 +35,8 @@
     ?>
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Keeplore">
-    <meta property="og:title" content="<?php echo h($page_title); ?> - Keeplore">
-    <meta property="og:description" content="Know what you own. Use what you keep.">
+    <meta property="og:title" content="<?php echo h($document_title); ?>">
+    <meta property="og:description" content="<?php echo h($page_description); ?>">
     <meta property="og:image" content="<?php echo h($keeplore_og_image); ?>">
     <meta property="og:image:width" content="1400">
     <meta property="og:image:height" content="788">
@@ -63,7 +73,7 @@
         if (meta) { meta.setAttribute('content', effective === 'dark' ? '#0c1222' : '#30395c'); }
       })();
     </script>
-    <link rel="stylesheet" media="all" href="../../style.css?v=41" />
+    <link rel="stylesheet" media="all" href="../../style.css?v=42" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -80,7 +90,7 @@
 
   </head>
 
-  <body class="<?php echo is_guest() ? 'guest-mode' : 'signed-in-mode'; ?>">
+  <body class="<?php echo h($keeplore_body_class); ?>">
     <header class="site-header">
       <div class="site-header-inner">
         <div class="site-brand">
@@ -143,6 +153,7 @@
               <div class="nav-more-panel" role="menu" aria-label="More destinations">
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('/types'); ?>">Types</a>
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('/users'); ?>">Users</a>
+                <a class="nav-link" role="menuitem" href="<?php echo url_for('/api-docs'); ?>">API</a>
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('/support'); ?>">Support</a>
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('/settings/edit'); ?>">Settings</a>
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('logout'); ?>">Logout</a>
@@ -169,9 +180,22 @@
               <summary class="nav-link nav-more-summary" aria-haspopup="menu">More</summary>
               <div class="nav-more-panel" role="menu" aria-label="More destinations">
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('/types'); ?>">Types</a>
+                <a class="nav-link" role="menuitem" href="<?php echo url_for('/api-docs'); ?>">API</a>
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('/login.php?action=logout'); ?>">Exit&nbsp;Guest&nbsp;Mode</a>
               </div>
             </details>
+          </div>
+          <?php
+        } else {
+          ?>
+          <div class="nav-group nav-group-primary" aria-label="Primary">
+            <a class="nav-link nav-link-primary" href="<?php echo url_for('/register.php'); ?>">Create&nbsp;account</a>
+            <a class="nav-link nav-link-primary" href="<?php echo url_for('/login.php'); ?>">Log&nbsp;in</a>
+          </div>
+
+          <div class="nav-group nav-group-secondary" aria-label="Browse">
+            <a class="nav-link" href="<?php echo url_for('/api-docs'); ?>">API</a>
+            <a class="nav-link" href="<?php echo url_for('/login.php?action=guest'); ?>">Browse&nbsp;as&nbsp;guest</a>
           </div>
           <?php
         }

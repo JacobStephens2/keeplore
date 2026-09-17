@@ -4,7 +4,10 @@
           <p class="footer-label">Keeplore</p>
           <h2>Know what you own. Use what you keep.</h2>
         </div>
-        <p class="footer-meta">&copy; <?php echo date('Y'); ?> <a href="https://resume.jacobstephens.net" target="_blank">Jacob Stephens</a></p>
+        <p class="footer-meta">
+          <a href="<?php echo url_for('/api-docs'); ?>">API</a>
+          &copy; <?php echo date('Y'); ?> <a href="https://resume.jacobstephens.net" target="_blank" rel="noopener">Jacob Stephens</a>
+        </p>
       </div>
     </footer>
 
