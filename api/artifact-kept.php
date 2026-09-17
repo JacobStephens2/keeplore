@@ -46,12 +46,13 @@
   }
 
   $body = (array) $requestBody;
-  $kept = isset($body['is_kept']) && $body['is_kept'] !== null && $body['is_kept'] !== ''
-    ? normalize_kept_value($body['is_kept'])
-    : null;
+  $raw_kept = $body['is_kept'] ?? null;
+  // Strict 0/1: anything else (including truthy strings) is rejected rather
+  // than silently coerced, so a malformed call can never flip kept by accident.
+  $kept = in_array($raw_kept, [0, 1, '0', '1', true, false], true) ? (int) $raw_kept : null;
   if ($kept === null) {
     http_response_code(400);
-    $response->message = 'Missing required field: is_kept (0 or 1)';
+    $response->message = 'Missing or invalid required field: is_kept (0 or 1)';
     echo json_encode($response);
     exit;
   }
@@ -82,10 +83,7 @@
   }
 
   // Single kept seam: exactly one kept vocabulary.
-  $stmt = $database->prepare("UPDATE games SET is_kept = ? WHERE id = ? AND user_id = ? LIMIT 1");
-  $stmt->bind_param("iii", $kept, $id, $user_id);
-  $stmt->execute();
-  $stmt->close();
+  set_artifact_kept_for_user($database, $user_id, $id, $kept);
 
   $updated = Artifact::find_by_id_and_user_id($id, $user_id);
   $row = $updated ? get_object_vars($updated) : $record;

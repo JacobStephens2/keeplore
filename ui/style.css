@@ -1358,6 +1358,23 @@ p.copied_message {
   border: 2px solid #7a1d12;
 }
 
+/* Items page kept-visibility switch (spec #10) */
+.kept-switch {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.kept-switch a {
+  padding: 0.4rem 1rem;
+  border: 1px solid #888;
+  border-radius: 999px;
+  text-decoration: none;
+}
+.kept-switch a[aria-current="true"] {
+  font-weight: bold;
+  border-width: 2px;
+}
+
 .modal[hidden] { display: none; }
 
 .modal {

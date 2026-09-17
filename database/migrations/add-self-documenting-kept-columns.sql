@@ -20,8 +20,11 @@ ALTER TABLE games
 
 UPDATE games SET is_kept = KeptCol WHERE is_kept IS NULL;
 
+-- Guarded (dual-write keeps both forms in sync), so only rows never
+-- backfilled are touched and later edits survive a rerun.
 UPDATE games
-  SET is_in_secondary_collection = CASE WHEN InSecondaryCollection = 'yes' THEN 1 ELSE 0 END;
+  SET is_in_secondary_collection = 1
+  WHERE InSecondaryCollection = 'yes' AND is_in_secondary_collection = 0;
 
 UPDATE games SET is_digital = KeptDig WHERE is_digital IS NULL;
 

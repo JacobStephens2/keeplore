@@ -39,15 +39,13 @@
   }
 
   // Surfaced visibility switch shares the panel's kept value. Accept the
-  // short switch values ('all', 'yes', 'no') alongside the legacy panel
-  // values and fall back to showing everything.
+  // short switch value ('all') alongside the panel values and fall back to
+  // showing everything.
   $kept_aliases = [
     'all' => 'allkeptandnot',
     'allkeptandnot' => 'allkeptandnot',
     'yes' => 'yes',
-    'kept' => 'yes',
     'no' => 'no',
-    'not' => 'no',
     'secondary_only' => 'secondary_only',
   ];
   $kept = $kept_aliases[$kept] ?? 'allkeptandnot';
@@ -114,26 +112,11 @@
         'yes' => 'Kept',
         'no' => 'Not kept',
       ];
-      $kept_switch_active = $kept === 'secondary_only' ? 'all' : $kept;
+      // Secondary-only has no switch option (it stays in the panel), so no
+      // option highlights while it is active.
+      $kept_switch_active = $kept === 'secondary_only' ? null : $kept;
     ?>
     <nav class="kept-switch" aria-label="Kept visibility">
-      <style>
-        .kept-switch {
-          display: flex;
-          gap: 0.5rem;
-          margin: 1rem 0;
-        }
-        .kept-switch a {
-          padding: 0.4rem 1rem;
-          border: 1px solid #888;
-          border-radius: 999px;
-          text-decoration: none;
-        }
-        .kept-switch a[aria-current="true"] {
-          font-weight: bold;
-          border-width: 2px;
-        }
-      </style>
       <?php foreach ($kept_switch_options as $switch_value => $switch_label) { ?>
         <a href="<?php echo h(url_for('/artifacts/index.php?' . http_build_query(array_merge($switch_base, ['kept' => $switch_value])))); ?>"
           <?php if ($kept_switch_active === $switch_value) { echo 'aria-current="true"'; } ?>
@@ -386,9 +369,9 @@
     <div id="items-toast" class="toast" role="status" aria-live="polite"></div>
 
     <script>
-      // Row Keep/Kept toggle: reuses the JSON toggle endpoint
-      // (set-tracked.php) with toast confirmation. The row keeps its place
-      // with updated state; nothing reloads.
+      // Row Keep/Kept toggle: reuses the JSON kept-toggle endpoint with
+      // toast confirmation. The row keeps its place with updated state;
+      // nothing reloads.
       (function () {
         var toastEl = document.getElementById('items-toast');
         var toastTimer = null;

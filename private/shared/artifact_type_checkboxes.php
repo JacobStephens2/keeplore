@@ -5,7 +5,7 @@
   global $type;
   // Pages that tidy their filter panel (Items, #15) set
   // $type_filter_shortcuts = 'trimmed' before including this partial to
-  // keep only Select All / Deselect All plus one games shortcut. Every
+  // keep only Select All / Deselect All plus one game-type shortcut. Every
   // other consumer keeps the full shortcut set.
   global $type_filter_shortcuts;
   $trimmed_shortcuts = isset($type_filter_shortcuts) && $type_filter_shortcuts === 'trimmed';

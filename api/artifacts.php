@@ -89,16 +89,12 @@
         $per_page
       );
     } elseif ($is_agent_key) {
-      // Agents always read their own user's collection, first page.
-      $result = Artifact::list_artifacts_by_user_paginated(
+      // Agents read their own user's collection with the requested page.
+      $artifacts = Artifact::list_artifacts_by_user(
         $authentication_response->user_id,
-        $per_page,
-        null
+        $page,
+        $per_page
       );
-      $response->artifacts = $result['data'];
-      $response->next_cursor = $result['next_cursor'];
-      $response->has_more = $result['has_more'];
-      $response->per_page = $per_page;
     } else {
       $artifacts = Artifact::list_artifacts($page, $per_page);
     }

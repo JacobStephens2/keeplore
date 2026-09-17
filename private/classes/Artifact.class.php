@@ -112,6 +112,30 @@ class Artifact extends DatabaseObject {
     ];
   }
 
+  public static function list_artifacts_by_user($user_id, $page = 1, $per_page = 50) {
+    $user_id = (int) $user_id;
+    $page = max(1, (int) $page);
+    $per_page = max(1, min(200, (int) $per_page));
+    $offset = ($page - 1) * $per_page;
+
+    $stmt = self::$database->prepare(
+      "SELECT games.id, games.Title
+       FROM games
+       WHERE games.user_id = ?
+       ORDER BY games.Title ASC
+       LIMIT ? OFFSET ?"
+    );
+    $stmt->bind_param("iii", $user_id, $per_page, $offset);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $array = array();
+    while($record = $result->fetch_assoc()) {
+      $array[] = $record;
+    }
+    $stmt->close();
+    return $array;
+  }
+
   public static function list_artifacts_by_user_paginated($user_id, $per_page = 50, $cursor = null) {
     $user_id = (int) $user_id;
     $per_page = max(1, min(200, (int) $per_page));
