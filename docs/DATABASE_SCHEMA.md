@@ -24,9 +24,7 @@ The primary artifacts table. Despite its name, it stores all artifact types (boa
 | `type_id` | INT | YES | FK to `types.id` -- the normalized type reference |
 | `user_id` | INT | NO | FK to `users.id` -- the owning user |
 | `Acq` | DATE | YES | Acquisition / tracking-start date |
-| `KeptCol` | TINYINT(1) | YES | Legacy kept flag, dual-written with `is_kept` during the overlap release; removed by Contract (#17) |
 | `is_kept` | TINYINT(1) | YES | Whether the artifact is kept in the primary collection (1 = yes, 0 = no). Kept means kept only |
-| `InSecondaryCollection` | VARCHAR(10) | YES | Legacy secondary-membership flag (`'yes'` / otherwise), dual-written with `is_in_secondary_collection`; removed by Contract (#17) |
 | `is_in_secondary_collection` | TINYINT(1) | NO | Whether it is in a secondary collection (1 = yes, 0 = no, default 0) |
 | `Candidate` | VARCHAR(255) | YES | Candidate status or label |
 | `CandidateGroupDate` | DATE | YES | Date associated with candidate grouping |
@@ -46,9 +44,7 @@ The primary artifacts table. Despite its name, it stores all artifact types (boa
 | `Access` | VARCHAR(100) | YES | Access level or platform |
 | `OrigPlat` | VARCHAR(100) | YES | Original platform |
 | `System` | VARCHAR(100) | YES | System or platform |
-| `KeptDig` | TINYINT(1) | YES | Legacy digital flag, dual-written with `is_digital`; removed by Contract (#17) |
 | `is_digital` | TINYINT(1) | YES | Pure format flag: the item has a digital form. Independent of kept |
-| `KeptPhys` | TINYINT(1) | YES | Legacy physical flag, dual-written with `is_physical`; removed by Contract (#17) |
 | `is_physical` | TINYINT(1) | YES | Pure format flag: the item has a physical form. Independent of kept. An item can be both physical and digital |
 | `Notes` | TEXT | YES | Free-form notes |
 | `interaction_frequency_days` | DECIMAL/FLOAT | YES | Per-artifact override for the interaction frequency interval (in days) |

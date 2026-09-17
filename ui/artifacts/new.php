@@ -23,8 +23,8 @@ if(is_post_request()) {
   $artifact['Title'] = $_POST['Title'] ?? '';
   $artifact['Acq'] = $_POST['Acq'] ?? date('Y-m-d');
   $artifact['type'] = $_POST['type'] ?? '';
-  // A quick add (e.g. from Record Use) defaults to tracked; the full form posts KeptCol explicitly.
-  $artifact['KeptCol'] = $_POST['KeptCol'] ?? ($is_ajax ? '1' : '');
+  // A quick add (e.g. from Record Use) defaults to kept; the full form posts is_kept explicitly.
+  $artifact['is_kept'] = $_POST['is_kept'] ?? ($is_ajax ? '1' : '');
   $artifact['Candidate'] = $_POST['Candidate'] ?? '';
   $artifact['interaction_frequency_days'] = $_POST['interaction_frequency_days'] ?? $default_interval;
   $artifact['CandidateGroupDate'] = date('Y-m-d');
@@ -69,7 +69,7 @@ if(is_post_request()) {
   $artifact["Title"] = '';
   $artifact["type"] = '';
   $artifact["Acq"] = '';
-  $artifact["KeptCol"] = '';
+  $artifact["is_kept"] = '';
   $artifact["Candidate"] = '';
   $artifact["UsedRecUserCt"] = '';
   $artifact["MnT"] = $defaultMnT;
@@ -137,9 +137,9 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
       <label for="MxT">Maxiumum Time</label>
       <input type="number" name="MxT" id="MxT" value="<?php echo $artifact['MxT']; ?>">
 
-      <label for="KeptCol">Tracked? (Checked Means Yes)</label>
-      <input type="hidden" name="KeptCol" value="0" />
-      <input type="checkbox" name="KeptCol" id="KeptCol" value="1" checked/>
+      <label for="is_kept">Kept? (Checked Means Yes)</label>
+      <input type="hidden" name="is_kept" value="0" />
+      <input type="checkbox" name="is_kept" id="is_kept" value="1" checked/>
       
       <label for="Notes">Notes</label>
       <textarea name="Notes" id="Notes" cols="30" rows="5"></textarea>

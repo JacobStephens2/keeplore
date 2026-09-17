@@ -5,8 +5,8 @@ class Artifact extends DatabaseObject {
   static protected $table_name = 'games';
   static protected $db_columns = [
     'Access', 'Acq', 'Age', 'age_max', 'Av', 'BGG_Rat', 'Candidate', 'FavCt', 'FullTitle', 'id',
-    'is_digital', 'is_in_secondary_collection', 'is_kept', 'is_physical', 'KeptCol',
-    'KeptDig', 'KeptPhys', 'MnP', 'MnT', 'MxP', 'MxT', 'OrigPlat', 'SS', 'System', 'Title',
+    'is_digital', 'is_in_secondary_collection', 'is_kept', 'is_physical',
+    'MnP', 'MnT', 'MxP', 'MxT', 'OrigPlat', 'SS', 'System', 'Title',
     'to_get_rid_of', 'type', 'UsedRecUserCt', 'user_id', 'Wt', 'Yr'
   ];
 
@@ -25,9 +25,6 @@ class Artifact extends DatabaseObject {
   public $is_in_secondary_collection;
   public $is_kept;
   public $is_physical;
-  public $KeptCol;
-  public $KeptDig;
-  public $KeptPhys;
   public $MnP;
   public $MnT;
   public $MxP;

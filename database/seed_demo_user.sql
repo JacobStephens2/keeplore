@@ -55,13 +55,13 @@ UPDATE users SET player_id = @demo_player_id WHERE id = @demo_user_id;
 -- ============================================================
 
 -- Books (5) -----------------------------------------------
-INSERT INTO games (Title, user_id, type_id, type, Acq, KeptCol, is_kept, is_in_secondary_collection, is_digital, is_physical, interaction_frequency_days, to_get_rid_of)
+INSERT INTO games (Title, user_id, type_id, type, Acq, is_kept, is_in_secondary_collection, is_digital, is_physical, interaction_frequency_days, to_get_rid_of)
 VALUES
-  ('Dune',                     @demo_user_id, @type_book, 'book', DATE_SUB(CURDATE(), INTERVAL 400 DAY), 1, 1, 0, NULL, NULL, 90,   0),
-  ('The Hobbit',               @demo_user_id, @type_book, 'book', DATE_SUB(CURDATE(), INTERVAL 300 DAY), 1, 1, 0, NULL, NULL, NULL, 0),
-  ('Atomic Habits',            @demo_user_id, @type_book, 'book', DATE_SUB(CURDATE(), INTERVAL 200 DAY), 1, 1, 0, NULL, NULL, 60,   0),
-  ('Deep Work',                @demo_user_id, @type_book, 'book', DATE_SUB(CURDATE(), INTERVAL 150 DAY), 1, 1, 0, NULL, NULL, 90,   0),
-  ('The Great Gatsby',         @demo_user_id, @type_book, 'book', DATE_SUB(CURDATE(), INTERVAL 500 DAY), 1, 1, 0, NULL, NULL, 90,   1);
+  ('Dune',                     @demo_user_id, @type_book, 'book', DATE_SUB(CURDATE(), INTERVAL 400 DAY), 1, 0, NULL, NULL, 90,   0),
+  ('The Hobbit',               @demo_user_id, @type_book, 'book', DATE_SUB(CURDATE(), INTERVAL 300 DAY), 1, 0, NULL, NULL, NULL, 0),
+  ('Atomic Habits',            @demo_user_id, @type_book, 'book', DATE_SUB(CURDATE(), INTERVAL 200 DAY), 1, 0, NULL, NULL, 60,   0),
+  ('Deep Work',                @demo_user_id, @type_book, 'book', DATE_SUB(CURDATE(), INTERVAL 150 DAY), 1, 0, NULL, NULL, 90,   0),
+  ('The Great Gatsby',         @demo_user_id, @type_book, 'book', DATE_SUB(CURDATE(), INTERVAL 500 DAY), 1, 0, NULL, NULL, 90,   1);
 
 SET @a_dune          = (SELECT id FROM games WHERE Title = 'Dune'             AND user_id = @demo_user_id LIMIT 1);
 SET @a_hobbit        = (SELECT id FROM games WHERE Title = 'The Hobbit'       AND user_id = @demo_user_id LIMIT 1);
@@ -70,12 +70,12 @@ SET @a_deepwork      = (SELECT id FROM games WHERE Title = 'Deep Work'        AN
 SET @a_gatsby        = (SELECT id FROM games WHERE Title = 'The Great Gatsby' AND user_id = @demo_user_id LIMIT 1);
 
 -- Board games (4) ----------------------------------------
-INSERT INTO games (Title, user_id, type_id, type, Acq, KeptCol, is_kept, is_in_secondary_collection, is_digital, is_physical, mnp, mxp, mnt, mxt, interaction_frequency_days, to_get_rid_of)
+INSERT INTO games (Title, user_id, type_id, type, Acq, is_kept, is_in_secondary_collection, is_digital, is_physical, mnp, mxp, mnt, mxt, interaction_frequency_days, to_get_rid_of)
 VALUES
-  ('Catan',                    @demo_user_id, @type_boardgame, 'board-game', DATE_SUB(CURDATE(), INTERVAL 365 DAY), 1, 1, 0, NULL, NULL, 3, 4, 60, 120, 60,   0),
-  ('Ticket to Ride',           @demo_user_id, @type_boardgame, 'board-game', DATE_SUB(CURDATE(), INTERVAL 250 DAY), 1, 1, 0, NULL, NULL, 2, 5, 30,  60, 90,   0),
-  ('Wingspan',                 @demo_user_id, @type_boardgame, 'board-game', DATE_SUB(CURDATE(), INTERVAL 180 DAY), 1, 1, 0, NULL, NULL, 1, 5, 40,  70, NULL, 0),
-  ('Monopoly',                 @demo_user_id, @type_boardgame, 'board-game', DATE_SUB(CURDATE(), INTERVAL 600 DAY), 1, 1, 0, NULL, NULL, 2, 8, 60, 180, 90,   1);
+  ('Catan',                    @demo_user_id, @type_boardgame, 'board-game', DATE_SUB(CURDATE(), INTERVAL 365 DAY), 1, 0, NULL, NULL, 3, 4, 60, 120, 60,   0),
+  ('Ticket to Ride',           @demo_user_id, @type_boardgame, 'board-game', DATE_SUB(CURDATE(), INTERVAL 250 DAY), 1, 0, NULL, NULL, 2, 5, 30,  60, 90,   0),
+  ('Wingspan',                 @demo_user_id, @type_boardgame, 'board-game', DATE_SUB(CURDATE(), INTERVAL 180 DAY), 1, 0, NULL, NULL, 1, 5, 40,  70, NULL, 0),
+  ('Monopoly',                 @demo_user_id, @type_boardgame, 'board-game', DATE_SUB(CURDATE(), INTERVAL 600 DAY), 1, 0, NULL, NULL, 2, 8, 60, 180, 90,   1);
 
 SET @a_catan         = (SELECT id FROM games WHERE Title = 'Catan'           AND user_id = @demo_user_id LIMIT 1);
 SET @a_ticket        = (SELECT id FROM games WHERE Title = 'Ticket to Ride'  AND user_id = @demo_user_id LIMIT 1);
@@ -83,39 +83,39 @@ SET @a_wingspan      = (SELECT id FROM games WHERE Title = 'Wingspan'        AND
 SET @a_monopoly      = (SELECT id FROM games WHERE Title = 'Monopoly'        AND user_id = @demo_user_id LIMIT 1);
 
 -- Films (3) -----------------------------------------------
-INSERT INTO games (Title, user_id, type_id, type, Acq, KeptCol, is_kept, is_in_secondary_collection, is_digital, is_physical, interaction_frequency_days, to_get_rid_of)
+INSERT INTO games (Title, user_id, type_id, type, Acq, is_kept, is_in_secondary_collection, is_digital, is_physical, interaction_frequency_days, to_get_rid_of)
 VALUES
-  ('The Shawshank Redemption', @demo_user_id, @type_film, 'film', DATE_SUB(CURDATE(), INTERVAL 350 DAY), 1, 1, 0, NULL, NULL, 120,  0),
-  ('Spirited Away',            @demo_user_id, @type_film, 'film', DATE_SUB(CURDATE(), INTERVAL 200 DAY), 1, 1, 0, NULL, NULL, 90,   0),
-  ('The Grand Budapest Hotel', @demo_user_id, @type_film, 'film', DATE_SUB(CURDATE(), INTERVAL 100 DAY), 1, 1, 0, NULL, NULL, NULL, 0);
+  ('The Shawshank Redemption', @demo_user_id, @type_film, 'film', DATE_SUB(CURDATE(), INTERVAL 350 DAY), 1, 0, NULL, NULL, 120,  0),
+  ('Spirited Away',            @demo_user_id, @type_film, 'film', DATE_SUB(CURDATE(), INTERVAL 200 DAY), 1, 0, NULL, NULL, 90,   0),
+  ('The Grand Budapest Hotel', @demo_user_id, @type_film, 'film', DATE_SUB(CURDATE(), INTERVAL 100 DAY), 1, 0, NULL, NULL, NULL, 0);
 
 SET @a_shawshank     = (SELECT id FROM games WHERE Title = 'The Shawshank Redemption' AND user_id = @demo_user_id LIMIT 1);
 SET @a_spirited      = (SELECT id FROM games WHERE Title = 'Spirited Away'             AND user_id = @demo_user_id LIMIT 1);
 SET @a_budapest      = (SELECT id FROM games WHERE Title = 'The Grand Budapest Hotel'  AND user_id = @demo_user_id LIMIT 1);
 
 -- Equipment (3) -------------------------------------------
-INSERT INTO games (Title, user_id, type_id, type, Acq, KeptCol, is_kept, is_in_secondary_collection, is_digital, is_physical, interaction_frequency_days, to_get_rid_of)
+INSERT INTO games (Title, user_id, type_id, type, Acq, is_kept, is_in_secondary_collection, is_digital, is_physical, interaction_frequency_days, to_get_rid_of)
 VALUES
-  ('Cast Iron Skillet',        @demo_user_id, @type_equipment, 'equipment', DATE_SUB(CURDATE(), INTERVAL 500 DAY), 1, 1, 0, NULL, NULL, 30,   0),
-  ('Camping Tent',             @demo_user_id, @type_equipment, 'equipment', DATE_SUB(CURDATE(), INTERVAL 400 DAY), 1, 1, 0, NULL, NULL, 120,  0),
-  ('Stand Mixer',              @demo_user_id, @type_equipment, 'equipment', DATE_SUB(CURDATE(), INTERVAL 250 DAY), 1, 1, 0, NULL, NULL, 60,   0);
+  ('Cast Iron Skillet',        @demo_user_id, @type_equipment, 'equipment', DATE_SUB(CURDATE(), INTERVAL 500 DAY), 1, 0, NULL, NULL, 30,   0),
+  ('Camping Tent',             @demo_user_id, @type_equipment, 'equipment', DATE_SUB(CURDATE(), INTERVAL 400 DAY), 1, 0, NULL, NULL, 120,  0),
+  ('Stand Mixer',              @demo_user_id, @type_equipment, 'equipment', DATE_SUB(CURDATE(), INTERVAL 250 DAY), 1, 0, NULL, NULL, 60,   0);
 
 SET @a_skillet       = (SELECT id FROM games WHERE Title = 'Cast Iron Skillet' AND user_id = @demo_user_id LIMIT 1);
 SET @a_tent          = (SELECT id FROM games WHERE Title = 'Camping Tent'      AND user_id = @demo_user_id LIMIT 1);
 SET @a_mixer         = (SELECT id FROM games WHERE Title = 'Stand Mixer'       AND user_id = @demo_user_id LIMIT 1);
 
 -- Instrument (1) ------------------------------------------
-INSERT INTO games (Title, user_id, type_id, type, Acq, KeptCol, is_kept, is_in_secondary_collection, is_digital, is_physical, interaction_frequency_days, to_get_rid_of)
+INSERT INTO games (Title, user_id, type_id, type, Acq, is_kept, is_in_secondary_collection, is_digital, is_physical, interaction_frequency_days, to_get_rid_of)
 VALUES
-  ('Acoustic Guitar',          @demo_user_id, @type_instrument, 'instrument', DATE_SUB(CURDATE(), INTERVAL 700 DAY), 1, 1, 0, NULL, NULL, 30, 0);
+  ('Acoustic Guitar',          @demo_user_id, @type_instrument, 'instrument', DATE_SUB(CURDATE(), INTERVAL 700 DAY), 1, 0, NULL, NULL, 30, 0);
 
 SET @a_guitar        = (SELECT id FROM games WHERE Title = 'Acoustic Guitar' AND user_id = @demo_user_id LIMIT 1);
 
 -- Food & Drink (2) ----------------------------------------
-INSERT INTO games (Title, user_id, type_id, type, Acq, KeptCol, is_kept, is_in_secondary_collection, is_digital, is_physical, interaction_frequency_days, to_get_rid_of)
+INSERT INTO games (Title, user_id, type_id, type, Acq, is_kept, is_in_secondary_collection, is_digital, is_physical, interaction_frequency_days, to_get_rid_of)
 VALUES
-  ('Sourdough Starter',        @demo_user_id, @type_food,  'food',  DATE_SUB(CURDATE(), INTERVAL 300 DAY), 1, 1, 0, NULL, NULL, 14, 0),
-  ('French Press',             @demo_user_id, @type_drink, 'drink', DATE_SUB(CURDATE(), INTERVAL 200 DAY), 1, 1, 0, NULL, NULL, 7,  0);
+  ('Sourdough Starter',        @demo_user_id, @type_food,  'food',  DATE_SUB(CURDATE(), INTERVAL 300 DAY), 1, 0, NULL, NULL, 14, 0),
+  ('French Press',             @demo_user_id, @type_drink, 'drink', DATE_SUB(CURDATE(), INTERVAL 200 DAY), 1, 0, NULL, NULL, 7,  0);
 
 SET @a_sourdough     = (SELECT id FROM games WHERE Title = 'Sourdough Starter' AND user_id = @demo_user_id LIMIT 1);
 SET @a_frenchpress   = (SELECT id FROM games WHERE Title = 'French Press'      AND user_id = @demo_user_id LIMIT 1);

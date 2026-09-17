@@ -1,8 +1,7 @@
 <?php
 
   // Kept toggle for remote agents (spec #10, ticket #18, ADR 0002).
-  // POST { "id": 123, "is_kept": 1 } — the legacy "KeptCol" alias is also
-  // accepted and both names are returned during the overlap release.
+  // POST { "id": 123, "is_kept": 1 } — exactly one kept vocabulary.
 
   require_once('private/initialize.php');
   require_once('../private/rate_limiter.php');
@@ -46,7 +45,10 @@
     exit;
   }
 
-  $kept = resolve_agent_kept_input($requestBody);
+  $body = (array) $requestBody;
+  $kept = isset($body['is_kept']) && $body['is_kept'] !== null && $body['is_kept'] !== ''
+    ? normalize_kept_value($body['is_kept'])
+    : null;
   if ($kept === null) {
     http_response_code(400);
     $response->message = 'Missing required field: is_kept (0 or 1)';
@@ -79,15 +81,14 @@
     exit;
   }
 
-  // Single kept seam, dual-writing the new and legacy columns during the
-  // overlap release.
-  $stmt = $database->prepare("UPDATE games SET is_kept = ?, KeptCol = ? WHERE id = ? AND user_id = ? LIMIT 1");
-  $stmt->bind_param("iiii", $kept, $kept, $id, $user_id);
+  // Single kept seam: exactly one kept vocabulary.
+  $stmt = $database->prepare("UPDATE games SET is_kept = ? WHERE id = ? AND user_id = ? LIMIT 1");
+  $stmt->bind_param("iii", $kept, $id, $user_id);
   $stmt->execute();
   $stmt->close();
 
   $updated = Artifact::find_by_id_and_user_id($id, $user_id);
-  $fields = agent_kept_fields($updated ? get_object_vars($updated) : $record);
+  $row = $updated ? get_object_vars($updated) : $record;
 
   $logger->logDataChange('update', 'artifact-kept', $id, ['is_kept' => $kept]);
 
@@ -97,9 +98,8 @@
   $response->message = $kept === 1
     ? $response->artifact_name . ' is now kept.'
     : $response->artifact_name . ' is no longer kept.';
-  foreach ($fields as $field => $value) {
-    $response->$field = $value;
-  }
+  $response->is_kept = artifact_is_kept($row) ? 1 : 0;
+  $response->is_in_secondary_collection = artifact_is_in_secondary_collection($row) ? 1 : 0;
   echo json_encode($response);
 
 ?>

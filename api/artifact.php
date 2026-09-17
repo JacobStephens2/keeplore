@@ -86,7 +86,8 @@
       // Map request body fields onto the artifact object
       $allowed_fields = [
         'Access', 'Acq', 'Age', 'age_max', 'Av', 'BGG_Rat', 'Candidate',
-        'FavCt', 'FullTitle', 'KeptCol', 'KeptDig', 'KeptPhys', 'MnP',
+        'FavCt', 'FullTitle', 'is_digital', 'is_in_secondary_collection',
+        'is_kept', 'is_physical', 'MnP',
         'MnT', 'MxP', 'MxT', 'OrigPlat', 'SS', 'System', 'Title',
         'to_get_rid_of', 'type', 'UsedRecUserCt', 'Wt', 'Yr'
       ];
@@ -160,7 +161,8 @@
       // Merge allowed fields from request body
       $allowed_fields = [
         'Access', 'Acq', 'Age', 'age_max', 'Av', 'BGG_Rat', 'Candidate',
-        'FavCt', 'FullTitle', 'KeptCol', 'KeptDig', 'KeptPhys', 'MnP',
+        'FavCt', 'FullTitle', 'is_digital', 'is_in_secondary_collection',
+        'is_kept', 'is_physical', 'MnP',
         'MnT', 'MxP', 'MxT', 'OrigPlat', 'SS', 'System', 'Title',
         'to_get_rid_of', 'type', 'UsedRecUserCt', 'Wt', 'Yr'
       ];
