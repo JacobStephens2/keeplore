@@ -23,6 +23,7 @@ $database = db_connect();
 // Kept-status seam and agent-key helpers (shared with the UI bootstrap)
 require_once('../private/kept_status.php');
 require_once('../private/agent_keys.php');
+require_once('../private/agent_api_docs.php');
 
 require_once('../private/classes/DatabaseObject.class.php');
 DatabaseObject::set_database($database);

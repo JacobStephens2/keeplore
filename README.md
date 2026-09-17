@@ -59,7 +59,9 @@ Formerly **Artifact Manager** — see [docs/keeplore-app-name.md](docs/keeplore-
 
 ### REST API
 
-- JWT + API key authentication
+- Per-user agent keys (`Authorization: Bearer`) for remote agents: collection, uses, and proposal reads plus the kept toggle
+- Public docs at [`/api-docs`](https://keeplore.app/api-docs) (JSON at `/api-docs?format=json`)
+- JWT session cookies and a legacy shared API key for the web app
 - CRUD endpoints for items, uses, types, and users
 - Cursor-based and offset-based pagination
 - Search and filtering
@@ -76,6 +78,8 @@ Formerly **Artifact Manager** — see [docs/keeplore-app-name.md](docs/keeplore-
 
 ```
 ui/                         Web-accessible frontend
+├── index.php               Dashboard when signed in; marketing home when not
+├── api-docs.php            Public agent API docs
 ├── artifacts/              Item CRUD pages
 ├── uses/                   Interaction recording
 ├── players/                Player management

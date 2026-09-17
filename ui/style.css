@@ -1735,8 +1735,11 @@ ul.fun-facts .fact-aside {
 }
 
 .footer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
   margin: 0;
-  white-space: nowrap;
   font-size: 0.92rem;
 }
 
@@ -1863,6 +1866,166 @@ ul.fun-facts .fact-aside {
   border-radius: var(--radius-lg);
   background: var(--panel);
   box-shadow: var(--shadow);
+}
+
+/* --- Public landing + agent API docs --- */
+
+.landing {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(16rem, 0.95fr);
+  gap: 1.75rem;
+  align-items: center;
+  padding: 2rem;
+  background: var(--panel);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.landing-copy {
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.landing-lede {
+  max-width: 46ch;
+  font-size: 1.08rem;
+}
+
+.landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.landing-hero-visual {
+  margin: 0;
+  border-radius: calc(var(--radius-lg) - 6px);
+  overflow: hidden;
+  background: var(--surface-lowest);
+  box-shadow: inset 0 0 0 1px var(--outline);
+}
+
+.landing-hero-visual img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  aspect-ratio: 16 / 9;
+}
+
+.landing-features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.landing-feature {
+  padding: 1.5rem 1.6rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface-lowest);
+  box-shadow: var(--shadow);
+}
+
+.landing-feature h2 {
+  margin-bottom: 0.65rem;
+}
+
+.landing-feature p,
+.landing-how p,
+.landing-api p,
+.landing-steps p {
+  margin-bottom: 0;
+}
+
+.landing-how,
+.landing-api {
+  padding: 1.75rem;
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.landing-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.landing-steps li {
+  list-style: none;
+  padding: 1.15rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-lowest);
+}
+
+.landing-step-num {
+  margin: 0 0 0.45rem;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.landing h3,
+.api-docs h3 {
+  font-size: 1.05rem;
+  margin: 1rem 0 0.4rem;
+}
+
+.landing-steps h3 {
+  margin: 0 0 0.45rem;
+}
+
+.landing-api .landing-actions {
+  margin-top: 1.15rem;
+}
+
+.landing code,
+.api-docs code {
+  font-size: 0.9em;
+  color: var(--primary);
+}
+
+.api-docs .api-docs-panel + .api-docs-panel {
+  margin-top: 1.25rem;
+}
+
+.api-docs-panel h2 {
+  margin-bottom: 0.55rem;
+}
+
+.api-docs-meta {
+  margin: 0 0 1rem;
+}
+
+.api-docs-panel ul {
+  margin: 0 0 0.75rem;
+}
+
+.api-docs pre {
+  margin: 0.75rem 0 0;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-lowest);
+  box-shadow: inset 0 0 0 1px var(--outline);
+}
+
+.api-docs pre code {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre;
 }
 
 .empty-state {
@@ -2001,7 +2164,10 @@ tbody tr:last-child td:last-child {
   }
 
   .auth-layout,
-  .auth-layout-compact {
+  .auth-layout-compact,
+  .landing-hero,
+  .landing-features,
+  .landing-steps {
     grid-template-columns: 1fr;
   }
 
@@ -2220,7 +2386,12 @@ tbody tr:last-child td:last-child {
   }
 
   .auth-intro,
-  .auth-panel {
+  .auth-panel,
+  .landing-hero,
+  .landing-how,
+  .landing-api,
+  .landing-feature,
+  .api-docs-panel {
     padding: 1.1rem;
   }
 
@@ -2652,9 +2823,14 @@ html[data-theme="dark"] .auth-mark {
     rgba(26, 35, 66, 0.78);
 }
 
-html[data-theme="dark"] .auth-hero {
+html[data-theme="dark"] .auth-hero,
+html[data-theme="dark"] .landing-hero-visual {
   background: rgba(26, 35, 66, 0.78);
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.1);
+}
+
+html[data-theme="dark"] .api-docs pre {
+  background: var(--surface-low);
 }
 
 html[data-theme="dark"] .menu-about {

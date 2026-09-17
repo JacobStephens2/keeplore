@@ -1,5 +1,11 @@
 <?php
 require_once('../private/initialize.php');
+
+if (!is_logged_in() && !is_guest()) {
+  require SHARED_PATH . '/landing.php';
+  exit;
+}
+
 require_login_or_guest();
 $page_title = 'Menu';
 
