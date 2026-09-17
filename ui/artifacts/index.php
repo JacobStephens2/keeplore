@@ -260,14 +260,22 @@
       <tbody>
         <?php while($artifact = mysqli_fetch_assoc($artifact_set)) { ?>
           <tr>
-            <td class="kept">
-              <?php 
-                if ($artifact['KeptCol'] == 1) {
-                  echo 'yes';
-                } else {
-                  echo 'no';
-                }
-              ?>
+            <?php $row_is_kept = artifact_is_kept($artifact); ?>
+            <td class="kept" data-artifact-id="<?php echo h($artifact['id']); ?>" data-kept="<?php echo $row_is_kept ? '1' : '0'; ?>">
+              <?php if (is_guest()) { ?>
+                <?php echo $row_is_kept ? 'yes' : 'no'; ?>
+              <?php } else { ?>
+                <form method="post" action="<?php echo url_for('/artifacts/set-tracked.php'); ?>" class="kept-toggle-form" style="margin:0;">
+                  <?php echo csrf_input(); ?>
+                  <input type="hidden" name="artifact_id" value="<?php echo h($artifact['id']); ?>">
+                  <input type="hidden" name="artifact_name" value="<?php echo h($artifact['Title']); ?>">
+                  <input type="hidden" name="value" value="<?php echo $row_is_kept ? '0' : '1'; ?>">
+                  <input type="hidden" name="return_to" value="index">
+                  <button type="submit" class="kept-toggle-btn" aria-pressed="<?php echo $row_is_kept ? 'true' : 'false'; ?>">
+                    <?php echo $row_is_kept ? 'Kept' : 'Keep'; ?>
+                  </button>
+                </form>
+              <?php } ?>
             </td>
 
             <td><?php echo h($artifact['type']); ?></td>
@@ -353,6 +361,64 @@
     </div>
 
     <?php mysqli_free_result($artifact_set); ?>
+
+    <div id="items-toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      // Row Keep/Kept toggle: reuses the JSON toggle endpoint
+      // (set-tracked.php) with toast confirmation. The row keeps its place
+      // with updated state; nothing reloads.
+      (function () {
+        var toastEl = document.getElementById('items-toast');
+        var toastTimer = null;
+        function showToast(message, kind) {
+          if (!toastEl) { alert(message); return; }
+          toastEl.textContent = message;
+          toastEl.classList.remove('toast-success', 'toast-error', 'is-visible');
+          toastEl.classList.add(kind === 'error' ? 'toast-error' : 'toast-success');
+          void toastEl.offsetWidth;
+          toastEl.classList.add('is-visible');
+          if (toastTimer) clearTimeout(toastTimer);
+          toastTimer = setTimeout(function () { toastEl.classList.remove('is-visible'); }, 3500);
+        }
+        document.querySelectorAll('.kept-toggle-form').forEach(function (form) {
+          form.addEventListener('submit', function (event) {
+            event.preventDefault();
+            var cell = form.closest('td.kept');
+            var button = form.querySelector('.kept-toggle-btn');
+            var valueInput = form.querySelector('input[name="value"]');
+            button.disabled = true;
+            fetch(form.action, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+              body: new FormData(form),
+            })
+              .then(function (response) {
+                return response.json().then(function (data) { return { ok: response.ok, data: data }; });
+              })
+              .then(function (result) {
+                if (result.ok && result.data && result.data.ok) {
+                  var isKept = result.data.is_kept === 1;
+                  cell.dataset.kept = isKept ? '1' : '0';
+                  button.textContent = isKept ? 'Kept' : 'Keep';
+                  button.setAttribute('aria-pressed', isKept ? 'true' : 'false');
+                  valueInput.value = isKept ? '0' : '1';
+                  showToast(result.data.message || 'Updated.', 'success');
+                } else {
+                  var msg = (result.data && result.data.message) || 'Request failed';
+                  showToast(msg, 'error');
+                }
+                button.disabled = false;
+              })
+              .catch(function (error) {
+                showToast('Network error: ' + error.message, 'error');
+                button.disabled = false;
+              });
+          });
+        });
+      })();
+    </script>
 
     <script class="data_table">
       let table = new DataTable('#artifacts', {
