@@ -31,3 +31,19 @@ The number of an item's proposals recorded as “chose something else” within 
 
 **Item chosen instead**:
 The alternative selected by the group, optionally recorded as an existing item or a name without adding it to the collection. Selection does not establish actual use, so recording it does not create a use or change the alternative's use history.
+
+**Kept**:
+An item the user has chosen to keep in the primary collection.
+_Avoid_: Tracked (a legacy form label for the same idea).
+
+**Secondary collection**:
+A separate overflow collection an item can belong to whether or not it is kept.
+
+**To get rid of**:
+An item flagged for removal, whether or not it is kept.
+
+**Physical item**:
+An item with a physical form. Independent of whether it is kept.
+
+**Digital item**:
+An item with a digital form. Independent of whether it is kept. An item can be both physical and digital.
