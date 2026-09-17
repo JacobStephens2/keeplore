@@ -61,6 +61,8 @@
       break;
 
     case 'POST':
+      // Agent keys permit reads plus the kept toggle only.
+      deny_agent_key_writes($authentication_response);
       // Create a new artifact
       $requestBody = json_decode(file_get_contents('php://input'));
 
@@ -84,7 +86,8 @@
       // Map request body fields onto the artifact object
       $allowed_fields = [
         'Access', 'Acq', 'Age', 'age_max', 'Av', 'BGG_Rat', 'Candidate',
-        'FavCt', 'FullTitle', 'KeptCol', 'KeptDig', 'KeptPhys', 'MnP',
+        'FavCt', 'FullTitle', 'is_digital', 'is_in_secondary_collection',
+        'is_kept', 'is_physical', 'MnP',
         'MnT', 'MxP', 'MxT', 'OrigPlat', 'SS', 'System', 'Title',
         'to_get_rid_of', 'type', 'UsedRecUserCt', 'Wt', 'Yr'
       ];
@@ -119,6 +122,8 @@
       break;
 
     case 'PUT':
+      // Agent keys permit reads plus the kept toggle only.
+      deny_agent_key_writes($authentication_response);
       // Update an existing artifact
       $requestBody = json_decode(file_get_contents('php://input'));
 
@@ -156,7 +161,8 @@
       // Merge allowed fields from request body
       $allowed_fields = [
         'Access', 'Acq', 'Age', 'age_max', 'Av', 'BGG_Rat', 'Candidate',
-        'FavCt', 'FullTitle', 'KeptCol', 'KeptDig', 'KeptPhys', 'MnP',
+        'FavCt', 'FullTitle', 'is_digital', 'is_in_secondary_collection',
+        'is_kept', 'is_physical', 'MnP',
         'MnT', 'MxP', 'MxT', 'OrigPlat', 'SS', 'System', 'Title',
         'to_get_rid_of', 'type', 'UsedRecUserCt', 'Wt', 'Yr'
       ];
@@ -195,6 +201,8 @@
       break;
 
     case 'DELETE':
+      // Agent keys permit reads plus the kept toggle only.
+      deny_agent_key_writes($authentication_response);
       // Delete an artifact by ID, scoped to authenticated user
       if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
         http_response_code(400);

@@ -24,11 +24,19 @@
   mysqli_stmt_close($stmt);
 
   if(is_post_request()) {
+    // The edit form has no format inputs: carry the row's current format
+    // flags forward so saving edits never clears them.
+    $prior_format = [
+      'is_digital' => $artifact['is_digital'] ?? null,
+      'is_physical' => $artifact['is_physical'] ?? null,
+    ];
     // Handle form values sent by new.php
     $artifact = [];
+    $artifact['is_digital'] = $prior_format['is_digital'];
+    $artifact['is_physical'] = $prior_format['is_physical'];
     $artifact['id'] = $id ?? '';
     $artifact['Title'] = $_POST['Title'] ?? '';
-    $artifact['InSecondaryCollection'] = $_POST['InSecondaryCollection'] ?? 'no';
+    $artifact['is_in_secondary_collection'] = $_POST['is_in_secondary_collection'] ?? 0;
     $artifact['Acq'] = $_POST['Acq'] ?? date('Y-m-d');
     $artifact['age'] = $_POST['age'] ?? 0;
     if ($artifact['age'] == '') {
@@ -41,7 +49,7 @@
     $artifact['type'] = $_POST['type'] ?? '';
 
     $artifact['interaction_frequency_days'] = $_POST['interaction_frequency_days'] ?? $default_interval;
-    $artifact['KeptCol'] = $_POST['KeptCol'] ?? '';
+    $artifact['is_kept'] = $_POST['is_kept'] ?? '';
     $artifact['to_get_rid_of'] = $_POST['to_get_rid_of'] ?? '0';
     $artifact['Candidate'] = $_POST['Candidate'] ?? '';
     $artifact['CandidateGroupDate'] = date('Y-m-d');
@@ -104,9 +112,9 @@
       <label for="Title">Title</label>
       <input type="text" name="Title" id="Title" value="<?php echo h($artifact['Title']); ?>" />
 
-      <label for="KeptCol" >Tracked? (Checked means yes)</label>
-      <input type="hidden" name="KeptCol" value="0" />
-      <input type="checkbox" name="KeptCol" id="KeptCol" value="1"<?php if($artifact['KeptCol'] == "1") { echo " checked"; } ?> />
+      <label for="is_kept" >Kept? (Checked means yes)</label>
+      <input type="hidden" name="is_kept" value="0" />
+      <input type="checkbox" name="is_kept" id="is_kept" value="1"<?php if(artifact_is_kept($artifact)) { echo " checked"; } ?> />
 
       <label for="type_search">Type</label>
       <?php
@@ -215,9 +223,9 @@
       <label for="age">Minimum Age</label>
       <input type="number" name="age" id="age" value="<?php echo $artifact['Age']; ?>">
 
-      <label for="InSecondaryCollection" >Kept in Secondary Collection? (Checked means yes)</label>
-      <input type="checkbox" name="InSecondaryCollection" id="InSecondaryCollection" value="yes" 
-        <?php if($artifact['InSecondaryCollection'] == "yes") { echo " checked"; } ?>
+      <label for="is_in_secondary_collection" >Kept in Secondary Collection? (Checked means yes)</label>
+      <input type="checkbox" name="is_in_secondary_collection" id="is_in_secondary_collection" value="1" 
+        <?php if(artifact_is_in_secondary_collection($artifact)) { echo " checked"; } ?>
       />
       
       <?php 

@@ -3,7 +3,7 @@
 function find_artifacts_by_characteristic($kept, $type, $allArtifacts, $favCt) {
   global $db;
 
-  $sql = "SELECT Title, id, mxt, mnt, ss, yr, wt, mnp, mxp, av, favct, age, bgg_rat, KeptCol, type ";
+  $sql = "SELECT Title, id, mxt, mnt, ss, yr, wt, mnp, mxp, av, favct, age, bgg_rat, is_kept, type ";
   $sql .= "FROM games ";
   $sql .= "WHERE ";
 
@@ -23,7 +23,7 @@ function find_artifacts_by_characteristic($kept, $type, $allArtifacts, $favCt) {
   $sql .= "AND ";
 
   if ($kept == 'true') {
-    $sql .= "KeptCol = 1 ";
+    $sql .= "is_kept = 1 ";
   } else {
     $sql .= '1 = 1 ';
   }

@@ -15,6 +15,9 @@
     exit;
   }
 
+  // Triggering email sends is outside the agent scope (reads plus kept toggle).
+  deny_agent_key_writes($authentication_response);
+
   $authenticated_user_id = isset($authentication_response->user_id) ? (int) $authentication_response->user_id : null;
   $requested_user_id = isset($_GET['userID']) ? (int) $_GET['userID'] : null;
 

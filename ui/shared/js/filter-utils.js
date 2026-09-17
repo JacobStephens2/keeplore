@@ -96,7 +96,8 @@ const FilterUtils = {
    *
    * Each artifact is expected to have at least:
    *   - type (string)          - the artifact type name
-   *   - KeptPhys, KeptDig, KeptCol (string/int) - kept flags
+   *   - is_kept (string/int)   - kept flag; kept means kept only, format
+   *                              flags never affect membership
    *   - Title (string)         - used for free-text search
    *
    * @param {Array<object>} artifacts - The full list to filter
@@ -118,14 +119,15 @@ const FilterUtils = {
     }
 
     // -- Kept filter ----------------------------------------------------------
+    // Kept means kept only: the single is_kept flag decides membership.
     if (criteria.kept && criteria.kept !== 'all') {
       if (criteria.kept === 'yes') {
         result = result.filter(
-          (a) => _isKept(a.KeptPhys) || _isKept(a.KeptDig) || _isKept(a.KeptCol)
+          (a) => _isKept(a.is_kept)
         );
       } else if (criteria.kept === 'no') {
         result = result.filter(
-          (a) => !_isKept(a.KeptPhys) && !_isKept(a.KeptDig) && !_isKept(a.KeptCol)
+          (a) => !_isKept(a.is_kept)
         );
       }
     }

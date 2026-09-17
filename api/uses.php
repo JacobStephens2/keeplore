@@ -92,6 +92,8 @@
       break;
 
     case 'POST':
+      // Agent keys permit reads plus the kept toggle only.
+      deny_agent_key_writes($authentication_response);
       // Record a new use
       $requestBody = json_decode(file_get_contents('php://input'));
 
@@ -186,6 +188,8 @@
       break;
 
     case 'DELETE':
+      // Agent keys permit reads plus the kept toggle only.
+      deny_agent_key_writes($authentication_response);
       // Delete a use record by ID, scoped to authenticated user
       if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
         http_response_code(400);

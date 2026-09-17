@@ -32,8 +32,8 @@ $stmt = mysqli_prepare($db, "SELECT
     LEFT JOIN responses ON games.id = responses.Title
     LEFT JOIN uses ON games.id = uses.artifact_id
     LEFT JOIN types ON games.type_id = types.id
-  GROUP BY games.id, games.Title, games.Acq, games.interaction_frequency_days, types.objectType, games.KeptCol, games.user_id, games.to_get_rid_of, games.snoozed_until
-  HAVING games.user_id = ? AND games.KeptCol = 1 AND (games.to_get_rid_of = 0 OR games.to_get_rid_of IS NULL)
+  GROUP BY games.id, games.Title, games.Acq, games.interaction_frequency_days, types.objectType, games.is_kept, games.user_id, games.to_get_rid_of, games.snoozed_until
+  HAVING games.user_id = ? AND games.is_kept = 1 AND (games.to_get_rid_of = 0 OR games.to_get_rid_of IS NULL)
     AND (games.snoozed_until IS NULL OR games.snoozed_until <= CURDATE())
   ORDER BY MostRecentUseOrResponse ASC");
 mysqli_stmt_bind_param($stmt, "i", $user_id);

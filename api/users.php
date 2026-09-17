@@ -10,6 +10,9 @@
     echo json_encode($authentication_response);
     exit;
   }
+  // User enumeration is outside the agent read scope (collection, uses,
+  // proposals, plus the kept toggle).
+  deny_agent_key_writes($authentication_response);
   $response->authentication_response = $authentication_response;
 
   $requestBody = json_decode(

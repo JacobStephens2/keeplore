@@ -24,8 +24,8 @@ The primary artifacts table. Despite its name, it stores all artifact types (boa
 | `type_id` | INT | YES | FK to `types.id` -- the normalized type reference |
 | `user_id` | INT | NO | FK to `users.id` -- the owning user |
 | `Acq` | DATE | YES | Acquisition / tracking-start date |
-| `KeptCol` | TINYINT(1) | YES | Whether the artifact is kept in the primary collection (1 = yes, 0 = no) |
-| `InSecondaryCollection` | VARCHAR(10) | YES | Whether it is in a secondary collection (`'yes'` / NULL) |
+| `is_kept` | TINYINT(1) | YES | Whether the artifact is kept in the primary collection (1 = yes, 0 = no). Kept means kept only |
+| `is_in_secondary_collection` | TINYINT(1) | NO | Whether it is in a secondary collection (1 = yes, 0 = no, default 0) |
 | `Candidate` | VARCHAR(255) | YES | Candidate status or label |
 | `CandidateGroupDate` | DATE | YES | Date associated with candidate grouping |
 | `SS` | VARCHAR(255) | YES | Sweet spot value(s) -- comma-separated player counts |
@@ -44,8 +44,8 @@ The primary artifacts table. Despite its name, it stores all artifact types (boa
 | `Access` | VARCHAR(100) | YES | Access level or platform |
 | `OrigPlat` | VARCHAR(100) | YES | Original platform |
 | `System` | VARCHAR(100) | YES | System or platform |
-| `KeptDig` | TINYINT(1) | YES | Kept in digital collection |
-| `KeptPhys` | TINYINT(1) | YES | Kept in physical collection |
+| `is_digital` | TINYINT(1) | YES | Pure format flag: the item has a digital form. Independent of kept |
+| `is_physical` | TINYINT(1) | YES | Pure format flag: the item has a physical form. Independent of kept. An item can be both physical and digital |
 | `Notes` | TEXT | YES | Free-form notes |
 | `interaction_frequency_days` | DECIMAL/FLOAT | YES | Per-artifact override for the interaction frequency interval (in days) |
 | `to_get_rid_of` | TINYINT(1) | NO | Whether the user has marked this artifact to get rid of (1 = yes, 0 = no, default 0). Excludes from interact-by list |
@@ -296,6 +296,26 @@ Legacy usage tracking table for `objects`. Superseded by `uses` and `responses`.
 **Foreign keys:**
 - `ObjectName` -> `objects.ID`
 - `user_id` -> `users.id`
+
+---
+
+### `agent_api_keys`
+
+Per-agent per-user keys for remote agent HTTP access (spec #10, ADR 0002).
+Only the SHA-256 hash is stored; the plaintext secret is shown once at
+creation. A key scopes its holder to one user's reads plus the kept toggle.
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | INT, AUTO_INCREMENT | NO | Primary key |
+| `user_id` | INT | NO | Owning user (application-level scoping, no FK) |
+| `agent_name` | VARCHAR(100) | NO | Human label for the key |
+| `key_hash` | VARCHAR(255) | NO | SHA-256 hex of the secret (unique) |
+| `created_at` | DATETIME | NO | Creation timestamp (defaults to `CURRENT_TIMESTAMP`) |
+| `last_used_at` | DATETIME | YES | Last successful use |
+| `revoked_at` | DATETIME | YES | Set on revocation; revoked keys are rejected |
+
+**Primary key:** `id`
 
 ---
 

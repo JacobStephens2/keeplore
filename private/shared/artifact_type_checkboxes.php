@@ -3,6 +3,12 @@
   require_once 'artifact_type_array.php';
   global $typesArray;
   global $type;
+  // Pages that tidy their filter panel (Items, #15) set
+  // $type_filter_shortcuts = 'trimmed' before including this partial to
+  // keep only Select All / Deselect All plus one game-type shortcut. Every
+  // other consumer keeps the full shortcut set.
+  global $type_filter_shortcuts;
+  $trimmed_shortcuts = isset($type_filter_shortcuts) && $type_filter_shortcuts === 'trimmed';
 
 ?>
 
@@ -39,9 +45,11 @@
   <button id="selectAll">Select All</button>
   <button id="deselectAll">Deselect All</button>
   <button id="selectGames">Select Games</button>
+  <?php if (!$trimmed_shortcuts) { ?>
   <button id="selectAnalogGames">Select Analog Games</button>
   <button id="selectOnlineGames">Select Online Games</button>
   <button id="selectOutdoorGames">Select Outdoor Games</button>
+  <?php } ?>
 </div>
 
 <span id="typeCheckboxes" style="display: flex; flex-wrap: wrap">
@@ -109,6 +117,7 @@
     document.querySelector('#typeCheckboxes #vr-game').checked = true;
   })
   
+  <?php if (!$trimmed_shortcuts) { ?>
   document.querySelector('#selectAnalogGames').addEventListener('click', function(event) {
     event.preventDefault();
     document.querySelectorAll('#typeCheckboxes input').forEach(element => element.checked = false);
@@ -138,5 +147,6 @@
     document.querySelector('#typeCheckboxes #toy').checked = true;
     document.querySelector('#typeCheckboxes #equipment').checked = true;
   })
+  <?php } ?>
 </script>
 

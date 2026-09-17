@@ -104,18 +104,6 @@ use PHPMailer\PHPMailer\Exception;
     return $result ? $snooze_until : false;
   }
 
-  function set_artifact_tracked($artifact_id, $value) {
-    global $db;
-    $user_id = (int) $_SESSION['user_id'];
-    $artifact_id = (int) $artifact_id;
-    $value = (int) $value;
-    $stmt = mysqli_prepare($db, "UPDATE games SET KeptCol = ? WHERE id = ? AND user_id = ? LIMIT 1");
-    mysqli_stmt_bind_param($stmt, "iii", $value, $artifact_id, $user_id);
-    $result = mysqli_stmt_execute($stmt);
-    mysqli_stmt_close($stmt);
-    return $result;
-  }
-
   function find_artifacts_to_get_rid_of() {
     global $db;
     $user_id = (int) $_SESSION['user_id'];
@@ -145,7 +133,7 @@ use PHPMailer\PHPMailer\Exception;
     global $db;
 
     $user_id = (int) $_SESSION['user_id'];
-    $stmt = mysqli_prepare($db, "SELECT games.id, games.Title, games.KeptCol, games.Acq FROM games WHERE user_id = ? ORDER BY games.Acq DESC");
+    $stmt = mysqli_prepare($db, "SELECT games.id, games.Title, games.is_kept, games.Acq FROM games WHERE user_id = ? ORDER BY games.Acq DESC");
     mysqli_stmt_bind_param($stmt, "i", $user_id);
     mysqli_stmt_execute($stmt);
     $result = mysqli_stmt_get_result($stmt);
@@ -157,7 +145,7 @@ use PHPMailer\PHPMailer\Exception;
 
     $sql = "SELECT * FROM games ";
     $sql .= "WHERE type = 'board-game' ";
-    $sql .= "ORDER BY KeptCol DESC, Acq DESC";
+    $sql .= "ORDER BY is_kept DESC, Acq DESC";
     $result = mysqli_query($db, $sql);
     confirm_result_set($result);
     return $result;
@@ -182,7 +170,8 @@ use PHPMailer\PHPMailer\Exception;
         games.UsedRecUserCt,
         games.ss,
         games.id,
-        games.InSecondaryCollection,
+        games.is_kept,
+        games.is_in_secondary_collection,
         types.objectType AS type,
         games.user_id,
         games.type_id,
@@ -199,7 +188,7 @@ use PHPMailer\PHPMailer\Exception;
             DATE_ADD(MAX(responses.PlayDate), INTERVAL " . $interval_double . " DAY)
           END UseBy,
         games.Acq,
-        games.KeptCol
+        games.is_kept
     FROM
         games
     LEFT JOIN responses ON games.id = responses.Title
@@ -208,7 +197,7 @@ use PHPMailer\PHPMailer\Exception;
     GROUP BY
         games.Acq,
         games.Title,
-        games.KeptCol,
+        games.is_kept,
         games.mnp,
         games.mxp,
         games.ss,
@@ -259,12 +248,14 @@ use PHPMailer\PHPMailer\Exception;
           }
         }
 
+        // Kept filter means kept only: the single kept predicate on the new
+        // column. Format flags never affect membership.
         if ( $kept == 'yes') {
-          $sql .= " AND games.KeptCol = 1 ";
+          $sql .= " AND games.is_kept = 1 ";
         } elseif ( $kept == 'no' ) {
-          $sql .= " AND games.KeptCol = 0 ";
+          $sql .= " AND games.is_kept = 0 ";
         } elseif ( $kept == 'secondary_only' ) {
-          $sql .= " AND games.InSecondaryCollection = 'yes' ";
+          $sql .= " AND games.is_in_secondary_collection = 1 ";
         }
 
     $sql .= "
@@ -272,7 +263,7 @@ use PHPMailer\PHPMailer\Exception;
         UseBy DESC,
         MaxPlay DESC,
         Acq DESC,
-        games.KeptCol DESC,
+        games.is_kept DESC,
         id ASC
     ";
     $stmt = mysqli_prepare($db, $sql);
@@ -356,23 +347,31 @@ use PHPMailer\PHPMailer\Exception;
 
     $to_get_rid_of = isset($artifact['to_get_rid_of']) ? (int) $artifact['to_get_rid_of'] : 0;
 
+    $kept = normalize_kept_value($artifact['is_kept']);
+    $secondary = normalize_secondary_membership($artifact['is_in_secondary_collection'] ?? null);
+    $digital = normalize_format_flag($artifact['is_digital'] ?? null);
+    $physical = normalize_format_flag($artifact['is_physical'] ?? null);
+
     $stmt = mysqli_prepare($db,
       "UPDATE games SET
-        Title=?, KeptCol=?, Acq=?, Candidate=?, UsedRecUserCt=?,
+        Title=?, is_kept=?, Acq=?, Candidate=?, UsedRecUserCt=?,
         type_id=?, type=?, SS=?, Notes=?, CandidateGroupDate=?,
-        MnT=?, MxT=?, Age=?, InSecondaryCollection=?, MnP=?, MxP=?,
-        interaction_frequency_days=?, to_get_rid_of=?
+        MnT=?, MxT=?, Age=?, is_in_secondary_collection=?, MnP=?, MxP=?,
+        interaction_frequency_days=?, to_get_rid_of=?,
+        is_digital=?, is_physical=?
       WHERE id=?
       LIMIT 1"
     );
-    mysqli_stmt_bind_param($stmt, "sssssisssssssssssii",
-      $artifact['Title'], $artifact['KeptCol'], $artifact['Acq'],
+    mysqli_stmt_bind_param($stmt, "sisssisssssssisssissi",
+      $artifact['Title'], $kept, $artifact['Acq'],
       $artifact['Candidate'], $artifact['UsedRecUserCt'],
       $type_id, $type_name, $artifact['SS'], $artifact['Notes'],
       $artifact['CandidateGroupDate'], $artifact['MnT'], $artifact['MxT'],
-      $artifact['age'], $artifact['InSecondaryCollection'],
+      $artifact['age'], $secondary,
       $artifact['MnP'], $artifact['MxP'], $artifact['interaction_frequency_days'],
       $to_get_rid_of,
+      $digital,
+      $physical,
       $artifact['id']
     );
     $result = mysqli_stmt_execute($stmt);
@@ -398,8 +397,8 @@ use PHPMailer\PHPMailer\Exception;
       $errors[] = "Title must be between 2 and 255 characters.";
     }
 
-    // KeptCol
-    $visible_str = (string) $artifact['KeptCol'];
+    // is_kept
+    $visible_str = (string) ($artifact['is_kept'] ?? '');
     if(!has_inclusion_of($visible_str, ["0","1"])) {
       $errors[] = "Kept must be true or false.";
     }
@@ -468,13 +467,18 @@ use PHPMailer\PHPMailer\Exception;
     $type_id = $artifact['type'];
     $type_name = get_type_name($type_id);
 
+    $kept = normalize_kept_value($artifact['is_kept']);
+    $secondary = normalize_secondary_membership($artifact['is_in_secondary_collection'] ?? null);
+    $digital = normalize_format_flag($artifact['is_digital'] ?? null);
+    $physical = normalize_format_flag($artifact['is_physical'] ?? null);
+
     $sql = "INSERT INTO games (
         Title,
         Notes,
         Acq,
         type_id,
         type,
-        KeptCol,
+        is_kept,
         Candidate,
         CandidateGroupDate,
         UsedRecUserCt,
@@ -484,17 +488,20 @@ use PHPMailer\PHPMailer\Exception;
         MnP,
         MxP,
         user_id,
-        interaction_frequency_days
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        interaction_frequency_days,
+        is_in_secondary_collection,
+        is_digital,
+        is_physical
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ";
     $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'ssssssssssssssss',
+    mysqli_stmt_bind_param($stmt, 'sssssssssssssssssss',
       $artifact['Title'],
       $artifact['Notes'],
       $artifact['Acq'],
       $type_id,
       $type_name,
-      $artifact['KeptCol'],
+      $kept,
       $artifact['Candidate'],
       $artifact['CandidateGroupDate'],
       $artifact['UsedRecUserCt'],
@@ -504,7 +511,10 @@ use PHPMailer\PHPMailer\Exception;
       $artifact['MnP'],
       $artifact['MxP'],
       $_SESSION['user_id'],
-      $artifact['interaction_frequency_days']
+      $artifact['interaction_frequency_days'],
+      $secondary,
+      $digital,
+      $physical
     );
     $result = mysqli_stmt_execute($stmt);
     mysqli_stmt_close($stmt);
@@ -608,10 +618,10 @@ use PHPMailer\PHPMailer\Exception;
         games.user_id,
         games.age,
         games.type_id,
-        games.InSecondaryCollection,
+        games.is_in_secondary_collection,
         recent.MostRecentUse AS MostRecentUseOrResponse,
         games.Acq,
-        games.KeptCol,
+        games.is_kept,
         games.interaction_frequency_days,
         games.to_get_rid_of,
         games.snoozed_until
@@ -635,9 +645,9 @@ use PHPMailer\PHPMailer\Exception;
       }
 
       if ($shelfSort == 'yes') {
-        $sql .= " AND (games.KeptCol = 1 OR games.InSecondaryCollection = 'yes') ";
+        $sql .= " AND (games.is_kept = 1 OR games.is_in_secondary_collection = 1) ";
       } else {
-        $sql .= " AND games.KeptCol = 1 ";
+        $sql .= " AND games.is_kept = 1 ";
       }
 
       if ($sweetSpot !== '') {
@@ -721,14 +731,14 @@ use PHPMailer\PHPMailer\Exception;
       END PlayBy,
       games.Acq,
       MAX(responses.PlayDate) AS MaxPlay,
-      games.KeptCol
+      games.is_kept
     FROM games
       LEFT JOIN responses ON games.id = responses.Title
     GROUP BY games.Acq,
       games.Title,
-      games.KeptCol, games.mnp, games.mxp, games.ss, games.type
+      games.is_kept, games.mnp, games.mxp, games.ss, games.type
 
-    HAVING (games.KeptCol) = 1
+    HAVING (games.is_kept) = 1
     and games.type = 'board-game'
     ORDER BY MostRecentUse DESC, MaxPlay DESC
     LIMIT 1
@@ -757,13 +767,13 @@ use PHPMailer\PHPMailer\Exception;
           END PlayBy,
           MAX(responses.PlayDate) AS MaxPlay,
           games.Acq,
-          games.KeptCol
+          games.is_kept
       FROM
           games
               LEFT JOIN
           responses ON games.id = responses.Title
-      GROUP BY games.Acq , games.Title , games.KeptCol , games.mnp , games.mxp , games.ss , games.type , games.id
-      HAVING games.user_id = 8 AND games.KeptCol = 1
+      GROUP BY games.Acq , games.Title , games.is_kept , games.mnp , games.mxp , games.ss , games.type , games.id
+      HAVING games.user_id = 8 AND games.is_kept = 1
           AND games.ss LIKE '%3%'
           AND games.type IN ('game' , 'board-game',
           'card-game',

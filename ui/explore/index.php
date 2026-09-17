@@ -82,7 +82,7 @@ include(SHARED_PATH . '/header.php');
       <?php while($object = mysqli_fetch_assoc($object_set)) { ?>
         <tr>
           <td><?php echo h($object['Title']); ?></td>
-          <td><?php echo $object['KeptCol'] == 1 ? 'true' : 'false'; ?></td>
+          <td><?php echo artifact_is_kept($object) ? 'true' : 'false'; ?></td>
     	    <td><?php echo h($object['type']); ?></td>
     	    <td><?php echo h($object['mnp']); ?></td>
     	    <td><?php echo h($object['mxp']); ?></td>

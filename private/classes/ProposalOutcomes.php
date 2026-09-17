@@ -119,7 +119,7 @@ final class ProposalOutcomes
         if ($start !== '' && $end !== '' && $start > $end) {
             throw new InvalidArgumentException('The start date must be on or before the end date.');
         }
-        $collectionClause = $includeOtherItems ? '' : " AND (g.KeptCol = 1 OR g.InSecondaryCollection = 'yes')";
+        $collectionClause = $includeOtherItems ? '' : " AND (g.is_kept = 1 OR g.is_in_secondary_collection = 1)";
         $params[] = $this->userId;
         $types .= 'i';
         $rows = $this->rows(

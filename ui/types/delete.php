@@ -80,14 +80,14 @@ include(SHARED_PATH . '/header.php');
               "SELECT COUNT(id) FROM games
               WHERE type = '$type'
               AND id = '$user_id'
-              AND KeptCol = '1'
+              AND is_kept = '1'
             ");
             echo "You keep $count_kept_with_this_type items with this type. ";
             $count_not_kept_with_this_type = singleValueQuery(
               "SELECT COUNT(id) FROM games
               WHERE type = '$type'
               AND id = '$user_id'
-              AND KeptCol = '0'
+              AND is_kept = '0'
             ");
             echo "You have created $count_not_kept_with_this_type items with this type that you do not keep. ";
           ?>
