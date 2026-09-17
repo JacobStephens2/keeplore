@@ -22,7 +22,12 @@
     }
     if (isset($_GET['type'])) {
       $type = array();
-      $type[] = db_escape($db, $_GET['type']);
+      foreach ((array) $_GET['type'] as $selected_type) {
+        $selected_type = db_escape($db, $selected_type);
+        if ($selected_type !== '' && $selected_type !== null) {
+          $type[] = $selected_type;
+        }
+      }
 
     } else {
       include(SHARED_PATH . '/artifact_type_array.php'); 
@@ -32,6 +37,20 @@
     
 
   }
+
+  // Surfaced visibility switch shares the panel's kept value. Accept the
+  // short switch values ('all', 'yes', 'no') alongside the legacy panel
+  // values and fall back to showing everything.
+  $kept_aliases = [
+    'all' => 'allkeptandnot',
+    'allkeptandnot' => 'allkeptandnot',
+    'yes' => 'yes',
+    'kept' => 'yes',
+    'no' => 'no',
+    'not' => 'no',
+    'secondary_only' => 'secondary_only',
+  ];
+  $kept = $kept_aliases[$kept] ?? 'allkeptandnot';
   $default_use_interval = singleValueQuery("SELECT default_use_interval
     FROM users
     WHERE id = " . $_SESSION['user_id'] . "
@@ -64,6 +83,65 @@
         <button type="button" id="display_filters">Show filters</button>
       </div>
     </header>
+
+    <?php
+      // Surfaced kept-visibility switch: mirrors the panel's kept value,
+      // applies immediately via GET, and preserves the type and sweet-spot
+      // selections (plus attribute visibility and interval).
+      $switch_base = [];
+      $switch_type_ids = [];
+      if (isset($type) && is_array($type)) {
+        foreach (array_values($type) as $type_id) {
+          if ($type_id !== '' && $type_id !== null) {
+            $switch_type_ids[] = $type_id;
+          }
+        }
+      }
+      if (!empty($switch_type_ids)) {
+        $switch_base['type'] = array_combine($switch_type_ids, $switch_type_ids);
+      }
+      if ($sweetSpotFilter !== '') {
+        $switch_base['sweetSpotFilter'] = $sweetSpotFilter;
+      }
+      if ($showAttributes === 'yes') {
+        $switch_base['showAttributes'] = 'yes';
+      }
+      if (isset($interval) && (string) $interval !== (string) $default_use_interval) {
+        $switch_base['interval'] = $interval;
+      }
+      $kept_switch_options = [
+        'all' => 'All',
+        'yes' => 'Kept',
+        'no' => 'Not kept',
+      ];
+      $kept_switch_active = $kept === 'secondary_only' ? 'all' : $kept;
+    ?>
+    <nav class="kept-switch" aria-label="Kept visibility">
+      <style>
+        .kept-switch {
+          display: flex;
+          gap: 0.5rem;
+          margin: 1rem 0;
+        }
+        .kept-switch a {
+          padding: 0.4rem 1rem;
+          border: 1px solid #888;
+          border-radius: 999px;
+          text-decoration: none;
+        }
+        .kept-switch a[aria-current="true"] {
+          font-weight: bold;
+          border-width: 2px;
+        }
+      </style>
+      <?php foreach ($kept_switch_options as $switch_value => $switch_label) { ?>
+        <a href="<?php echo h(url_for('/artifacts/index.php?' . http_build_query(array_merge($switch_base, ['kept' => $switch_value])))); ?>"
+          <?php if ($kept_switch_active === $switch_value) { echo 'aria-current="true"'; } ?>
+          >
+          <?php echo h($switch_label); ?>
+        </a>
+      <?php } ?>
+    </nav>
 
     <form class="filter-panel" action="<?php echo url_for('/artifacts/index.php'); ?>"
       method="post"

@@ -177,6 +177,8 @@ use PHPMailer\PHPMailer\Exception;
         games.UsedRecUserCt,
         games.ss,
         games.id,
+        games.is_kept,
+        games.is_in_secondary_collection,
         games.InSecondaryCollection,
         types.objectType AS type,
         games.user_id,
@@ -194,6 +196,7 @@ use PHPMailer\PHPMailer\Exception;
             DATE_ADD(MAX(responses.PlayDate), INTERVAL " . $interval_double . " DAY)
           END UseBy,
         games.Acq,
+        games.is_kept,
         games.KeptCol
     FROM
         games
@@ -203,6 +206,7 @@ use PHPMailer\PHPMailer\Exception;
     GROUP BY
         games.Acq,
         games.Title,
+        games.is_kept,
         games.KeptCol,
         games.mnp,
         games.mxp,
@@ -254,12 +258,14 @@ use PHPMailer\PHPMailer\Exception;
           }
         }
 
+        // Kept filter means kept only: the single kept predicate on the new
+        // column. Format flags never affect membership.
         if ( $kept == 'yes') {
-          $sql .= " AND games.KeptCol = 1 ";
+          $sql .= " AND games.is_kept = 1 ";
         } elseif ( $kept == 'no' ) {
-          $sql .= " AND games.KeptCol = 0 ";
+          $sql .= " AND games.is_kept = 0 ";
         } elseif ( $kept == 'secondary_only' ) {
-          $sql .= " AND games.InSecondaryCollection = 'yes' ";
+          $sql .= " AND games.is_in_secondary_collection = 1 ";
         }
 
     $sql .= "
@@ -267,7 +273,7 @@ use PHPMailer\PHPMailer\Exception;
         UseBy DESC,
         MaxPlay DESC,
         Acq DESC,
-        games.KeptCol DESC,
+        games.is_kept DESC,
         id ASC
     ";
     $stmt = mysqli_prepare($db, $sql);
