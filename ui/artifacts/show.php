@@ -24,7 +24,7 @@
   
   <dl>
     <dt>Tracked?</dt>
-    <dd><?php echo $object['KeptCol'] == '1' ? 'true' : 'false'; ?></dd>
+    <dd><?php echo artifact_is_kept($object) ? 'true' : 'false'; ?></dd>
   </dl>
   
   <dl>

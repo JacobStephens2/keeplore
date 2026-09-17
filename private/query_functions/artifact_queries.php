@@ -140,7 +140,7 @@ use PHPMailer\PHPMailer\Exception;
     global $db;
 
     $user_id = (int) $_SESSION['user_id'];
-    $stmt = mysqli_prepare($db, "SELECT games.id, games.Title, games.KeptCol, games.Acq FROM games WHERE user_id = ? ORDER BY games.Acq DESC");
+    $stmt = mysqli_prepare($db, "SELECT games.id, games.Title, games.is_kept, games.Acq FROM games WHERE user_id = ? ORDER BY games.Acq DESC");
     mysqli_stmt_bind_param($stmt, "i", $user_id);
     mysqli_stmt_execute($stmt);
     $result = mysqli_stmt_get_result($stmt);
@@ -152,7 +152,7 @@ use PHPMailer\PHPMailer\Exception;
 
     $sql = "SELECT * FROM games ";
     $sql .= "WHERE type = 'board-game' ";
-    $sql .= "ORDER BY KeptCol DESC, Acq DESC";
+    $sql .= "ORDER BY is_kept DESC, Acq DESC";
     $result = mysqli_query($db, $sql);
     confirm_result_set($result);
     return $result;
@@ -644,10 +644,10 @@ use PHPMailer\PHPMailer\Exception;
         games.user_id,
         games.age,
         games.type_id,
-        games.InSecondaryCollection,
+        games.is_in_secondary_collection,
         recent.MostRecentUse AS MostRecentUseOrResponse,
         games.Acq,
-        games.KeptCol,
+        games.is_kept,
         games.interaction_frequency_days,
         games.to_get_rid_of,
         games.snoozed_until
@@ -671,9 +671,9 @@ use PHPMailer\PHPMailer\Exception;
       }
 
       if ($shelfSort == 'yes') {
-        $sql .= " AND (games.KeptCol = 1 OR games.InSecondaryCollection = 'yes') ";
+        $sql .= " AND (games.is_kept = 1 OR games.is_in_secondary_collection = 1) ";
       } else {
-        $sql .= " AND games.KeptCol = 1 ";
+        $sql .= " AND games.is_kept = 1 ";
       }
 
       if ($sweetSpot !== '') {
@@ -757,14 +757,14 @@ use PHPMailer\PHPMailer\Exception;
       END PlayBy,
       games.Acq,
       MAX(responses.PlayDate) AS MaxPlay,
-      games.KeptCol
+      games.is_kept
     FROM games
       LEFT JOIN responses ON games.id = responses.Title
     GROUP BY games.Acq,
       games.Title,
-      games.KeptCol, games.mnp, games.mxp, games.ss, games.type
+      games.is_kept, games.mnp, games.mxp, games.ss, games.type
 
-    HAVING (games.KeptCol) = 1
+    HAVING (games.is_kept) = 1
     and games.type = 'board-game'
     ORDER BY MostRecentUse DESC, MaxPlay DESC
     LIMIT 1
@@ -793,13 +793,13 @@ use PHPMailer\PHPMailer\Exception;
           END PlayBy,
           MAX(responses.PlayDate) AS MaxPlay,
           games.Acq,
-          games.KeptCol
+          games.is_kept
       FROM
           games
               LEFT JOIN
           responses ON games.id = responses.Title
-      GROUP BY games.Acq , games.Title , games.KeptCol , games.mnp , games.mxp , games.ss , games.type , games.id
-      HAVING games.user_id = 8 AND games.KeptCol = 1
+      GROUP BY games.Acq , games.Title , games.is_kept , games.mnp , games.mxp , games.ss , games.type , games.id
+      HAVING games.user_id = 8 AND games.is_kept = 1
           AND games.ss LIKE '%3%'
           AND games.type IN ('game' , 'board-game',
           'card-game',

@@ -12,6 +12,10 @@ CREATE TABLE games (
     ss VARCHAR(255),
     KeptCol TINYINT DEFAULT 1,
     InSecondaryCollection VARCHAR(10),
+    is_kept TINYINT DEFAULT 1,
+    is_in_secondary_collection TINYINT DEFAULT 0,
+    is_digital TINYINT DEFAULT NULL,
+    is_physical TINYINT DEFAULT NULL,
     to_get_rid_of TINYINT DEFAULT 0,
     Acq DATE DEFAULT '2026-01-01',
     interaction_frequency_days INT DEFAULT 90
@@ -38,11 +42,11 @@ CREATE TABLE responses (
 ) ENGINE=InnoDB;
 INSERT INTO users (id) VALUES (1), (2);
 INSERT INTO types VALUES (1, 'board-game'), (2, 'film');
-INSERT INTO games (id, user_id, Title, type_id, KeptCol, InSecondaryCollection, to_get_rid_of) VALUES
-    (10, 1, 'Catan', 1, 1, NULL, 0),
-    (11, 1, 'Azul', 1, 1, NULL, 1),
-    (12, 1, 'Arrival', 2, 0, 'yes', 0),
-    (13, 1, 'Former possession', 1, 0, NULL, 0),
-    (20, 2, 'Private item', 1, 1, NULL, 0);
+INSERT INTO games (id, user_id, Title, type_id, KeptCol, InSecondaryCollection, is_kept, is_in_secondary_collection, is_digital, is_physical, to_get_rid_of) VALUES
+    (10, 1, 'Catan', 1, 1, NULL, 1, 0, NULL, NULL, 0),
+    (11, 1, 'Azul', 1, 1, NULL, 1, 0, NULL, NULL, 1),
+    (12, 1, 'Arrival', 2, 0, 'yes', 0, 1, NULL, NULL, 0),
+    (13, 1, 'Former possession', 1, 0, NULL, 0, 0, NULL, NULL, 0),
+    (20, 2, 'Private item', 1, 1, NULL, 1, 0, NULL, NULL, 0);
 INSERT INTO players VALUES (100, 1, 'Sam', 'Lee'), (101, 1, 'Jo', 'Smith'), (200, 2, 'Other', 'Person');
 INSERT INTO uses (artifact_id, user_id, use_date) VALUES (10, 1, '2026-02-01');

@@ -26,3 +26,6 @@ UPDATE games
 UPDATE games SET is_digital = KeptDig WHERE is_digital IS NULL;
 
 UPDATE games SET is_physical = KeptPhys WHERE is_physical IS NULL;
+
+-- The kept filters now read is_kept; carry over the use_by index shape.
+CREATE INDEX idx_games_user_is_kept ON games (user_id, is_kept, to_get_rid_of);

@@ -23,7 +23,7 @@ function choose_artifacts_for_group($range, $typeArray, $kept = 0) {
   games.MxT,
   games.Age,
   games.type,
-  games.KeptCol,
+  games.is_kept,
   playgroup.FullName,
   players.id AS PlayerID,
   players.FirstName,
@@ -81,7 +81,7 @@ function choose_artifacts_for_group($range, $typeArray, $kept = 0) {
   }
 
   if ($kept == 1) {
-    $sql .= " AND keptcol = 1 ";
+    $sql .= " AND is_kept = 1 ";
   }
   $sql .= "ORDER BY
     players.G,

@@ -106,7 +106,7 @@
 
       <label for="KeptCol" >Tracked? (Checked means yes)</label>
       <input type="hidden" name="KeptCol" value="0" />
-      <input type="checkbox" name="KeptCol" id="KeptCol" value="1"<?php if($artifact['KeptCol'] == "1") { echo " checked"; } ?> />
+      <input type="checkbox" name="KeptCol" id="KeptCol" value="1"<?php if(artifact_is_kept($artifact)) { echo " checked"; } ?> />
 
       <label for="type_search">Type</label>
       <?php
@@ -217,7 +217,7 @@
 
       <label for="InSecondaryCollection" >Kept in Secondary Collection? (Checked means yes)</label>
       <input type="checkbox" name="InSecondaryCollection" id="InSecondaryCollection" value="yes" 
-        <?php if($artifact['InSecondaryCollection'] == "yes") { echo " checked"; } ?>
+        <?php if(artifact_is_in_secondary_collection($artifact)) { echo " checked"; } ?>
       />
       
       <?php 

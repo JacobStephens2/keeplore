@@ -37,7 +37,7 @@
   $uses_7 = (int) (fetch_one("SELECT COUNT(*) AS c FROM uses WHERE user_id = ? AND use_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)", $user_id)['c'] ?? 0);
   $uses_30 = (int) (fetch_one("SELECT COUNT(*) AS c FROM uses WHERE user_id = ? AND use_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)", $user_id)['c'] ?? 0);
   $uses_90 = (int) (fetch_one("SELECT COUNT(*) AS c FROM uses WHERE user_id = ? AND use_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)", $user_id)['c'] ?? 0);
-  $tracked = (int) (fetch_one("SELECT COUNT(*) AS c FROM games WHERE user_id = ? AND KeptCol = 1 AND (to_get_rid_of = 0 OR to_get_rid_of IS NULL)", $user_id)['c'] ?? 0);
+  $tracked = (int) (fetch_one("SELECT COUNT(*) AS c FROM games WHERE user_id = ? AND is_kept = 1 AND (to_get_rid_of = 0 OR to_get_rid_of IS NULL)", $user_id)['c'] ?? 0);
   $distinct_used = (int) (fetch_one("SELECT COUNT(DISTINCT artifact_id) AS c FROM uses WHERE user_id = ?", $user_id)['c'] ?? 0);
   $first_use_row = fetch_one("SELECT MIN(use_date) AS d FROM uses WHERE user_id = ?", $user_id);
   $first_use = $first_use_row['d'] ?? null;
@@ -144,7 +144,7 @@
         games.Acq
      FROM games
      WHERE games.user_id = ?
-       AND games.KeptCol = 1
+       AND games.is_kept = 1
        AND (games.to_get_rid_of = 0 OR games.to_get_rid_of IS NULL)
      ORDER BY COALESCE(
        (SELECT MAX(uses.use_date) FROM uses WHERE uses.artifact_id = games.id AND uses.user_id = games.user_id),

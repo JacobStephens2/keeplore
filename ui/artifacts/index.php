@@ -314,7 +314,7 @@
                 }
                 $use_by = date("Y-m-d", strtotime("$starting_date + $conditional_interval days"));
                 
-                if ($use_by < date('Y-m-d') && $artifact['KeptCol'] == 1) {
+                if ($use_by < date('Y-m-d') && artifact_is_kept($artifact)) {
                   echo " style='color:red;' ";
                 }; 
               ?>

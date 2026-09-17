@@ -55,7 +55,7 @@
               FROM games
               WHERE type_id = '$type_id'
               AND user_id = '$user_id'
-              AND KeptCol = '1'
+              AND is_kept = '1'
             ";
             $artifacts_kept_of_this_type = singleValueQuery($query);
 
@@ -64,7 +64,7 @@
               FROM games
               WHERE type_id = '$type_id'
               AND user_id = '$user_id'
-              AND KeptCol = '0'
+              AND is_kept = '0'
             ");
             ?>
             
