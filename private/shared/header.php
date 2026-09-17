@@ -33,13 +33,37 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="<?php echo h($keeplore_og_image); ?>">
 
+    <link rel="icon" type="image/svg+xml" href="<?php echo url_for('/assets/logo.svg'); ?>?v=4">
     <link rel="icon" type="image/png" sizes="32x32" href="<?php echo url_for('/assets/favicon-32.png'); ?>?v=4">
     <link rel="icon" type="image/png" sizes="192x192" href="<?php echo url_for('/assets/icon-192x192.png'); ?>?v=4">
     <link rel="shortcut icon" type="image/x-icon" href="<?php echo url_for('/favicon.ico'); ?>?v=4">
     <link rel="manifest" href="<?php echo url_for('manifest.json') ?>">
     <link rel="apple-touch-icon" href="<?php echo url_for('/assets/icon-192x192.png'); ?>?v=4">
 
-    <link rel="stylesheet" media="all" href="../../style.css?v=40" />
+    <script>
+      // Display mode (issue #7): set data-theme="light|dark" before first
+      // paint so the correct tokens apply with no flash. Preference lives in
+      // localStorage `keeplore-theme`; `system` (default) follows the OS.
+      // The #theme-switcher select (values from theme_options()) is the
+      // source of truth for the vocabulary; ui/shared/js/theme.js wires it.
+      (function() {
+        var KEY = 'keeplore-theme';
+        var stored = null;
+        try { stored = window.localStorage.getItem(KEY); } catch (e) { stored = null; }
+        var pref = (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'system';
+        var effective = pref;
+        if (pref === 'system') {
+          try {
+            effective = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+          } catch (e) { effective = 'light'; }
+        }
+        document.documentElement.setAttribute('data-theme', effective);
+        document.documentElement.setAttribute('data-theme-pref', pref);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) { meta.setAttribute('content', effective === 'dark' ? '#0c1222' : '#30395c'); }
+      })();
+    </script>
+    <link rel="stylesheet" media="all" href="../../style.css?v=41" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -81,6 +105,14 @@
             <?php
           }
           ?>
+          <label class="theme-switcher">
+            <span class="sr-only">Display mode</span>
+            <select id="theme-switcher" data-default="<?php echo h(theme_default()); ?>" aria-label="Display mode">
+              <?php foreach (theme_options() as $theme_value => $theme_label) { ?>
+                <option value="<?php echo h($theme_value); ?>"><?php echo h($theme_label); ?></option>
+              <?php } ?>
+            </select>
+          </label>
           <button class="burger-btn" aria-label="Toggle menu" aria-expanded="false">
             <span class="burger-icon"></span>
           </button>

@@ -14,6 +14,7 @@
       }
     </script>
     <script src="/native-notifications.js?v=2" defer></script>
+    <script src="/shared/js/theme.js?v=1" defer></script>
   </body>
 </html>
 

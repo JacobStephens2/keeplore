@@ -63,6 +63,25 @@ function is_get_request() {
   return $_SERVER['REQUEST_METHOD'] == 'GET';
 }
 
+// Display-mode preference (system / light / dark).
+// The stored value lives in the browser (localStorage `keeplore-theme`);
+// This module owns the value vocabulary: header.php renders it into the
+// #theme-switcher select, and theme.js reads the allowed values back out of
+// that DOM (the cross-language seam), so the list exists in exactly one place.
+function theme_default() {
+  return 'system';
+}
+
+function theme_options() {
+  return ['system' => 'System', 'light' => 'Light', 'dark' => 'Dark'];
+}
+
+function theme_sanitize($value) {
+  return (is_string($value) && array_key_exists($value, theme_options()))
+    ? $value
+    : theme_default();
+}
+
 function display_errors($errors=array()) {
   $output = '';
   if(!empty($errors)) {

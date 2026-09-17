@@ -15,3 +15,6 @@
 .proposal-table-wrap caption { text-align: left; margin-bottom: .75rem; }
 .proposal-note { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 160px; max-width: 400px; }
 #proposal-history { margin-top: 2rem; scroll-margin-top: 5rem; }
+
+/* Dark display mode: keep the fieldset edge visible without a hard line. */
+html[data-theme="dark"] .proposal-form fieldset { border-color: rgba(148, 163, 184, 0.38); }
