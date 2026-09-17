@@ -104,16 +104,11 @@ use PHPMailer\PHPMailer\Exception;
     return $result ? $snooze_until : false;
   }
 
+  // Legacy alias kept for the overlap release: routes through the single
+  // kept seam so the write lands in both the new and legacy columns.
+  // Removed by the Contract ticket (#17).
   function set_artifact_tracked($artifact_id, $value) {
-    global $db;
-    $user_id = (int) $_SESSION['user_id'];
-    $artifact_id = (int) $artifact_id;
-    $value = (int) $value;
-    $stmt = mysqli_prepare($db, "UPDATE games SET KeptCol = ? WHERE id = ? AND user_id = ? LIMIT 1");
-    mysqli_stmt_bind_param($stmt, "iii", $value, $artifact_id, $user_id);
-    $result = mysqli_stmt_execute($stmt);
-    mysqli_stmt_close($stmt);
-    return $result;
+    return set_artifact_kept($artifact_id, $value);
   }
 
   function find_artifacts_to_get_rid_of() {
@@ -346,6 +341,7 @@ use PHPMailer\PHPMailer\Exception;
   function update_artifact($artifact) {
     global $db;
 
+    $artifact = fill_legacy_kept_keys($artifact);
     $errors = validate_artifact($artifact);
     if(!empty($errors)) {
       return $errors;
@@ -356,23 +352,33 @@ use PHPMailer\PHPMailer\Exception;
 
     $to_get_rid_of = isset($artifact['to_get_rid_of']) ? (int) $artifact['to_get_rid_of'] : 0;
 
+    // Overlap release dual-write: the new self-documenting columns carry the
+    // same state as the legacy ones. Removed by the Contract ticket (#17).
+    $kept_new = normalize_kept_value($artifact['KeptCol']);
+    $secondary_new = normalize_secondary_membership($artifact['InSecondaryCollection'] ?? null);
+    $digital_new = normalize_format_flag($artifact['KeptDig'] ?? null);
+    $physical_new = normalize_format_flag($artifact['KeptPhys'] ?? null);
+
     $stmt = mysqli_prepare($db,
       "UPDATE games SET
-        Title=?, KeptCol=?, Acq=?, Candidate=?, UsedRecUserCt=?,
+        Title=?, is_kept=?, KeptCol=?, Acq=?, Candidate=?, UsedRecUserCt=?,
         type_id=?, type=?, SS=?, Notes=?, CandidateGroupDate=?,
-        MnT=?, MxT=?, Age=?, InSecondaryCollection=?, MnP=?, MxP=?,
-        interaction_frequency_days=?, to_get_rid_of=?
+        MnT=?, MxT=?, Age=?, is_in_secondary_collection=?, InSecondaryCollection=?, MnP=?, MxP=?,
+        interaction_frequency_days=?, to_get_rid_of=?,
+        is_digital=?, KeptDig=?, is_physical=?, KeptPhys=?
       WHERE id=?
       LIMIT 1"
     );
-    mysqli_stmt_bind_param($stmt, "sssssisssssssssssii",
-      $artifact['Title'], $artifact['KeptCol'], $artifact['Acq'],
+    mysqli_stmt_bind_param($stmt, "sissssisssssssissssissssi",
+      $artifact['Title'], $kept_new, $artifact['KeptCol'], $artifact['Acq'],
       $artifact['Candidate'], $artifact['UsedRecUserCt'],
       $type_id, $type_name, $artifact['SS'], $artifact['Notes'],
       $artifact['CandidateGroupDate'], $artifact['MnT'], $artifact['MxT'],
-      $artifact['age'], $artifact['InSecondaryCollection'],
+      $artifact['age'], $secondary_new, $artifact['InSecondaryCollection'] ?? null,
       $artifact['MnP'], $artifact['MxP'], $artifact['interaction_frequency_days'],
       $to_get_rid_of,
+      $digital_new, $artifact['KeptDig'] ?? null,
+      $physical_new, $artifact['KeptPhys'] ?? null,
       $artifact['id']
     );
     $result = mysqli_stmt_execute($stmt);
@@ -460,6 +466,7 @@ use PHPMailer\PHPMailer\Exception;
   function insert_artifact($artifact) {
     global $db;
 
+    $artifact = fill_legacy_kept_keys($artifact);
     $errors = validate_artifact($artifact);
     if(!empty($errors)) {
       return $errors;
@@ -468,12 +475,22 @@ use PHPMailer\PHPMailer\Exception;
     $type_id = $artifact['type'];
     $type_name = get_type_name($type_id);
 
+    // Overlap release dual-write: the new self-documenting columns carry the
+    // same state as the legacy ones. Removed by the Contract ticket (#17).
+    $secondary_legacy = $artifact['InSecondaryCollection'] ?? null;
+    $secondary_new = normalize_secondary_membership($secondary_legacy);
+    $digital_legacy = $artifact['KeptDig'] ?? null;
+    $digital_new = normalize_format_flag($digital_legacy);
+    $physical_legacy = $artifact['KeptPhys'] ?? null;
+    $physical_new = normalize_format_flag($physical_legacy);
+
     $sql = "INSERT INTO games (
         Title,
         Notes,
         Acq,
         type_id,
         type,
+        is_kept,
         KeptCol,
         Candidate,
         CandidateGroupDate,
@@ -484,16 +501,23 @@ use PHPMailer\PHPMailer\Exception;
         MnP,
         MxP,
         user_id,
-        interaction_frequency_days
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        interaction_frequency_days,
+        is_in_secondary_collection,
+        InSecondaryCollection,
+        is_digital,
+        KeptDig,
+        is_physical,
+        KeptPhys
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ";
     $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'ssssssssssssssss',
+    mysqli_stmt_bind_param($stmt, 'sssssssssssssssssssssssss',
       $artifact['Title'],
       $artifact['Notes'],
       $artifact['Acq'],
       $type_id,
       $type_name,
+      normalize_kept_value($artifact['KeptCol']),
       $artifact['KeptCol'],
       $artifact['Candidate'],
       $artifact['CandidateGroupDate'],
@@ -504,7 +528,13 @@ use PHPMailer\PHPMailer\Exception;
       $artifact['MnP'],
       $artifact['MxP'],
       $_SESSION['user_id'],
-      $artifact['interaction_frequency_days']
+      $artifact['interaction_frequency_days'],
+      $secondary_new,
+      $secondary_legacy,
+      $digital_new,
+      $digital_legacy,
+      $physical_new,
+      $physical_legacy
     );
     $result = mysqli_stmt_execute($stmt);
     mysqli_stmt_close($stmt);
