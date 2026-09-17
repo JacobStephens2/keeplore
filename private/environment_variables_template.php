@@ -4,6 +4,7 @@ define("DB_SERVER", "");
 define("DB_USER", "");
 define("DB_PASS", "");
 define("DB_NAME", "");
+define("DB_PORT", 3306);
 
 // SMTP Configuration
 define("SMTP_HOST", "");
@@ -32,6 +33,9 @@ define("ARTIFACTS_DOMAIN", "keeplore.app");
 define("DOMAIN", ARTIFACTS_DOMAIN);
 define("API_ORIGIN", "api." . ARTIFACTS_DOMAIN);
 define("REQUEST_ORIGIN", ARTIFACTS_DOMAIN);
+
+define("DEV_NAME", "Jacob Stephens");
+define("DEV_EMAIL", "");
 
 define("SWEET_SPOT_BUTTONS_ON", false);
 

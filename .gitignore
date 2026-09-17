@@ -89,6 +89,7 @@ api/private/vendor
 api/vendor
 ui/uses/publicEnvironmentVaribles.js
 .phpunit.result.cache
+.playwright-mcp/
 
 # Capacitor / Android build artifacts and keystores
 capacitor/node_modules/
