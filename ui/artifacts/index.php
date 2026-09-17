@@ -30,7 +30,7 @@
       }
 
     } else {
-      include(SHARED_PATH . '/artifact_type_array.php'); 
+      require_once(SHARED_PATH . '/artifact_type_array.php');
       global $typesArray;
       $type = $typesArray;
     }
@@ -148,31 +148,7 @@
       style="display: none"
       >
       <?php echo csrf_input(); ?>
-      <label for="sweetSpotFilter">Sweet Spot (SwS)</label>
-      <input type="text" id="sweetSpotFilter" name="sweetSpotFilter"
-        <?php 
-          if (isset($_POST['sweetSpotFilter'])) {
-            echo 'value="' . $_POST['sweetSpotFilter'] . '"';
-          }
-        ?>
-      >
-
-      <label for="showAttributes">Show item attributes</label>
-      <input type="hidden" name="showAttributes" value="no">
-      <input type="checkbox" name="showAttributes" id="showAttributes" value="yes"
-        <?php 
-          if ($showAttributes === 'yes') {
-            echo ' checked ';
-          }
-        ?>
-      >
-
-      <label for="artifactType">Item type</label>
-      <section id="artifactType" class="type-chip-group">
-        <?php require_once SHARED_PATH . '/artifact_type_checkboxes.php'; ?>
-      </section>
-
-      <section id="kept" style="margin-top: 1rem">
+      <section id="kept">
         <style>
           section#kept label,
           section#kept input {
@@ -180,7 +156,7 @@
           }
         </style>
 
-        <div style="margin-top: 1.6rem">
+        <div>
           <label for="allkeptandnot">Show All Items</label>
           <input type="radio" name="kept" value="allkeptandnot" id="allkeptandnot"
           <?php 
@@ -214,7 +190,7 @@
         </div>
         
         <div>
-          <label for="notkept">Show Secondary Collection Only</label>
+          <label for="secondary_only">Show Secondary Collection Only</label>
           <input type="radio" name="kept" value="secondary_only" id="secondary_only"
           <?php 
             if ($kept === 'secondary_only') {
@@ -224,6 +200,51 @@
           >
         </div>
 
+      </section>
+
+      <label for="sweetSpotFilter">Sweet Spot (SwS)</label>
+      <input type="text" id="sweetSpotFilter" name="sweetSpotFilter"
+        <?php 
+          if (isset($_POST['sweetSpotFilter'])) {
+            echo 'value="' . $_POST['sweetSpotFilter'] . '"';
+          }
+        ?>
+      >
+
+      <label for="showAttributes">Show item attributes</label>
+      <input type="hidden" name="showAttributes" value="no">
+      <input type="checkbox" name="showAttributes" id="showAttributes" value="yes"
+        <?php 
+          if ($showAttributes === 'yes') {
+            echo ' checked ';
+          }
+        ?>
+      >
+
+      <?php
+        // The type list stays collapsed unless a type filter is active, i.e.
+        // the current selection differs from the full type set.
+        require_once(SHARED_PATH . '/artifact_type_array.php');
+        global $typesArray;
+        $all_type_ids = array_map('strval', array_values($typesArray ?? []));
+        $current_type_ids = [];
+        if (isset($type) && is_array($type)) {
+          foreach (array_values($type) as $type_id) {
+            if ($type_id !== '' && $type_id !== null) {
+              $current_type_ids[] = (string) $type_id;
+            }
+          }
+        }
+        sort($all_type_ids);
+        sort($current_type_ids);
+        $type_filter_active = !empty($current_type_ids) && $current_type_ids !== $all_type_ids;
+        $type_filter_shortcuts = 'trimmed';
+      ?>
+      <section id="artifactType" class="type-chip-group">
+        <details <?php if ($type_filter_active) { echo 'open'; } ?>>
+          <summary>Item type<?php if ($type_filter_active) { echo ' (filtering)'; } ?></summary>
+          <?php require_once SHARED_PATH . '/artifact_type_checkboxes.php'; ?>
+        </details>
       </section>
 
       <input type="submit" value="Submit" />
