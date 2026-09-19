@@ -36,6 +36,10 @@ The alternative selected by the group, optionally recorded as an existing item o
 An item the user has chosen to keep in the primary collection.
 _Avoid_: Tracked (a legacy form label for the same idea).
 
+**Owned**:
+Agent shorthand for Kept. An item is owned exactly when it is kept; format flags never affect ownership.
+_Avoid_: Owned (as a separate status), In collection.
+
 **Secondary collection**:
 A separate overflow collection an item can belong to whether or not it is kept.
 
