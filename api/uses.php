@@ -3,6 +3,7 @@
   require_once('private/initialize.php');
   require_once('../private/rate_limiter.php');
   require_once('../private/app_logger.php');
+  require_once('../private/use_participants.php');
   header('Content-Type: application/json');
 
   $logger = new AppLogger();
@@ -87,7 +88,9 @@
       }
       $stmt->close();
 
-      $response->uses = $uses;
+      $use_ids = array_column($uses, 'id');
+      $participant_rows = find_participants_for_uses($database, $use_ids, $user_id);
+      $response->uses = attach_participants_to_uses($uses, $participant_rows);
       echo json_encode($response);
       break;
 

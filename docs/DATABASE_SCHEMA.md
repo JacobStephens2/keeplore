@@ -20,13 +20,13 @@ The primary artifacts table. Despite its name, it stores all artifact types (boa
 | `id` | INT, AUTO_INCREMENT | NO | Primary key |
 | `Title` | VARCHAR(255) | NO | Display name of the artifact |
 | `FullTitle` | VARCHAR(255) | YES | Full / extended title |
-| `type` | VARCHAR(100) | YES | Legacy text-based type (e.g. `'board-game'`). Redundant with `type_id` |
-| `type_id` | INT | YES | FK to `types.id` -- the normalized type reference |
+| `type` | VARCHAR(100) | YES | Denormalized cache of `types.objectType`. One canonical slug per `type_id`; `type_id` is authoritative, never the string (see `normalize-games-type.sql`) |
+| `type_id` | INT | YES | FK to `types.id` -- the normalized type reference. **Authoritative** for an item's type; always prefer it over the `type` string |
 | `user_id` | INT | NO | FK to `users.id` -- the owning user |
 | `Acq` | DATE | YES | Acquisition / tracking-start date |
 | `is_kept` | TINYINT(1) | YES | Whether the artifact is kept in the primary collection (1 = yes, 0 = no). Kept means kept only |
 | `is_in_secondary_collection` | TINYINT(1) | NO | Whether it is in a secondary collection (1 = yes, 0 = no, default 0) |
-| `Candidate` | VARCHAR(255) | YES | Candidate status or label |
+| `Candidate` | VARCHAR(255) | YES | Acquisition-candidate label surfaced on the Candidates explore page. Not a wishlist flag and not part of kept/status semantics |
 | `CandidateGroupDate` | DATE | YES | Date associated with candidate grouping |
 | `SS` | VARCHAR(255) | YES | Sweet spot value(s) -- comma-separated player counts |
 | `MnP` | INT | YES | Minimum number of players/participants |
@@ -165,6 +165,8 @@ Junction table linking `uses` to `players` (many-to-many). Records which players
 - `use_id` -> `uses.id`
 - `player_id` -> `players.id`
 - `user_id` -> `users.id`
+
+**Uniqueness:** `(use_id, player_id)` is unique (see `dedupe-uses-players.sql`). One row per player per play; writers must skip (or handle the conflict for) already-linked players.
 
 ---
 
@@ -504,10 +506,14 @@ Both systems are queried simultaneously in use-by calculations (e.g., in `use_by
 
 4. **The `types` table is shared** between the active `games` schema (`games.type_id -> types.id`) and the legacy `objects` schema (`objects.ObjectType -> types.id`).
 
-5. **The `games` table has redundant type storage:** both `type` (VARCHAR, stores the type name string) and `type_id` (INT, FK to `types.id`). Both are set on insert/update. The `type_id` column is the normalized reference; the `type` column appears to be a denormalized cache.
+5. **The `games` table has redundant type storage:** both `type` (VARCHAR, stores the type name string) and `type_id` (INT, FK to `types.id`). Both are set on insert/update. The `type_id` column is the normalized reference and is **authoritative**; the `type` column is a denormalized cache holding one canonical slug per `type_id` (backfilled by `normalize-games-type.sql`). Never branch on the string.
 
-6. **Multi-tenancy is enforced at the application layer.** Most queries filter by `user_id = $_SESSION['user_id']`. There are no database-level row-security policies.
+6. **`favorites` is not family favourites.** The production `favorites` table holds top-40 lists by external designers and reviewers, not the owner's liked items. Do not read it as a wishlist or preference signal.
 
-7. **The `rate_limits` table is auto-created** via `CREATE TABLE IF NOT EXISTS` in the `RateLimiter` class constructor, making it the only table with a known exact DDL in the codebase.
+7. **"Owned" means kept.** An item is owned exactly when it is kept in the primary collection (`is_kept = 1`). Format flags (`is_digital`, `is_physical`), secondary-collection membership, and `to_get_rid_of` never affect ownership. See `Kept` / `Owned` in `CONTEXT.md`.
 
-8. **Use-by date calculation** uses both `responses.PlayDate` and `uses.use_date` with `MAX()` aggregations and `CASE` expressions to determine when an artifact should next be used, based on `users.default_use_interval` or the per-artifact `games.interaction_frequency_days` override.
+8. **Multi-tenancy is enforced at the application layer.** Most queries filter by `user_id = $_SESSION['user_id']`. There are no database-level row-security policies.
+
+9. **The `rate_limits` table is auto-created** via `CREATE TABLE IF NOT EXISTS` in the `RateLimiter` class constructor, making it the only table with a known exact DDL in the codebase.
+
+10. **Use-by date calculation** uses both `responses.PlayDate` and `uses.use_date` with `MAX()` aggregations and `CASE` expressions to determine when an artifact should next be used, based on `users.default_use_interval` or the per-artifact `games.interaction_frequency_days` override.

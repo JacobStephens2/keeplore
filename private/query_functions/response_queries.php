@@ -72,7 +72,13 @@
     $stmt = mysqli_prepare($db, $query);
 
     $i = 0;
+    $seen_player_ids = [];
     foreach($postArray['user'] as $userArray) {
+      $player_id = (int) ($userArray['id'] ?? '');
+      if ($player_id === 0 || isset($seen_player_ids[$player_id])) {
+        continue;
+      }
+      $seen_player_ids[$player_id] = true;
       mysqli_stmt_bind_param($stmt, 'sss',
         $use_id,
         $userArray['id'],
@@ -377,10 +383,16 @@ function update_use($useArray) {
     exit;
   }
 
+  $seen_player_ids = [];
   foreach ($useArray['user'] as $user) {
     if ($user['name'] == '') {
       continue;
     }
+    $player_id = (int) ($user['id'] ?? '');
+    if ($player_id === 0 || isset($seen_player_ids[$player_id])) {
+      continue;
+    }
+    $seen_player_ids[$player_id] = true;
     $query = "INSERT INTO uses_players (
         use_id,
         player_id,

@@ -12,6 +12,24 @@
 
   if(is_post_request()) {
 
+    // Merge another player into this one (issue #9, brief 3).
+    if(isset($_POST['merge_loser_id'])) {
+      $merge_errors = [];
+      if(!isset($_POST['merge_confirm']) || $_POST['merge_confirm'] !== 'yes') {
+        $merge_errors[] = "Confirm the merge before continuing.";
+      } else {
+        $merge_result = merge_players($id, $_POST['merge_loser_id'], $user_id);
+        if($merge_result === true) {
+          $_SESSION['message'] = 'The players were merged successfully.';
+          redirect_to(url_for('/users/show.php?id=' . h(u($id))));
+        } else {
+          $merge_errors = $merge_result;
+        }
+      }
+      $errors = $merge_errors;
+      $player = find_player_by_id($id);
+    } else {
+
     // Handle form values sent by new.php
     $player = [];
     $player['id'] = $id ?? '';
@@ -29,6 +47,8 @@
     } else {
       $errors = $result;
     }
+
+  }
 
   } else {
 
@@ -93,6 +113,58 @@
       <input type="submit" value="Save Edits" />
 
     </form>
+
+    <h2>Merge another player into this one</h2>
+    <p>
+      All of the selected player's recorded interactions move to
+      <?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?>,
+      and the selected player is deleted. This cannot be undone.
+    </p>
+
+    <form action="<?php echo url_for('/users/edit.php?id=' . h(u($id))); ?>" method="post">
+      <?php echo csrf_input(); ?>
+
+      <label for="merge_loser_id">Player to merge in and delete</label>
+      <select id="merge_loser_id" name="merge_loser_id">
+        <?php
+          $merge_candidates = find_players_by_user_id();
+          while($candidate = mysqli_fetch_assoc($merge_candidates)) {
+            if((int) $candidate['id'] === (int) $id) {
+              continue;
+            }
+            echo "<option value=\"" . h($candidate['id']) . "\">"
+              . h($candidate['FirstName'] . ' ' . $candidate['LastName'])
+              . "</option>";
+          }
+          mysqli_free_result($merge_candidates);
+        ?>
+      </select>
+
+      <label for="merge_confirm">
+        <input type="checkbox" id="merge_confirm" name="merge_confirm" value="yes">
+        <span id="merge_confirm_text">Yes, merge the selected player into
+        <?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?>
+        and delete it</span>
+      </label>
+
+      <input type="submit" value="Merge Players" />
+
+    </form>
+
+    <script>
+      (function() {
+        var loser = document.getElementById('merge_loser_id');
+        var text = document.getElementById('merge_confirm_text');
+        var survivor = <?php echo json_encode($player['FirstName'] . ' ' . $player['LastName']); ?>;
+        function updateMergeConfirm() {
+          var name = loser.options[loser.selectedIndex].text;
+          text.textContent = 'Yes, merge ' + name + ' into ' + survivor
+            + ' and delete ' + name;
+        }
+        loser.addEventListener('change', updateMergeConfirm);
+        updateMergeConfirm();
+      })();
+    </script>
 
   </div>
 
