@@ -22,6 +22,12 @@ class AgentApiDocsTest extends TestCase
         return $byId;
     }
 
+    public function test_catalog_uses_http_for_loopback_hosts(): void
+    {
+        $this->assertSame('http://127.0.0.1:8788', agent_api_docs('127.0.0.1:8788')['base_url']);
+        $this->assertSame('http://localhost:8788', agent_api_docs('localhost:8788')['base_url']);
+    }
+
     public function test_catalog_names_the_live_api_host_and_bearer_auth(): void
     {
         $docs = $this->docs();

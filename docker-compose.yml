@@ -1,0 +1,24 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: keeplore-mysql
+    environment:
+      MYSQL_DATABASE: keeplore
+      MYSQL_USER: keeplore
+      MYSQL_PASSWORD: keeplore
+      MYSQL_ROOT_PASSWORD: keeplore
+    ports:
+      - "${KEEPLORE_DB_PORT:-3306}:3306"
+    volumes:
+      - keeplore-mysql:/var/lib/mysql
+      - ./database/local-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/local-seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-ukeelore", "-pkeeplore"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  keeplore-mysql:

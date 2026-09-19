@@ -131,6 +131,20 @@ docs/                       Schema docs and naming decision record
 - Apache with mod_rewrite
 - Composer
 
+### Run locally
+
+Needs Docker (MySQL 8.4) and PHP with mysqli. From the repo root:
+
+```bash
+./bin/dev
+```
+
+Then open [http://127.0.0.1:8787/](http://127.0.0.1:8787/). Logged-out visitors see the marketing home; `/api-docs` is public. Log in as `localdev` / `LocalDev-12345`. The API listens on [http://127.0.0.1:8788/](http://127.0.0.1:8788/).
+
+`bin/dev` copies `private/environment_variables.local.php` to the gitignored `private/environment_variables.php` if that file is missing, starts MySQL, applies `database/local-schema.sql` and `database/local-seed.sql`, and serves `ui/` with the PHP built-in server (extensionless routes via `ui/router.php`).
+
+Ports: `KEEPLORE_UI_PORT` (default 8787), `KEEPLORE_API_PORT` (default 8788), `KEEPLORE_DB_PORT` (default 3306). Stop with Ctrl+C; `docker compose down` stops MySQL.
+
 ### Installation
 
 ```bash

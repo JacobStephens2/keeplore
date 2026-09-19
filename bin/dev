@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Start Keeplore locally: MySQL in Docker, PHP built-in server for the UI
+# (and the API). Usage: ./bin/dev
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+UI_PORT="${KEEPLORE_UI_PORT:-8787}"
+API_PORT="${KEEPLORE_API_PORT:-8788}"
+DB_PORT="${KEEPLORE_DB_PORT:-3306}"
+export APP_ENV="${APP_ENV:-development}"
+export KEEPLORE_DB_PORT="$DB_PORT"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "docker is required (used for MySQL)." >&2
+  exit 1
+fi
+if ! command -v php >/dev/null 2>&1; then
+  echo "php is required." >&2
+  exit 1
+fi
+if ! php -r 'exit(extension_loaded("mysqli") ? 0 : 1);'; then
+  echo "PHP mysqli extension is required ($(command -v php))." >&2
+  exit 1
+fi
+
+mkdir -p logs cache
+chmod u+w logs cache
+
+if [[ ! -f private/environment_variables.php ]]; then
+  cp private/environment_variables.local.php private/environment_variables.php
+  echo "Wrote private/environment_variables.php from the local template."
+fi
+
+echo "Starting MySQL on port ${DB_PORT}..."
+docker compose up -d mysql
+
+echo "Waiting for MySQL..."
+for i in $(seq 1 90); do
+  if docker compose exec -T mysql mysqladmin ping -h 127.0.0.1 -uroot -pkeeplore --silent >/dev/null 2>&1; then
+    break
+  fi
+  if [[ "$i" -eq 90 ]]; then
+    echo "MySQL did not become ready. Last logs:" >&2
+    docker compose logs --tail=40 mysql >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+# Init scripts only run on an empty volume; apply again so reruns stay current.
+docker compose exec -T mysql mysql -ukeeplore -pkeeplore keeplore < database/local-schema.sql
+docker compose exec -T mysql mysql -ukeeplore -pkeeplore keeplore < database/local-seed.sql
+
+API_PID=""
+cleanup() {
+  if [[ -n "$API_PID" ]]; then
+    kill "$API_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT INT TERM
+
+echo "API at http://127.0.0.1:${API_PORT}/"
+(
+  cd "$ROOT/api"
+  exec php -S "127.0.0.1:${API_PORT}"
+) &
+API_PID=$!
+
+echo
+echo "Keeplore UI at http://127.0.0.1:${UI_PORT}/"
+echo "API docs     at http://127.0.0.1:${UI_PORT}/api-docs"
+echo "Log in as    localdev / LocalDev-12345"
+echo
+
+cd "$ROOT/ui"
+exec php -S "127.0.0.1:${UI_PORT}" router.php
