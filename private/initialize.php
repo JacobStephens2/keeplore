@@ -39,14 +39,17 @@
   // survives across the canonical host. Load env first so domain is known.
   $session_lifetime = 86400; // 24 hours, matching JWT token expiry
   ini_set('session.gc_maxlifetime', $session_lifetime);
-  session_set_cookie_params([
+  $session_cookie = [
     'lifetime' => $session_lifetime,
     'path' => '/',
-    'domain' => ARTIFACTS_DOMAIN,
     'secure' => COOKIE_SECURE,
     'httponly' => true,
     'samesite' => 'Lax',
-  ]);
+  ];
+  if (ARTIFACTS_DOMAIN !== '') {
+    $session_cookie['domain'] = ARTIFACTS_DOMAIN;
+  }
+  session_set_cookie_params($session_cookie);
   session_start();
 
   require_once('functions.php');

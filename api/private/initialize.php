@@ -13,6 +13,19 @@ if (getenv('APP_ENV') === 'development') {
 
 require_once('../private/environment_variables.php');
 
+$keeplore_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$keeplore_origin_host = $keeplore_origin !== '' ? parse_url($keeplore_origin, PHP_URL_HOST) : '';
+if ($keeplore_origin_host === '127.0.0.1' || $keeplore_origin_host === 'localhost') {
+  header('Access-Control-Allow-Origin: ' . $keeplore_origin);
+  header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+  header('Access-Control-Allow-Headers: Content-Type, Authorization');
+  header('Access-Control-Allow-Credentials: true');
+  if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+  }
+}
+
 require_once('../private/vendor/autoload.php');
 
 require_once('../private/auth_functions.php');

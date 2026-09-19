@@ -11,7 +11,12 @@ function agent_api_base_url($api_origin = null) {
   if ($origin === null || $origin === '') {
     $origin = defined('API_ORIGIN') ? API_ORIGIN : 'api.keeplore.app';
   }
-  return 'https://' . $origin;
+  if (str_starts_with($origin, 'http://') || str_starts_with($origin, 'https://')) {
+    return $origin;
+  }
+  $host = explode(':', $origin)[0];
+  $scheme = ($host === '127.0.0.1' || $host === 'localhost') ? 'http' : 'https';
+  return $scheme . '://' . $origin;
 }
 
 function agent_api_docs($api_origin = null) {

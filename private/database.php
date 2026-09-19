@@ -1,7 +1,8 @@
 <?php
 
   function db_connect() {
-    $connection = mysqli_connect(DB_SERVER, DB_USER, DB_PASS, DB_NAME);
+    $port = defined('DB_PORT') ? (int) DB_PORT : 3306;
+    $connection = mysqli_connect(DB_SERVER, DB_USER, DB_PASS, DB_NAME, $port);
     confirm_db_connect();
     return $connection;
   }
