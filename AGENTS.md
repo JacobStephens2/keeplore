@@ -2,11 +2,11 @@
 
 ### Issue tracker
 
-Issues live in this repo's GitHub Issues (via `gh`). See `docs/agents/issue-tracker.md`.
+Issues and specs live as GitHub issues in JacobStephens2/keeplore. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+The five canonical roles use matching label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
