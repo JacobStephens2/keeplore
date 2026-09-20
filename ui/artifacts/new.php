@@ -107,6 +107,10 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
     <form class="form-layout" action="<?php echo url_for('/artifacts/new'); ?>" method="POST">
       <?php echo csrf_input(); ?>
 
+      <div class="form-field-span create-item-submit">
+        <button type="submit">Create Item <kbd>s</kbd></button>
+      </div>
+
       <div class="form-field form-field-span">
         <label for="Title">Name</label>
         <input type="text" name="Title" id="Title" autofocus value="<?php echo h($artifact['Title']); ?>" />
@@ -230,8 +234,8 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
         />
       </div>
 
-      <div id="operations" class="form-field-span">
-        <input type="submit" value="Create Item" />
+      <div id="operations" class="form-field-span create-item-submit">
+        <button type="submit">Create Item <kbd>s</kbd></button>
       </div>
     </form>
 
@@ -240,5 +244,32 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 </main>
 
 <script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=5"></script>
+<script>
+  document.addEventListener('keydown', function(event) {
+    if (event.key !== 's' && event.key !== 'S') {
+      return;
+    }
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      return;
+    }
+    const target = event.target;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
+      const type = (target.type || '').toLowerCase();
+      if (target.tagName !== 'INPUT' || (type !== 'checkbox' && type !== 'radio' && type !== 'submit' && type !== 'button')) {
+        return;
+      }
+    }
+    const form = document.querySelector('form.form-layout');
+    if (!form) {
+      return;
+    }
+    event.preventDefault();
+    if (typeof form.requestSubmit === 'function') {
+      form.requestSubmit();
+    } else {
+      form.submit();
+    }
+  });
+</script>
 
 <?php include(SHARED_PATH . '/footer.php'); ?>

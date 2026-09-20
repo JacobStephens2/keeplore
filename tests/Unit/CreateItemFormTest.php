@@ -37,4 +37,28 @@ class CreateItemFormTest extends TestCase
             'Use this game must keep a visible cover preview on the create form.'
         );
     }
+
+    public function test_create_item_submit_is_above_the_name_field(): void
+    {
+        $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/new.php');
+        $this->assertNotFalse($source);
+        $titlePos = strpos($source, 'id="Title"');
+        $this->assertNotFalse($titlePos);
+        $beforeTitle = substr($source, 0, $titlePos);
+        $this->assertMatchesRegularExpression(
+            '/<(?:input|button)[^>]*type="submit"/',
+            $beforeTitle,
+            'A Create Item submit must sit above Name so the form can be saved without scrolling.'
+        );
+        $this->assertStringContainsString('Create Item', $beforeTitle);
+    }
+
+    public function test_s_submits_create_item_when_not_in_a_text_field(): void
+    {
+        $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/new.php');
+        $this->assertNotFalse($source);
+        $this->assertStringContainsString("event.key !== 's'", $source);
+        $this->assertStringContainsString('TEXTAREA', $source);
+        $this->assertStringContainsString('requestSubmit', $source);
+    }
 }
