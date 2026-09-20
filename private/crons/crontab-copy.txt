@@ -1,1 +1,1 @@
-00 * * * * php /var/www/artifact-management-tool/private/crons/email_notification_of_todays_use_bys.php >> /var/www/artifact-management-tool/private/crons/email_notification_of_todays_use_bys.php.log 2>&1
+00 * * * * /usr/bin/php /opt/keeplore/current/private/crons/email_notification_of_todays_use_bys.php >> /opt/keeplore/shared/logs/email_notification_of_todays_use_bys.php.log 2>&1

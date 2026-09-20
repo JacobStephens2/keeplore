@@ -79,6 +79,12 @@
   // Generate CSRF token for all pages
   generate_csrf_token();
 
+  // CLI (cron, scripts) has no HTTP method. The CSRF check below reads
+  // REQUEST_METHOD, which PHP warns about when the key is unset.
+  if (php_sapi_name() === 'cli' && !isset($_SERVER['REQUEST_METHOD'])) {
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+  }
+
   // Validate CSRF token on all POST requests
   if ($_SERVER['REQUEST_METHOD'] === 'POST' && php_sapi_name() !== 'cli') {
     if (!validate_csrf_token()) {
