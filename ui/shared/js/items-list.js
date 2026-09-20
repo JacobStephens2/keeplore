@@ -1,10 +1,9 @@
 (function () {
   var PAGE_LENGTH = 100;
-  var ORDER_KEY = 'keeplore-artifacts-order';
-  var DEFAULT_ORDER = [
-    [3, 'desc'], // Name
-    [4, 'desc'], // Tracking Start
-    [5, 'desc'], // Recent Interaction
+  var SORT_FALLBACK = [
+    { column: 'Tracking Start', dir: 'desc' },
+    { column: 'Recent Interaction', dir: 'desc' },
+    { column: 'Interact By', dir: 'desc' },
   ];
 
   function columnKeys(tableEl) {
@@ -13,27 +12,10 @@
     });
   }
 
-  function normalizeOrder(order, columnCount) {
-    if (!Array.isArray(order) || order.length === 0) {
-      return null;
-    }
-    var normalized = [];
-    for (var i = 0; i < order.length; i++) {
-      var pair = order[i];
-      if (!Array.isArray(pair) || pair.length < 2) {
-        continue;
-      }
-      var index = pair[0];
-      var dir = pair[1];
-      if (typeof index !== 'number' || index < 0 || index % 1 !== 0 || index >= columnCount) {
-        continue;
-      }
-      if (dir !== 'asc' && dir !== 'desc') {
-        continue;
-      }
-      normalized.push([index, dir]);
-    }
-    return normalized.length ? normalized : null;
+  function headerTexts(tableEl) {
+    return Array.prototype.map.call(tableEl.querySelectorAll('thead th'), function (th) {
+      return th.textContent;
+    });
   }
 
   function sortsFromOrder(order, keys) {
@@ -58,22 +40,27 @@
     return order;
   }
 
-  function loadSavedOrder(columnCount) {
-    try {
-      return normalizeOrder(JSON.parse(window.localStorage.getItem(ORDER_KEY)), columnCount);
-    } catch (e) {
-      return null;
+  function restoreSorts(headers, keys) {
+    var restored = [];
+    if (window.KeeploreItemsTableSort && typeof KeeploreItemsTableSort.restore === 'function') {
+      restored = KeeploreItemsTableSort.restore(headers, window.localStorage, SORT_FALLBACK);
     }
+    var sorts = sortsFromOrder(restored || [], keys);
+    if (sorts.length) {
+      return sorts;
+    }
+    return [
+      { key: 'acq', dir: 'desc' },
+      { key: 'most_recent_use', dir: 'desc' },
+      { key: 'use_by', dir: 'desc' },
+    ];
   }
 
-  function saveOrder(order, columnCount) {
-    var normalized = normalizeOrder(order, columnCount);
-    if (!normalized) {
+  function persistSorts(headers, sorts, keys) {
+    if (!window.KeeploreItemsTableSort || typeof KeeploreItemsTableSort.persist !== 'function') {
       return;
     }
-    try {
-      window.localStorage.setItem(ORDER_KEY, JSON.stringify(normalized));
-    } catch (e) {}
+    KeeploreItemsTableSort.persist(headers, window.localStorage, orderFromSorts(sorts, keys));
   }
 
   function configFromPage() {
@@ -288,11 +275,11 @@
     }
 
     var keys = columnKeys(table);
-    var savedOrder = loadSavedOrder(keys.length);
+    var headers = headerTexts(table);
     var state = {
       items: [],
       loaded: false,
-      sorts: sortsFromOrder(savedOrder || DEFAULT_ORDER, keys),
+      sorts: restoreSorts(headers, keys),
       page: 0,
     };
 
@@ -401,7 +388,7 @@
         var dir = current && current.key === key && current.dir === 'desc' ? 'asc' : 'desc';
         state.sorts = [{ key: key, dir: dir }];
         applyAriaSort();
-        saveOrder(orderFromSorts(state.sorts, keys), keys.length);
+        persistSorts(headers, state.sorts, keys);
         render();
       });
     });

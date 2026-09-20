@@ -82,7 +82,7 @@
         if (meta) { meta.setAttribute('content', effective === 'dark' ? '#0c1222' : '#30395c'); }
       })();
     </script>
-    <link rel="stylesheet" media="all" href="../../style.css?v=50" />
+    <link rel="stylesheet" media="all" href="../../style.css?v=52" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -156,7 +156,7 @@
 
           <div class="nav-group nav-group-secondary" aria-label="Browse">
             <a class="nav-link" href="<?php echo url_for('/uses/interactions'); ?>">Interactions</a>
-            <a class="nav-link" href="<?php echo url_for('/artifacts'); ?>">Items</a>
+            <a class="nav-link" href="<?php echo url_for('/artifacts'); ?>" data-shortcut="items">Items</a>
             <a class="nav-link" href="<?php echo url_for('/artifacts/to-get-rid-of'); ?>">To&nbsp;Get&nbsp;Rid&nbsp;Of</a>
             <a class="nav-link" href="<?php echo url_for('/analysis'); ?>">Analysis</a>
           </div>
@@ -184,7 +184,7 @@
 
           <div class="nav-group nav-group-secondary" aria-label="Browse">
             <a class="nav-link" href="<?php echo url_for('/uses/interactions'); ?>">Interactions</a>
-            <a class="nav-link" href="<?php echo url_for('/artifacts'); ?>">Items</a>
+            <a class="nav-link" href="<?php echo url_for('/artifacts'); ?>" data-shortcut="items">Items</a>
             <a class="nav-link" href="<?php echo url_for('/artifacts/to-get-rid-of'); ?>">To&nbsp;Get&nbsp;Rid&nbsp;Of</a>
             <a class="nav-link" href="<?php echo url_for('/analysis'); ?>">Analysis</a>
           </div>
@@ -302,5 +302,7 @@
         }
       })();
     </script>
+
+    <script src="/shared/js/items-shortcut.js?v=2" defer></script>
 
     <?php echo display_session_message(); ?>

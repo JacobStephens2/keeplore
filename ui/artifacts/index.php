@@ -44,7 +44,7 @@
 
     <label class="items-search-wrap">
       <span class="sr-only">Search items</span>
-      <input type="search" id="items-search" class="items-search" placeholder="Search by name" autocomplete="off" spellcheck="false" autofocus>
+      <input type="search" id="items-search" class="items-search" data-shortcut="items-search" placeholder="Search by name" autocomplete="off" spellcheck="false" autofocus>
     </label>
     <script>
       (function () {
@@ -280,6 +280,7 @@
 
     <div id="items-toast" class="toast" role="status" aria-live="polite"></div>
 
+    <script src="<?php echo url_for('/artifacts/items-table-sort.js'); ?>?v=1"></script>
     <script type="application/json" id="items-list-config"><?php
       echo json_encode([
         'dataUrl' => url_for('/artifacts/items-data.php') . '?' . http_build_query(items_list_query_params($filters, $typesArray ?? [])),
@@ -291,7 +292,7 @@
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=2"></script>
+    <script src="/shared/js/items-list.js?v=3"></script>
   </div>
 </main>
 

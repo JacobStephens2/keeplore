@@ -63,6 +63,7 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
   if ($url === '' && $id > 0) {
     $url = bgg_canonical_url($id, $source);
   }
+  $image = bgg_image_url_from_item($item);
 
   $fields = ['Title' => $name];
   $sweet_spot = bgg_sweet_spot_from_polls($dynamic);
@@ -77,17 +78,43 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
   if ($year !== '') {
     $fields['Yr'] = $year;
   }
+  if ($image !== '') {
+    $fields['image_url'] = $image;
+  }
+
+  $match = [
+    'id' => $id,
+    'name' => $name,
+    'year' => $year,
+    'url' => $url,
+    'source' => $source,
+  ];
+  if ($image !== '') {
+    $match['image'] = $image;
+  }
 
   return [
-    'match' => [
-      'id' => $id,
-      'name' => $name,
-      'year' => $year,
-      'url' => $url,
-      'source' => $source,
-    ],
+    'match' => $match,
     'fields' => $fields,
   ];
+}
+
+function bgg_image_url_from_item($item) {
+  if (!is_array($item)) {
+    return '';
+  }
+  $candidates = [
+    $item['imageurl'] ?? '',
+    is_array($item['images'] ?? null) ? ($item['images']['previewthumb'] ?? '') : '',
+    is_array($item['images'] ?? null) ? ($item['images']['original'] ?? '') : '',
+  ];
+  foreach ($candidates as $candidate) {
+    $url = normalize_item_image_url($candidate);
+    if ($url !== '') {
+      return $url;
+    }
+  }
+  return '';
 }
 
 function bgg_source_from_item($item) {

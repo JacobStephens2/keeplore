@@ -40,6 +40,14 @@ function h($string="") {
   return htmlspecialchars($string);
 }
 
+function normalize_item_image_url($value) {
+  $url = trim((string) $value);
+  if ($url === '' || strlen($url) > 1024 || !preg_match('#^https://[^\s]+$#i', $url)) {
+    return '';
+  }
+  return $url;
+}
+
 function error_404() {
   header($_SERVER["SERVER_PROTOCOL"] . " 404 Not Found");
   exit();

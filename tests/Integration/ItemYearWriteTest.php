@@ -45,6 +45,7 @@ final class ItemYearWriteTest extends TestCase
             type VARCHAR(100) DEFAULT NULL,
             SS VARCHAR(255) DEFAULT NULL,
             Notes TEXT,
+            image_url VARCHAR(1024) DEFAULT NULL,
             CandidateGroupDate DATE DEFAULT NULL,
             MnT INT DEFAULT NULL,
             MxT INT DEFAULT NULL,

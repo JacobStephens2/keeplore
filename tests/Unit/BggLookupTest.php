@@ -49,6 +49,7 @@ class BggLookupTest extends TestCase
 
     public function test_sky_team_payloads_fill_create_form_fields(): void
     {
+        $cover = 'https://cf.geekdo-images.com/uXMeQzNenHb3zK7Hoa6b2w__itemrep/img/oaw-LYEIaB20e79Y568JgyHZ5NQ=/fit-in/246x300/filters:strip_icc()/pic7398904.jpg';
         $itemJson = json_encode([
             'item' => [
                 'objectid' => 373106,
@@ -60,6 +61,7 @@ class BggLookupTest extends TestCase
                 'maxplaytime' => 20,
                 'minage' => 10,
                 'canonical_link' => 'https://boardgamegeek.com/boardgame/373106/sky-team',
+                'imageurl' => $cover,
             ],
         ]);
         $dynamicJson = json_encode([
@@ -81,6 +83,7 @@ class BggLookupTest extends TestCase
                     'year' => '2023',
                     'url' => 'https://boardgamegeek.com/boardgame/373106/sky-team',
                     'source' => 'BGG',
+                    'image' => $cover,
                 ],
                 'fields' => [
                     'Title' => 'Sky Team',
@@ -91,6 +94,7 @@ class BggLookupTest extends TestCase
                     'MxT' => '20',
                     'Age' => '10',
                     'Yr' => '2023',
+                    'image_url' => $cover,
                 ],
             ],
             bgg_form_fields_from_json($itemJson, $dynamicJson)
@@ -156,6 +160,50 @@ class BggLookupTest extends TestCase
             ],
         ]);
         $this->assertSame('VGG', bgg_form_fields_from_json($itemJson, '{}')['match']['source']);
+    }
+
+    public function test_cover_falls_back_to_preview_then_original(): void
+    {
+        $preview = 'https://cf.geekdo-images.com/example__previewthumb/img/a=/fit-in/300x320/pic1.jpg';
+        $original = 'https://cf.geekdo-images.com/example__original/img/b=/0x0/pic1.jpg';
+
+        $previewMapped = bgg_form_fields_from_json(json_encode([
+            'item' => [
+                'objectid' => 1,
+                'name' => 'Preview Only',
+                'images' => ['previewthumb' => $preview, 'original' => $original],
+            ],
+        ]), '{}');
+        $this->assertSame($preview, $previewMapped['match']['image']);
+        $this->assertSame($preview, $previewMapped['fields']['image_url']);
+
+        $originalMapped = bgg_form_fields_from_json(json_encode([
+            'item' => [
+                'objectid' => 2,
+                'name' => 'Original Only',
+                'images' => ['original' => $original],
+            ],
+        ]), '{}');
+        $this->assertSame($original, $originalMapped['match']['image']);
+    }
+
+    public function test_cover_is_omitted_when_missing_or_not_https(): void
+    {
+        $missing = bgg_form_fields_from_json(json_encode([
+            'item' => ['objectid' => 1, 'name' => 'No Art'],
+        ]), '{}');
+        $this->assertArrayNotHasKey('image', $missing['match']);
+        $this->assertArrayNotHasKey('image_url', $missing['fields']);
+
+        $insecure = bgg_form_fields_from_json(json_encode([
+            'item' => [
+                'objectid' => 2,
+                'name' => 'Http Art',
+                'imageurl' => 'http://cf.geekdo-images.com/insecure.jpg',
+            ],
+        ]), '{}');
+        $this->assertArrayNotHasKey('image', $insecure['match']);
+        $this->assertArrayNotHasKey('image_url', $insecure['fields']);
     }
 
     public function test_sweet_spot_is_omitted_when_the_poll_is_missing(): void
@@ -274,6 +322,7 @@ class BggLookupTest extends TestCase
                 ['objectid' => '426898', 'name' => 'Sky Team: Agon Spiele Insert'],
             ],
         ]);
+        $cover = 'https://cf.geekdo-images.com/uXMeQzNenHb3zK7Hoa6b2w__itemrep/img/oaw-LYEIaB20e79Y568JgyHZ5NQ=/fit-in/246x300/filters:strip_icc()/pic7398904.jpg';
         $itemJson = json_encode([
             'item' => [
                 'objectid' => 373106,
@@ -285,6 +334,7 @@ class BggLookupTest extends TestCase
                 'maxplaytime' => '20',
                 'minage' => '10',
                 'canonical_link' => 'https://boardgamegeek.com/boardgame/373106/sky-team',
+                'imageurl' => $cover,
             ],
         ]);
         $dynamicJson = json_encode([
@@ -326,6 +376,8 @@ class BggLookupTest extends TestCase
         $this->assertSame('Sky Team', $result['match']['name']);
         $this->assertSame('2023', $result['match']['year']);
         $this->assertSame('BGG', $result['match']['source']);
+        $this->assertSame($cover, $result['match']['image']);
+        $this->assertSame($cover, $result['fields']['image_url']);
         $this->assertSame('02', $result['fields']['SS']);
         $this->assertSame('20', $result['fields']['MnT']);
         $this->assertSame(
