@@ -2739,6 +2739,14 @@ table#useBy.cards-view tbody td.get-rid-of button.get-rid-of-btn {
   max-width: none;
 }
 
+.form-field-hint {
+  margin: 0.4rem 0 0;
+  max-width: none;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
 .form-field-check {
   display: flex;
   flex-direction: row;

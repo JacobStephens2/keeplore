@@ -135,7 +135,9 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
         <label for="SS">Sweet Spot(s)</label>
         <input type="text" name="SS" id="SS"
           value="<?php echo $artifact['SS']; ?>"
+          aria-describedby="ss-hint"
         >
+        <p id="ss-hint" class="form-field-hint">Ideal player counts, comma-separated. Example: 2, 3, 4</p>
       </div>
 
       <div class="form-field form-field-check">
