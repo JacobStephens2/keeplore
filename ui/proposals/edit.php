@@ -57,7 +57,7 @@ if (!isset($itemsById[$values['chosen_item_id'] ?? ''])) {
 $page_title = $id === null ? 'Record proposal outcome' : 'Edit proposal outcome';
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/proposals/proposals.css'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/proposals/proposals.css?v=1'); ?>">
 <main class="proposal-page">
     <header class="page-header">
         <p class="section-label">Proposal history</p>
@@ -92,13 +92,26 @@ include(SHARED_PATH . '/header.php');
             </fieldset>
             <fieldset>
                 <legend>Item chosen instead <span class="menu-support">(optional)</span></legend>
-                <label for="chosen_item_id">Choose an existing item</label>
-                <select name="chosen_item_id" id="chosen_item_id">
-                    <option value="">None selected</option>
-                    <?php foreach ($items as $item) { ?>
-                        <option value="<?php echo (int) $item['id']; ?>" <?php echo (string) ($values['chosen_item_id'] ?? '') === (string) $item['id'] ? 'selected' : ''; ?>><?php echo h($item['Title']); ?></option>
-                    <?php } ?>
-                </select>
+                <?php
+                    $chosenItemTitle = ($values['chosen_item_id'] ?? '') !== ''
+                        ? $itemsById[$values['chosen_item_id']]['Title']
+                        : '';
+                ?>
+                <label for="chosen_item_search">Choose an existing item</label>
+                <input type="search" id="chosen_item_search"
+                    value="<?php echo h($chosenItemTitle); ?>"
+                    placeholder="Search items"
+                    autocomplete="off"
+                >
+                <input type="hidden" name="chosen_item_id" id="chosen_item_id" value="<?php echo h($values['chosen_item_id'] ?? ''); ?>">
+                <div id="chosen_item_results" class="searchResults" style="display: none;">
+                    <ul id="chosen_item_results_list" class="searchResults"></ul>
+                </div>
+                <script type="application/json" id="chosen-item-options"><?php echo json_encode(
+                    array_map(static fn($item) => ['id' => (int) $item['id'], 'label' => $item['Title']], $items),
+                    JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE
+                ); ?></script>
+                <script type="module" src="<?php echo url_for('/proposals/edit.js?v=1'); ?>"></script>
                 <label for="chosen_item_name">Or enter a name</label>
                 <input type="text" id="chosen_item_name" name="chosen_item_name" maxlength="255" value="<?php echo h($values['chosen_item_id'] ? '' : $values['chosen_item_name']); ?>" aria-describedby="alternative-help">
                 <p id="alternative-help" class="menu-support">An existing selection takes precedence over a typed name. A typed name does not add an item to your collection. Record actual use separately.</p>
