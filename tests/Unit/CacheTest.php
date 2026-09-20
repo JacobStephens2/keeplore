@@ -157,17 +157,32 @@ class CacheTest extends TestCase
         mkdir($parent, 0755);
         chmod($parent, 0555);
         $cacheDir = $parent . '/cache/';
+        $warnings = [];
+        set_error_handler(static function ($severity, $message) use (&$warnings) {
+            $warnings[] = $message;
+            return true;
+        });
 
         try {
+            if (is_writable($parent)) {
+                $this->markTestSkipped('Parent stayed writable; chmod 0555 is not enough under this user.');
+            }
             $cache = new Cache($cacheDir);
             $value = $cache->remember('k', 60, static function () {
                 return 'computed';
             });
             $this->assertSame('computed', $value);
             $this->assertNull($cache->get('k'));
+            $cache->set('direct', 'stored');
+            $this->assertNull($cache->get('direct'));
             $this->assertDirectoryDoesNotExist($cacheDir);
+            $this->assertSame([], $warnings);
         } finally {
+            restore_error_handler();
             chmod($parent, 0755);
+            if (is_dir($cacheDir)) {
+                rmdir($cacheDir);
+            }
             rmdir($parent);
         }
     }
