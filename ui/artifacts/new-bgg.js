@@ -7,9 +7,12 @@
   const matchYearWrap = document.querySelector("#bggMatchYearWrap");
   const matchSourceEl = document.querySelector("#bggMatchSource");
   const matchLinkEl = document.querySelector("#bggMatchLink");
+  const matchImageEl = document.querySelector("#bggMatchImage");
   const useBtn = document.querySelector("#bggUseMatch");
   const othersEl = document.querySelector("#bggOtherMatches");
   const titleInput = document.querySelector("#Title");
+  const pictureInput = document.querySelector("#image_url");
+  const picturePreviewEl = document.querySelector("#itemPicturePreview");
 
   if (!requestBtn || !titleInput) {
     return;
@@ -69,6 +72,7 @@
 
   function showMatch(data) {
     const match = data.match || {};
+    showCover(matchImageEl, match.image, match.name);
     matchNameEl.textContent = match.name || "";
     if (match.year) {
       matchYearEl.textContent = match.year;
@@ -141,6 +145,30 @@
     setField("MxT", fields.MxT);
     setField("age", fields.Age);
     setField("Yr", fields.Yr);
+    setPicture(fields.image_url);
+  }
+
+  function showCover(img, url, name) {
+    if (!img) {
+      return;
+    }
+    if (!url) {
+      img.removeAttribute("src");
+      img.alt = "";
+      img.hidden = true;
+      return;
+    }
+    img.src = url;
+    img.alt = name ? name + " cover" : "Game cover";
+    img.hidden = false;
+  }
+
+  function setPicture(url) {
+    if (!pictureInput || !picturePreviewEl) {
+      return;
+    }
+    showCover(picturePreviewEl, url, titleInput.value);
+    pictureInput.value = url || "";
   }
 
   function setField(id, value) {
@@ -183,5 +211,6 @@
     confirmEl.hidden = true;
     othersEl.hidden = true;
     othersEl.innerHTML = "";
+    showCover(matchImageEl, "", "");
   }
 })();

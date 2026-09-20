@@ -499,6 +499,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
     $physical = normalize_format_flag($artifact['is_physical'] ?? null);
     $year = normalize_artifact_year($artifact['Yr'] ?? null);
 
+    $image_url = $artifact['image_url'] ?? '';
     $sql = "INSERT INTO games (
         Title,
         Notes,
@@ -520,11 +521,12 @@ require_once dirname(__DIR__) . '/item_tags.php';
         interaction_frequency_days,
         is_in_secondary_collection,
         is_digital,
-        is_physical
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        is_physical,
+        image_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ";
     $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'sssssssssssssssssssss',
+    mysqli_stmt_bind_param($stmt, 'ssssssssssssssssssssss',
       $artifact['Title'],
       $artifact['Notes'],
       $artifact['Acq'],
@@ -545,7 +547,8 @@ require_once dirname(__DIR__) . '/item_tags.php';
       $artifact['interaction_frequency_days'],
       $secondary,
       $digital,
-      $physical
+      $physical,
+      $image_url
     );
     $result = mysqli_stmt_execute($stmt);
     mysqli_stmt_close($stmt);

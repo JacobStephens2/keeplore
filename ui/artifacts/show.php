@@ -16,6 +16,15 @@
   <?php } ?>
   
   <h1>Title: <?php echo h($object['Title']); ?></h1>
+
+  <?php
+    $picture = normalize_item_image_url($object['image_url'] ?? '');
+    if ($picture !== '') {
+  ?>
+  <p class="item-picture-wrap">
+    <img class="item-picture" src="<?php echo h($picture); ?>" alt="<?php echo h($object['Title']); ?>" referrerpolicy="no-referrer">
+  </p>
+  <?php } ?>
   
   <dl>
     <dt>Acquisition Date</dt>
