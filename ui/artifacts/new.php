@@ -113,14 +113,6 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
       </div>
 
       <div class="form-field">
-        <label for="tags">Tags (comma-separated)</label>
-        <input type="text" name="tags" id="tags"
-          value="<?php echo h($artifact['tags'] ?? ''); ?>"
-          placeholder="portable, beach-safe, two-player, party"
-        />
-      </div>
-
-      <div class="form-field">
         <label for="Acq">Tracking Start Date</label>
         <input type="date" name="Acq" id="Acq" value="<?php
           $tz = 'America/New_York';
@@ -177,6 +169,14 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
       <div class="form-field form-field-span">
         <label for="Notes">Notes</label>
         <textarea name="Notes" id="Notes" cols="30" rows="5"></textarea>
+      </div>
+
+      <div class="form-field form-field-span">
+        <label for="tags">Tags (comma-separated)</label>
+        <input type="text" name="tags" id="tags"
+          value="<?php echo h($artifact['tags'] ?? ''); ?>"
+          placeholder="portable, beach-safe, two-player, party"
+        />
       </div>
 
       <div id="operations" class="form-field-span">
