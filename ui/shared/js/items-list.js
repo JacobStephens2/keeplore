@@ -1,5 +1,80 @@
 (function () {
   var PAGE_LENGTH = 100;
+  var ORDER_KEY = 'keeplore-artifacts-order';
+  var DEFAULT_ORDER = [
+    [3, 'desc'], // Name
+    [4, 'desc'], // Tracking Start
+    [5, 'desc'], // Recent Interaction
+  ];
+
+  function columnKeys(tableEl) {
+    return Array.prototype.map.call(tableEl.querySelectorAll('thead th[data-sort]'), function (th) {
+      return th.getAttribute('data-sort');
+    });
+  }
+
+  function normalizeOrder(order, columnCount) {
+    if (!Array.isArray(order) || order.length === 0) {
+      return null;
+    }
+    var normalized = [];
+    for (var i = 0; i < order.length; i++) {
+      var pair = order[i];
+      if (!Array.isArray(pair) || pair.length < 2) {
+        continue;
+      }
+      var index = pair[0];
+      var dir = pair[1];
+      if (typeof index !== 'number' || index < 0 || index % 1 !== 0 || index >= columnCount) {
+        continue;
+      }
+      if (dir !== 'asc' && dir !== 'desc') {
+        continue;
+      }
+      normalized.push([index, dir]);
+    }
+    return normalized.length ? normalized : null;
+  }
+
+  function sortsFromOrder(order, keys) {
+    var sorts = [];
+    for (var i = 0; i < order.length; i++) {
+      var key = keys[order[i][0]];
+      if (key) {
+        sorts.push({ key: key, dir: order[i][1] });
+      }
+    }
+    return sorts;
+  }
+
+  function orderFromSorts(sorts, keys) {
+    var order = [];
+    for (var i = 0; i < sorts.length; i++) {
+      var index = keys.indexOf(sorts[i].key);
+      if (index >= 0) {
+        order.push([index, sorts[i].dir]);
+      }
+    }
+    return order;
+  }
+
+  function loadSavedOrder(columnCount) {
+    try {
+      return normalizeOrder(JSON.parse(window.localStorage.getItem(ORDER_KEY)), columnCount);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveOrder(order, columnCount) {
+    var normalized = normalizeOrder(order, columnCount);
+    if (!normalized) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(ORDER_KEY, JSON.stringify(normalized));
+    } catch (e) {}
+  }
 
   function configFromPage() {
     var el = document.getElementById('items-list-config');
@@ -212,16 +287,29 @@
       return;
     }
 
+    var keys = columnKeys(table);
+    var savedOrder = loadSavedOrder(keys.length);
     var state = {
       items: [],
       loaded: false,
-      sorts: [
-        { key: 'acq', dir: 'desc' },
-        { key: 'most_recent_use', dir: 'desc' },
-        { key: 'use_by', dir: 'desc' },
-      ],
+      sorts: sortsFromOrder(savedOrder || DEFAULT_ORDER, keys),
       page: 0,
     };
+
+    function applyAriaSort() {
+      table.querySelectorAll('thead th[data-sort]').forEach(function (th) {
+        th.removeAttribute('aria-sort');
+      });
+      var primary = state.sorts[0];
+      if (!primary) {
+        return;
+      }
+      var active = table.querySelector('thead th[data-sort="' + primary.key + '"]');
+      if (active) {
+        active.setAttribute('aria-sort', primary.dir === 'desc' ? 'descending' : 'ascending');
+      }
+    }
+    applyAriaSort();
 
     function filteredItems() {
       var query = search.value;
@@ -312,10 +400,8 @@
         var current = state.sorts[0];
         var dir = current && current.key === key && current.dir === 'desc' ? 'asc' : 'desc';
         state.sorts = [{ key: key, dir: dir }];
-        table.querySelectorAll('thead th[data-sort]').forEach(function (other) {
-          other.removeAttribute('aria-sort');
-        });
-        th.setAttribute('aria-sort', dir === 'desc' ? 'descending' : 'ascending');
+        applyAriaSort();
+        saveOrder(orderFromSorts(state.sorts, keys), keys.length);
         render();
       });
     });

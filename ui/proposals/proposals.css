@@ -2,11 +2,15 @@
 .proposal-form { max-width: 680px; }
 .proposal-form fieldset { margin: 1.25rem 0; padding: 1rem; border: 1px solid #cad1dd; border-radius: 12px; }
 .proposal-form legend { padding: 0 .4rem; font-weight: 600; }
-.proposal-form select, .proposal-form textarea, .proposal-form input[type="text"] { width: 100%; box-sizing: border-box; }
+.proposal-form select, .proposal-form textarea, .proposal-form input[type="text"], .proposal-form input[type="search"] { width: 100%; box-sizing: border-box; }
+.proposal-form .searchResults { position: relative; }
+.proposal-form ul.searchResults { margin: 0.35rem 0 0; }
+.proposal-form .searchResults li.is-active { background: rgba(48, 57, 92, 0.08); }
 .proposal-form label:not(.proposal-choice) { display: block; margin: .8rem 0 .35rem; }
 .proposal-choice { display: flex; align-items: center; gap: .6rem; margin: .5rem 0; }
 .proposal-choice input { flex: 0 0 auto; margin: 0; }
 .proposal-participants { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); max-height: 240px; overflow-y: auto; }
+.proposal-participants .proposal-choice[hidden] { display: none; }
 .proposal-actions, .proposal-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
 .proposal-filters { align-items: end; margin: 1.5rem 0; }
 .proposal-filters input[type="date"] { display: block; margin-top: .35rem; }

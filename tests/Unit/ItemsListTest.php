@@ -178,5 +178,8 @@ class ItemsListTest extends TestCase
         $this->assertStringContainsString('/shared/js/items-list.js', $source);
         $this->assertStringContainsString('/artifacts/items-data.php', $source);
         $this->assertStringContainsString("event.key !== 'n'", $source);
+        $js = file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
+        $this->assertNotFalse($js);
+        $this->assertStringContainsString('keeplore-artifacts-order', $js);
     }
 }

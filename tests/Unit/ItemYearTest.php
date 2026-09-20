@@ -36,4 +36,13 @@ class ItemYearTest extends TestCase
         $this->assertStringContainsString('id="Yr"', $form);
         $this->assertMatchesRegularExpression('/<label for="Yr">Year<\/label>/', $form);
     }
+
+    public function test_blank_year_normalizes_to_null(): void
+    {
+        require_once PRIVATE_PATH . '/query_functions/artifact_queries.php';
+        $this->assertNull(normalize_artifact_year(''));
+        $this->assertNull(normalize_artifact_year('  '));
+        $this->assertNull(normalize_artifact_year(null));
+        $this->assertSame('1999', normalize_artifact_year('1999'));
+    }
 }
