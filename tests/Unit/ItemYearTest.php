@@ -45,4 +45,10 @@ class ItemYearTest extends TestCase
         $this->assertNull(normalize_artifact_year(null));
         $this->assertSame('1999', normalize_artifact_year('1999'));
     }
+
+    public function test_local_schema_year_column_is_double(): void
+    {
+        $schema = (string) file_get_contents(PROJECT_PATH . '/database/local-schema.sql');
+        $this->assertMatchesRegularExpression('/\bYr\s+DOUBLE\b/i', $schema);
+    }
 }

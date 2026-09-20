@@ -21,3 +21,7 @@ sudo /usr/local/libexec/keeplore/promote-keeplore-staging.sh <40-char-sha>
 ```
 
 Host copies of the scripts live in `/usr/local/libexec/keeplore/`. This directory is the versioned source; install with `sudo install -m 0755 deploy/*.sh /usr/local/libexec/keeplore/`.
+
+## Production shared paths
+
+`KEEPLORE_SHARED_PATHS` in `/etc/voice-agent/keeplore.conf` is the list `install-keeplore-release.sh` symlinks from `/opt/keeplore/shared` into each Release. It must include `cache`. Staging already does (`deploy/install-keeplore-staging.sh`). Without that link, `Cache` cannot `mkdir` in the read-only Release and type-name lookups hit the database on every request.
