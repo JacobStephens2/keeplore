@@ -84,7 +84,7 @@
         <p class="page-lede">Everything you track, filterable by type and attributes.</p>
       </div>
       <div class="page-header-actions">
-        <a class="prominent-link" href="<?php echo url_for('/artifacts/new'); ?>">Create item</a>
+        <a class="prominent-link" href="<?php echo url_for('/artifacts/new'); ?>">Create item <kbd>n</kbd></a>
         <button type="button" id="display_filters">Show filters</button>
       </div>
     </header>
@@ -453,11 +453,45 @@
           [ 3, 'desc'], // most recent acquisition first
           [ 4, 'desc'], // most recent use first
           [ 5, 'desc'], // most recent use by first
-        ], 
+        ],
+      });
+
+      const itemsSearch = document.querySelector('#artifacts_filter input')
+        || document.querySelector('.dataTables_wrapper .dataTables_filter input');
+      if (itemsSearch) {
+        itemsSearch.focus();
+        itemsSearch.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape') {
+            itemsSearch.blur();
+          }
+        });
+      }
+
+      const createItemUrl = <?php echo json_encode(url_for('/artifacts/new')); ?>;
+      document.addEventListener('keydown', function(event) {
+        if (event.key !== 'n' && event.key !== 'N') {
+          return;
+        }
+        if (event.metaKey || event.ctrlKey || event.altKey) {
+          return;
+        }
+        const target = event.target;
+        const inEmptyItemsSearch = target
+          && target.closest
+          && target.closest('.dataTables_filter')
+          && target.value === '';
+        if (!inEmptyItemsSearch && target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
+          return;
+        }
+        event.preventDefault();
+        window.location.href = createItemUrl;
       });
 
       document.addEventListener('keypress', function(event) {
         if (event.key === 'Enter') {
+          if (event.target && event.target.closest('.dataTables_filter')) {
+            return;
+          }
           event.preventDefault();
           document.querySelector('form').submit();
         }

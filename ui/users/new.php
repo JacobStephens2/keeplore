@@ -46,7 +46,7 @@ if(is_post_request()) {
     if ($is_ajax) {
       header('Content-Type: application/json');
       http_response_code(500);
-      echo json_encode(['ok' => false, 'message' => 'Failed to create interactor.']);
+      echo json_encode(['ok' => false, 'message' => 'Failed to create person.']);
       exit;
     }
     $errors = $result;

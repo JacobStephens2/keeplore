@@ -5,9 +5,9 @@
   const matchNameEl = document.querySelector("#bggMatchName");
   const matchYearEl = document.querySelector("#bggMatchYear");
   const matchYearWrap = document.querySelector("#bggMatchYearWrap");
+  const matchSourceEl = document.querySelector("#bggMatchSource");
   const matchLinkEl = document.querySelector("#bggMatchLink");
   const useBtn = document.querySelector("#bggUseMatch");
-  const notThisBtn = document.querySelector("#bggNotThis");
   const othersEl = document.querySelector("#bggOtherMatches");
   const titleInput = document.querySelector("#Title");
 
@@ -37,14 +37,6 @@
     fillForm(pending.fields);
     showStatus("Filled from " + pending.match.name + ".");
     hideConfirm();
-  });
-
-  notThisBtn.addEventListener("click", function (event) {
-    event.preventDefault();
-    const currentId = pending && pending.match ? pending.match.id : null;
-    showAlternatives(roster.filter(function (alt) {
-      return alt.id !== currentId;
-    }));
   });
 
   function lookup(url) {
@@ -84,13 +76,18 @@
     } else {
       matchYearWrap.hidden = true;
     }
+    if (match.source && match.source !== "BGG") {
+      matchSourceEl.textContent = match.source;
+      matchSourceEl.hidden = false;
+    } else {
+      matchSourceEl.textContent = "";
+      matchSourceEl.hidden = true;
+    }
     matchLinkEl.href = match.url || "https://boardgamegeek.com/";
-    othersEl.hidden = true;
-    othersEl.innerHTML = "";
-    const otherCount = roster.filter(function (alt) {
+    matchLinkEl.textContent = "View on " + sourceSiteName(match.source);
+    showAlternatives(roster.filter(function (alt) {
       return alt.id !== match.id;
-    }).length;
-    notThisBtn.hidden = otherCount === 0;
+    }));
     confirmEl.hidden = false;
   }
 
@@ -101,7 +98,12 @@
     const match = data.match || {};
     roster = [];
     if (match.id && match.name) {
-      roster.push({ id: match.id, name: match.name });
+      roster.push({
+        id: match.id,
+        name: match.name,
+        year: match.year || "",
+        source: match.source || "BGG",
+      });
     }
     data.alternatives.forEach(function (alt) {
       roster.push(alt);
@@ -111,8 +113,7 @@
   function showAlternatives(alternatives) {
     othersEl.innerHTML = "";
     if (!alternatives.length) {
-      showStatus("No other BoardGameGeek matches for that name.");
-      hideConfirm();
+      othersEl.hidden = true;
       return;
     }
     alternatives.forEach(function (alt) {
@@ -120,7 +121,7 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "bgg-secondary";
-      button.textContent = alt.name;
+      button.textContent = alternativeLabel(alt);
       button.addEventListener("click", function (event) {
         event.preventDefault();
         lookup("/artifacts/bgg-data?objectid=" + encodeURIComponent(alt.id));
@@ -139,6 +140,7 @@
     setField("MnT", fields.MnT);
     setField("MxT", fields.MxT);
     setField("age", fields.Age);
+    setField("Yr", fields.Yr);
   }
 
   function setField(id, value) {
@@ -149,6 +151,27 @@
     if (el) {
       el.value = value;
     }
+  }
+
+  function alternativeLabel(alt) {
+    let label = alt.name || "";
+    if (alt.year) {
+      label += " (" + alt.year + ")";
+    }
+    if (alt.source && alt.source !== "BGG") {
+      label += " · " + alt.source;
+    }
+    return label;
+  }
+
+  function sourceSiteName(source) {
+    if (source === "RPGG") {
+      return "RPGGeek";
+    }
+    if (source === "VGG") {
+      return "VideoGameGeek";
+    }
+    return "BoardGameGeek";
   }
 
   function showStatus(message) {

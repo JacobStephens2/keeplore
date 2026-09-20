@@ -27,15 +27,22 @@ function bgg_preferred_candidate($candidates, $query) {
     return null;
   }
   $needle = strtolower(trim((string) $query));
+  $exact = [];
   foreach ($candidates as $candidate) {
     if (!is_array($candidate) || !isset($candidate['name'])) {
       continue;
     }
     if (strtolower((string) $candidate['name']) === $needle) {
+      $exact[] = $candidate;
+    }
+  }
+  $pool = $exact !== [] ? $exact : $candidates;
+  foreach ($pool as $candidate) {
+    if (($candidate['source'] ?? '') === 'BGG') {
       return $candidate;
     }
   }
-  return $candidates[0];
+  return $pool[0];
 }
 
 function bgg_form_fields_from_json($item_json, $dynamic_json) {
@@ -51,9 +58,10 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
   $id = isset($item['objectid']) ? (int) $item['objectid'] : (isset($item['id']) ? (int) $item['id'] : 0);
   $name = isset($item['name']) ? trim((string) $item['name']) : '';
   $year = isset($item['yearpublished']) ? trim((string) $item['yearpublished']) : '';
+  $source = bgg_source_from_item($item);
   $url = isset($item['canonical_link']) ? trim((string) $item['canonical_link']) : '';
   if ($url === '' && $id > 0) {
-    $url = 'https://boardgamegeek.com/boardgame/' . $id;
+    $url = bgg_canonical_url($id, $source);
   }
 
   $fields = ['Title' => $name];
@@ -66,6 +74,9 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
   $fields['MnT'] = bgg_scalar_string($item['minplaytime'] ?? '');
   $fields['MxT'] = bgg_scalar_string($item['maxplaytime'] ?? '');
   $fields['Age'] = bgg_scalar_string($item['minage'] ?? '');
+  if ($year !== '') {
+    $fields['Yr'] = $year;
+  }
 
   return [
     'match' => [
@@ -73,9 +84,36 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
       'name' => $name,
       'year' => $year,
       'url' => $url,
+      'source' => $source,
     ],
     'fields' => $fields,
   ];
+}
+
+function bgg_source_from_item($item) {
+  $subtype = strtolower(trim((string) ($item['subtype'] ?? '')));
+  if ($subtype === '' && isset($item['subtypes'][0])) {
+    $subtype = strtolower(trim((string) $item['subtypes'][0]));
+  }
+  $url = (string) ($item['canonical_link'] ?? $item['href'] ?? '');
+  if ($subtype === 'rpgitem' || str_contains($url, 'rpggeek.com') || str_contains($url, '/rpgitem/')) {
+    return 'RPGG';
+  }
+  if ($subtype === 'videogame' || str_contains($url, 'videogamegeek.com') || str_contains($url, '/videogame/')) {
+    return 'VGG';
+  }
+  return 'BGG';
+}
+
+function bgg_canonical_url($id, $source) {
+  $id = (int) $id;
+  if ($source === 'RPGG') {
+    return 'https://rpggeek.com/rpgitem/' . $id;
+  }
+  if ($source === 'VGG') {
+    return 'https://videogamegeek.com/videogame/' . $id;
+  }
+  return 'https://boardgamegeek.com/boardgame/' . $id;
 }
 
 function bgg_scalar_string($value) {
@@ -121,17 +159,21 @@ function bgg_api_root() {
   return 'https://api.geekdo.com/api';
 }
 
+function bgg_curl_options() {
+  return [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_TIMEOUT => 15,
+    CURLOPT_USERAGENT => 'Keeplore/1.0 (https://keeplore.app)',
+    CURLOPT_HTTPHEADER => ['Accept: application/json'],
+  ];
+}
+
 function bgg_http_get($url) {
   $ch = curl_init($url);
   if ($ch === false) {
     throw new RuntimeException('Could not start BoardGameGeek request.');
   }
-  curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT => 15,
-    CURLOPT_USERAGENT => 'Keeplore/1.0 (https://keeplore.app)',
-    CURLOPT_HTTPHEADER => ['Accept: application/json'],
-  ]);
+  curl_setopt_array($ch, bgg_curl_options());
   $body = curl_exec($ch);
   $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
   $error = curl_error($ch);
@@ -140,6 +182,38 @@ function bgg_http_get($url) {
     throw new RuntimeException($error !== '' ? $error : 'BoardGameGeek HTTP ' . $code);
   }
   return $body;
+}
+
+function bgg_http_get_many($urls) {
+  $mh = curl_multi_init();
+  $handles = [];
+  foreach ($urls as $key => $url) {
+    $ch = curl_init($url);
+    if ($ch === false) {
+      continue;
+    }
+    curl_setopt_array($ch, bgg_curl_options());
+    curl_multi_add_handle($mh, $ch);
+    $handles[$key] = $ch;
+  }
+
+  do {
+    $status = curl_multi_exec($mh, $active);
+    if ($active) {
+      curl_multi_select($mh, 1.0);
+    }
+  } while ($active && $status === CURLM_OK);
+
+  $bodies = [];
+  foreach ($handles as $key => $ch) {
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $body = curl_multi_getcontent($ch);
+    $bodies[$key] = ($body !== false && $code > 0 && $code < 400) ? $body : null;
+    curl_multi_remove_handle($mh, $ch);
+    curl_close($ch);
+  }
+  curl_multi_close($mh);
+  return $bodies;
 }
 
 function bgg_fetch($url, $get_json) {
@@ -220,20 +294,76 @@ function bgg_fields_for_id($object_id, $get_json = null) {
   ];
 }
 
+function bgg_candidate_from_item_json($json, $fallback) {
+  $mapped = bgg_form_fields_from_json($json, '{}');
+  $match = $mapped['match'];
+  $id = $match['id'] > 0 ? $match['id'] : (int) $fallback['id'];
+  $name = $match['name'] !== '' ? $match['name'] : (string) $fallback['name'];
+  return [
+    'id' => $id,
+    'name' => $name,
+    'year' => $match['year'],
+    'source' => $match['source'] ?? 'BGG',
+  ];
+}
+
+function bgg_enrich_candidates($candidates, $get_json = null) {
+  if (!is_array($candidates) || $candidates === []) {
+    return [];
+  }
+
+  $urls = [];
+  foreach ($candidates as $candidate) {
+    $id = (int) $candidate['id'];
+    $urls[$id] = bgg_api_root() . '/geekitems?objectid=' . $id . '&objecttype=thing';
+  }
+
+  if ($get_json === null) {
+    $bodies = bgg_http_get_many($urls);
+  } else {
+    $bodies = [];
+    foreach ($urls as $id => $url) {
+      try {
+        $bodies[$id] = bgg_fetch($url, $get_json);
+      } catch (Throwable $e) {
+        $bodies[$id] = null;
+      }
+    }
+  }
+
+  $enriched = [];
+  foreach ($candidates as $candidate) {
+    $id = (int) $candidate['id'];
+    $json = $bodies[$id] ?? null;
+    if (!is_string($json) || $json === '') {
+      $enriched[] = [
+        'id' => $id,
+        'name' => $candidate['name'],
+        'year' => '',
+        'source' => 'BGG',
+      ];
+      continue;
+    }
+    $enriched[] = bgg_candidate_from_item_json($json, $candidate);
+  }
+  return $enriched;
+}
+
 function bgg_lookup_name($query, $get_json = null) {
   $search = bgg_search($query, $get_json);
   if (empty($search['ok'])) {
     return $search;
   }
 
-  $preferred = $search['preferred'];
+  $candidates = bgg_enrich_candidates($search['candidates'], $get_json);
+  $preferred = bgg_preferred_candidate($candidates, $query);
   $fields = bgg_fields_for_id($preferred['id'], $get_json);
   if (empty($fields['ok'])) {
     return $fields;
   }
 
   $alternatives = [];
-  foreach ($search['candidates'] as $candidate) {
+  foreach ($candidates as $candidate) {
     if ((int) $candidate['id'] !== (int) $preferred['id']) {
       $alternatives[] = $candidate;
     }

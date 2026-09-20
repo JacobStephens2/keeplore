@@ -50,6 +50,18 @@ body {
   color: var(--text);
 }
 
+.staging-banner {
+  margin: 0;
+  max-width: none;
+  padding: 0.45rem 1rem;
+  background: #7a2e12;
+  color: #fff8f3;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
 a {
   color: var(--primary);
   text-decoration: none;
@@ -646,6 +658,13 @@ button.untrack-btn:hover {
   margin: 0 0 0.45rem;
 }
 
+.bgg-source {
+  margin-left: 0.4rem;
+  color: var(--text-soft);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .bgg-confirm-actions {
   display: flex;
   flex-wrap: wrap;
@@ -659,6 +678,20 @@ button.untrack-btn:hover {
   padding: 0;
   display: grid;
   gap: 0.4rem;
+}
+
+.bgg-other-matches button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  background: var(--surface-lowest);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--outline-strong);
+}
+
+.bgg-other-matches button:hover {
+  color: var(--text);
+  background: var(--surface-high);
 }
 
 button.bgg-secondary {
@@ -1913,6 +1946,17 @@ ul.fun-facts .fact-aside {
   padding: 0.45rem 0.95rem;
 }
 
+.page-header-actions kbd {
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: rgba(255, 255, 255, 0.2);
+  color: inherit;
+}
+
 .surface-panel {
   padding: 1.5rem;
   border-radius: var(--radius-lg);
@@ -2930,6 +2974,17 @@ html[data-theme="dark"] button.snooze-btn,
 html[data-theme="dark"] .new-interactor-toggle,
 html[data-theme="dark"] .new-interactor-cancel {
   background: rgba(26, 35, 66, 0.76);
+}
+
+html[data-theme="dark"] .bgg-other-matches button {
+  background: var(--surface-high);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--outline-strong);
+}
+
+html[data-theme="dark"] .bgg-other-matches button:hover {
+  color: var(--text);
+  background: #343e63;
 }
 
 html[data-theme="dark"] .auth-mark {
