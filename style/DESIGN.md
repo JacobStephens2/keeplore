@@ -42,6 +42,7 @@ Aligned to the Digital Curator style board and live CSS tokens in `ui/style.css`
 | Page bg / shade | `#f8fafc` / `#eaedef` | `#0c1222` / `#0a0f1e` | Gradient endpoints |
 | Panel / strong | `rgba(247,249,251,0.82/0.92)` | `rgba(23,30,57,0.82/0.92)` | Dashboard hero, surface panels, forms, zebra rows — never hardcode panel white |
 | Text / soft | `#1b2230` / `#5f6777` | `#e9edf5` / `#a6b0c4` | |
+| On-primary | `#f8fbff` | `#0c1222` | Ink on primary-filled buttons (Keep, Create item, submits). Dark mode inverts it because primary itself is lightened for links |
 | Outline / strong | `rgba(100,116,139,0.16/0.3)` | `rgba(148,163,184,0.2/0.38)` | Ghost-border opacities preserved |
 | Danger / success | `#b63d2f` / `#2e6d51` | `#e0705f` / `#45b483` | Brightened for dark surfaces |
 | Shadow | `0 12px 32px rgba(25,28,30,0.06)` | `0 12px 32px rgba(0,0,0,0.45)` | Ambient, never pure-black-on-light |

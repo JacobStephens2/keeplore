@@ -68,49 +68,61 @@
 
     <?php echo display_errors($errors); ?>
 
-    <form action="<?php echo url_for('/users/edit.php?id=' . h(u($id))); ?>" method="post">
+    <form class="form-layout" action="<?php echo url_for('/users/edit.php?id=' . h(u($id))); ?>" method="post">
       <?php echo csrf_input(); ?>
 
-      <label for="FirstName">First Name</label>
-      <input 
-        type="text" 
-        name="FirstName" 
-        id="FirstName"
-        value="<?php echo h($player['FirstName']); ?>" 
-      />
+      <div class="form-field">
+        <label for="FirstName">First Name</label>
+        <input
+          type="text"
+          name="FirstName"
+          id="FirstName"
+          value="<?php echo h($player['FirstName']); ?>"
+        />
+      </div>
 
-      <label for="LastName">Last Name</label>
-      <input 
-        type="text" 
-        id="LastName"
-        name="LastName" 
-        value="<?php echo h($player['LastName']); ?>" 
-      />
+      <div class="form-field">
+        <label for="LastName">Last Name</label>
+        <input
+          type="text"
+          id="LastName"
+          name="LastName"
+          value="<?php echo h($player['LastName']); ?>"
+        />
+      </div>
 
-      <label for="Gender">Gender (M, F, or Other)</label>
-      <input type="text" id="Gender" name="G" value="<?php echo h($player['G']); ?>" />
+      <div class="form-field">
+        <label for="Gender">Gender (M, F, or Other)</label>
+        <input type="text" id="Gender" name="G" value="<?php echo h($player['G']); ?>" />
+      </div>
 
-      <label for="birth_year">Birth Year</label>
-      <input type="number" id="birth_year" name="birth_year" value="<?php echo h($player['birth_year']); ?>" />
+      <div class="form-field">
+        <label for="birth_year">Birth Year</label>
+        <input type="number" id="birth_year" name="birth_year" value="<?php echo h($player['birth_year']); ?>" />
+      </div>
 
-      <label for="thisPlayerIsMe">This User Is Me</label>
-      <input type="hidden" name="thisPlayerIsMe" value="no">
-      <input type="checkbox" name="thisPlayerIsMe" id="thisPlayerIsMe"
-        value="yes"
-        <?php 
-          $stmt_rep = mysqli_prepare($db, "SELECT represents_user_id FROM players WHERE id = ?");
-          mysqli_stmt_bind_param($stmt_rep, "i", $id);
-          mysqli_stmt_execute($stmt_rep);
-          $rep_result = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt_rep));
-          mysqli_stmt_close($stmt_rep);
-          $userIDThisPlayerIDRepresents = $rep_result['represents_user_id'] ?? null;
-          if ($userIDThisPlayerIDRepresents == $_SESSION['user_id']) {
-            echo 'checked';
-          }
-        ?>
-      >
+      <div class="form-field form-field-check">
+        <input type="hidden" name="thisPlayerIsMe" value="no">
+        <input type="checkbox" name="thisPlayerIsMe" id="thisPlayerIsMe"
+          value="yes"
+          <?php
+            $stmt_rep = mysqli_prepare($db, "SELECT represents_user_id FROM players WHERE id = ?");
+            mysqli_stmt_bind_param($stmt_rep, "i", $id);
+            mysqli_stmt_execute($stmt_rep);
+            $rep_result = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt_rep));
+            mysqli_stmt_close($stmt_rep);
+            $userIDThisPlayerIDRepresents = $rep_result['represents_user_id'] ?? null;
+            if ($userIDThisPlayerIDRepresents == $_SESSION['user_id']) {
+              echo 'checked';
+            }
+          ?>
+        >
+        <label for="thisPlayerIsMe">This User Is Me</label>
+      </div>
 
-      <input type="submit" value="Save Edits" />
+      <div class="form-field-span">
+        <input type="submit" value="Save Edits" />
+      </div>
 
     </form>
 

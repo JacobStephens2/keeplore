@@ -85,146 +85,174 @@ mysqli_stmt_close($stmt);
       }
   ?>
 
-  <form class="surface-panel" method='POST'>
+  <form class="surface-panel form-layout" method='POST'>
     <?php echo csrf_input(); ?>
-    <label for="first_name">First Name</label>
-    <input
-      type="text"
-      name="first_name"
-      id="first_name"
-      value="<?php echo h($userArray['first_name']); ?>"
-      required minlength="2" maxlength="255"
-    >
-
-    <label for="last_name">Last Name</label>
-    <input
-      type="text"
-      name="last_name"
-      id="last_name"
-      value="<?php echo h($userArray['last_name']); ?>"
-      required minlength="2" maxlength="255"
-    >
-
-    <label for="email">Email</label>
-    <input
-      type="email"
-      name="email"
-      id="email"
-      value="<?php echo h($userArray['email']); ?>"
-      required maxlength="255"
-    >
-
-    <label for="username">Username</label>
-    <input
-      type="text"
-      name="username"
-      id="username"
-      value="<?php echo h($userArray['username']); ?>"
-      required minlength="8" maxlength="255"
-    >
-
-    <label for="default_use_interval">Default Use Interval</label>
-    <input
-      type="number"
-      step="0.1"
-      name="default_use_interval"
-      id="default_use_interval"
-      value="<?php echo h($userArray['default_use_interval']); ?>"
-      required min="1"
-    >
-    
-    <label for="default_snooze_days">Snooze length (days)</label>
-    <input
-      type="number"
-      step="1"
-      name="default_snooze_days"
-      id="default_snooze_days"
-      value="<?php echo h($userArray['default_snooze_days']); ?>"
-      required min="1" max="365"
-    >
-
-    <label for="default_setting">Default Setting</label>
-    <input
-      type="text"
-      name="default_setting"
-      id="default_setting"
-      value="<?php echo h($userArray['default_setting']); ?>"
-    >
-
-    <label for="daily_email">
+    <div class="form-field">
+      <label for="first_name">First Name</label>
       <input
-        type="checkbox"
-        name="daily_email"
-        id="daily_email"
-        value="1"
-        <?php if ($userArray['daily_email']) echo 'checked'; ?>
+        type="text"
+        name="first_name"
+        id="first_name"
+        value="<?php echo h($userArray['first_name']); ?>"
+        required minlength="2" maxlength="255"
       >
-      Receive daily use-by email
-    </label>
+    </div>
 
-    <label for="daily_email_hour">Preferred email time (Eastern Time)</label>
-    <select name="daily_email_hour" id="daily_email_hour">
-      <?php
-        for ($h = 0; $h <= 23; $h++) {
-          $label = ($h === 0) ? '12:00 AM (midnight)' :
-                   (($h < 12) ? $h . ':00 AM' :
-                   (($h === 12) ? '12:00 PM (noon)' :
-                   ($h - 12) . ':00 PM'));
-          $selected = ((int)$userArray['daily_email_hour'] === $h) ? 'selected' : '';
-          echo "<option value=\"$h\" $selected>$label</option>";
-        }
-      ?>
-    </select>
-
-    <h2>App notifications</h2>
-    <p>These settings control notifications from the Keeplore Android app.</p>
-
-    <label for="native_notify_enabled">
+    <div class="form-field">
+      <label for="last_name">Last Name</label>
       <input
-        type="checkbox"
-        name="native_notify_enabled"
-        id="native_notify_enabled"
-        value="1"
-        <?php if ($userArray['native_notify_enabled']) echo 'checked'; ?>
+        type="text"
+        name="last_name"
+        id="last_name"
+        value="<?php echo h($userArray['last_name']); ?>"
+        required minlength="2" maxlength="255"
       >
-      Enable app notifications
-    </label>
+    </div>
 
-    <label for="native_notify_hour">Notification time (your device's local time)</label>
-    <select name="native_notify_hour" id="native_notify_hour">
-      <?php
-        for ($h = 0; $h <= 23; $h++) {
-          $label = ($h === 0) ? '12:00 AM (midnight)' :
-                   (($h < 12) ? $h . ':00 AM' :
-                   (($h === 12) ? '12:00 PM (noon)' :
-                   ($h - 12) . ':00 PM'));
-          $selected = ((int)$userArray['native_notify_hour'] === $h) ? 'selected' : '';
-          echo "<option value=\"$h\" $selected>$label</option>";
-        }
-      ?>
-    </select>
-
-    <label for="native_notify_lead_days">Days before due to notify me (0 to skip the early heads-up)</label>
-    <input
-      type="number"
-      name="native_notify_lead_days"
-      id="native_notify_lead_days"
-      value="<?php echo h($userArray['native_notify_lead_days']); ?>"
-      min="0" max="14" step="1"
-    >
-
-    <label for="native_notify_past_due">
+    <div class="form-field">
+      <label for="email">Email</label>
       <input
-        type="checkbox"
-        name="native_notify_past_due"
-        id="native_notify_past_due"
-        value="1"
-        <?php if ($userArray['native_notify_past_due']) echo 'checked'; ?>
+        type="email"
+        name="email"
+        id="email"
+        value="<?php echo h($userArray['email']); ?>"
+        required maxlength="255"
       >
-      Remind me about overdue items
-    </label>
+    </div>
 
-    <input type="submit" value="Update Settings">
+    <div class="form-field">
+      <label for="username">Username</label>
+      <input
+        type="text"
+        name="username"
+        id="username"
+        value="<?php echo h($userArray['username']); ?>"
+        required minlength="8" maxlength="255"
+      >
+    </div>
+
+    <div class="form-field">
+      <label for="default_use_interval">Default Use Interval</label>
+      <input
+        type="number"
+        step="0.1"
+        name="default_use_interval"
+        id="default_use_interval"
+        value="<?php echo h($userArray['default_use_interval']); ?>"
+        required min="1"
+      >
+    </div>
+
+    <div class="form-field">
+      <label for="default_snooze_days">Snooze length (days)</label>
+      <input
+        type="number"
+        step="1"
+        name="default_snooze_days"
+        id="default_snooze_days"
+        value="<?php echo h($userArray['default_snooze_days']); ?>"
+        required min="1" max="365"
+      >
+    </div>
+
+    <div class="form-field">
+      <label for="default_setting">Default Setting</label>
+      <input
+        type="text"
+        name="default_setting"
+        id="default_setting"
+        value="<?php echo h($userArray['default_setting']); ?>"
+      >
+    </div>
+
+    <div class="form-field form-field-check">
+      <label for="daily_email">
+        <input
+          type="checkbox"
+          name="daily_email"
+          id="daily_email"
+          value="1"
+          <?php if ($userArray['daily_email']) echo 'checked'; ?>
+        >
+        Receive daily use-by email
+      </label>
+    </div>
+
+    <div class="form-field">
+      <label for="daily_email_hour">Preferred email time (Eastern Time)</label>
+      <select name="daily_email_hour" id="daily_email_hour">
+        <?php
+          for ($h = 0; $h <= 23; $h++) {
+            $label = ($h === 0) ? '12:00 AM (midnight)' :
+                     (($h < 12) ? $h . ':00 AM' :
+                     (($h === 12) ? '12:00 PM (noon)' :
+                     ($h - 12) . ':00 PM'));
+            $selected = ((int)$userArray['daily_email_hour'] === $h) ? 'selected' : '';
+            echo "<option value=\"$h\" $selected>$label</option>";
+          }
+        ?>
+      </select>
+    </div>
+
+    <h2 class="form-field-span">App notifications</h2>
+    <p class="form-field-span">These settings control notifications from the Keeplore Android app.</p>
+
+    <div class="form-field form-field-check">
+      <label for="native_notify_enabled">
+        <input
+          type="checkbox"
+          name="native_notify_enabled"
+          id="native_notify_enabled"
+          value="1"
+          <?php if ($userArray['native_notify_enabled']) echo 'checked'; ?>
+        >
+        Enable app notifications
+      </label>
+    </div>
+
+    <div class="form-field">
+      <label for="native_notify_hour">Notification time (your device's local time)</label>
+      <select name="native_notify_hour" id="native_notify_hour">
+        <?php
+          for ($h = 0; $h <= 23; $h++) {
+            $label = ($h === 0) ? '12:00 AM (midnight)' :
+                     (($h < 12) ? $h . ':00 AM' :
+                     (($h === 12) ? '12:00 PM (noon)' :
+                     ($h - 12) . ':00 PM'));
+            $selected = ((int)$userArray['native_notify_hour'] === $h) ? 'selected' : '';
+            echo "<option value=\"$h\" $selected>$label</option>";
+          }
+        ?>
+      </select>
+    </div>
+
+    <div class="form-field">
+      <label for="native_notify_lead_days">Days before due to notify me (0 to skip the early heads-up)</label>
+      <input
+        type="number"
+        name="native_notify_lead_days"
+        id="native_notify_lead_days"
+        value="<?php echo h($userArray['native_notify_lead_days']); ?>"
+        min="0" max="14" step="1"
+      >
+    </div>
+
+    <div class="form-field form-field-check">
+      <label for="native_notify_past_due">
+        <input
+          type="checkbox"
+          name="native_notify_past_due"
+          id="native_notify_past_due"
+          value="1"
+          <?php if ($userArray['native_notify_past_due']) echo 'checked'; ?>
+        >
+        Remind me about overdue items
+      </label>
+    </div>
+
+    <div class="form-field-span">
+      <input type="submit" value="Update Settings">
+    </div>
   </form>
 
   <a href="<?php echo url_for('/reset-password/index.php'); ?>">

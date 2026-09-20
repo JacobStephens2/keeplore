@@ -23,6 +23,9 @@ if(is_post_request()) {
   $artifact['Title'] = $_POST['Title'] ?? '';
   $artifact['Acq'] = $_POST['Acq'] ?? date('Y-m-d');
   $artifact['type'] = $_POST['type'] ?? '';
+  if ($artifact['type'] === '') {
+    $artifact['type'] = DEFAULT_TYPE;
+  }
   // A quick add (e.g. from Record Use) defaults to kept; the full form posts is_kept explicitly.
   $artifact['is_kept'] = $_POST['is_kept'] ?? ($is_ajax ? '1' : '');
   $artifact['Candidate'] = $_POST['Candidate'] ?? '';
@@ -92,68 +95,93 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
     <h1>Create Item</h1>
     <?php echo display_errors($errors); ?>
 
-    <form action="<?php echo url_for('/artifacts/new'); ?>" method="POST">
+    <form class="form-layout" action="<?php echo url_for('/artifacts/new'); ?>" method="POST">
       <?php echo csrf_input(); ?>
 
-      <label for="Title">Name</label>
-      <input type="text" name="Title" id="Title" value="<?php echo h($artifact['Title']); ?>" /></dd>
-      
-      <label for="type">Type</label>
-      <select name="type" id="type">
-        <?php 
-          $type = $artifact['type']; 
-          require_once(SHARED_PATH . '/artifact_type_options.php'); 
+      <div class="form-field form-field-span">
+        <label for="Title">Name</label>
+        <input type="text" name="Title" id="Title" value="<?php echo h($artifact['Title']); ?>" />
+      </div>
+
+      <div class="form-field">
+        <?php
+          $type_id = ($artifact['type'] !== '' && $artifact['type'] !== null)
+            ? $artifact['type']
+            : DEFAULT_TYPE;
+          require SHARED_PATH . '/artifact_type_search.php';
         ?>
-      </select>
-      
-      <label for="tags">Tags (comma-separated)</label>
-      <input type="text" name="tags" id="tags"
-        value="<?php echo h($artifact['tags'] ?? ''); ?>"
-        placeholder="portable, beach-safe, two-player, party"
-      />
+      </div>
 
-      <label for="Acq">Tracking Start Date</label>
-      <input type="date" name="Acq" id="Acq" value="<?php 
-        $tz = 'America/New_York';
-        $timestamp = time();
-        $dt = new DateTime("now", new DateTimeZone($tz)); //first argument "must" be a string
-        $dt->setTimestamp($timestamp); //adjust the object to correct timestamp
-        echo $dt->format('Y') . '-' . $dt->format('m') . '-' . $dt->format('d'); 
-      ?>"/>
+      <div class="form-field">
+        <label for="Acq">Tracking Start Date</label>
+        <input type="date" name="Acq" id="Acq" value="<?php
+          $tz = 'America/New_York';
+          $timestamp = time();
+          $dt = new DateTime("now", new DateTimeZone($tz)); //first argument "must" be a string
+          $dt->setTimestamp($timestamp); //adjust the object to correct timestamp
+          echo $dt->format('Y') . '-' . $dt->format('m') . '-' . $dt->format('d');
+        ?>"/>
+      </div>
 
-      <label for="interaction_frequency_days">Interaction Frequency (Days)</label>
-      <input type="number" step="0.1" name="interaction_frequency_days" id="interaction_frequency_days"
-        value="<?php echo $default_interval; ?>"
-        onwheel="this.blur()"
-      >
+      <div class="form-field">
+        <label for="interaction_frequency_days">Interaction Frequency (Days)</label>
+        <input type="number" step="0.1" name="interaction_frequency_days" id="interaction_frequency_days"
+          value="<?php echo $default_interval; ?>"
+          onwheel="this.blur()"
+        >
+      </div>
 
-      <label for="SS">Sweet Spot(s)</label>
-      <input type="text" name="SS" id="SS" 
-        value="<?php echo $artifact['SS']; ?>"
-      >
+      <div class="form-field">
+        <label for="SS">Sweet Spot(s)</label>
+        <input type="text" name="SS" id="SS"
+          value="<?php echo $artifact['SS']; ?>"
+          aria-describedby="ss-hint"
+        >
+        <p id="ss-hint" class="form-field-hint">Ideal player counts, comma-separated. Example: 2, 3, 4</p>
+      </div>
 
-      <label for="MnP">Minimum User Count</label>
-      <input type="number" name="MnP" id="MnP" 
-        value="<?php echo $artifact['MnP']; ?>"
-      >
+      <div class="form-field form-field-check">
+        <input type="hidden" name="is_kept" value="0" />
+        <input type="checkbox" name="is_kept" id="is_kept" value="1" checked/>
+        <label for="is_kept">Kept? (Checked Means Yes)</label>
+      </div>
 
-      <label for="MxP">Maximum User Count</label>
-      <input type="number" name="MxP" id="MxP" value="<?php echo $artifact['MxP']; ?>">
+      <div class="form-field">
+        <label for="MnP">Minimum User Count</label>
+        <input type="number" name="MnP" id="MnP"
+          value="<?php echo $artifact['MnP']; ?>"
+        >
+      </div>
 
-      <label for="MnT">Minimum Time</label>
-      <input type="number" name="MnT" id="MnT" value="<?php echo $artifact['MnT']; ?>">
+      <div class="form-field">
+        <label for="MxP">Maximum User Count</label>
+        <input type="number" name="MxP" id="MxP" value="<?php echo $artifact['MxP']; ?>">
+      </div>
 
-      <label for="MxT">Maxiumum Time</label>
-      <input type="number" name="MxT" id="MxT" value="<?php echo $artifact['MxT']; ?>">
+      <div class="form-field">
+        <label for="MnT">Minimum Time</label>
+        <input type="number" name="MnT" id="MnT" value="<?php echo $artifact['MnT']; ?>">
+      </div>
 
-      <label for="is_kept">Kept? (Checked Means Yes)</label>
-      <input type="hidden" name="is_kept" value="0" />
-      <input type="checkbox" name="is_kept" id="is_kept" value="1" checked/>
-      
-      <label for="Notes">Notes</label>
-      <textarea name="Notes" id="Notes" cols="30" rows="5"></textarea>
+      <div class="form-field">
+        <label for="MxT">Maxiumum Time</label>
+        <input type="number" name="MxT" id="MxT" value="<?php echo $artifact['MxT']; ?>">
+      </div>
 
-      <div id="operations">
+      <div class="form-field form-field-span">
+        <label for="Notes">Notes</label>
+        <textarea name="Notes" id="Notes" cols="30" rows="5"></textarea>
+      </div>
+
+      <div class="form-field form-field-span">
+        <label for="tags">Tags (comma-separated)</label>
+        <input type="text" name="tags" id="tags"
+          value="<?php echo h($artifact['tags'] ?? ''); ?>"
+          placeholder="portable, beach-safe, two-player, party"
+        />
+      </div>
+
+      <div id="operations" class="form-field-span">
         <input type="submit" value="Create Item" />
       </div>
     </form>

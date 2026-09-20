@@ -38,9 +38,10 @@ include(SHARED_PATH . '/header.php');
 
     <?php echo display_errors($errors); ?>
 
-    <form action="<?php echo url_for('/aversions/edit.php?id=' . h(u($id))); ?>" method="post">
+    <form class="form-layout" action="<?php echo url_for('/aversions/edit.php?id=' . h(u($id))); ?>" method="post">
       <?php echo csrf_input(); ?>
-      <label for="Title">Item</label>
+      <div class="form-field">
+        <label for="Title">Item</label>
         <select id="Title" name="Title">
         <?php
           $type_set = list_artifacts();
@@ -54,28 +55,35 @@ include(SHARED_PATH . '/header.php');
           mysqli_free_result($type_set);
         ?>
         </select>
-      <label for="User">User</label>
-      <select id="User" name="Player">
-        <option value='Invalid'>Choose a User</option>
-        <?php
-          $player_set = list_players();
-          while($player = mysqli_fetch_assoc($player_set)) {
-            echo "<option value=\"" . h($player['id']) . "\"";
-            if($response["Player"] == $player['id']) {
-              echo " selected";
+      </div>
+      <div class="form-field">
+        <label for="User">User</label>
+        <select id="User" name="Player">
+          <option value='Invalid'>Choose a User</option>
+          <?php
+            $player_set = list_players();
+            while($player = mysqli_fetch_assoc($player_set)) {
+              echo "<option value=\"" . h($player['id']) . "\"";
+              if($response["Player"] == $player['id']) {
+                echo " selected";
+              }
+              echo ">" . h($player['FirstName']) . ' ' . h($player['LastName']) . "</option>";
             }
-            echo ">" . h($player['FirstName']) . ' ' . h($player['LastName']) . "</option>";
-          }
-          mysqli_free_result($player_set);
-        ?>
-      </select>
-    
-      <label for="AversionDate">Aversion Date</label>
-      <input type="date" name="AversionDate" id="AversionDate" value="<?php echo h($response['AversionDate']); ?>" />
+            mysqli_free_result($player_set);
+          ?>
+        </select>
+      </div>
+
+      <div class="form-field">
+        <label for="AversionDate">Aversion Date</label>
+        <input type="date" name="AversionDate" id="AversionDate" value="<?php echo h($response['AversionDate']); ?>" />
+      </div>
 
       <input type="hidden" name="id" value="<?php echo h($response['id']); ?>" />
 
-      <input type="submit" value="Save Aversion" />
+      <div class="form-field-span">
+        <input type="submit" value="Save Aversion" />
+      </div>
     </form>
 
     <a 

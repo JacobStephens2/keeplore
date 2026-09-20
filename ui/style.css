@@ -16,6 +16,7 @@
   --panel-strong: rgba(247, 249, 251, 0.92);
   --text: #1b2230;
   --text-soft: #5f6777;
+  --on-primary: #f8fbff;
   --outline: rgba(100, 116, 139, 0.16);
   --outline-strong: rgba(100, 116, 139, 0.3);
   --danger: #b63d2f;
@@ -120,8 +121,9 @@ main {
   padding: 2rem 1.5rem 4rem;
 }
 
-/* Useby page uses the full viewport so table rows have room to breathe. */
-main.useby-page {
+/* Wide tables (interact-by, items) use the full viewport so rows have room. */
+main.useby-page,
+main.items-page {
   width: 100%;
   max-width: none;
 }
@@ -201,7 +203,7 @@ main.useby-page {
 
 .site-status {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
 }
 
@@ -562,13 +564,13 @@ button,
 input[type="submit"],
 .prominent-link {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-soft) 100%);
-  color: #f8fbff;
+  color: var(--on-primary);
 }
 
 button:hover,
 input[type="submit"]:hover,
 .prominent-link:hover {
-  color: #fff;
+  color: var(--on-primary);
   transform: translateY(-1px);
 }
 
@@ -586,12 +588,16 @@ button.sweetSpot {
   padding: 0.7rem 1rem;
 }
 
-button.get-rid-of-btn {
+button.get-rid-of-btn,
+button.get-rid-of-btn:hover {
   background: linear-gradient(135deg, #8b2d22 0%, var(--danger) 100%);
+  color: #f8fbff;
 }
 
-button.restore-btn {
+button.restore-btn,
+button.restore-btn:hover {
   background: linear-gradient(135deg, #244e3b 0%, var(--success) 100%);
+  color: #f8fbff;
 }
 
 button.snooze-btn {
@@ -1482,7 +1488,7 @@ p.copied_message {
 
 .modal-save {
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 #record-modal-users {
@@ -2696,6 +2702,83 @@ table#useBy.cards-view tbody td.get-rid-of button.get-rid-of-btn {
   }
 }
 
+/* Wide-viewport object forms: two field columns so the right side of the
+   panel holds inputs instead of empty space. Single column below 900px. */
+.form-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  column-gap: 1.5rem;
+  row-gap: 0;
+  align-items: start;
+  margin-bottom: 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.form-field > label {
+  margin-top: 1.1rem;
+  margin-bottom: 0.45rem;
+}
+
+.form-layout > .form-field:first-of-type > label {
+  margin-top: 0;
+}
+
+.form-field-span {
+  grid-column: 1 / -1;
+}
+
+.form-layout .form-field input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="hidden"]),
+.form-layout .form-field select,
+.form-layout .form-field textarea {
+  width: 100%;
+  max-width: none;
+}
+
+.form-field-hint {
+  margin: 0.4rem 0 0;
+  max-width: none;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
+.form-field-check {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: end;
+  gap: 0.55rem;
+  min-height: 3.5rem;
+  margin-top: 1.1rem;
+}
+
+.form-field-check > label {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-layout > h2.form-field-span {
+  margin-top: 1.5rem;
+}
+
+.form-layout > p.form-field-span {
+  margin-bottom: 0.5rem;
+}
+
+@media (min-width: 900px) {
+  .form-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
 /* --- Edit entity page: action bar + non-overlapping form controls (2026-06-16) --- */
 #editArtifact .edit-actions {
   display: flex;
@@ -2709,26 +2792,11 @@ table#useBy.cards-view tbody td.get-rid-of button.get-rid-of-btn {
   margin-top: 0;
 }
 
-/* Stack every control on its own row so submit buttons never overlap the
-   textarea (they were inline-flex and flowed beside it). */
 #editForm {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.45rem;
   margin-bottom: 0;
 }
 
-#editForm label {
-  margin: 0.95rem 0 0;
-}
-
-#editForm label:first-of-type {
-  margin-top: 0.25rem;
-}
-
 #editForm input[type="submit"] {
-  align-self: flex-start;
   margin: 1.1rem 0 0.35rem;
 }
 
@@ -2770,6 +2838,7 @@ html[data-theme="dark"] {
   --page-bg-shade: #0a0f1e;
   --text: #e9edf5;
   --text-soft: #a6b0c4;
+  --on-primary: #0c1222;
   --outline: rgba(148, 163, 184, 0.2);
   --outline-strong: rgba(148, 163, 184, 0.38);
   --danger: #e0705f;
@@ -2870,6 +2939,8 @@ html[data-theme="dark"] .modal-panel {
 .theme-switcher {
   display: inline-flex;
   align-items: center;
+  /* Global `label` margin would drop System below the email pill. */
+  margin: 0;
 }
 
 .theme-switcher select {
