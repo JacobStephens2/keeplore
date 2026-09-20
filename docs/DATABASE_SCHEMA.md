@@ -36,7 +36,7 @@ The primary artifacts table. Despite its name, it stores all artifact types (boa
 | `Age` | INT | YES | Minimum recommended age |
 | `age_max` | INT | YES | Maximum recommended age |
 | `Wt` | VARCHAR(50) | YES | Weight / complexity rating |
-| `Yr` | VARCHAR(10) | YES | Year of publication or release |
+| `Yr` | DOUBLE | YES | Year of publication or release. Production type; blank years must be written as NULL because an empty string truncates under STRICT_TRANS_TABLES |
 | `Av` | VARCHAR(50) | YES | Availability indicator |
 | `BGG_Rat` | VARCHAR(10) | YES | BoardGameGeek rating |
 | `FavCt` | INT | YES | Favorite count |
