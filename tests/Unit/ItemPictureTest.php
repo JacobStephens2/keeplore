@@ -44,4 +44,14 @@ class ItemPictureTest extends TestCase
             $show
         );
     }
+
+    public function test_edit_page_renders_the_stored_picture(): void
+    {
+        $edit = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/edit.php');
+        $this->assertStringContainsString("\$artifact['image_url']", $edit);
+        $this->assertMatchesRegularExpression(
+            '/<img[^>]*class="item-picture"/',
+            $edit
+        );
+    }
 }

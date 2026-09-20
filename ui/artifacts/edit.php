@@ -89,6 +89,15 @@
   <div id="editArtifact" class="object edit">
     <h1>Edit <?php echo h($artifact['Title']); ?></h1>
 
+    <?php
+      $picture = normalize_item_image_url($artifact['image_url'] ?? '');
+      if ($picture !== '') {
+    ?>
+    <p class="item-picture-wrap">
+      <img class="item-picture" src="<?php echo h($picture); ?>" alt="<?php echo h($artifact['Title']); ?>" referrerpolicy="no-referrer">
+    </p>
+    <?php } ?>
+
     <?php echo display_errors($errors); ?>
 
     <div class="edit-actions">
