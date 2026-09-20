@@ -10,7 +10,8 @@ const STATIC_ASSETS = [
   '/shared/js/api-client.js',
   '/shared/js/search-component.js',
   '/shared/js/filter-utils.js',
-  '/shared/js/theme.js'
+  '/shared/js/theme.js',
+  '/shared/js/items-shortcut.js'
 ];
 
 const OFFLINE_PAGE = '/offline.html';
