@@ -104,7 +104,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
     <h1>Create Item</h1>
     <?php echo display_errors($errors); ?>
 
-    <form class="form-layout" action="<?php echo url_for('/artifacts/new'); ?>" method="POST">
+    <form class="form-layout" data-shortcut="save" action="<?php echo url_for('/artifacts/new'); ?>" method="POST">
       <?php echo csrf_input(); ?>
 
       <div class="form-field-span create-item-submit">
@@ -244,32 +244,6 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 </main>
 
 <script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=5"></script>
-<script>
-  document.addEventListener('keydown', function(event) {
-    if (event.key !== 's' && event.key !== 'S') {
-      return;
-    }
-    if (event.metaKey || event.ctrlKey || event.altKey) {
-      return;
-    }
-    const target = event.target;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
-      const type = (target.type || '').toLowerCase();
-      if (target.tagName !== 'INPUT' || (type !== 'checkbox' && type !== 'radio' && type !== 'submit' && type !== 'button')) {
-        return;
-      }
-    }
-    const form = document.querySelector('form.form-layout');
-    if (!form) {
-      return;
-    }
-    event.preventDefault();
-    if (typeof form.requestSubmit === 'function') {
-      form.requestSubmit();
-    } else {
-      form.submit();
-    }
-  });
-</script>
+<script src="<?php echo url_for('/shared/js/form-save-shortcut.js'); ?>?v=1"></script>
 
 <?php include(SHARED_PATH . '/footer.php'); ?>
