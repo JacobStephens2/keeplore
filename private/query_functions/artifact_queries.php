@@ -362,6 +362,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
     $secondary = normalize_secondary_membership($artifact['is_in_secondary_collection'] ?? null);
     $digital = normalize_format_flag($artifact['is_digital'] ?? null);
     $physical = normalize_format_flag($artifact['is_physical'] ?? null);
+    $year = normalize_artifact_year($artifact['Yr'] ?? null);
 
     $stmt = mysqli_prepare($db,
       "UPDATE games SET
@@ -378,7 +379,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
       $artifact['Candidate'], $artifact['UsedRecUserCt'],
       $type_id, $type_name, $artifact['SS'], $artifact['Notes'],
       $artifact['CandidateGroupDate'], $artifact['MnT'], $artifact['MxT'],
-      $artifact['age'], $artifact['Yr'], $secondary,
+      $artifact['age'], $year, $secondary,
       $artifact['MnP'], $artifact['MxP'], $artifact['interaction_frequency_days'],
       $to_get_rid_of,
       $digital,
@@ -396,6 +397,14 @@ require_once dirname(__DIR__) . '/item_tags.php';
       exit;
     }
 
+  }
+
+  function normalize_artifact_year($year) {
+    if ($year === null) {
+      return null;
+    }
+    $trimmed = trim((string) $year);
+    return $trimmed === '' ? null : $trimmed;
   }
 
   function validate_artifact($artifact) {
@@ -488,6 +497,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
     $secondary = normalize_secondary_membership($artifact['is_in_secondary_collection'] ?? null);
     $digital = normalize_format_flag($artifact['is_digital'] ?? null);
     $physical = normalize_format_flag($artifact['is_physical'] ?? null);
+    $year = normalize_artifact_year($artifact['Yr'] ?? null);
 
     $sql = "INSERT INTO games (
         Title,
@@ -528,7 +538,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
       $artifact['MnT'],
       $artifact['MxT'],
       $artifact['age'],
-      $artifact['Yr'],
+      $year,
       $artifact['MnP'],
       $artifact['MxP'],
       $_SESSION['user_id'],
