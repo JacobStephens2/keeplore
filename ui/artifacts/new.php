@@ -23,6 +23,9 @@ if(is_post_request()) {
   $artifact['Title'] = $_POST['Title'] ?? '';
   $artifact['Acq'] = $_POST['Acq'] ?? date('Y-m-d');
   $artifact['type'] = $_POST['type'] ?? '';
+  if ($artifact['type'] === '') {
+    $artifact['type'] = DEFAULT_TYPE;
+  }
   // A quick add (e.g. from Record Use) defaults to kept; the full form posts is_kept explicitly.
   $artifact['is_kept'] = $_POST['is_kept'] ?? ($is_ajax ? '1' : '');
   $artifact['Candidate'] = $_POST['Candidate'] ?? '';
@@ -101,13 +104,12 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
       </div>
 
       <div class="form-field">
-        <label for="type">Type</label>
-        <select name="type" id="type">
-          <?php
-            $type = $artifact['type'];
-            require_once(SHARED_PATH . '/artifact_type_options.php');
-          ?>
-        </select>
+        <?php
+          $type_id = ($artifact['type'] !== '' && $artifact['type'] !== null)
+            ? $artifact['type']
+            : DEFAULT_TYPE;
+          require SHARED_PATH . '/artifact_type_search.php';
+        ?>
       </div>
 
       <div class="form-field">
