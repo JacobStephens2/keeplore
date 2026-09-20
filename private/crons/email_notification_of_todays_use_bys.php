@@ -4,11 +4,9 @@
     date_default_timezone_set('America/New_York');
     $current_hour = (int) date('G');
 
-    file_put_contents(
-        __FILE__ . '.log',
-        __FILE__ . " began running at " . date('Y-m-d G:i:s') . " (hour: $current_hour)\n",
-        FILE_APPEND
-    );
+    // Log to stdout so crontab can append to the shared log volume. The
+    // promoted release tree is root-owned and not writable by www-data.
+    echo __FILE__ . " began running at " . date('Y-m-d G:i:s') . " (hour: $current_hour)\n";
 
     $stmt = mysqli_prepare($db, "SELECT id FROM users WHERE daily_email = 1 AND daily_email_hour = ?");
     mysqli_stmt_bind_param($stmt, "i", $current_hour);
@@ -27,10 +25,6 @@
 
     }
 
-    file_put_contents(
-        __FILE__ . '.log',
-        __FILE__ . ' finished running at ' . date('Y-m-d G:i:s') . "\n",
-        FILE_APPEND
-    );
+    echo __FILE__ . ' finished running at ' . date('Y-m-d G:i:s') . "\n";
 
 ?>
