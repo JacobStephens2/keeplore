@@ -62,6 +62,8 @@
     redirect_to(url_for('/index.php') . '#priority-queue');
   } elseif ($return_to === 'index') {
     redirect_to(url_for('/artifacts/index.php'));
+  } elseif ($return_to === 'to-get-rid-of') {
+    redirect_to(url_for('/artifacts/to-get-rid-of.php'));
   } else {
     redirect_to(url_for('/artifacts/useby.php'));
   }

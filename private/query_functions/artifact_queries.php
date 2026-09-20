@@ -112,6 +112,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
     $stmt = mysqli_prepare($db, "SELECT games.id, games.Title, games.Acq, games.interaction_frequency_days,
         types.objectType AS type,
         games.to_get_rid_of,
+        games.is_kept,
         CASE
           WHEN MAX(uses.use_date) IS NULL THEN MAX(responses.PlayDate)
           WHEN MAX(uses.use_date) < MAX(responses.PlayDate) THEN MAX(responses.PlayDate)
@@ -121,7 +122,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
         LEFT JOIN responses ON games.id = responses.Title
         LEFT JOIN uses ON games.id = uses.artifact_id
         LEFT JOIN types ON games.type_id = types.id
-      GROUP BY games.id, games.Title, games.Acq, games.interaction_frequency_days, types.objectType, games.user_id, games.to_get_rid_of
+      GROUP BY games.id, games.Title, games.Acq, games.interaction_frequency_days, types.objectType, games.user_id, games.to_get_rid_of, games.is_kept
       HAVING games.user_id = ? AND games.to_get_rid_of = 1
       ORDER BY games.Title ASC");
     mysqli_stmt_bind_param($stmt, "i", $user_id);

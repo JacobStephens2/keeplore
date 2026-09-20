@@ -42,13 +42,14 @@
           <th>Last Interaction</th>
           <th>Tracking Start</th>
           <?php if (!is_guest()) { ?><th>Restore</th>
-          <th>Delete</th><?php } ?>
+          <th>Kept</th><?php } ?>
         </tr>
       </thead>
 
       <tbody>
         <?php while ($artifact = mysqli_fetch_assoc($artifact_set)) {
           $id = h(u($artifact['id']));
+          $is_kept = artifact_is_kept($artifact);
         ?>
           <tr>
             <td class="name">
@@ -77,10 +78,17 @@
               </form>
             </td>
 
-            <td>
-              <a class="action" href="<?php echo url_for('/artifacts/delete.php?id=' . $id); ?>">
-                Delete
-              </a>
+            <td class="kept" data-artifact-id="<?php echo $id; ?>" data-kept="<?php echo $is_kept ? '1' : '0'; ?>">
+              <form method="post" action="<?php echo url_for('/artifacts/set-tracked.php'); ?>" class="kept-toggle-form" style="display:inline; margin:0;">
+                <?php echo csrf_input(); ?>
+                <input type="hidden" name="artifact_id" value="<?php echo $id; ?>">
+                <input type="hidden" name="artifact_name" value="<?php echo h($artifact['Title']); ?>">
+                <input type="hidden" name="value" value="<?php echo $is_kept ? '0' : '1'; ?>">
+                <input type="hidden" name="return_to" value="to-get-rid-of">
+                <button type="submit" class="kept-toggle-btn" aria-pressed="<?php echo $is_kept ? 'true' : 'false'; ?>">
+                  <?php echo $is_kept ? 'Kept' : 'Keep'; ?>
+                </button>
+              </form>
             </td>
             <?php } ?>
           </tr>
@@ -93,6 +101,73 @@
   <?php } ?>
 
   <?php mysqli_free_result($artifact_set); ?>
+
+  <div id="rid-of-toast" class="toast" role="status" aria-live="polite"></div>
+  <script>
+    (function () {
+      var toastEl = document.getElementById('rid-of-toast');
+      var toastTimer = null;
+      function showToast(message, kind) {
+        if (!toastEl) { window.alert(message); return; }
+        toastEl.textContent = message;
+        toastEl.classList.remove('toast-success', 'toast-error', 'is-visible');
+        toastEl.classList.add(kind === 'error' ? 'toast-error' : 'toast-success');
+        void toastEl.offsetWidth;
+        toastEl.classList.add('is-visible');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+          toastEl.classList.remove('is-visible');
+        }, 3500);
+      }
+
+      document.querySelectorAll('form.kept-toggle-form').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          var cell = form.closest('td.kept');
+          var button = form.querySelector('.kept-toggle-btn');
+          var valueInput = form.querySelector('input[name="value"]');
+          var nameInput = form.querySelector('input[name="artifact_name"]');
+          var name = (nameInput && nameInput.value) ? nameInput.value : 'this item';
+          if (valueInput && valueInput.value === '0') {
+            if (!confirm('Remove ' + name + ' from kept?')) {
+              return;
+            }
+          }
+          if (button) { button.disabled = true; }
+          fetch(form.action, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+            body: new FormData(form),
+          })
+            .then(function (response) {
+              return response.json().then(function (data) {
+                return { ok: response.ok, data: data };
+              });
+            })
+            .then(function (result) {
+              if (result.ok && result.data && result.data.ok) {
+                var isKept = result.data.is_kept === 1;
+                if (cell) { cell.dataset.kept = isKept ? '1' : '0'; }
+                if (button) {
+                  button.textContent = isKept ? 'Kept' : 'Keep';
+                  button.setAttribute('aria-pressed', isKept ? 'true' : 'false');
+                }
+                if (valueInput) { valueInput.value = isKept ? '0' : '1'; }
+                showToast(result.data.message || 'Updated.', 'success');
+              } else {
+                showToast((result.data && result.data.message) || 'Request failed', 'error');
+              }
+              if (button) { button.disabled = false; }
+            })
+            .catch(function (error) {
+              showToast('Network error: ' + error.message, 'error');
+              if (button) { button.disabled = false; }
+            });
+        });
+      });
+    })();
+  </script>
 
 </main>
 
