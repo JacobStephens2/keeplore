@@ -43,12 +43,12 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="<?php echo h($keeplore_og_image); ?>">
 
-    <link rel="icon" type="image/svg+xml" href="<?php echo url_for('/assets/logo.svg'); ?>?v=4">
-    <link rel="icon" type="image/png" sizes="32x32" href="<?php echo url_for('/assets/favicon-32.png'); ?>?v=4">
-    <link rel="icon" type="image/png" sizes="192x192" href="<?php echo url_for('/assets/icon-192x192.png'); ?>?v=4">
-    <link rel="shortcut icon" type="image/x-icon" href="<?php echo url_for('/favicon.ico'); ?>?v=4">
+    <link rel="icon" type="image/svg+xml" href="<?php echo url_for('/assets/logo.svg'); ?>?v=5">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?php echo url_for('/assets/favicon-32.png'); ?>?v=5">
+    <link rel="icon" type="image/png" sizes="192x192" href="<?php echo url_for('/assets/icon-192x192.png'); ?>?v=5">
+    <link rel="shortcut icon" type="image/x-icon" href="<?php echo url_for('/favicon.ico'); ?>?v=5">
     <link rel="manifest" href="<?php echo url_for('manifest.json') ?>">
-    <link rel="apple-touch-icon" href="<?php echo url_for('/assets/icon-192x192.png'); ?>?v=4">
+    <link rel="apple-touch-icon" href="<?php echo url_for('/assets/icon-192x192.png'); ?>?v=5">
 
     <script>
       // Display mode (issue #7): set data-theme="light|dark" before first
@@ -95,7 +95,7 @@
       <div class="site-header-inner">
         <div class="site-brand">
           <a class="header-link" href="/">
-            <img class="site-logo" src="<?php echo url_for('/assets/icon-192x192.png'); ?>?v=4" width="36" height="36" alt="" aria-hidden="true">
+            <img class="site-logo" src="<?php echo url_for('/assets/icon-192x192.png'); ?>?v=5" width="36" height="36" alt="" aria-hidden="true">
             <span class="site-wordmark">Keeplore</span>
           </a>
           <p class="site-tagline">Know what you own. Use what you keep.</p>
