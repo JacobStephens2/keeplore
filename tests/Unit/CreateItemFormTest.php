@@ -57,8 +57,11 @@ class CreateItemFormTest extends TestCase
     {
         $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/new.php');
         $this->assertNotFalse($source);
-        $this->assertStringContainsString("event.key !== 's'", $source);
-        $this->assertStringContainsString('TEXTAREA', $source);
-        $this->assertStringContainsString('requestSubmit', $source);
+        $this->assertMatchesRegularExpression(
+            '/<form[^>]*data-shortcut="save"/',
+            $source,
+            'Create Item must mark its form so s can save it.'
+        );
+        $this->assertStringContainsString('form-save-shortcut.js', $source);
     }
 }

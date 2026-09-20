@@ -116,14 +116,14 @@
       </button>
     </div>
 
-    <form id="editForm" class="form-layout"
+    <form id="editForm" class="form-layout" data-shortcut="save"
       action="<?php echo url_for('/artifacts/edit?id=' . h(u($id))); ?>"
       method="post"
       >
       <?php echo csrf_input(); ?>
 
       <div class="form-field-span">
-        <input type="submit" value="Save Edits" />
+        <button type="submit">Save Edits <kbd>s</kbd></button>
       </div>
 
       <div class="form-field form-field-span">
@@ -276,7 +276,7 @@
       </div>
 
       <div class="form-field-span">
-        <input type="submit" value="Save Edits" />
+        <button type="submit">Save Edits <kbd>s</kbd></button>
       </div>
     </form>
 
@@ -332,5 +332,6 @@
 
   editFormDisplayButton.addEventListener('click', toggleEditFormDisplay);
 </script>
+<script src="<?php echo url_for('/shared/js/form-save-shortcut.js'); ?>?v=1"></script>
 
 <?php include(SHARED_PATH . '/footer.php'); ?>
