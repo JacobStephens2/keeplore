@@ -184,10 +184,10 @@ class ItemsShortcutTest extends TestCase
     {
         $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
         $this->assertNotFalse($source);
-        $this->assertStringContainsString(
-            "setAttribute('data-shortcut', 'items-search')",
+        $this->assertMatchesRegularExpression(
+            '/id="items-search"[^>]*data-shortcut="items-search"|data-shortcut="items-search"[^>]*id="items-search"/',
             $source,
-            'After DataTables creates the filter input, mark it so s can focus it.'
+            'The items search box must be marked so s can focus it.'
         );
     }
 

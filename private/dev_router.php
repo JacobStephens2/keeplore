@@ -20,6 +20,12 @@ function keeplore_ui_router_script($uri, $docroot) {
   if (is_file($direct)) {
     return false;
   }
+  if (is_dir($direct)) {
+    $index = rtrim($direct, '/') . '/index.php';
+    if (is_file($index)) {
+      return $index;
+    }
+  }
 
   if (!str_contains(basename($path), '.')) {
     $php = $direct . '.php';

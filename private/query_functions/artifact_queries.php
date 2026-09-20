@@ -156,9 +156,6 @@ require_once dirname(__DIR__) . '/item_tags.php';
   function find_artifacts_by_user_id($kept, $type, $interval, $sweetSpot = '', $tag = '') {
     global $db;
 
-    $interval = (int)$interval;
-    $interval_double = (int)($interval * 2);
-
     $params = [];
     $param_types = '';
 
@@ -166,50 +163,28 @@ require_once dirname(__DIR__) . '/item_tags.php';
         games.Title,
         games.mnp,
         games.mxp,
-        games.mnt,
-        games.mxt,
+        games.mnt AS mnt,
+        games.mxt AS mxt,
         games.Candidate,
         games.UsedRecUserCt,
-        games.ss,
+        games.ss AS ss,
         games.id,
         games.is_kept,
         games.is_in_secondary_collection,
         types.objectType AS type,
         games.user_id,
         games.type_id,
-        DATE(MAX(responses.PlayDate)) AS MaxPlay,
-        DATE(MAX(uses.use_date)) AS MaxUse,
-        CASE
-          WHEN
-            MAX(responses.PlayDate) < games.Acq
-            THEN DATE_ADD(games.Acq, INTERVAL " . $interval . " DAY)
-          WHEN
-            MAX(responses.PlayDate) IS NULL
-            THEN DATE_ADD(games.Acq, INTERVAL " . $interval . " DAY)
-          ELSE
-            DATE_ADD(MAX(responses.PlayDate), INTERVAL " . $interval_double . " DAY)
-          END UseBy,
-        games.Acq,
-        games.is_kept
+        DATE((SELECT MAX(responses.PlayDate) FROM responses WHERE responses.Title = games.id)) AS MaxPlay,
+        DATE((SELECT MAX(uses.use_date) FROM uses WHERE uses.artifact_id = games.id)) AS MaxUse,
+        games.Acq
     FROM
         games
-    LEFT JOIN responses ON games.id = responses.Title
-    LEFT JOIN uses ON games.id = uses.artifact_id
     LEFT JOIN types ON games.type_id = types.id
-    GROUP BY
-        games.Acq,
-        games.Title,
-        games.is_kept,
-        games.mnp,
-        games.mxp,
-        games.ss,
-        games.type,
-        games.id
-    HAVING
+    WHERE
         games.user_id = ? ";
 
         $params[] = $_SESSION['user_id'];
-        $param_types .= 's';
+        $param_types .= 'i';
 
         if (strlen($sweetSpot) > 0) {
           $sql .= " AND games.ss LIKE ? ";
@@ -271,11 +246,9 @@ require_once dirname(__DIR__) . '/item_tags.php';
 
     $sql .= "
         ORDER BY
-        UseBy DESC,
-        MaxPlay DESC,
-        Acq DESC,
+        games.Acq DESC,
         games.is_kept DESC,
-        id ASC
+        games.id ASC
     ";
     $stmt = mysqli_prepare($db, $sql);
     mysqli_stmt_bind_param($stmt, $param_types, ...$params);

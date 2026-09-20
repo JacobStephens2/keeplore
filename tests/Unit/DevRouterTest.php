@@ -69,6 +69,22 @@ class DevRouterTest extends TestCase
         $this->assertFalse(keeplore_ui_router_script('/api-docs.php', $this->docroot));
     }
 
+    public function test_directory_path_serves_index_php(): void
+    {
+        mkdir($this->docroot . '/artifacts', 0777, true);
+        file_put_contents($this->docroot . '/artifacts/index.php', '<?php');
+        $this->assertSame(
+            $this->docroot . '/artifacts/index.php',
+            keeplore_ui_router_script('/artifacts/', $this->docroot)
+        );
+        $this->assertSame(
+            $this->docroot . '/artifacts/index.php',
+            keeplore_ui_router_script('/artifacts', $this->docroot)
+        );
+        unlink($this->docroot . '/artifacts/index.php');
+        rmdir($this->docroot . '/artifacts');
+    }
+
     public function test_unknown_paths_are_not_found(): void
     {
         $this->assertNull(keeplore_ui_router_script('/does-not-exist', $this->docroot));

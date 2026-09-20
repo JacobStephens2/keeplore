@@ -21,31 +21,33 @@ class ItemsTableSortTest extends TestCase
 
     public function test_items_page_restores_tracking_start_sort_from_column_names(): void
     {
-        $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
-        $this->assertNotFalse($source);
+        $page = file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
+        $list = file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
+        $this->assertNotFalse($page);
+        $this->assertNotFalse($list);
         $this->assertStringContainsString(
             'items-table-sort.js',
-            $source,
+            $page,
             'Items page must load the named-column sort module.'
         );
         $this->assertMatchesRegularExpression(
             "/column:\\s*['\"]Tracking Start['\"]/",
-            $source,
+            $list,
             'Fresh visits must fall back to Tracking Start, not Name.'
         );
         $this->assertStringContainsString(
             'KeeploreItemsTableSort.restore(',
-            $source,
-            'DataTable init must restore the persisted column-header order.'
+            $list,
+            'The items list must restore the persisted column-header order.'
         );
         $this->assertStringContainsString(
             'KeeploreItemsTableSort.persist(',
-            $source,
+            $list,
             'Column-header clicks must persist the named sort for the next visit.'
         );
         $this->assertDoesNotMatchRegularExpression(
             "/new DataTable\\('#artifacts',[\\s\\S]*?order:\\s*\\[\\s*\\[\\s*3,/",
-            $source,
+            $page,
             'Do not hardcode order column 3; after Tags that is Name and puts Zork I first.'
         );
     }
