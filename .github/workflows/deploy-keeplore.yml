@@ -1,0 +1,65 @@
+# Push to main deploys that commit to production. Protect main already required
+# keeplore-verification, so github.sha is the verified tip.
+
+name: Deploy Keeplore
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-keeplore
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check whether the deploy identity is configured
+        id: deploy
+        env:
+          DEPLOY_HOST: ${{ vars.KEEPLORE_DEPLOY_HOST }}
+          DEPLOY_KEY_B64: ${{ secrets.KEEPLORE_DEPLOY_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$DEPLOY_HOST" && -n "$DEPLOY_KEY_B64" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "KEEPLORE_DEPLOY_HOST / KEEPLORE_DEPLOY_KEY_B64 are unset; skipping deploy."
+          fi
+
+      - name: Configure restricted SSH identity
+        if: steps.deploy.outputs.configured == 'true'
+        env:
+          DEPLOY_KEY_B64: ${{ secrets.KEEPLORE_DEPLOY_KEY_B64 }}
+          KNOWN_HOSTS_B64: ${{ secrets.KEEPLORE_KNOWN_HOSTS_B64 }}
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s' "$DEPLOY_KEY_B64" | base64 --decode > "$HOME/.ssh/id_ed25519"
+          printf '%s' "$KNOWN_HOSTS_B64" | base64 --decode > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Promote github.sha on the server
+        if: steps.deploy.outputs.configured == 'true'
+        env:
+          DEPLOY_HOST: ${{ vars.KEEPLORE_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.KEEPLORE_DEPLOY_USER }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          printf '%s\n' "$COMMIT" | ssh \
+            -i "$HOME/.ssh/id_ed25519" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            'IFS= read -r commit; exec sudo -n /usr/local/libexec/keeplore/promote-keeplore-main.sh "$commit"'
