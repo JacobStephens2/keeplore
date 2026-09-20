@@ -71,7 +71,16 @@ class AgentApiDocsTest extends TestCase
         $this->assertContains('page', $endpoint['body_fields']);
         $this->assertContains('per_page', $endpoint['body_fields']);
         $this->assertContains('query', $endpoint['body_fields']);
+        $this->assertContains('tag', $endpoint['body_fields']);
         $this->assertTrue($endpoint['get_lists_first_page']);
+    }
+
+    public function test_list_and_show_payloads_include_each_items_tags(): void
+    {
+        $listNotes = implode(' ', $this->endpointsById()['list-items']['notes']);
+        $showNotes = implode(' ', $this->endpointsById()['show-item']['notes']);
+        $this->assertStringContainsString('tags', $listNotes);
+        $this->assertStringContainsString('tags', $showNotes);
     }
 
     public function test_show_item_and_uses_are_get_reads(): void
@@ -112,6 +121,7 @@ class AgentApiDocsTest extends TestCase
             'Agent keys permit reads plus the kept toggle only.',
             $this->docs()['denied_message']
         );
+        $this->assertNotContains('set-tags', array_column($this->docs()['endpoints'], 'id'));
     }
 
     public function test_discovery_map_matches_catalog_paths(): void

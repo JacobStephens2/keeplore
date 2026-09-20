@@ -1,5 +1,7 @@
 <?php
 
+require_once dirname(__DIR__) . '/item_tags.php';
+
 class Artifact extends DatabaseObject {
 
   static protected $table_name = 'games';
@@ -11,6 +13,7 @@ class Artifact extends DatabaseObject {
   ];
 
   public $id;
+  public $tags = [];
 
   public $Access;
   public $Acq;
@@ -112,20 +115,23 @@ class Artifact extends DatabaseObject {
     ];
   }
 
-  public static function list_artifacts_by_user($user_id, $page = 1, $per_page = 50) {
+  public static function list_artifacts_by_user($user_id, $page = 1, $per_page = 50, $tag = '') {
     $user_id = (int) $user_id;
     $page = max(1, (int) $page);
     $per_page = max(1, min(200, (int) $per_page));
     $offset = ($page - 1) * $per_page;
+    $filter = item_tag_user_filter($tag, $user_id);
 
     $stmt = self::$database->prepare(
       "SELECT games.id, games.Title
        FROM games
-       WHERE games.user_id = ?
+       WHERE games.user_id = ?" . $filter['sql'] . "
        ORDER BY games.Title ASC
        LIMIT ? OFFSET ?"
     );
-    $stmt->bind_param("iii", $user_id, $per_page, $offset);
+    $types = 'i' . $filter['types'] . 'ii';
+    $params = array_merge([$user_id], $filter['params'], [$per_page, $offset]);
+    $stmt->bind_param($types, ...$params);
     $stmt->execute();
     $result = $stmt->get_result();
     $array = array();
@@ -136,30 +142,35 @@ class Artifact extends DatabaseObject {
     return $array;
   }
 
-  public static function list_artifacts_by_user_paginated($user_id, $per_page = 50, $cursor = null) {
+  public static function list_artifacts_by_user_paginated($user_id, $per_page = 50, $cursor = null, $tag = '') {
     $user_id = (int) $user_id;
     $per_page = max(1, min(200, (int) $per_page));
     $fetch_limit = $per_page + 1;
+    $filter = item_tag_user_filter($tag, $user_id);
 
     if ($cursor !== null) {
       $cursor = (int) $cursor;
       $stmt = self::$database->prepare(
         "SELECT games.id, games.Title
          FROM games
-         WHERE games.user_id = ? AND games.id > ?
+         WHERE games.user_id = ? AND games.id > ?" . $filter['sql'] . "
          ORDER BY games.id ASC
          LIMIT ?"
       );
-      $stmt->bind_param("iii", $user_id, $cursor, $fetch_limit);
+      $types = 'ii' . $filter['types'] . 'i';
+      $params = array_merge([$user_id, $cursor], $filter['params'], [$fetch_limit]);
+      $stmt->bind_param($types, ...$params);
     } else {
       $stmt = self::$database->prepare(
         "SELECT games.id, games.Title
          FROM games
-         WHERE games.user_id = ?
+         WHERE games.user_id = ?" . $filter['sql'] . "
          ORDER BY games.id ASC
          LIMIT ?"
       );
-      $stmt->bind_param("ii", $user_id, $fetch_limit);
+      $types = 'i' . $filter['types'] . 'i';
+      $params = array_merge([$user_id], $filter['params'], [$fetch_limit]);
+      $stmt->bind_param($types, ...$params);
     }
 
     $stmt->execute();
@@ -188,21 +199,25 @@ class Artifact extends DatabaseObject {
     ];
   }
 
-  public static function list_artifacts_by_query($query, $user_id, $page = 1, $per_page = 50) {
+  public static function list_artifacts_by_query($query, $user_id, $page = 1, $per_page = 50, $tag = '') {
     $page = max(1, (int) $page);
     $per_page = max(1, min(200, (int) $per_page));
     $offset = ($page - 1) * $per_page;
+    $user_id = (int) $user_id;
+    $filter = item_tag_user_filter($tag, $user_id);
 
     $stmt = self::$database->prepare(
       "SELECT games.id, games.Title
        FROM games
        WHERE games.Title LIKE ?
-       AND user_id = ?
+       AND user_id = ?" . $filter['sql'] . "
        ORDER BY games.Title ASC
        LIMIT ? OFFSET ?"
     );
     $like_query = '%' . $query . '%';
-    $stmt->bind_param("siii", $like_query, $user_id, $per_page, $offset);
+    $types = 'si' . $filter['types'] . 'ii';
+    $params = array_merge([$like_query, $user_id], $filter['params'], [$per_page, $offset]);
+    $stmt->bind_param($types, ...$params);
     $stmt->execute();
     $result = $stmt->get_result();
     $array = array();

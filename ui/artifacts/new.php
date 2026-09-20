@@ -36,10 +36,12 @@ if(is_post_request()) {
   (($_POST['MxP'] ?? '') == '') ? $artifact['MxP'] = $defaultMxP : $artifact['MxP'] = $_POST['MxP'];
   (($_POST['SS'] ?? '') == '') ? $artifact['SS'] = $defaultSS : $artifact['SS'] = $_POST['SS'];
 
+  $artifact['tags'] = $_POST['tags'] ?? '';
   $result = insert_artifact($artifact);
 
   if($result === true) {
     $new_id = mysqli_insert_id($db);
+    replace_item_tags($db, $new_id, (int) $_SESSION['user_id'], $artifact['tags']);
 
     if ($is_ajax) {
       header('Content-Type: application/json');
@@ -77,6 +79,7 @@ if(is_post_request()) {
   $artifact["MnP"] = $defaultMnP;
   $artifact["MxP"] = $defaultMxP;
   $artifact["SS"] = $defaultSS;
+  $artifact['tags'] = '';
 }
 
 $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
@@ -103,6 +106,12 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
         ?>
       </select>
       
+      <label for="tags">Tags (comma-separated)</label>
+      <input type="text" name="tags" id="tags"
+        value="<?php echo h($artifact['tags'] ?? ''); ?>"
+        placeholder="portable, beach-safe, two-player, party"
+      />
+
       <label for="Acq">Tracking Start Date</label>
       <input type="date" name="Acq" id="Acq" value="<?php 
         $tz = 'America/New_York';

@@ -57,7 +57,14 @@
   $interval = $_POST['interval'] ?? $default_use_interval;
   $sweetSpotFilter = $_POST['sweetSpotFilter'] ?? '';
   $showAttributes = $_POST['showAttributes'] ?? 'no';
-  $artifact_set = find_artifacts_by_user_id($kept, $type, $interval, $sweetSpotFilter);
+  $tagFilter = $_POST['tag'] ?? ($_GET['tag'] ?? '');
+  $artifact_set = find_artifacts_by_user_id($kept, $type, $interval, $sweetSpotFilter, $tagFilter);
+  $artifacts = [];
+  while ($row = mysqli_fetch_assoc($artifact_set)) {
+    $artifacts[] = $row;
+  }
+  mysqli_free_result($artifact_set);
+  $artifacts = with_item_tags($db, $artifacts, (int) $_SESSION['user_id']);
   $page_title = 'Items';
   if ($kept === 'secondary_only') { $page_title .= ' (Secondary Only)'; }
   include(SHARED_PATH . '/header.php'); 
@@ -100,6 +107,9 @@
       }
       if ($sweetSpotFilter !== '') {
         $switch_base['sweetSpotFilter'] = $sweetSpotFilter;
+      }
+      if ($tagFilter !== '') {
+        $switch_base['tag'] = $tagFilter;
       }
       if ($showAttributes === 'yes') {
         $switch_base['showAttributes'] = 'yes';
@@ -188,8 +198,17 @@
       <label for="sweetSpotFilter">Sweet Spot (SwS)</label>
       <input type="text" id="sweetSpotFilter" name="sweetSpotFilter"
         <?php 
-          if (isset($_POST['sweetSpotFilter'])) {
-            echo 'value="' . $_POST['sweetSpotFilter'] . '"';
+          if ($sweetSpotFilter !== '') {
+            echo 'value="' . h($sweetSpotFilter) . '"';
+          }
+        ?>
+      >
+
+      <label for="tag">Tag</label>
+      <input type="text" id="tag" name="tag" placeholder="beach-safe"
+        <?php
+          if ($tagFilter !== '') {
+            echo 'value="' . h($tagFilter) . '"';
           }
         ?>
       >
@@ -239,7 +258,8 @@
         <tr id="headerRow">
           <th>Kept</th>
           <th>Type</th>
-          <th>Name (<?php echo $artifact_set->num_rows; ?>)</th>
+          <th>Tags</th>
+          <th>Name (<?php echo count($artifacts); ?>)</th>
           <th>Tracking Start</th>
           <th>Recent Interaction</th>
           <th>Interact By</th>
@@ -262,7 +282,7 @@
       </style>
 
       <tbody>
-        <?php while($artifact = mysqli_fetch_assoc($artifact_set)) { ?>
+        <?php foreach ($artifacts as $artifact) { ?>
           <tr>
             <?php $row_is_kept = artifact_is_kept($artifact); ?>
             <td class="kept" data-artifact-id="<?php echo h($artifact['id']); ?>" data-kept="<?php echo $row_is_kept ? '1' : '0'; ?>">
@@ -283,6 +303,8 @@
             </td>
 
             <td><?php echo h($artifact['type']); ?></td>
+
+            <td><?php echo h(implode(', ', $artifact['tags'] ?? [])); ?></td>
 
             <td class="artifact_title">
               <a class="table-action"
@@ -364,7 +386,7 @@
   	</table>
     </div>
 
-    <?php mysqli_free_result($artifact_set); ?>
+
 
     <div id="items-toast" class="toast" role="status" aria-live="polite"></div>
 

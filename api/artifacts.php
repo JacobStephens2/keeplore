@@ -41,6 +41,14 @@
     $requestBody->userid = $authentication_response->user_id;
   }
 
+  $tag = isset($requestBody->tag) ? (string) $requestBody->tag : '';
+  $collection_user_id = 0;
+  if (isset($requestBody->userid) && $requestBody->userid != '') {
+    $collection_user_id = (int) $requestBody->userid;
+  } elseif (isset($authentication_response->user_id)) {
+    $collection_user_id = (int) $authentication_response->user_id;
+  }
+
   $per_page = isset($requestBody->per_page) ? (int) $requestBody->per_page : 50;
 
   // Determine pagination mode: cursor-based or offset-based
@@ -55,7 +63,8 @@
         $requestBody->query,
         $requestBody->userid,
         $page,
-        $per_page
+        $per_page,
+        $tag
       );
       $response->artifacts = $artifacts;
       $response->page = $page;
@@ -64,7 +73,8 @@
       $result = Artifact::list_artifacts_by_user_paginated(
         $requestBody->userid,
         $per_page,
-        $cursor
+        $cursor,
+        $tag
       );
       $response->artifacts = $result['data'];
       $response->next_cursor = $result['next_cursor'];
@@ -86,14 +96,15 @@
         $requestBody->query,
         $requestBody->userid,
         $page,
-        $per_page
+        $per_page,
+        $tag
       );
-    } elseif ($is_agent_key) {
-      // Agents read their own user's collection with the requested page.
+    } elseif ($is_agent_key || ($tag !== '' && $collection_user_id > 0)) {
       $artifacts = Artifact::list_artifacts_by_user(
-        $authentication_response->user_id,
+        $collection_user_id > 0 ? $collection_user_id : $authentication_response->user_id,
         $page,
-        $per_page
+        $per_page,
+        $tag
       );
     } else {
       $artifacts = Artifact::list_artifacts($page, $per_page);
@@ -103,6 +114,10 @@
       $response->page = $page;
       $response->per_page = $per_page;
     }
+  }
+
+  if ($collection_user_id > 0 && isset($response->artifacts) && is_array($response->artifacts)) {
+    $response->artifacts = with_item_tags($database, $response->artifacts, $collection_user_id);
   }
 
   echo json_encode($response);

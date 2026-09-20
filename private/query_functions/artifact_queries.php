@@ -4,6 +4,8 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
+require_once dirname(__DIR__) . '/item_tags.php';
+
   function compute_artifact_use_by_status($artifact_id, $user_id) {
     global $db;
     $stmt = mysqli_prepare(
@@ -151,7 +153,7 @@ use PHPMailer\PHPMailer\Exception;
     return $result;
   }
 
-  function find_artifacts_by_user_id($kept, $type, $interval, $sweetSpot = '') {
+  function find_artifacts_by_user_id($kept, $type, $interval, $sweetSpot = '', $tag = '') {
     global $db;
 
     $interval = (int)$interval;
@@ -256,6 +258,15 @@ use PHPMailer\PHPMailer\Exception;
           $sql .= " AND games.is_kept = 0 ";
         } elseif ( $kept == 'secondary_only' ) {
           $sql .= " AND games.is_in_secondary_collection = 1 ";
+        }
+
+        $tag_filter = item_tag_user_filter($tag, $_SESSION['user_id']);
+        $sql .= $tag_filter['sql'];
+        if ($tag_filter['types'] !== '') {
+          $param_types .= $tag_filter['types'];
+          foreach ($tag_filter['params'] as $tag_param) {
+            $params[] = $tag_param;
+          }
         }
 
     $sql .= "
@@ -532,6 +543,9 @@ use PHPMailer\PHPMailer\Exception;
 
   function delete_artifact($id) {
     global $db;
+
+    $user_id = isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
+    delete_item_tags_for_artifact($db, (int) $id, $user_id);
 
     $sql = "DELETE FROM games WHERE id=? LIMIT 1";
     $stmt = mysqli_prepare($db, $sql);
