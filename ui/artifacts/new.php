@@ -105,7 +105,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 
       <div class="form-field form-field-span">
         <label for="Title">Name</label>
-        <input type="text" name="Title" id="Title" value="<?php echo h($artifact['Title']); ?>" />
+        <input type="text" name="Title" id="Title" autofocus value="<?php echo h($artifact['Title']); ?>" />
       </div>
 
       <div class="form-field form-field-span">
