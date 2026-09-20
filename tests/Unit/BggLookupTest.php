@@ -80,6 +80,7 @@ class BggLookupTest extends TestCase
                     'name' => 'Sky Team',
                     'year' => '2023',
                     'url' => 'https://boardgamegeek.com/boardgame/373106/sky-team',
+                    'source' => 'BGG',
                 ],
                 'fields' => [
                     'Title' => 'Sky Team',
@@ -89,6 +90,7 @@ class BggLookupTest extends TestCase
                     'MnT' => '20',
                     'MxT' => '20',
                     'Age' => '10',
+                    'Yr' => '2023',
                 ],
             ],
             bgg_form_fields_from_json($itemJson, $dynamicJson)
@@ -122,6 +124,38 @@ class BggLookupTest extends TestCase
         $mapped = bgg_form_fields_from_json($itemJson, $dynamicJson);
         $this->assertSame('03,04', $mapped['fields']['SS']);
         $this->assertSame('https://boardgamegeek.com/boardgame/13', $mapped['match']['url']);
+        $this->assertSame('BGG', $mapped['match']['source']);
+    }
+
+    public function test_rpgitem_payload_is_labeled_rpgg(): void
+    {
+        $itemJson = json_encode([
+            'item' => [
+                'objectid' => 161315,
+                'name' => 'Ravine',
+                'yearpublished' => 2014,
+                'subtype' => 'rpgitem',
+                'canonical_link' => 'https://rpggeek.com/rpgitem/161315/ravine',
+            ],
+        ]);
+        $mapped = bgg_form_fields_from_json($itemJson, '{}');
+        $this->assertSame('RPGG', $mapped['match']['source']);
+        $this->assertSame('2014', $mapped['match']['year']);
+        $this->assertSame('https://rpggeek.com/rpgitem/161315/ravine', $mapped['match']['url']);
+    }
+
+    public function test_videogame_payload_is_labeled_vgg(): void
+    {
+        $itemJson = json_encode([
+            'item' => [
+                'objectid' => 123,
+                'name' => 'Ravine',
+                'yearpublished' => 2010,
+                'subtype' => 'videogame',
+                'canonical_link' => 'https://videogamegeek.com/videogame/123/ravine',
+            ],
+        ]);
+        $this->assertSame('VGG', bgg_form_fields_from_json($itemJson, '{}')['match']['source']);
     }
 
     public function test_sweet_spot_is_omitted_when_the_poll_is_missing(): void
@@ -165,6 +199,18 @@ class BggLookupTest extends TestCase
         $this->assertSame(
             ['id' => 9209, 'name' => 'Ticket to Ride'],
             bgg_preferred_candidate($candidates, 'ticket')
+        );
+    }
+
+    public function test_preferred_exact_name_picks_bgg_over_rpgg(): void
+    {
+        $candidates = [
+            ['id' => 161315, 'name' => 'Ravine', 'source' => 'RPGG', 'year' => '2014'],
+            ['id' => 237728, 'name' => 'Ravine', 'source' => 'BGG', 'year' => '2017'],
+        ];
+        $this->assertSame(
+            237728,
+            bgg_preferred_candidate($candidates, 'Ravine')['id']
         );
     }
 
@@ -251,7 +297,17 @@ class BggLookupTest extends TestCase
             ],
         ]);
 
-        $result = bgg_lookup_name('Sky Team', function ($url) use ($searchJson, $itemJson, $dynamicJson) {
+        $insertJson = json_encode([
+            'item' => [
+                'objectid' => 426898,
+                'name' => 'Sky Team: Agon Spiele Insert',
+                'yearpublished' => 2024,
+                'subtype' => 'boardgame',
+                'canonical_link' => 'https://boardgamegeek.com/boardgameaccessory/426898/sky-team-agon-spiele-insert',
+            ],
+        ]);
+
+        $result = bgg_lookup_name('Sky Team', function ($url) use ($searchJson, $itemJson, $insertJson, $dynamicJson) {
             if (str_contains($url, 'search=')) {
                 return $searchJson;
             }
@@ -259,20 +315,75 @@ class BggLookupTest extends TestCase
                 $this->assertStringContainsString('objectid=373106', $url);
                 return $dynamicJson;
             }
+            if (str_contains($url, 'objectid=426898')) {
+                return $insertJson;
+            }
             $this->assertStringContainsString('objectid=373106', $url);
-            $this->assertStringContainsString('objecttype=thing', $url);
             return $itemJson;
         });
 
         $this->assertTrue($result['ok']);
         $this->assertSame('Sky Team', $result['match']['name']);
         $this->assertSame('2023', $result['match']['year']);
+        $this->assertSame('BGG', $result['match']['source']);
         $this->assertSame('02', $result['fields']['SS']);
         $this->assertSame('20', $result['fields']['MnT']);
         $this->assertSame(
-            [['id' => 426898, 'name' => 'Sky Team: Agon Spiele Insert']],
+            [[
+                'id' => 426898,
+                'name' => 'Sky Team: Agon Spiele Insert',
+                'year' => '2024',
+                'source' => 'BGG',
+            ]],
             $result['alternatives']
         );
+    }
+
+    public function test_lookup_by_name_notes_rpgg_when_the_exact_hit_is_not_bgg(): void
+    {
+        $searchJson = json_encode([
+            'items' => [
+                ['objectid' => '161315', 'name' => 'Ravine'],
+                ['objectid' => '245407', 'name' => 'Dry Ravine Complex'],
+            ],
+        ]);
+        $rpgJson = json_encode([
+            'item' => [
+                'objectid' => 161315,
+                'name' => 'Ravine',
+                'yearpublished' => 2014,
+                'subtype' => 'rpgitem',
+                'canonical_link' => 'https://rpggeek.com/rpgitem/161315/ravine',
+            ],
+        ]);
+        $altJson = json_encode([
+            'item' => [
+                'objectid' => 245407,
+                'name' => 'Dry Ravine Complex',
+                'yearpublished' => 2018,
+                'subtype' => 'rpgitem',
+                'canonical_link' => 'https://rpggeek.com/rpgitem/245407/dry-ravine-complex',
+            ],
+        ]);
+
+        $result = bgg_lookup_name('Ravine', function ($url) use ($searchJson, $rpgJson, $altJson) {
+            if (str_contains($url, 'search=')) {
+                return $searchJson;
+            }
+            if (str_contains($url, 'dynamicinfo')) {
+                return '{"item":{}}';
+            }
+            if (str_contains($url, 'objectid=245407')) {
+                return $altJson;
+            }
+            return $rpgJson;
+        });
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame('RPGG', $result['match']['source']);
+        $this->assertSame('2014', $result['match']['year']);
+        $this->assertSame('2018', $result['alternatives'][0]['year']);
+        $this->assertSame('RPGG', $result['alternatives'][0]['source']);
     }
 
     public function test_fields_for_id_loads_the_chosen_game(): void

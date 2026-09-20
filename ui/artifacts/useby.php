@@ -172,7 +172,7 @@
         <input type="hidden" name="artifact[id]" id="record-modal-artifact-id">
         <input type="hidden" name="artifact[name]" id="record-modal-artifact-name">
 
-        <label>Interactors</label>
+        <label>People</label>
         <div id="record-modal-users">
           <div class="modal-user-chip" data-user-index="0">
             <span class="modal-user-name"><?php echo h($_SESSION['FullName'] ?? 'Me'); ?></span>
@@ -183,7 +183,7 @@
 
         <div id="record-modal-add-user">
           <div class="modal-user-search-wrap">
-            <input type="search" id="record-modal-user-search" placeholder="Add another interactor…" autocomplete="off">
+            <input type="search" id="record-modal-user-search" placeholder="Add another person…" autocomplete="off">
             <ul id="record-modal-user-results" class="modal-user-results" hidden></ul>
           </div>
           <button type="button" id="record-modal-new-user-toggle" class="new-interactor-toggle">+ New person</button>
@@ -859,7 +859,7 @@
               addChip(res.d.id, res.d.FullName);
               resetNewForm();
             } else {
-              newMsg.textContent = (res.d && res.d.message) || 'Could not create interactor.';
+              newMsg.textContent = (res.d && res.d.message) || 'Could not create person.';
             }
           })
           .catch(function (err) { newCreate.disabled = false; newMsg.textContent = 'Error: ' + err.message; });

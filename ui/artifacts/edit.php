@@ -42,6 +42,7 @@
     if ($artifact['age'] == '') {
       $artifact['age'] = 0;
     }
+    $artifact['Yr'] = trim((string) ($_POST['Yr'] ?? ''));
 
     if ($artifact['Acq'] == '') {
       $artifact['Acq'] = date('Y-m-d');
@@ -233,6 +234,13 @@
       <div class="form-field">
         <label for="MxT">Maxiumum Time</label>
         <input type="number" name="MxT" id="MxT" value="<?php echo $artifact['MxT']; ?>">
+      </div>
+
+      <div class="form-field">
+        <label for="Yr">Year</label>
+        <input type="number" name="Yr" id="Yr" min="1" max="9999" step="1"
+          value="<?php echo h($artifact['Yr'] ?? ''); ?>"
+        >
       </div>
 
       <div class="form-field form-field-check form-field-span">

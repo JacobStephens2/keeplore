@@ -367,18 +367,18 @@ require_once dirname(__DIR__) . '/item_tags.php';
       "UPDATE games SET
         Title=?, is_kept=?, Acq=?, Candidate=?, UsedRecUserCt=?,
         type_id=?, type=?, SS=?, Notes=?, CandidateGroupDate=?,
-        MnT=?, MxT=?, Age=?, is_in_secondary_collection=?, MnP=?, MxP=?,
+        MnT=?, MxT=?, Age=?, Yr=?, is_in_secondary_collection=?, MnP=?, MxP=?,
         interaction_frequency_days=?, to_get_rid_of=?,
         is_digital=?, is_physical=?
       WHERE id=?
       LIMIT 1"
     );
-    mysqli_stmt_bind_param($stmt, "sisssisssssssisssissi",
+    mysqli_stmt_bind_param($stmt, "sisssissssssssisssissi",
       $artifact['Title'], $kept, $artifact['Acq'],
       $artifact['Candidate'], $artifact['UsedRecUserCt'],
       $type_id, $type_name, $artifact['SS'], $artifact['Notes'],
       $artifact['CandidateGroupDate'], $artifact['MnT'], $artifact['MxT'],
-      $artifact['age'], $secondary,
+      $artifact['age'], $artifact['Yr'], $secondary,
       $artifact['MnP'], $artifact['MxP'], $artifact['interaction_frequency_days'],
       $to_get_rid_of,
       $digital,
@@ -442,6 +442,12 @@ require_once dirname(__DIR__) . '/item_tags.php';
       }
     }
 
+    if (isset($artifact['Yr']) && $artifact['Yr'] !== '') {
+      if (!preg_match('/^\d{1,4}$/', (string) $artifact['Yr'])) {
+        $errors[] = "Year must be a 1 to 4 digit number.";
+      }
+    }
+
     // Acquisition date format
     if(isset($artifact['Acq']) && !empty($artifact['Acq'])) {
       $date = DateTime::createFromFormat('Y-m-d', $artifact['Acq']);
@@ -497,6 +503,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
         MnT,
         MxT,
         Age,
+        Yr,
         MnP,
         MxP,
         user_id,
@@ -504,10 +511,10 @@ require_once dirname(__DIR__) . '/item_tags.php';
         is_in_secondary_collection,
         is_digital,
         is_physical
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ";
     $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'ssssssssssssssssssss',
+    mysqli_stmt_bind_param($stmt, 'sssssssssssssssssssss',
       $artifact['Title'],
       $artifact['Notes'],
       $artifact['Acq'],
@@ -521,6 +528,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
       $artifact['MnT'],
       $artifact['MxT'],
       $artifact['age'],
+      $artifact['Yr'],
       $artifact['MnP'],
       $artifact['MxP'],
       $_SESSION['user_id'],

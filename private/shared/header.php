@@ -8,6 +8,15 @@
   }
   $keeplore_is_public = !is_logged_in() && !is_guest();
   $keeplore_body_class = $keeplore_is_public ? 'public-mode' : (is_guest() ? 'guest-mode' : 'signed-in-mode');
+  $keeplore_is_staging = defined('KEEPLORE_ENV') && KEEPLORE_ENV === 'staging';
+  if ($keeplore_is_staging) {
+    $keeplore_body_class .= ' staging-mode';
+    if ($page_title === 'Keeplore') {
+      $document_title = 'Keeplore staging';
+    } else {
+      $document_title = $page_title . ' - Keeplore staging';
+    }
+  }
 ?>
 
 <!DOCTYPE html>
@@ -73,11 +82,12 @@
         if (meta) { meta.setAttribute('content', effective === 'dark' ? '#0c1222' : '#30395c'); }
       })();
     </script>
-    <link rel="stylesheet" media="all" href="../../style.css?v=47" />
+    <link rel="stylesheet" media="all" href="../../style.css?v=50" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
+    <?php if (empty($keeplore_is_staging)) { ?>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-P3N6C9C37N"></script>
     <script>
@@ -87,10 +97,14 @@
 
       gtag('config', 'G-P3N6C9C37N');
     </script>
+    <?php } ?>
 
   </head>
 
   <body class="<?php echo h($keeplore_body_class); ?>">
+    <?php if (!empty($keeplore_is_staging)) { ?>
+      <p class="staging-banner">Staging — same data as production. Do not treat this as live.</p>
+    <?php } ?>
     <header class="site-header">
       <div class="site-header-inner">
         <div class="site-brand">

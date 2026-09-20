@@ -157,7 +157,7 @@
       <span id="newEntityMsg" class="new-interactor-msg" role="status" aria-live="polite"></span>
     </div>
 
-    <label for="users">Interactors</label>
+    <label for="users">People</label>
     <section id="users">
       <input 
         type="search" 

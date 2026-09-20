@@ -42,6 +42,7 @@ if(is_post_request()) {
   if ($artifact['age'] === '') {
     $artifact['age'] = 0;
   }
+  $artifact['Yr'] = trim((string) ($_POST['Yr'] ?? ''));
 
   $artifact['tags'] = $_POST['tags'] ?? '';
   $result = insert_artifact($artifact);
@@ -87,6 +88,7 @@ if(is_post_request()) {
   $artifact["MxP"] = $defaultMxP;
   $artifact["SS"] = $defaultSS;
   $artifact["age"] = '';
+  $artifact["Yr"] = '';
   $artifact['tags'] = '';
 }
 
@@ -114,16 +116,15 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
           <p class="bgg-lookup-status" id="bggLookupStatus" hidden></p>
           <div class="bgg-confirm" id="bggConfirm" hidden>
             <p>
-              BoardGameGeek match:
               <strong id="bggMatchName"></strong>
               <span id="bggMatchYearWrap">(<span id="bggMatchYear"></span>)</span>
+              <span id="bggMatchSource" class="bgg-source" hidden></span>
             </p>
             <p>
               <a id="bggMatchLink" href="#" target="_blank" rel="noopener">View on BoardGameGeek</a>
             </p>
             <div class="bgg-confirm-actions">
               <button type="button" id="bggUseMatch">Use this game</button>
-              <button type="button" class="bgg-secondary" id="bggNotThis">Not this game</button>
             </div>
             <ul class="bgg-other-matches" id="bggOtherMatches" hidden></ul>
           </div>
@@ -200,6 +201,13 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
         <input type="number" name="age" id="age" value="<?php echo h($artifact['age']); ?>">
       </div>
 
+      <div class="form-field">
+        <label for="Yr">Year</label>
+        <input type="number" name="Yr" id="Yr" min="1" max="9999" step="1"
+          value="<?php echo h($artifact['Yr']); ?>"
+        >
+      </div>
+
       <div class="form-field form-field-span">
         <label for="Notes">Notes</label>
         <textarea name="Notes" id="Notes" cols="30" rows="5"></textarea>
@@ -222,6 +230,6 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 
 </main>
 
-<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=1"></script>
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=4"></script>
 
 <?php include(SHARED_PATH . '/footer.php'); ?>

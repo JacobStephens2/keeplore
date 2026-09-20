@@ -79,7 +79,7 @@ function createInteractor(event) {
         addUserRow({ id: result.data.id, name: result.data.FullName });
         resetForm();
       } else {
-        msg.textContent = (result.data && result.data.message) || "Could not create interactor.";
+        msg.textContent = (result.data && result.data.message) || "Could not create person.";
       }
     })
     .catch(function (error) {
