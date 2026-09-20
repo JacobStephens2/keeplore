@@ -121,8 +121,9 @@ main {
   padding: 2rem 1.5rem 4rem;
 }
 
-/* Useby page uses the full viewport so table rows have room to breathe. */
-main.useby-page {
+/* Wide tables (interact-by, items) use the full viewport so rows have room. */
+main.useby-page,
+main.items-page {
   width: 100%;
   max-width: none;
 }

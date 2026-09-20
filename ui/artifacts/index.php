@@ -74,7 +74,7 @@
 
 <script defer src="/shared/filter_button.js"></script>
 
-<main>
+<main class="items-page">
   <div class="objects listing">
 
     <header class="page-header page-header-row">
