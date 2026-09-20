@@ -1,6 +1,6 @@
 // Bump CACHE_NAME whenever shipping CSS/chrome so PWA clients drop stale assets.
 // Pages load style.css?v=N; the SW still pre-caches /style.css - both must stay in sync.
-const CACHE_NAME = 'keeplore-v12';
+const CACHE_NAME = 'keeplore-v13';
 const STATIC_ASSETS = [
   '/style.css',
   '/manifest.json',
@@ -10,7 +10,8 @@ const STATIC_ASSETS = [
   '/shared/js/api-client.js',
   '/shared/js/search-component.js',
   '/shared/js/filter-utils.js',
-  '/shared/js/theme.js'
+  '/shared/js/theme.js',
+  '/shared/js/items-shortcut.js'
 ];
 
 const OFFLINE_PAGE = '/offline.html';

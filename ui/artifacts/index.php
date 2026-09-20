@@ -459,6 +459,7 @@
       const itemsSearch = document.querySelector('#artifacts_filter input')
         || document.querySelector('.dataTables_wrapper .dataTables_filter input');
       if (itemsSearch) {
+        itemsSearch.setAttribute('data-shortcut', 'items-search');
         itemsSearch.focus();
         itemsSearch.addEventListener('keydown', function(event) {
           if (event.key === 'Escape') {
