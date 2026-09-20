@@ -43,6 +43,7 @@ if(is_post_request()) {
     $artifact['age'] = 0;
   }
   $artifact['Yr'] = trim((string) ($_POST['Yr'] ?? ''));
+  $artifact['image_url'] = normalize_item_image_url($_POST['image_url'] ?? '');
 
   $artifact['tags'] = $_POST['tags'] ?? '';
   $result = insert_artifact($artifact);
@@ -89,6 +90,7 @@ if(is_post_request()) {
   $artifact["SS"] = $defaultSS;
   $artifact["age"] = '';
   $artifact["Yr"] = '';
+  $artifact['image_url'] = '';
   $artifact['tags'] = '';
 }
 
@@ -115,6 +117,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
           <button type="button" id="requestBggData">Request BGG Data</button>
           <p class="bgg-lookup-status" id="bggLookupStatus" hidden></p>
           <div class="bgg-confirm" id="bggConfirm" hidden>
+            <img id="bggMatchImage" class="bgg-match-image" alt="" hidden referrerpolicy="no-referrer">
             <p>
               <strong id="bggMatchName"></strong>
               <span id="bggMatchYearWrap">(<span id="bggMatchYear"></span>)</span>
@@ -129,6 +132,12 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
             <ul class="bgg-other-matches" id="bggOtherMatches" hidden></ul>
           </div>
         </div>
+        <?php $preview_url = normalize_item_image_url($artifact['image_url'] ?? ''); ?>
+        <input type="hidden" name="image_url" id="image_url" value="<?php echo h($preview_url); ?>">
+        <img id="itemPicturePreview" class="item-picture-preview"
+          alt="<?php echo $preview_url !== '' ? h($artifact['Title']) . ' cover' : ''; ?>"
+          <?php if ($preview_url !== '') { ?>src="<?php echo h($preview_url); ?>"<?php } else { ?>hidden<?php } ?>
+          referrerpolicy="no-referrer">
       </div>
 
       <div class="form-field">
@@ -230,6 +239,6 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 
 </main>
 
-<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=4"></script>
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=5"></script>
 
 <?php include(SHARED_PATH . '/footer.php'); ?>

@@ -47,6 +47,7 @@ The primary artifacts table. Despite its name, it stores all artifact types (boa
 | `is_digital` | TINYINT(1) | YES | Pure format flag: the item has a digital form. Independent of kept |
 | `is_physical` | TINYINT(1) | YES | Pure format flag: the item has a physical form. Independent of kept. An item can be both physical and digital |
 | `Notes` | TEXT | YES | Free-form notes |
+| `image_url` | VARCHAR(1024) | YES | Cover picture URL from Request BGG Data (`https` only). Apply [`add-item-image-url.sql`](../database/migrations/add-item-image-url.sql) |
 | `interaction_frequency_days` | DECIMAL/FLOAT | YES | Per-artifact override for the interaction frequency interval (in days) |
 | `to_get_rid_of` | TINYINT(1) | NO | Whether the user has marked this artifact to get rid of (1 = yes, 0 = no, default 0). Excludes from interact-by list |
 

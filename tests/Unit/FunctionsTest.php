@@ -59,6 +59,19 @@ class FunctionsTest extends TestCase
         $this->assertSame('hello world', h('hello world'));
     }
 
+    public function test_normalize_item_image_url_keeps_https(): void
+    {
+        $url = 'https://cf.geekdo-images.com/uXMeQzNenHb3zK7Hoa6b2w__itemrep/img/oaw-LYEIaB20e79Y568JgyHZ5NQ=/fit-in/246x300/filters:strip_icc()/pic7398904.jpg';
+        $this->assertSame($url, normalize_item_image_url('  ' . $url . '  '));
+    }
+
+    public function test_normalize_item_image_url_rejects_non_https(): void
+    {
+        $this->assertSame('', normalize_item_image_url('http://cf.geekdo-images.com/x.jpg'));
+        $this->assertSame('', normalize_item_image_url('javascript:alert(1)'));
+        $this->assertSame('', normalize_item_image_url(''));
+    }
+
     // -----------------------------------------------------------------
     // u() - URL encoding
     // -----------------------------------------------------------------

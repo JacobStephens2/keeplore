@@ -654,6 +654,29 @@ button.untrack-btn:hover {
   box-shadow: inset 0 0 0 1px var(--outline);
 }
 
+.bgg-match-image,
+.item-picture-preview,
+.item-picture {
+  display: block;
+  max-width: 12rem;
+  max-height: 16rem;
+  width: auto;
+  height: auto;
+  margin: 0 0 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-high);
+  box-shadow: inset 0 0 0 1px var(--outline);
+}
+
+.bgg-match-image[hidden],
+.item-picture-preview[hidden] {
+  display: none;
+}
+
+.item-picture-wrap {
+  margin: 0 0 1rem;
+}
+
 .bgg-confirm p {
   margin: 0 0 0.45rem;
 }
