@@ -446,60 +446,31 @@
       })();
     </script>
 
+    <script src="<?php echo url_for('/artifacts/items-table-sort.js'); ?>?v=1"></script>
     <script class="data_table">
-      (function () {
-        var KEY = 'keeplore-artifacts-order';
-        var defaultOrder = [
-          [ 3, 'desc'], // Name
-          [ 4, 'desc'], // Tracking Start
-          [ 5, 'desc'], // Recent Interaction
-        ];
-        var columnCount = document.querySelectorAll('#artifacts thead th').length;
-
-        function normalizeOrder(order) {
-          if (!Array.isArray(order) || order.length === 0) {
-            return null;
-          }
-          var normalized = [];
-          for (var i = 0; i < order.length; i++) {
-            var pair = order[i];
-            if (!Array.isArray(pair) || pair.length < 2) {
-              continue;
-            }
-            var index = pair[0];
-            var dir = pair[1];
-            if (typeof index !== 'number' || index < 0 || index % 1 !== 0 || index >= columnCount) {
-              continue;
-            }
-            if (dir !== 'asc' && dir !== 'desc') {
-              continue;
-            }
-            normalized.push([index, dir]);
-          }
-          return normalized.length ? normalized : null;
-        }
-
-        var savedOrder = null;
-        try {
-          savedOrder = normalizeOrder(JSON.parse(window.localStorage.getItem(KEY)));
-        } catch (e) {
-          savedOrder = null;
-        }
-
-        var table = new DataTable('#artifacts', {
-          order: savedOrder || defaultOrder,
-        });
-
-        table.on('order', function () {
-          var order = normalizeOrder(table.order());
-          if (!order) {
-            return;
-          }
-          try {
-            window.localStorage.setItem(KEY, JSON.stringify(order));
-          } catch (e) {}
-        });
-      })();
+      const itemsTableHeaders = Array.prototype.map.call(
+        document.querySelectorAll('#artifacts thead th'),
+        function (th) { return th.textContent; }
+      );
+      const itemsTableSortFallback = [
+        { column: 'Tracking Start', dir: 'desc' },
+        { column: 'Recent Interaction', dir: 'desc' },
+        { column: 'Interact By', dir: 'desc' },
+      ];
+      let table = new DataTable('#artifacts', {
+        order: KeeploreItemsTableSort.restore(
+          itemsTableHeaders,
+          window.localStorage,
+          itemsTableSortFallback
+        ),
+      });
+      table.on('order', function () {
+        KeeploreItemsTableSort.persist(
+          itemsTableHeaders,
+          window.localStorage,
+          table.order()
+        );
+      });
 
       const itemsSearch = document.querySelector('#artifacts_filter input')
         || document.querySelector('.dataTables_wrapper .dataTables_filter input');
