@@ -106,154 +106,190 @@
       </button>
     </div>
 
-    <form id="editForm"
+    <form id="editForm" class="form-layout"
       action="<?php echo url_for('/artifacts/edit?id=' . h(u($id))); ?>"
       method="post"
       >
       <?php echo csrf_input(); ?>
 
-      <input type="submit" value="Save Edits" />
+      <div class="form-field-span">
+        <input type="submit" value="Save Edits" />
+      </div>
 
-      <label for="Title">Title</label>
-      <input type="text" name="Title" id="Title" value="<?php echo h($artifact['Title']); ?>" />
+      <div class="form-field form-field-span">
+        <label for="Title">Title</label>
+        <input type="text" name="Title" id="Title" value="<?php echo h($artifact['Title']); ?>" />
+      </div>
 
-      <label for="is_kept" >Kept? (Checked means yes)</label>
-      <input type="hidden" name="is_kept" value="0" />
-      <input type="checkbox" name="is_kept" id="is_kept" value="1"<?php if(artifact_is_kept($artifact)) { echo " checked"; } ?> />
+      <div class="form-field form-field-check">
+        <input type="hidden" name="is_kept" value="0" />
+        <input type="checkbox" name="is_kept" id="is_kept" value="1"<?php if(artifact_is_kept($artifact)) { echo " checked"; } ?> />
+        <label for="is_kept">Kept? (Checked means yes)</label>
+      </div>
 
-      <label for="type_search">Type</label>
-      <?php
-        $type_id = $artifact['type_id'];
-        require_once(SHARED_PATH . '/artifact_type_array.php');
-        $current_type_name = '';
-        foreach ($typesArray as $type => $tid) {
-          if ($tid == $type_id) {
-            $current_type_name = $type;
-            break;
-          }
-        }
-      ?>
-      <input type="text" id="type_search" list="type_list" value="<?php echo h($current_type_name); ?>" autocomplete="off" />
-      <input type="hidden" name="type" id="type" value="<?php echo h($type_id); ?>" />
-      <datalist id="type_list">
-        <?php foreach ($typesArray as $type => $tid) { ?>
-          <option value="<?php echo h($type); ?>" data-id="<?php echo h($tid); ?>"></option>
-        <?php } ?>
-      </datalist>
-      <script>
-        document.getElementById('type_search').addEventListener('input', function() {
-          var options = document.querySelectorAll('#type_list option');
-          var hidden = document.getElementById('type');
-          var val = this.value;
-          hidden.value = '';
-          for (var i = 0; i < options.length; i++) {
-            if (options[i].value === val) {
-              hidden.value = options[i].dataset.id;
+      <div class="form-field form-field-check">
+        <input type="hidden" name="to_get_rid_of" value="0" />
+        <input type="checkbox" name="to_get_rid_of" id="to_get_rid_of" value="1"<?php if($artifact['to_get_rid_of'] == "1") { echo " checked"; } ?> />
+        <label for="to_get_rid_of">To Get Rid Of? (Checked means yes)</label>
+      </div>
+
+      <div class="form-field">
+        <label for="type_search">Type</label>
+        <?php
+          $type_id = $artifact['type_id'];
+          require_once(SHARED_PATH . '/artifact_type_array.php');
+          $current_type_name = '';
+          foreach ($typesArray as $type => $tid) {
+            if ($tid == $type_id) {
+              $current_type_name = $type;
               break;
             }
           }
-        });
-      </script>
+        ?>
+        <input type="text" id="type_search" list="type_list" value="<?php echo h($current_type_name); ?>" autocomplete="off" />
+        <input type="hidden" name="type" id="type" value="<?php echo h($type_id); ?>" />
+        <datalist id="type_list">
+          <?php foreach ($typesArray as $type => $tid) { ?>
+            <option value="<?php echo h($type); ?>" data-id="<?php echo h($tid); ?>"></option>
+          <?php } ?>
+        </datalist>
+        <script>
+          document.getElementById('type_search').addEventListener('input', function() {
+            var options = document.querySelectorAll('#type_list option');
+            var hidden = document.getElementById('type');
+            var val = this.value;
+            hidden.value = '';
+            for (var i = 0; i < options.length; i++) {
+              if (options[i].value === val) {
+                hidden.value = options[i].dataset.id;
+                break;
+              }
+            }
+          });
+        </script>
+      </div>
 
-      <label for="tags">Tags (comma-separated)</label>
-      <input type="text" name="tags" id="tags"
-        value="<?php echo h(implode(', ', $item_tags)); ?>"
-        placeholder="portable, beach-safe, two-player, party"
-      />
+      <div class="form-field">
+        <label for="tags">Tags (comma-separated)</label>
+        <input type="text" name="tags" id="tags"
+          value="<?php echo h(implode(', ', $item_tags)); ?>"
+          placeholder="portable, beach-safe, two-player, party"
+        />
+      </div>
 
-      <label for="Acq">Tracking Start Date</label>
-      <input type="date" name="Acq" id="Acq" value="<?php echo h($artifact['Acq']); ?>" />
+      <div class="form-field">
+        <label for="Acq">Tracking Start Date</label>
+        <input type="date" name="Acq" id="Acq" value="<?php echo h($artifact['Acq']); ?>" />
+      </div>
 
-      <label for="to_get_rid_of">To Get Rid Of? (Checked means yes)</label>
-      <input type="hidden" name="to_get_rid_of" value="0" />
-      <input type="checkbox" name="to_get_rid_of" id="to_get_rid_of" value="1"<?php if($artifact['to_get_rid_of'] == "1") { echo " checked"; } ?> />
+      <div class="form-field">
+        <label for="interaction_frequency_days">Interaction Frequency (Days)</label>
+        <input type="number" step="0.1" name="interaction_frequency_days" id="interaction_frequency_days"
+          onwheel="this.blur()"
+          value="<?php
+            if ($artifact['interaction_frequency_days'] === null) {
+              echo $default_interval;
+            } else {
+              echo h($artifact['interaction_frequency_days']);
+            }
+            ?>"
+        >
+      </div>
 
-      <label for="interaction_frequency_days">Interaction Frequency (Days)</label>
-      <input type="number" step="0.1" name="interaction_frequency_days" id="interaction_frequency_days"
-        onwheel="this.blur()"
-        value="<?php 
-          if ($artifact['interaction_frequency_days'] === null) {
-            echo $default_interval; 
-          } else {
-            echo h($artifact['interaction_frequency_days']); 
-          }
-          ?>"
-      >
+      <div class="form-field">
+        <label for="SS">Sweet Spot(s)</label>
+        <input type="text" name="SS" id="SS" value="<?php echo $artifact['SS']; ?>">
+      </div>
 
-      <label for="SS">Sweet Spot(s)</label>
-      <input type="text" name="SS" id="SS" value="<?php echo $artifact['SS']; ?>">
+      <div class="form-field">
+        <label for="age">Minimum Age</label>
+        <input type="number" name="age" id="age" value="<?php echo $artifact['Age']; ?>">
+      </div>
 
-      <?php 
+      <?php
       if (SWEET_SPOT_BUTTONS_ON == true) {
         ?>
-        <section id="sweetSpots">
-          <?php
-          $i = 0;
-          foreach ($sweetSpotsResultObject as $row) {
-            ?>
-            <div>
-              <input 
-                class="sweetSpot"
-                type="number" 
-                name="SwS[<?php echo $i; ?>]" 
-                id="SS<?php echo $row['id']; ?>" 
-                value="<?php echo $row['SwS']; ?>"
-              >
-              <button class="sweetSpot">-</button>
-            </div>
+        <div class="form-field-span">
+          <section id="sweetSpots">
             <?php
-            $i++;
-          }
-          ?>
-        </section>
-        <button 
-          id="addSweetSpot"
-          class="sweetSpot"
-          style="display: block;"
-          >
-          +
-        </button>
+            $i = 0;
+            foreach ($sweetSpotsResultObject as $row) {
+              ?>
+              <div>
+                <input
+                  class="sweetSpot"
+                  type="number"
+                  name="SwS[<?php echo $i; ?>]"
+                  id="SS<?php echo $row['id']; ?>"
+                  value="<?php echo $row['SwS']; ?>"
+                >
+                <button class="sweetSpot">-</button>
+              </div>
+              <?php
+              $i++;
+            }
+            ?>
+          </section>
+          <button
+            id="addSweetSpot"
+            class="sweetSpot"
+            style="display: block;"
+            >
+            +
+          </button>
+        </div>
         <?php
       }
       ?>
 
       <script defer src="edit.js?v=2"></script>
 
-      <label for="MnP">Minimum User Count</label>
-      <input type="number" name="MnP" id="MnP" value="<?php echo $artifact['MnP']; ?>">
+      <div class="form-field">
+        <label for="MnP">Minimum User Count</label>
+        <input type="number" name="MnP" id="MnP" value="<?php echo $artifact['MnP']; ?>">
+      </div>
 
-      <label for="MxP">Maximum User Count</label>
-      <input type="number" name="MxP" id="MxP" value="<?php echo $artifact['MxP']; ?>">
+      <div class="form-field">
+        <label for="MxP">Maximum User Count</label>
+        <input type="number" name="MxP" id="MxP" value="<?php echo $artifact['MxP']; ?>">
+      </div>
 
-      <label for="MnT">Minimum Time</label>
-      <input type="number" name="MnT" id="MnT" value="<?php echo $artifact['MnT']; ?>">
+      <div class="form-field">
+        <label for="MnT">Minimum Time</label>
+        <input type="number" name="MnT" id="MnT" value="<?php echo $artifact['MnT']; ?>">
+      </div>
 
-      <label for="MxT">Maxiumum Time</label>
-      <input type="number" name="MxT" id="MxT" value="<?php echo $artifact['MxT']; ?>">
+      <div class="form-field">
+        <label for="MxT">Maxiumum Time</label>
+        <input type="number" name="MxT" id="MxT" value="<?php echo $artifact['MxT']; ?>">
+      </div>
 
-      <label for="age">Minimum Age</label>
-      <input type="number" name="age" id="age" value="<?php echo $artifact['Age']; ?>">
+      <div class="form-field form-field-check form-field-span">
+        <input type="checkbox" name="is_in_secondary_collection" id="is_in_secondary_collection" value="1"
+          <?php if(artifact_is_in_secondary_collection($artifact)) { echo " checked"; } ?>
+        />
+        <label for="is_in_secondary_collection">Kept in Secondary Collection? (Checked means yes)</label>
+      </div>
 
-      <label for="is_in_secondary_collection" >Kept in Secondary Collection? (Checked means yes)</label>
-      <input type="checkbox" name="is_in_secondary_collection" id="is_in_secondary_collection" value="1" 
-        <?php if(artifact_is_in_secondary_collection($artifact)) { echo " checked"; } ?>
-      />
-      
-      <?php 
-      if (!isset($artifact['Notes'])) { 
+      <?php
+      if (!isset($artifact['Notes'])) {
         $artifact['Notes'] = '';
       }
       ?>
 
-      <label for="Notes">Notes</label>
-      <textarea 
-        name="Notes" 
-        id="Notes" 
-        cols="30" 
-        rows="10"
-        ><?php echo h($artifact['Notes']); ?></textarea>
+      <div class="form-field form-field-span">
+        <label for="Notes">Notes</label>
+        <textarea
+          name="Notes"
+          id="Notes"
+          cols="30"
+          rows="10"
+          ><?php echo h($artifact['Notes']); ?></textarea>
+      </div>
 
-      <input type="submit" value="Save Edits" />
+      <div class="form-field-span">
+        <input type="submit" value="Save Edits" />
+      </div>
     </form>
 
   </div>
@@ -301,11 +337,7 @@
   let editForm = document.querySelector('#editForm');
 
   function toggleEditFormDisplay() {
-    if (editForm.style.display == 'none') {
-        editForm.style.display = 'block';
-    } else {
-        editForm.style.display = 'none';
-    }
+    editForm.hidden = !editForm.hidden;
   }
 
   let editFormDisplayButton = document.querySelector('#editFormDisplayButton');

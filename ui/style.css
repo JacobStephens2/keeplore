@@ -2696,6 +2696,75 @@ table#useBy.cards-view tbody td.get-rid-of button.get-rid-of-btn {
   }
 }
 
+/* Wide-viewport object forms: two field columns so the right side of the
+   panel holds inputs instead of empty space. Single column below 900px. */
+.form-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  column-gap: 1.5rem;
+  row-gap: 0;
+  align-items: start;
+  margin-bottom: 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.form-field > label {
+  margin-top: 1.1rem;
+  margin-bottom: 0.45rem;
+}
+
+.form-layout > .form-field:first-of-type > label {
+  margin-top: 0;
+}
+
+.form-field-span {
+  grid-column: 1 / -1;
+}
+
+.form-layout .form-field input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="hidden"]),
+.form-layout .form-field select,
+.form-layout .form-field textarea {
+  width: 100%;
+  max-width: none;
+}
+
+.form-field-check {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  align-self: end;
+  gap: 0.55rem;
+  min-height: 3.5rem;
+  margin-top: 1.1rem;
+}
+
+.form-field-check > label {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-layout > h2.form-field-span {
+  margin-top: 1.5rem;
+}
+
+.form-layout > p.form-field-span {
+  margin-bottom: 0.5rem;
+}
+
+@media (min-width: 900px) {
+  .form-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
 /* --- Edit entity page: action bar + non-overlapping form controls (2026-06-16) --- */
 #editArtifact .edit-actions {
   display: flex;
@@ -2709,26 +2778,11 @@ table#useBy.cards-view tbody td.get-rid-of button.get-rid-of-btn {
   margin-top: 0;
 }
 
-/* Stack every control on its own row so submit buttons never overlap the
-   textarea (they were inline-flex and flowed beside it). */
 #editForm {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.45rem;
   margin-bottom: 0;
 }
 
-#editForm label {
-  margin: 0.95rem 0 0;
-}
-
-#editForm label:first-of-type {
-  margin-top: 0.25rem;
-}
-
 #editForm input[type="submit"] {
-  align-self: flex-start;
   margin: 1.1rem 0 0.35rem;
 }
 
