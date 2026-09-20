@@ -16,6 +16,7 @@
   --panel-strong: rgba(247, 249, 251, 0.92);
   --text: #1b2230;
   --text-soft: #5f6777;
+  --on-primary: #f8fbff;
   --outline: rgba(100, 116, 139, 0.16);
   --outline-strong: rgba(100, 116, 139, 0.3);
   --danger: #b63d2f;
@@ -562,13 +563,13 @@ button,
 input[type="submit"],
 .prominent-link {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-soft) 100%);
-  color: #f8fbff;
+  color: var(--on-primary);
 }
 
 button:hover,
 input[type="submit"]:hover,
 .prominent-link:hover {
-  color: #fff;
+  color: var(--on-primary);
   transform: translateY(-1px);
 }
 
@@ -586,12 +587,16 @@ button.sweetSpot {
   padding: 0.7rem 1rem;
 }
 
-button.get-rid-of-btn {
+button.get-rid-of-btn,
+button.get-rid-of-btn:hover {
   background: linear-gradient(135deg, #8b2d22 0%, var(--danger) 100%);
+  color: #f8fbff;
 }
 
-button.restore-btn {
+button.restore-btn,
+button.restore-btn:hover {
   background: linear-gradient(135deg, #244e3b 0%, var(--success) 100%);
+  color: #f8fbff;
 }
 
 button.snooze-btn {
@@ -1482,7 +1487,7 @@ p.copied_message {
 
 .modal-save {
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 #record-modal-users {
@@ -2824,6 +2829,7 @@ html[data-theme="dark"] {
   --page-bg-shade: #0a0f1e;
   --text: #e9edf5;
   --text-soft: #a6b0c4;
+  --on-primary: #0c1222;
   --outline: rgba(148, 163, 184, 0.2);
   --outline-strong: rgba(148, 163, 184, 0.38);
   --danger: #e0705f;
