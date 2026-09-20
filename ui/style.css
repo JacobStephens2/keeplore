@@ -625,6 +625,52 @@ button.untrack-btn:hover {
   box-shadow: inset 0 0 0 1px rgba(80, 95, 118, 0.55);
 }
 
+.bgg-lookup {
+  margin: 0 0 1.1rem;
+}
+
+.bgg-lookup-status {
+  margin: 0.55rem 0 0;
+  color: var(--text-soft);
+}
+
+.bgg-confirm {
+  margin: 0.75rem 0 0;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-lowest);
+  box-shadow: inset 0 0 0 1px var(--outline);
+}
+
+.bgg-confirm p {
+  margin: 0 0 0.45rem;
+}
+
+.bgg-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.bgg-other-matches {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+button.bgg-secondary {
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--outline), var(--shadow);
+}
+
+button.bgg-secondary:hover {
+  color: var(--primary);
+}
+
 table#useBy td.get-rid-of .get-rid-of-form {
   display: block;
 }
