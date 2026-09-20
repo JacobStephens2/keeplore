@@ -1,7 +1,7 @@
 // Keyboard shortcuts:
 //   i - open the Items page (nav link marked data-shortcut="items")
 //   s - focus the Items search box (input marked data-shortcut="items-search")
-//   f - open the filter panel (button#display_filters, via the existing click handler)
+//   f - toggle the filter panel (button#display_filters, via the existing click handler)
 //
 // Bind is a no-op on pages with none of those targets (public landing / login).
 // Callers pass go(url) so tests can observe navigation without a browser.
@@ -17,12 +17,6 @@
       && type !== 'submit' && type !== 'reset' && type !== 'file'
       && type !== 'range' && type !== 'color' && type !== 'image'
       && type !== 'hidden';
-  }
-
-  function openFilters(doc, button) {
-    var panel = doc.querySelector('form.filter-panel');
-    if (panel && panel.style && panel.style.display !== 'none') return;
-    if (typeof button.click === 'function') button.click();
   }
 
   var ItemsShortcut = {
@@ -46,7 +40,7 @@
 
         if ((event.key === 'f' || event.key === 'F') && filtersButton) {
           if (typeof event.preventDefault === 'function') event.preventDefault();
-          openFilters(doc, filtersButton);
+          if (typeof filtersButton.click === 'function') filtersButton.click();
           return;
         }
 

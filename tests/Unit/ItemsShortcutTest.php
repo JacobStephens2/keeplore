@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
  * On signed-in and guest pages the Items nav link is the destination.
  * Pressing i (no modifiers, not typing in a textual field) calls go(href).
  * Pressing s focuses the Items search box marked data-shortcut="items-search".
- * Pressing f opens the filter panel by clicking #display_filters when it is hidden.
+ * Pressing f toggles the filter panel by clicking #display_filters.
  */
 class ItemsShortcutTest extends TestCase
 {
@@ -120,23 +120,14 @@ class ItemsShortcutTest extends TestCase
         $this->assertFalse($result['searchFocused']);
     }
 
-    public function test_pressing_f_opens_hidden_filters(): void
+    public function test_pressing_f_clicks_the_filters_button(): void
     {
         $result = $this->runShortcut(['key' => 'f'], ['hasFilters' => true]);
         $this->assertTrue($result['filtersClicked']);
         $this->assertNull($result['navigated']);
     }
 
-    public function test_pressing_f_does_not_close_open_filters(): void
-    {
-        $result = $this->runShortcut(['key' => 'f'], [
-            'hasFilters' => true,
-            'filtersDisplay' => 'block',
-        ]);
-        $this->assertFalse($result['filtersClicked']);
-    }
-
-    public function test_pressing_f_in_a_text_input_does_not_open_filters(): void
+    public function test_pressing_f_in_a_text_input_does_not_click_filters(): void
     {
         $result = $this->runShortcut([
             'key' => 'f',
@@ -145,7 +136,7 @@ class ItemsShortcutTest extends TestCase
         $this->assertFalse($result['filtersClicked']);
     }
 
-    public function test_capital_f_opens_hidden_filters(): void
+    public function test_capital_f_clicks_the_filters_button(): void
     {
         $this->assertTrue($this->runShortcut(['key' => 'F'], ['hasFilters' => true])['filtersClicked']);
     }
@@ -209,7 +200,6 @@ class ItemsShortcutTest extends TestCase
         $itemsHref = array_key_exists('itemsHref', $opts) ? $opts['itemsHref'] : '/artifacts';
         $hasSearch = $opts['hasSearch'] ?? true;
         $hasFilters = $opts['hasFilters'] ?? false;
-        $filtersDisplay = $opts['filtersDisplay'] ?? 'none';
 
         $event += [
             'key' => 'i',
@@ -225,7 +215,6 @@ class ItemsShortcutTest extends TestCase
         $hrefJson = json_encode($itemsHref);
         $hasSearchJson = json_encode($hasSearch);
         $hasFiltersJson = json_encode($hasFilters);
-        $filtersDisplayJson = json_encode($filtersDisplay);
         $script = <<<JS
 const ItemsShortcut = require({$module});
 let navigated = null;
@@ -243,13 +232,11 @@ const filtersButton = {$hasFiltersJson} ? {
   clicked: false,
   click: function () { this.clicked = true; },
 } : null;
-const filtersPanel = {$hasFiltersJson} ? { style: { display: {$filtersDisplayJson} } } : null;
 const doc = {
   querySelector: (sel) => {
     if (sel === '[data-shortcut="items"]') return link;
     if (sel === '[data-shortcut="items-search"]') return search;
     if (sel === '#display_filters') return filtersButton;
-    if (sel === 'form.filter-panel') return filtersPanel;
     return null;
   },
   addEventListener: (type, fn) => { listeners[type] = fn; },
