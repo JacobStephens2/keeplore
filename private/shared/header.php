@@ -303,6 +303,6 @@
       })();
     </script>
 
-    <script src="/shared/js/items-shortcut.js?v=1" defer></script>
+    <script src="/shared/js/items-shortcut.js?v=2" defer></script>
 
     <?php echo display_session_message(); ?>

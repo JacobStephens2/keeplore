@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
  * On signed-in and guest pages the Items nav link is the destination.
  * Pressing i (no modifiers, not typing in a textual field) calls go(href).
  * Pressing s focuses the Items search box marked data-shortcut="items-search".
+ * Pressing f opens the filter panel by clicking #display_filters when it is hidden.
  */
 class ItemsShortcutTest extends TestCase
 {
@@ -119,6 +120,43 @@ class ItemsShortcutTest extends TestCase
         $this->assertFalse($result['searchFocused']);
     }
 
+    public function test_pressing_f_opens_hidden_filters(): void
+    {
+        $result = $this->runShortcut(['key' => 'f'], ['hasFilters' => true]);
+        $this->assertTrue($result['filtersClicked']);
+        $this->assertNull($result['navigated']);
+    }
+
+    public function test_pressing_f_does_not_close_open_filters(): void
+    {
+        $result = $this->runShortcut(['key' => 'f'], [
+            'hasFilters' => true,
+            'filtersDisplay' => 'block',
+        ]);
+        $this->assertFalse($result['filtersClicked']);
+    }
+
+    public function test_pressing_f_in_a_text_input_does_not_open_filters(): void
+    {
+        $result = $this->runShortcut([
+            'key' => 'f',
+            'target' => ['tagName' => 'INPUT', 'type' => 'text'],
+        ], ['hasFilters' => true]);
+        $this->assertFalse($result['filtersClicked']);
+    }
+
+    public function test_capital_f_opens_hidden_filters(): void
+    {
+        $this->assertTrue($this->runShortcut(['key' => 'F'], ['hasFilters' => true])['filtersClicked']);
+    }
+
+    public function test_pressing_f_is_idle_without_a_filters_button(): void
+    {
+        $result = $this->runShortcut(['key' => 'f']);
+        $this->assertFalse($result['filtersClicked']);
+        $this->assertNull($result['navigated']);
+    }
+
     public function test_header_loads_the_items_shortcut_script(): void
     {
         $header = file_get_contents(PROJECT_PATH . '/private/shared/header.php');
@@ -164,12 +202,14 @@ class ItemsShortcutTest extends TestCase
     /**
      * @param array<string, mixed> $event
      * @param array<string, mixed> $opts
-     * @return array{navigated: ?string, searchFocused: bool, searchSelected: bool}
+     * @return array{navigated: ?string, searchFocused: bool, searchSelected: bool, filtersClicked: bool}
      */
     private function runShortcut(array $event, array $opts = []): array
     {
         $itemsHref = array_key_exists('itemsHref', $opts) ? $opts['itemsHref'] : '/artifacts';
         $hasSearch = $opts['hasSearch'] ?? true;
+        $hasFilters = $opts['hasFilters'] ?? false;
+        $filtersDisplay = $opts['filtersDisplay'] ?? 'none';
 
         $event += [
             'key' => 'i',
@@ -184,6 +224,8 @@ class ItemsShortcutTest extends TestCase
         $eventJson = json_encode($event);
         $hrefJson = json_encode($itemsHref);
         $hasSearchJson = json_encode($hasSearch);
+        $hasFiltersJson = json_encode($hasFilters);
+        $filtersDisplayJson = json_encode($filtersDisplay);
         $script = <<<JS
 const ItemsShortcut = require({$module});
 let navigated = null;
@@ -197,10 +239,17 @@ const search = {$hasSearchJson} ? {
   focus: function () { this.focused = true; },
   select: function () { this.selected = true; },
 } : null;
+const filtersButton = {$hasFiltersJson} ? {
+  clicked: false,
+  click: function () { this.clicked = true; },
+} : null;
+const filtersPanel = {$hasFiltersJson} ? { style: { display: {$filtersDisplayJson} } } : null;
 const doc = {
   querySelector: (sel) => {
     if (sel === '[data-shortcut="items"]') return link;
     if (sel === '[data-shortcut="items-search"]') return search;
+    if (sel === '#display_filters') return filtersButton;
+    if (sel === 'form.filter-panel') return filtersPanel;
     return null;
   },
   addEventListener: (type, fn) => { listeners[type] = fn; },
@@ -215,6 +264,7 @@ process.stdout.write(JSON.stringify({
   navigated: navigated,
   searchFocused: !!(search && search.focused),
   searchSelected: !!(search && search.selected),
+  filtersClicked: !!(filtersButton && filtersButton.clicked),
 }));
 JS;
 
