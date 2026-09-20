@@ -57,7 +57,7 @@ if (!isset($itemsById[$values['chosen_item_id'] ?? ''])) {
 $page_title = $id === null ? 'Record proposal outcome' : 'Edit proposal outcome';
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/proposals/proposals.css?v=1'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/proposals/proposals.css?v=2'); ?>">
 <main class="proposal-page">
     <header class="page-header">
         <p class="section-label">Proposal history</p>
@@ -111,22 +111,28 @@ include(SHARED_PATH . '/header.php');
                     array_map(static fn($item) => ['id' => (int) $item['id'], 'label' => $item['Title']], $items),
                     JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE
                 ); ?></script>
-                <script type="module" src="<?php echo url_for('/proposals/edit.js?v=1'); ?>"></script>
+                <script type="module" src="<?php echo url_for('/proposals/edit.js?v=2'); ?>"></script>
                 <label for="chosen_item_name">Or enter a name</label>
                 <input type="text" id="chosen_item_name" name="chosen_item_name" maxlength="255" value="<?php echo h($values['chosen_item_id'] ? '' : $values['chosen_item_name']); ?>" aria-describedby="alternative-help">
                 <p id="alternative-help" class="menu-support">An existing selection takes precedence over a typed name. A typed name does not add an item to your collection. Record actual use separately.</p>
             </fieldset>
             <fieldset>
                 <legend>Participants <span class="menu-support">(optional)</span></legend>
-                <div class="proposal-participants">
-                    <?php foreach ($participants as $participant) { ?>
-                        <label class="proposal-choice">
-                            <input type="checkbox" name="participant_ids[]" value="<?php echo (int) $participant['id']; ?>" <?php echo in_array($participant['id'], $values['participant_ids']) ? 'checked' : ''; ?>>
-                            <?php echo h(trim(($participant['FirstName'] ?? '') . ' ' . ($participant['LastName'] ?? ''))); ?>
-                        </label>
-                    <?php } ?>
-                </div>
-                <?php if (!$participants) { ?><p class="menu-support">You can record this without participants.</p><?php } ?>
+                <?php if ($participants) { ?>
+                    <label for="participant_search">Filter participants</label>
+                    <input type="search" id="participant_search" placeholder="Search participants" autocomplete="off" aria-controls="proposal-participants">
+                    <div class="proposal-participants" id="proposal-participants">
+                        <?php foreach ($participants as $participant) { ?>
+                            <label class="proposal-choice">
+                                <input type="checkbox" name="participant_ids[]" value="<?php echo (int) $participant['id']; ?>" <?php echo in_array($participant['id'], $values['participant_ids']) ? 'checked' : ''; ?>>
+                                <?php echo h(trim(($participant['FirstName'] ?? '') . ' ' . ($participant['LastName'] ?? ''))); ?>
+                            </label>
+                        <?php } ?>
+                    </div>
+                    <p id="participant-filter-empty" class="menu-support" hidden>No matching participants.</p>
+                <?php } else { ?>
+                    <p class="menu-support">You can record this without participants.</p>
+                <?php } ?>
             </fieldset>
             <label for="note">Note <span class="menu-support">(optional)</span></label>
             <textarea id="note" name="note" rows="4" placeholder="Reason, who objected, or other circumstances"><?php echo h($values['note']); ?></textarea>

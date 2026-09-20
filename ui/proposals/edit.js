@@ -70,3 +70,36 @@ if (optionsEl && chosenItemSearch && chosenItemId && chosenItemResults && chosen
     debounceMs: 0,
   });
 }
+
+bindParticipantFilter();
+
+function bindParticipantFilter() {
+  const participantSearch = document.getElementById('participant_search');
+  const participantList = document.getElementById('proposal-participants');
+  const emptyMessage = document.getElementById('participant-filter-empty');
+  if (!participantSearch || !participantList) {
+    return;
+  }
+
+  const rows = [...participantList.querySelectorAll('.proposal-choice')];
+
+  function applyFilter() {
+    const needle = participantSearch.value.trim().toLowerCase();
+    let visible = 0;
+    rows.forEach((row) => {
+      const checked = row.querySelector('input')?.checked;
+      const match = needle === '' || row.textContent.toLowerCase().includes(needle);
+      const show = match || checked;
+      row.hidden = !show;
+      if (show) {
+        visible += 1;
+      }
+    });
+    if (emptyMessage) {
+      emptyMessage.hidden = visible > 0 || needle === '';
+    }
+  }
+
+  participantSearch.addEventListener('input', applyFilter);
+  participantList.addEventListener('change', applyFilter);
+}
