@@ -32,6 +32,17 @@
     <dd><?php echo h($object['type']); ?></dd>
   </dl>
 
+  <?php
+    $tag_user_id = (int) ($object['user_id'] ?? ($_SESSION['user_id'] ?? 0));
+    $item_tags = $tag_user_id > 0
+      ? (find_item_tags_for_artifacts($db, [(int) $object['id']], $tag_user_id)[(int) $object['id']] ?? [])
+      : [];
+  ?>
+  <dl>
+    <dt>Tags</dt>
+    <dd><?php echo $item_tags === [] ? 'None' : h(implode(', ', $item_tags)); ?></dd>
+  </dl>
+
   <?php if (!is_guest()) { ?>
   <li><a class="back-link" href="<?php echo url_for('/artifacts/edit.php?id=' . h(u($object['id']))); ?>">Edit</a></li>
   <?php } ?>

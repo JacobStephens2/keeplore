@@ -62,6 +62,7 @@
     ($_POST['SS'] == '') ? $artifact['SS'] = 1 : $artifact['SS'] = $_POST['SS'];
     $result = update_artifact($artifact);
     if($result === true) {
+      replace_item_tags($db, $id, (int) $_SESSION['user_id'], $_POST['tags'] ?? '');
       $_SESSION['message'] = 'The item was updated successfully.';
       redirect_to(url_for('/artifacts/edit.php?id=' . $id));
     } else {
@@ -70,6 +71,10 @@
   }
 
   $artifact = find_artifact_by_id($id);
+  $item_tags = find_item_tags_for_artifacts($db, [$id], (int) $_SESSION['user_id'])[$id] ?? [];
+  if (is_post_request() && isset($_POST['tags'])) {
+    $item_tags = parse_item_tags_input($_POST['tags']);
+  }
 
   $sweetSpotsResultObject = find_sweet_spots_by_artifact_id($id);
 
@@ -149,6 +154,12 @@
           }
         });
       </script>
+
+      <label for="tags">Tags (comma-separated)</label>
+      <input type="text" name="tags" id="tags"
+        value="<?php echo h(implode(', ', $item_tags)); ?>"
+        placeholder="portable, beach-safe, two-player, party"
+      />
 
       <label for="Acq">Tracking Start Date</label>
       <input type="date" name="Acq" id="Acq" value="<?php echo h($artifact['Acq']); ?>" />

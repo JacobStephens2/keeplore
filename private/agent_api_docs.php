@@ -42,13 +42,14 @@ function agent_api_docs($api_origin = null) {
         'method' => 'POST',
         'path' => '/artifacts.php',
         'summary' => 'List or search items in the key\'s collection.',
-        'body_fields' => ['page', 'per_page', 'query', 'cursor'],
+        'body_fields' => ['page', 'per_page', 'query', 'cursor', 'tag'],
         'example_body' => '{"page":1,"per_page":50}',
         'get_lists_first_page' => true,
         'notes' => [
           'Agent keys always read their own user; a userid in the body is ignored.',
           'Default page size is 50; maximum is 200.',
-          'The list returns id and Title. Fetch one item for kept, secondary collection, physical, digital, and the rest of the record.',
+          'The list returns id, Title, and tags. Fetch one item for kept, secondary collection, physical, digital, and the rest of the record.',
+          'tag filters to items the owner labelled with that tag (for example beach-safe).',
           'GET with no body also lists page 1 for an agent key.',
         ],
       ],
@@ -62,6 +63,7 @@ function agent_api_docs($api_origin = null) {
         'discovery_key' => 'GET /artifact.php?id=<id>',
         'notes' => [
           'Kept is is_kept. Secondary collection, physical, and digital are independent flags.',
+          'tags are the owner\'s free-form labels (portable, beach-safe, two-player, party). They complement player-count and time columns; they do not replace them.',
         ],
       ],
       [
@@ -116,7 +118,7 @@ function agent_api_docs($api_origin = null) {
         'example_body' => '{"id":123,"is_kept":1}',
         'is_kept_values' => [0, 1],
         'notes' => [
-          'is_kept must be 0 or 1. This does not change secondary collection, physical, digital, or to get rid of.',
+          'is_kept must be 0 or 1. This does not change secondary collection, physical, digital, tags, or to get rid of.',
         ],
       ],
     ],

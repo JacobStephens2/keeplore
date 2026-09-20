@@ -56,6 +56,9 @@
         exit;
       }
 
+      if ($user_id) {
+        $artifact = with_item_tags($database, [$artifact], $user_id)[0];
+      }
       $response->artifact = $artifact;
       echo json_encode($response);
       break;
@@ -108,6 +111,10 @@
       $result = $artifact->save();
 
       if ($result === true) {
+        $tags_input = (is_object($requestBody) && property_exists($requestBody, 'tags'))
+          ? $requestBody->tags
+          : null;
+        $artifact = persist_and_attach_item_tags($database, $artifact, $user_id, $tags_input);
         http_response_code(201);
         $logger->logDataChange('create', 'artifact', $artifact->id, ['title' => $artifact->Title]);
         $response->message = 'Item created successfully.';
@@ -183,6 +190,10 @@
       }
 
       if ($result === true) {
+        $tags_input = (is_object($requestBody) && property_exists($requestBody, 'tags'))
+          ? $requestBody->tags
+          : null;
+        $artifact = persist_and_attach_item_tags($database, $artifact, $user_id, $tags_input);
         $logger->logDataChange('update', 'artifact', $artifact->id, ['title' => $artifact->Title]);
         $response->message = 'Item updated successfully.';
         $response->artifact = $artifact;
@@ -234,6 +245,7 @@
       }
 
       if ($result === true) {
+        delete_item_tags_for_artifact($database, $id, $user_id);
         $logger->logDataChange('delete', 'artifact', $id, ['title' => $artifact->Title]);
         $response->message = 'Item deleted successfully.';
         echo json_encode($response);

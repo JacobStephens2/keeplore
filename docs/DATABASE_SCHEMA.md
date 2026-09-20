@@ -57,6 +57,22 @@ The primary artifacts table. Despite its name, it stores all artifact types (boa
 
 ---
 
+### `item_tags`
+
+Owner-managed free-form tags on items (issue #28). Distinct from BGG rating metadata and from player-count/time columns (`MnP`/`MxP`/`SS`/`MnT`/`MxT`). Apply [`add-item-tags.sql`](../database/migrations/add-item-tags.sql); it is safe to rerun.
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | INT UNSIGNED, AUTO_INCREMENT | NO | Primary key |
+| `user_id` | INT | NO | User who labelled the item; tags never cross collections |
+| `artifact_id` | INT | NO | Tagged item, `games.id` |
+| `tag` | VARCHAR(64) | NO | Normalized label (lowercase, trimmed), e.g. `beach-safe` |
+
+**Primary key:** `id`
+**Uniqueness:** `(user_id, artifact_id, tag)` is unique.
+
+---
+
 ### `users`
 
 Authentication and account records for application users.
