@@ -496,6 +496,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
         SS,
         MnT,
         MxT,
+        Age,
         MnP,
         MxP,
         user_id,
@@ -503,10 +504,10 @@ require_once dirname(__DIR__) . '/item_tags.php';
         is_in_secondary_collection,
         is_digital,
         is_physical
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ";
     $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'sssssssssssssssssss',
+    mysqli_stmt_bind_param($stmt, 'ssssssssssssssssssss',
       $artifact['Title'],
       $artifact['Notes'],
       $artifact['Acq'],
@@ -519,6 +520,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
       $artifact['SS'],
       $artifact['MnT'],
       $artifact['MxT'],
+      $artifact['age'],
       $artifact['MnP'],
       $artifact['MxP'],
       $_SESSION['user_id'],

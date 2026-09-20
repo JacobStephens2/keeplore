@@ -38,6 +38,10 @@ if(is_post_request()) {
   (($_POST['MnP'] ?? '') == '') ? $artifact['MnP'] = $defaultMnP : $artifact['MnP'] = $_POST['MnP'];
   (($_POST['MxP'] ?? '') == '') ? $artifact['MxP'] = $defaultMxP : $artifact['MxP'] = $_POST['MxP'];
   (($_POST['SS'] ?? '') == '') ? $artifact['SS'] = $defaultSS : $artifact['SS'] = $_POST['SS'];
+  $artifact['age'] = $_POST['age'] ?? 0;
+  if ($artifact['age'] === '') {
+    $artifact['age'] = 0;
+  }
 
   $artifact['tags'] = $_POST['tags'] ?? '';
   $result = insert_artifact($artifact);
@@ -82,6 +86,7 @@ if(is_post_request()) {
   $artifact["MnP"] = $defaultMnP;
   $artifact["MxP"] = $defaultMxP;
   $artifact["SS"] = $defaultSS;
+  $artifact["age"] = '';
   $artifact['tags'] = '';
 }
 
@@ -101,6 +106,28 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
       <div class="form-field form-field-span">
         <label for="Title">Name</label>
         <input type="text" name="Title" id="Title" value="<?php echo h($artifact['Title']); ?>" />
+      </div>
+
+      <div class="form-field form-field-span">
+        <div class="bgg-lookup">
+          <button type="button" id="requestBggData">Request BGG Data</button>
+          <p class="bgg-lookup-status" id="bggLookupStatus" hidden></p>
+          <div class="bgg-confirm" id="bggConfirm" hidden>
+            <p>
+              BoardGameGeek match:
+              <strong id="bggMatchName"></strong>
+              <span id="bggMatchYearWrap">(<span id="bggMatchYear"></span>)</span>
+            </p>
+            <p>
+              <a id="bggMatchLink" href="#" target="_blank" rel="noopener">View on BoardGameGeek</a>
+            </p>
+            <div class="bgg-confirm-actions">
+              <button type="button" id="bggUseMatch">Use this game</button>
+              <button type="button" class="bgg-secondary" id="bggNotThis">Not this game</button>
+            </div>
+            <ul class="bgg-other-matches" id="bggOtherMatches" hidden></ul>
+          </div>
+        </div>
       </div>
 
       <div class="form-field">
@@ -168,6 +195,11 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
         <input type="number" name="MxT" id="MxT" value="<?php echo $artifact['MxT']; ?>">
       </div>
 
+      <div class="form-field">
+        <label for="age">Minimum Age</label>
+        <input type="number" name="age" id="age" value="<?php echo h($artifact['age']); ?>">
+      </div>
+
       <div class="form-field form-field-span">
         <label for="Notes">Notes</label>
         <textarea name="Notes" id="Notes" cols="30" rows="5"></textarea>
@@ -189,5 +221,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
   </div>
 
 </main>
+
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=1"></script>
 
 <?php include(SHARED_PATH . '/footer.php'); ?>
