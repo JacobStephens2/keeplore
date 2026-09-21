@@ -2125,6 +2125,41 @@ ul.fun-facts .fact-aside {
   box-shadow: inset 0 0 0 1px rgba(48, 57, 92, 0.35), 0 0 0 4px rgba(51, 177, 228, 0.12);
 }
 
+.create-item-lookup {
+  margin: 0 0 1.75rem;
+  padding: 1.15rem 1.25rem 0.85rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-low);
+}
+
+.create-item-lookup h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  color: var(--primary);
+}
+
+.create-item-lookup > p {
+  margin: 0 0 0.75rem;
+  max-width: 62ch;
+  color: var(--text-soft);
+}
+
+.create-item-lookup .list-search-wrap {
+  margin-top: 0;
+  margin-bottom: 0.65rem;
+}
+
+.create-item-lookup .list-pager {
+  margin-top: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+
+.create-item-lookup .kept-toggle-btn {
+  min-height: 2.2rem;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.9rem;
+}
+
 .list-search-wrap {
   display: block;
   margin: 0.75rem 0 1rem;

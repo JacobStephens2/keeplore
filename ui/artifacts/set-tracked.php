@@ -64,6 +64,8 @@
     redirect_to(url_for('/artifacts/index.php'));
   } elseif ($return_to === 'to-get-rid-of') {
     redirect_to(url_for('/artifacts/to-get-rid-of.php'));
+  } elseif ($return_to === 'new') {
+    redirect_to(url_for('/artifacts/new'));
   } else {
     redirect_to(url_for('/artifacts/useby.php'));
   }
