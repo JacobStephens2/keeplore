@@ -39,6 +39,7 @@
     */
 
     $is_ajax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
+    $after_record = record_use_return_path($_POST, url_for('/uses/' . $formProcessingFile));
 
     if ($_POST['artifact']['name'] == '') {
 
@@ -51,7 +52,7 @@
 
       $_SESSION['message'] = "Please choose an item.";
 
-      redirect_to(url_for('/uses/' . $formProcessingFile));
+      redirect_to($after_record);
 
     } else {
 
@@ -59,31 +60,18 @@
 
       if($insertResult === true) {
         $new_id = mysqli_insert_id($db);
-        $user_count = count($_POST['user']);
-        if ($user_count === 1) {
-          $user_count_word = 'person';
-        } else {
-          $user_count_word = 'people';
-        }
-        $message = "The interaction with " . $_POST['artifact']['name']
-          . " with $user_count $user_count_word was recorded.";
+        $message = record_use_success_message($_POST);
 
         if ($is_ajax) {
           $status = compute_artifact_use_by_status((int) $_POST['artifact']['id'], (int) $_SESSION['user_id']);
+          $artifact_row = find_artifact_by_id((int) $_POST['artifact']['id']);
           header('Content-Type: application/json');
-          echo json_encode([
-            'ok' => true,
-            'message' => $message,
-            'artifact_id' => (int) $_POST['artifact']['id'],
-            'new_use_by_date' => $status['use_by_date'],
-            'most_recent_use_date' => $status['most_recent_use_date'],
-            'is_overdue' => $status['is_overdue'],
-          ]);
+          echo json_encode(record_use_ajax_payload($_POST, (int) $new_id, $status, $artifact_row));
           exit;
         }
 
         $_SESSION['message'] = $message;
-        redirect_to(url_for('/uses/' . $formProcessingFile));
+        redirect_to($after_record);
       } else {
         if ($is_ajax) {
           header('Content-Type: application/json');
@@ -216,26 +204,10 @@
     >
 
     <label for="Note">Setting</label>
-    <?php 
-      $most_recent_setting = singleValueQuery(
-        "SELECT note 
-        FROM uses
-        WHERE user_id = '" . $_SESSION['user_id'] . "'
-        ORDER BY id DESC
-        LIMIT 1
-      ");
-      if ($most_recent_setting === null) {
-        $default_setting = singleValueQuery(
-          "SELECT default_setting
-          FROM users
-          WHERE id = '" . $_SESSION['user_id'] . "'
-        ");
-      }
-    ?>
     <input type="text" 
       name="Note" 
       id="Note"
-      value="<?php echo $most_recent_setting; ?>"
+      value="<?php echo h(most_recent_use_setting((int) $_SESSION['user_id'])); ?>"
     >
 
     <label for="NotesTwo">Notes</label>
