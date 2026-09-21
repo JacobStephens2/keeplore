@@ -183,29 +183,7 @@
 
   <section id="uses">
     <?php
-      $player_id = (int) $_REQUEST['id'];
-      $user_id_int = (int) $user_id;
-
-      $stmt_interactions = mysqli_prepare($db, "SELECT
-        uses.id AS use_id,
-        DATE(uses.use_date) AS use_date,
-        games.id AS artifactID,
-        games.Title,
-        games.type
-        FROM uses_players
-        JOIN uses ON uses.id = uses_players.use_id
-        JOIN games ON games.id = uses.artifact_id
-        WHERE uses_players.user_id = ?
-          AND uses_players.player_id = ?
-        ORDER BY uses.use_date DESC");
-      mysqli_stmt_bind_param($stmt_interactions, "ii", $user_id_int, $player_id);
-      mysqli_stmt_execute($stmt_interactions);
-      $interactionsResult = mysqli_stmt_get_result($stmt_interactions);
-      $interactions = [];
-      while ($row = mysqli_fetch_assoc($interactionsResult)) {
-        $interactions[] = $row;
-      }
-      mysqli_stmt_close($stmt_interactions);
+      $interactions = find_player_uses($db, $user_id, $_REQUEST['id']);
       $most_used_items = rank_items_by_player_uses($interactions);
     ?>
     <?php if (!empty($most_used_items)) { ?>
@@ -226,12 +204,7 @@
           <?php foreach ($most_used_items as $row) { ?>
             <tr>
               <td><?php echo h($row['use_count']); ?></td>
-              <td>
-                <a href="<?php echo url_for('/artifacts/edit.php?id=' . h(u($row['artifactID']))); ?>">
-                  <?php echo h($row['Title']); ?>
-                </a>
-              </td>
-              <td><?php echo h($row['type']); ?></td>
+              <?php echo player_use_item_cells($row); ?>
             </tr>
           <?php } ?>
         </tbody>
@@ -260,12 +233,7 @@
                 <?php echo $row['use_date'] ? h($row['use_date']) : 'No date'; ?>
               </a>
             </td>
-            <td>
-              <a href="<?php echo url_for('/artifacts/edit.php?id=' . h(u($row['artifactID']))); ?>">
-                <?php echo h($row['Title']); ?>
-              </a>
-            </td>
-            <td><?php echo h($row['type']); ?></td>
+            <?php echo player_use_item_cells($row); ?>
           </tr>
         <?php } ?>
       </tbody>

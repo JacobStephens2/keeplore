@@ -10,6 +10,8 @@ require_once PROJECT_PATH . '/private/player_item_uses.php';
  * Seams:
  * - rank_items_by_player_uses(): group a player's recorded uses by item
  *   and rank them most uses first
+ * - find_player_uses(): load that player's already-scoped use rows
+ * - player_use_item_cells(): Item and Type cells shared by both tables
  * - ui/users/edit.php source: Edit User shows that ranking without
  *   scanning the chronological interactions table
  */
@@ -97,16 +99,61 @@ class PlayerItemUsesTest extends TestCase
         $this->assertSame('book', $ranked[2]['type']);
     }
 
+    public function test_item_cells_link_the_title_and_show_the_type(): void
+    {
+        $html = player_use_item_cells($this->useRow(10, 'Catan'));
+
+        $this->assertStringContainsString('/artifacts/edit.php?id=10', $html);
+        $this->assertStringContainsString('>Catan</a>', $html);
+        $this->assertStringContainsString('<td>board-game</td>', $html);
+    }
+
+    public function test_item_cells_escape_title_and_type(): void
+    {
+        $html = player_use_item_cells($this->useRow(10, '<b>X</b>', 'a&b'));
+
+        $this->assertStringContainsString('&lt;b&gt;X&lt;/b&gt;', $html);
+        $this->assertStringContainsString('a&amp;b', $html);
+        $this->assertStringNotContainsString('<b>X</b>', $html);
+    }
+
     private function editUserPage(): string
     {
         return (string) file_get_contents(PROJECT_PATH . '/ui/users/edit.php');
+    }
+
+    private function findPlayerUsesFn(): string
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/private/player_item_uses.php');
+        $this->assertSame(
+            1,
+            preg_match('/function find_player_uses\s*\(.*?\n\}/s', $source, $match),
+            'find_player_uses must exist so Edit User can load uses without owning the SQL.'
+        );
+        return $match[0];
+    }
+
+    public function test_find_player_uses_scopes_to_the_account_and_player(): void
+    {
+        $fn = $this->findPlayerUsesFn();
+        $this->assertMatchesRegularExpression('/FROM uses_players/i', $fn);
+        $this->assertStringContainsString('uses_players.user_id = ?', $fn);
+        $this->assertStringContainsString('uses_players.player_id = ?', $fn);
+        $this->assertStringContainsString('ORDER BY uses.use_date DESC', $fn);
+        $this->assertStringContainsString('games.id AS artifactID', $fn);
     }
 
     public function test_edit_user_ranks_the_player_uses_already_on_the_page(): void
     {
         $page = $this->editUserPage();
         $this->assertStringContainsString("require_once(PRIVATE_PATH . '/player_item_uses.php')", $page);
+        $this->assertStringContainsString('find_player_uses(', $page);
         $this->assertStringContainsString('rank_items_by_player_uses(', $page);
+        $this->assertStringNotContainsString(
+            'FROM uses_players',
+            $page,
+            'Edit User must load uses through find_player_uses, not inline SQL.'
+        );
     }
 
     public function test_edit_user_shows_use_count_item_and_type_for_the_ranking(): void
@@ -117,7 +164,12 @@ class PlayerItemUsesTest extends TestCase
         $this->assertStringContainsString('<th>Uses</th>', $page);
         $this->assertStringContainsString('foreach ($most_used_items as $row)', $page);
         $this->assertStringContainsString("\$row['use_count']", $page);
-        $this->assertStringContainsString('/artifacts/edit.php?id=', $page);
+        $this->assertSame(
+            2,
+            substr_count($page, 'player_use_item_cells($row)'),
+            'Both Edit User tables must share player_use_item_cells for Item and Type.'
+        );
+        $this->assertStringNotContainsString('/artifacts/edit.php?id=', $page);
         $this->assertDoesNotMatchRegularExpression(
             '/id="most-used-items"[\s\S]*Most used games/i',
             $page,

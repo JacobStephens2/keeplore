@@ -1,11 +1,9 @@
 <?php
 
 /**
- * Rank items by how often a player participated in their recorded uses.
- *
- * Pure: no database access. Callers pass the player's already-scoped use
- * rows (artifactID, Title, type). Returns one row per item, most uses
- * first, with equal counts broken alphabetically by title.
+ * A player's recorded uses on Edit User: load the rows, rank items by
+ * how often the player participated, and share Item/Type table cells
+ * between the ranking and the chronological list.
  */
 
 function rank_items_by_player_uses(array $uses) {
@@ -34,4 +32,54 @@ function rank_items_by_player_uses(array $uses) {
     return strcasecmp($a['Title'], $b['Title']);
   });
   return $ranked;
+}
+
+/**
+ * Item and Type table cells for a player's use or ranking row.
+ *
+ * Both Edit User tables share this pair: a link to Edit Item and the
+ * item type. Callers supply the first-column cell themselves.
+ */
+function player_use_item_cells(array $row) {
+  $id = h(u($row['artifactID'] ?? ''));
+  $title = h($row['Title'] ?? '');
+  $type = h($row['type'] ?? '');
+  $href = url_for('/artifacts/edit.php?id=' . $id);
+  return '<td><a href="' . $href . '">' . $title . '</a></td>'
+    . '<td>' . $type . '</td>';
+}
+
+/**
+ * Load one player's recorded uses for the acting account, newest first.
+ *
+ * Each row has use_id, use_date, artifactID, Title, and type, the shape
+ * rank_items_by_player_uses() and the chronological table both consume.
+ */
+function find_player_uses($conn, $user_id, $player_id) {
+  $user_id = (int) $user_id;
+  $player_id = (int) $player_id;
+  $stmt = mysqli_prepare(
+    $conn,
+    "SELECT
+      uses.id AS use_id,
+      DATE(uses.use_date) AS use_date,
+      games.id AS artifactID,
+      games.Title,
+      games.type
+      FROM uses_players
+      JOIN uses ON uses.id = uses_players.use_id
+      JOIN games ON games.id = uses.artifact_id
+      WHERE uses_players.user_id = ?
+        AND uses_players.player_id = ?
+      ORDER BY uses.use_date DESC"
+  );
+  mysqli_stmt_bind_param($stmt, "ii", $user_id, $player_id);
+  mysqli_stmt_execute($stmt);
+  $result = mysqli_stmt_get_result($stmt);
+  $rows = [];
+  while ($row = mysqli_fetch_assoc($result)) {
+    $rows[] = $row;
+  }
+  mysqli_stmt_close($stmt);
+  return $rows;
 }
