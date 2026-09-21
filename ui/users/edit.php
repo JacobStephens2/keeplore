@@ -1,6 +1,7 @@
 <?php
 
   require_once('../../private/initialize.php');
+  require_once(PRIVATE_PATH . '/player_item_uses.php');
   require_login();
 
   if(!isset($_GET['id'])) {
@@ -200,9 +201,45 @@
       mysqli_stmt_bind_param($stmt_interactions, "ii", $user_id_int, $player_id);
       mysqli_stmt_execute($stmt_interactions);
       $interactionsResult = mysqli_stmt_get_result($stmt_interactions);
+      $interactions = [];
+      while ($row = mysqli_fetch_assoc($interactionsResult)) {
+        $interactions[] = $row;
+      }
+      mysqli_stmt_close($stmt_interactions);
+      $most_used_items = rank_items_by_player_uses($interactions);
     ?>
+    <?php if (!empty($most_used_items)) { ?>
+    <section id="most-used-items">
+      <h2>
+        Most used items with
+        <?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?>
+      </h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Uses</th>
+            <th>Item</th>
+            <th>Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($most_used_items as $row) { ?>
+            <tr>
+              <td><?php echo h($row['use_count']); ?></td>
+              <td>
+                <a href="<?php echo url_for('/artifacts/edit.php?id=' . h(u($row['artifactID']))); ?>">
+                  <?php echo h($row['Title']); ?>
+                </a>
+              </td>
+              <td><?php echo h($row['type']); ?></td>
+            </tr>
+          <?php } ?>
+        </tbody>
+      </table>
+    </section>
+    <?php } ?>
     <h2>
-      <?php echo $interactionsResult->num_rows; ?>
+      <?php echo count($interactions); ?>
       <?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?>
       interactions are recorded
     </h2>
@@ -216,7 +253,7 @@
         </tr>
       </thead>
       <tbody>
-        <?php foreach ($interactionsResult as $row) { ?>
+        <?php foreach ($interactions as $row) { ?>
           <tr>
             <td>
               <a href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($row['use_id']))); ?>">
