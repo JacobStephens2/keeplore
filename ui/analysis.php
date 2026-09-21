@@ -1,183 +1,41 @@
 <?php
   require_once('../private/initialize.php');
+  require_once(PRIVATE_PATH . '/analysis.php');
   require_login_or_guest();
 
   $page_title = 'Analysis';
-  $user_id = (int) $_SESSION['user_id'];
   date_default_timezone_set('America/New_York');
+  $report = analysis_report_for_user($db, (int) $_SESSION['user_id'], date('Y-m-d'));
 
-  // ---- Helpers ---------------------------------------------------------------
+  $totals = $report['totals'];
+  $pace = $report['pace'];
+  $records = $report['records'];
+  $recency = $report['recency'];
+  $company = $report['company'];
 
-  function fetch_one($sql, $user_id) {
-    global $db;
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'i', $user_id);
-    mysqli_stmt_execute($stmt);
-    $res = mysqli_stmt_get_result($stmt);
-    $row = mysqli_fetch_assoc($res);
-    mysqli_stmt_close($stmt);
-    return $row;
+  function analysis_item_link(array $row) {
+    $page = is_guest() ? 'show' : 'edit';
+    return '<a href="' . url_for('/artifacts/' . $page . '.php?id=' . h(u($row['id']))) . '">' . h($row['title']) . '</a>';
   }
 
-  function fetch_all($sql, $user_id) {
-    global $db;
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'i', $user_id);
-    mysqli_stmt_execute($stmt);
-    $res = mysqli_stmt_get_result($stmt);
-    $rows = [];
-    while ($row = mysqli_fetch_assoc($res)) { $rows[] = $row; }
-    mysqli_stmt_close($stmt);
-    return $rows;
+  // "+4 vs prior 30 days" style comparison line under a headline figure.
+  function analysis_change(int $now, int $before, string $versus) {
+    $diff = $now - $before;
+    $sign = $diff > 0 ? '+' : ($diff < 0 ? '&minus;' : '&plusmn;');
+    return $sign . number_format(abs($diff)) . ' vs ' . h($versus);
   }
 
-  // ---- Summary counts --------------------------------------------------------
-
-  $total_uses = (int) (fetch_one("SELECT COUNT(*) AS c FROM uses WHERE user_id = ?", $user_id)['c'] ?? 0);
-  $uses_7 = (int) (fetch_one("SELECT COUNT(*) AS c FROM uses WHERE user_id = ? AND use_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)", $user_id)['c'] ?? 0);
-  $uses_30 = (int) (fetch_one("SELECT COUNT(*) AS c FROM uses WHERE user_id = ? AND use_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)", $user_id)['c'] ?? 0);
-  $uses_90 = (int) (fetch_one("SELECT COUNT(*) AS c FROM uses WHERE user_id = ? AND use_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)", $user_id)['c'] ?? 0);
-  $kept_count = (int) (fetch_one("SELECT COUNT(*) AS c FROM games WHERE user_id = ? AND is_kept = 1 AND (to_get_rid_of = 0 OR to_get_rid_of IS NULL)", $user_id)['c'] ?? 0);
-  $distinct_used = (int) (fetch_one("SELECT COUNT(DISTINCT artifact_id) AS c FROM uses WHERE user_id = ?", $user_id)['c'] ?? 0);
-  $first_use_row = fetch_one("SELECT MIN(use_date) AS d FROM uses WHERE user_id = ?", $user_id);
-  $first_use = $first_use_row['d'] ?? null;
-  $days_tracking = $first_use ? max(1, (int) ((time() - strtotime($first_use)) / 86400)) : null;
-  $avg_per_week = ($days_tracking && $total_uses > 0)
-    ? round(($total_uses / max($days_tracking, 1)) * 7, 1)
-    : 0;
-
-  // ---- Uses per month (last 12 months including current) ---------------------
-
-  $monthly_rows = fetch_all(
-    "SELECT DATE_FORMAT(use_date, '%Y-%m') AS month, COUNT(*) AS c
-     FROM uses
-     WHERE user_id = ?
-       AND use_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 11 MONTH)
-     GROUP BY month
-     ORDER BY month",
-    $user_id
-  );
-  $monthly_map = [];
-  foreach ($monthly_rows as $r) { $monthly_map[$r['month']] = (int) $r['c']; }
-  $monthly_labels = [];
-  $monthly_counts = [];
-  $month_cursor = new DateTime(date('Y-m-01'));
-  $month_cursor->modify('-11 months');
-  for ($i = 0; $i < 12; $i++) {
-    $key = $month_cursor->format('Y-m');
-    $monthly_labels[] = $month_cursor->format('M Y');
-    $monthly_counts[] = $monthly_map[$key] ?? 0;
-    $month_cursor->modify('+1 month');
-  }
-
-  // ---- Top 10 most-interacted (last 90 days) --------------------------------
-
-  $top_recent = fetch_all(
-    "SELECT games.id, games.Title, COALESCE(types.objectType, '') AS type, COUNT(uses.id) AS use_count
-     FROM uses
-     JOIN games ON uses.artifact_id = games.id
-     LEFT JOIN types ON games.type_id = types.id
-     WHERE uses.user_id = ?
-       AND uses.use_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
-     GROUP BY games.id, games.Title, types.objectType
-     ORDER BY use_count DESC, games.Title ASC
-     LIMIT 10",
-    $user_id
-  );
-
-  // ---- Uses by type (last 90 days) ------------------------------------------
-
-  $type_rows = fetch_all(
-    "SELECT COALESCE(types.objectType, '—') AS type, COUNT(uses.id) AS c
-     FROM uses
-     JOIN games ON uses.artifact_id = games.id
-     LEFT JOIN types ON games.type_id = types.id
-     WHERE uses.user_id = ?
-       AND uses.use_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
-     GROUP BY types.objectType
-     ORDER BY c DESC",
-    $user_id
-  );
-  $type_labels = array_map(fn($r) => $r['type'], $type_rows);
-  $type_counts = array_map(fn($r) => (int) $r['c'], $type_rows);
-
-  // ---- Day-of-week breakdown -------------------------------------------------
-
-  $dow_rows = fetch_all(
-    "SELECT DAYOFWEEK(use_date) AS dow, COUNT(*) AS c
-     FROM uses
-     WHERE user_id = ?
-     GROUP BY dow",
-    $user_id
-  );
-  $dow_counts = array_fill(1, 7, 0);
-  foreach ($dow_rows as $r) { $dow_counts[(int) $r['dow']] = (int) $r['c']; }
-  $dow_labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  $dow_values = [$dow_counts[1], $dow_counts[2], $dow_counts[3], $dow_counts[4], $dow_counts[5], $dow_counts[6], $dow_counts[7]];
-
-  // ---- Fun facts -------------------------------------------------------------
-
-  $top_ever = fetch_one(
-    "SELECT games.Title, COUNT(uses.id) AS c
-     FROM uses
-     JOIN games ON uses.artifact_id = games.id
-     WHERE uses.user_id = ?
-     GROUP BY games.id, games.Title
-     ORDER BY c DESC, games.Title ASC
-     LIMIT 1",
-    $user_id
-  );
-
-  $busiest_day = fetch_one(
-    "SELECT use_date, COUNT(*) AS c
-     FROM uses
-     WHERE user_id = ?
-     GROUP BY use_date
-     ORDER BY c DESC, use_date DESC
-     LIMIT 1",
-    $user_id
-  );
-
-  $stalest = fetch_one(
-    "SELECT games.Title,
-        (SELECT MAX(uses.use_date) FROM uses WHERE uses.artifact_id = games.id AND uses.user_id = games.user_id) AS last_used,
-        games.Acq
-     FROM games
-     WHERE games.user_id = ?
-       AND games.is_kept = 1
-       AND (games.to_get_rid_of = 0 OR games.to_get_rid_of IS NULL)
-     ORDER BY COALESCE(
-       (SELECT MAX(uses.use_date) FROM uses WHERE uses.artifact_id = games.id AND uses.user_id = games.user_id),
-       games.Acq
-     ) ASC
-     LIMIT 1",
-    $user_id
-  );
-
-  // Longest run of consecutive days with at least one interaction
-  $distinct_days = fetch_all(
-    "SELECT DISTINCT use_date FROM uses WHERE user_id = ? ORDER BY use_date",
-    $user_id
-  );
-  $longest_streak = 0; $current_streak = 0; $streak_end = null; $streak_start = null;
-  $best_start = null; $best_end = null;
-  $prev_ts = null;
-  foreach ($distinct_days as $row) {
-    $d = $row['use_date'];
-    $ts = strtotime($d);
-    if ($prev_ts !== null && ($ts - $prev_ts) === 86400) {
-      $current_streak++;
-    } else {
-      $current_streak = 1;
-      $streak_start = $d;
+  // Horizontal bar list: label, proportional bar, value. No script needed.
+  function analysis_bar_list(array $rows) {
+    $max = max(1, max(array_column($rows, 'count') ?: [0]));
+    $html = '<ul class="bar-list">';
+    foreach ($rows as $row) {
+      $width = round($row['count'] / $max * 100, 1);
+      $html .= '<li><span class="bar-list-label">' . h($row['label']) . '</span>'
+        . '<span class="bar-list-track"><span class="bar-list-bar" style="width:' . $width . '%"></span></span>'
+        . '<span class="bar-list-value">' . number_format($row['count']) . '</span></li>';
     }
-    $streak_end = $d;
-    if ($current_streak > $longest_streak) {
-      $longest_streak = $current_streak;
-      $best_start = $streak_start;
-      $best_end = $streak_end;
-    }
-    $prev_ts = $ts;
+    return $html . '</ul>';
   }
 
   include(SHARED_PATH . '/header.php');
@@ -185,81 +43,246 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
 
-<main>
+<main class="analysis-page">
   <header class="page-header">
     <p class="section-label">Insights</p>
     <h1>Analysis</h1>
-    <p class="page-lede">How often you interact, what leads the list, and where the queue is thin.</p>
+    <p class="page-lede">What you track, how often you use it, and which kept items are earning their place.</p>
     <?php if (!is_guest()) { ?>
       <p><a href="<?php echo url_for('/proposals/index.php'); ?>">Proposal outcomes — compare explicit declines and items passed over</a></p>
     <?php } ?>
   </header>
-  <div class="dashboard">
-    <section class="dashboard-hero">
-      <div class="dashboard-hero-copy">
-        <p class="section-label">Insights</p>
-        <h1>Analysis</h1>
-        <p class="dashboard-intro">Trends and fun facts from your interaction history.</p>
+
+  <section class="analysis-layout">
+    <div class="analysis-tiles">
+      <div class="metric-card">
+        <span class="metric-label">People</span>
+        <strong><?php echo number_format($totals['people']); ?></strong>
+        <span class="metric-note"><?php echo number_format($company['people_count']); ?> shared a use</span>
       </div>
-      <div class="dashboard-hero-aside">
-        <div class="metric-card">
-          <span class="metric-label">Total interactions</span>
-          <strong><?php echo number_format($total_uses); ?></strong>
-        </div>
-        <div class="metric-card">
-          <span class="metric-label">Last 7 days</span>
-          <strong><?php echo number_format($uses_7); ?></strong>
-        </div>
-        <div class="metric-card">
-          <span class="metric-label">Last 30 days</span>
-          <strong><?php echo number_format($uses_30); ?></strong>
-        </div>
-        <div class="metric-card">
-          <span class="metric-label">Last 90 days</span>
-          <strong><?php echo number_format($uses_90); ?></strong>
-        </div>
-        <div class="metric-card">
-          <span class="metric-label">Tracked items</span>
-          <strong><?php echo number_format($kept_count); ?></strong>
-        </div>
-        <div class="metric-card">
-          <span class="metric-label">Distinct ever used</span>
-          <strong><?php echo number_format($distinct_used); ?></strong>
-        </div>
+      <div class="metric-card">
+        <span class="metric-label">Items</span>
+        <strong><?php echo number_format($totals['items']); ?></strong>
+        <span class="metric-note"><?php echo number_format($totals['kept_items']); ?> kept</span>
       </div>
-    </section>
+      <div class="metric-card">
+        <span class="metric-label">Uses</span>
+        <strong><?php echo number_format($totals['uses']); ?></strong>
+        <?php if ($pace['first_use']) { ?>
+          <span class="metric-note">since <?php echo h($pace['first_use']); ?></span>
+        <?php } ?>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Last 30 days</span>
+        <strong><?php echo number_format($pace['last_30']); ?></strong>
+        <span class="metric-note"><?php echo analysis_change($pace['last_30'], $pace['prior_30'], 'prior 30'); ?></span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">This year</span>
+        <strong><?php echo number_format($pace['this_year']); ?></strong>
+        <span class="metric-note"><?php echo analysis_change($pace['this_year'], $pace['last_year_to_date'], 'last year to date'); ?></span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Uses / week</span>
+        <strong><?php echo h($pace['avg_per_week']); ?></strong>
+        <span class="metric-note">over <?php echo number_format($pace['days_tracking']); ?> days</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Kept, used past year</span>
+        <strong><?php echo (int) $recency['used_past_year_percent']; ?>%</strong>
+        <span class="metric-note"><?php echo number_format($recency['used_past_year']); ?> of <?php echo number_format($recency['kept_items']); ?></span>
+      </div>
+    </div>
 
     <section class="menu-card analysis-card">
-      <p class="section-label">Trend</p>
-      <h2 class="menu-card-title">Interactions per month</h2>
-      <p class="menu-support">Last 12 months of recorded interactions.</p>
-      <div class="chart-wrap"><canvas id="chart-monthly" height="260"></canvas></div>
+      <p class="section-label">Activity</p>
+      <h2 class="menu-card-title">The past year, day by day</h2>
+      <div class="calendar-scroll">
+        <div class="calendar-months" aria-hidden="true">
+          <?php
+            // One label cell per week column; named when a new month starts.
+            $shown_month = '';
+            foreach (array_chunk($report['calendar']['days'], 7) as $week) {
+              $month = date_create($week[0]['date'])->format('M');
+              echo '<span>' . ($month !== $shown_month ? h($month) : '') . '</span>';
+              $shown_month = $month;
+            }
+          ?>
+        </div>
+        <div class="calendar-grid" role="img" aria-label="Uses per day over the past year">
+          <?php foreach ($report['calendar']['days'] as $day) {
+          ?><span class="calendar-day level-<?php echo (int) $day['level']; ?>" title="<?php echo h($day['date']); ?>: <?php echo (int) $day['count']; ?> use<?php echo $day['count'] === 1 ? '' : 's'; ?>"></span><?php } ?>
+        </div>
+      </div>
+      <p class="calendar-legend">
+        Fewer
+        <span class="calendar-day level-0"></span><span class="calendar-day level-1"></span><span class="calendar-day level-2"></span><span class="calendar-day level-3"></span><span class="calendar-day level-4"></span>
+        More
+        <?php if ($records['current_streak'] > 0) { ?>
+          &middot; current streak <?php echo (int) $records['current_streak']; ?> day<?php echo $records['current_streak'] === 1 ? '' : 's'; ?>
+        <?php } ?>
+      </p>
     </section>
+
+    <div class="analysis-split">
+      <section class="menu-card analysis-card">
+        <p class="section-label">Trend</p>
+        <h2 class="menu-card-title">Uses per month, against the year before</h2>
+        <div class="chart-wrap"><canvas id="chart-monthly" height="300"></canvas></div>
+      </section>
+
+      <section class="menu-card analysis-card">
+        <p class="section-label">Records</p>
+        <h2 class="menu-card-title">High-water marks</h2>
+        <ul class="fun-facts">
+          <?php if ($records['longest_streak']['days'] > 0) { ?>
+            <li>
+              <span class="fact-label">Longest daily streak</span>
+              <?php echo (int) $records['longest_streak']['days']; ?> day<?php echo $records['longest_streak']['days'] === 1 ? '' : 's'; ?>
+              <span class="fact-aside"><?php echo h($records['longest_streak']['start']); ?> &rarr; <?php echo h($records['longest_streak']['end']); ?></span>
+            </li>
+          <?php } ?>
+          <?php if ($records['busiest_day']) { ?>
+            <li>
+              <span class="fact-label">Busiest day</span>
+              <?php echo h($records['busiest_day']['date']); ?>
+              <span class="fact-aside"><?php echo number_format($records['busiest_day']['count']); ?> uses</span>
+            </li>
+          <?php } ?>
+          <?php if ($records['busiest_month']) { ?>
+            <li>
+              <span class="fact-label">Busiest month</span>
+              <?php echo h($records['busiest_month']['month']); ?>
+              <span class="fact-aside"><?php echo number_format($records['busiest_month']['count']); ?> uses</span>
+            </li>
+          <?php } ?>
+          <?php if ($totals['uses'] > 0) { ?>
+            <li>
+              <span class="fact-label">Concentration</span>
+              <?php echo (int) $records['top_ten_share']; ?>% of uses
+              <span class="fact-aside">go to your ten most-used items</span>
+            </li>
+            <li>
+              <span class="fact-label">Company</span>
+              <?php echo number_format($company['shared_uses']); ?> shared
+              <span class="fact-aside"><?php echo number_format($company['solo_uses']); ?> solo or unrecorded</span>
+            </li>
+          <?php } ?>
+        </ul>
+      </section>
+    </div>
+
+    <?php if (!empty($report['settings'])) { ?>
+      <section class="menu-card analysis-card">
+        <p class="section-label">Settings</p>
+        <h2 class="menu-card-title">Where uses happen, and what gets used there</h2>
+        <div class="settings-grid">
+          <?php foreach ($report['settings'] as $setting) { ?>
+            <div class="setting-column">
+              <h3><?php echo h($setting['setting']); ?></h3>
+              <p class="metric-note"><?php echo number_format($setting['count']); ?> use<?php echo $setting['count'] === 1 ? '' : 's'; ?></p>
+              <ol>
+                <?php foreach ($setting['items'] as $row) { ?>
+                  <li>
+                    <?php echo analysis_item_link($row); ?>
+                    <span class="bar-list-value"><?php echo number_format($row['count']); ?></span>
+                  </li>
+                <?php } ?>
+              </ol>
+            </div>
+          <?php } ?>
+        </div>
+      </section>
+    <?php } ?>
 
     <div class="analysis-grid">
       <section class="menu-card analysis-card">
-        <p class="section-label">Top 10</p>
-        <h2 class="menu-card-title">Most-interacted (last 90 days)</h2>
-        <?php if (empty($top_recent)) { ?>
-          <p class="menu-support">No interactions recorded in the last 90 days.</p>
+        <p class="section-label">Kept items</p>
+        <h2 class="menu-card-title">When each was last used</h2>
+        <?php echo analysis_bar_list($recency['buckets']); ?>
+      </section>
+
+      <section class="menu-card analysis-card">
+        <p class="section-label">Neglected</p>
+        <h2 class="menu-card-title">Kept items idle the longest</h2>
+        <?php if (empty($report['neglected'])) { ?>
+          <p class="menu-support">No kept items to weigh yet.</p>
         <?php } else { ?>
           <table class="list analysis-list">
-            <thead>
-              <tr>
-                <th>Item</th>                <th>Type</th>
-                <th class="num">Uses</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Item</th><th>Since</th><th class="num">Days idle</th></tr></thead>
             <tbody>
-              <?php foreach ($top_recent as $row) { ?>
+              <?php foreach ($report['neglected'] as $row) { ?>
+                <tr>
+                  <td><?php echo analysis_item_link($row); ?></td>
+                  <td class="nowrap"><?php echo $row['last_used'] ? 'used ' : 'acquired '; echo h($row['since']); ?></td>
+                  <td class="num"><?php echo number_format($row['days_idle']); ?></td>
+                </tr>
+              <?php } ?>
+            </tbody>
+          </table>
+        <?php } ?>
+      </section>
+
+      <section class="menu-card analysis-card">
+        <p class="section-label">Top 10</p>
+        <h2 class="menu-card-title">Most used, last 90 days</h2>
+        <?php if (empty($report['top_recent'])) { ?>
+          <p class="menu-support">No uses recorded in the last 90 days.</p>
+        <?php } else { ?>
+          <table class="list analysis-list">
+            <thead><tr><th>Item</th><th>Type</th><th class="num">Uses</th></tr></thead>
+            <tbody>
+              <?php foreach ($report['top_recent'] as $row) { ?>
+                <tr>
+                  <td><?php echo analysis_item_link($row); ?></td>
+                  <td><?php echo h($row['type']); ?></td>
+                  <td class="num"><?php echo number_format($row['count']); ?></td>
+                </tr>
+              <?php } ?>
+            </tbody>
+          </table>
+        <?php } ?>
+      </section>
+
+      <section class="menu-card analysis-card">
+        <p class="section-label">Top 10</p>
+        <h2 class="menu-card-title">Most used, all time</h2>
+        <?php if (empty($report['top_all_time'])) { ?>
+          <p class="menu-support">No uses recorded yet.</p>
+        <?php } else { ?>
+          <table class="list analysis-list">
+            <thead><tr><th>Item</th><th>Last used</th><th class="num">Uses</th></tr></thead>
+            <tbody>
+              <?php foreach ($report['top_all_time'] as $row) { ?>
+                <tr>
+                  <td><?php echo analysis_item_link($row); ?></td>
+                  <td><?php echo h($row['last_used'] ?? ''); ?></td>
+                  <td class="num"><?php echo number_format($row['count']); ?></td>
+                </tr>
+              <?php } ?>
+            </tbody>
+          </table>
+        <?php } ?>
+      </section>
+
+      <section class="menu-card analysis-card">
+        <p class="section-label">Company</p>
+        <h2 class="menu-card-title">Who you share uses with</h2>
+        <?php if (empty($company['people'])) { ?>
+          <p class="menu-support">No shared uses recorded yet.</p>
+        <?php } else { ?>
+          <table class="list analysis-list">
+            <thead><tr><th>Person</th><th>Last shared</th><th class="num">Uses</th></tr></thead>
+            <tbody>
+              <?php foreach ($company['people'] as $row) { ?>
                 <tr>
                   <td>
-                    <a href="<?php echo url_for('/artifacts/' . (is_guest() ? 'show' : 'edit') . '.php?id=' . h(u($row['id']))); ?>">
-                      <?php echo h($row['Title']); ?>
-                    </a>
+                    <?php if (is_guest()) { echo h($row['name']); } else { ?>
+                      <a href="<?php echo url_for('/users/edit.php?id=' . h(u($row['id']))); ?>"><?php echo h($row['name']); ?></a>
+                    <?php } ?>
                   </td>
-                  <td><?php echo h($row['type']); ?></td>
-                  <td class="num"><?php echo (int) $row['use_count']; ?></td>
+                  <td><?php echo h($row['last_shared'] ?? ''); ?></td>
+                  <td class="num"><?php echo number_format($row['count']); ?></td>
                 </tr>
               <?php } ?>
             </tbody>
@@ -269,193 +292,84 @@
 
       <section class="menu-card analysis-card">
         <p class="section-label">Breakdown</p>
-        <h2 class="menu-card-title">By type (last 90 days)</h2>
-        <?php if (empty($type_rows)) { ?>
-          <p class="menu-support">No interactions recorded in the last 90 days.</p>
-        <?php } else { ?>
-          <div class="chart-wrap"><canvas id="chart-types" height="260"></canvas></div>
-        <?php } ?>
+        <h2 class="menu-card-title">Uses by type, last 90 days</h2>
+        <?php if (empty($report['types'])) { ?>
+          <p class="menu-support">No uses recorded in the last 90 days.</p>
+        <?php } else { echo analysis_bar_list($report['types']); } ?>
       </section>
 
       <section class="menu-card analysis-card">
         <p class="section-label">Pattern</p>
-        <h2 class="menu-card-title">Day-of-week rhythm</h2>
-        <p class="menu-support">All recorded interactions, grouped by weekday.</p>
-        <div class="chart-wrap"><canvas id="chart-dow" height="260"></canvas></div>
+        <h2 class="menu-card-title">Weekday rhythm, all time</h2>
+        <?php echo analysis_bar_list($report['weekdays']); ?>
       </section>
     </div>
-
-    <section class="menu-card analysis-card">
-      <p class="section-label">Fun facts</p>
-      <h2 class="menu-card-title">Anything jump out?</h2>
-      <ul class="fun-facts">
-        <?php if ($first_use) { ?>
-          <li>
-            <span class="fact-label">Tracking since</span>
-            <?php echo h($first_use); ?>
-            <span class="fact-aside">(<?php echo number_format($days_tracking); ?> days)</span>
-          </li>
-        <?php } ?>
-        <?php if ($avg_per_week > 0) { ?>
-          <li>
-            <span class="fact-label">Average interactions / week</span>
-            <?php echo $avg_per_week; ?>
-          </li>
-        <?php } ?>
-        <?php if (!empty($top_ever)) { ?>
-          <li>
-            <span class="fact-label">Most-interacted ever</span>
-            <?php echo h($top_ever['Title']); ?>
-            <span class="fact-aside">(<?php echo (int) $top_ever['c']; ?> uses)</span>
-          </li>
-        <?php } ?>
-        <?php if (!empty($busiest_day)) { ?>
-          <li>
-            <span class="fact-label">Busiest day</span>
-            <?php echo h($busiest_day['use_date']); ?>
-            <span class="fact-aside">(<?php echo (int) $busiest_day['c']; ?> interactions)</span>
-          </li>
-        <?php } ?>
-        <?php if ($longest_streak > 0) { ?>
-          <li>
-            <span class="fact-label">Longest daily streak</span>
-            <?php echo $longest_streak; ?> day<?php echo $longest_streak === 1 ? '' : 's'; ?>
-            <?php if ($best_start) { ?>
-              <span class="fact-aside">(<?php echo h($best_start); ?> &rarr; <?php echo h($best_end); ?>)</span>
-            <?php } ?>
-          </li>
-        <?php } ?>
-        <?php
-          $most_active_dow = null; $most_active_count = 0;
-          for ($i = 0; $i < 7; $i++) {
-            if ($dow_values[$i] > $most_active_count) {
-              $most_active_count = $dow_values[$i];
-              $most_active_dow = $dow_labels[$i];
-            }
-          }
-          if ($most_active_dow && $most_active_count > 0) {
-        ?>
-          <li>
-            <span class="fact-label">Most-active weekday</span>
-            <?php echo h($most_active_dow); ?>
-            <span class="fact-aside">(<?php echo $most_active_count; ?> interactions)</span>
-          </li>
-        <?php } ?>
-        <?php if (!empty($stalest)) { ?>
-          <li>
-            <span class="fact-label">Hasn't been touched the longest</span>
-            <?php echo h($stalest['Title']); ?>
-            <?php
-              $marker = $stalest['last_used'] ?: $stalest['Acq'];
-              if ($marker) {
-                $days = max(0, (int) ((time() - strtotime($marker)) / 86400));
-                echo '<span class="fact-aside">(' . ($stalest['last_used'] ? 'last used ' : 'acquired ') . h(substr($marker, 0, 10)) . ', ' . number_format($days) . ' days ago)</span>';
-              }
-            ?>
-          </li>
-        <?php } ?>
-      </ul>
-    </section>
-  </div>
+  </section>
 
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      function whenChartReady(cb) {
-        if (typeof Chart !== 'undefined') { cb(); return; }
-        var tries = 0;
-        var t = setInterval(function () {
-          if (typeof Chart !== 'undefined') {
-            clearInterval(t); cb();
-          } else if (++tries > 50) {
-            clearInterval(t);
-            console.warn('Chart.js failed to load');
-          }
-        }, 100);
+      var canvas = document.getElementById('chart-monthly');
+      var monthly = <?php echo json_encode($report['monthly']); ?>;
+      var chart = null;
+
+      function token(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
       }
 
-      whenChartReady(function () {
-        var primary = '#1a2345';
-        var primarySoft = 'rgba(26, 35, 69, 0.55)';
-        var grid = 'rgba(80, 95, 118, 0.12)';
-
-        var monthly = document.getElementById('chart-monthly');
-        if (monthly) {
-          new Chart(monthly, {
-            type: 'line',
-            data: {
-              labels: <?php echo json_encode($monthly_labels); ?>,
-              datasets: [{
-                label: 'Interactions',
-                data: <?php echo json_encode($monthly_counts); ?>,
-                borderColor: primary,
-                backgroundColor: primarySoft,
-                fill: true,
+      // Colors come from the theme tokens so the chart follows light/dark.
+      function draw() {
+        if (chart) { chart.destroy(); }
+        Chart.defaults.color = token('--text-soft');
+        chart = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels: monthly.labels.map(function (label) { return label.slice(0, 3); }),
+            datasets: [
+              {
+                label: 'Last 12 months',
+                data: monthly.current,
+                borderColor: token('--primary'),
+                backgroundColor: token('--primary'),
+                borderWidth: 2,
                 tension: 0.25,
-                pointRadius: 4,
-                pointBackgroundColor: primary,
-              }],
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: {
-                x: { grid: { color: grid } },
-                y: { beginAtZero: true, grid: { color: grid }, ticks: { precision: 0 } },
+                pointRadius: 3,
               },
+              {
+                label: 'Year before',
+                data: monthly.previous,
+                borderColor: token('--secondary'),
+                backgroundColor: token('--secondary'),
+                borderWidth: 2,
+                borderDash: [5, 4],
+                tension: 0.25,
+                pointRadius: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'line' } } },
+            scales: {
+              x: { grid: { display: false } },
+              y: { beginAtZero: true, grid: { color: token('--outline') }, ticks: { precision: 0 } },
             },
-          });
-        }
+          },
+        });
+      }
 
-        var types = document.getElementById('chart-types');
-        if (types) {
-          new Chart(types, {
-            type: 'bar',
-            data: {
-              labels: <?php echo json_encode($type_labels); ?>,
-              datasets: [{
-                label: 'Interactions',
-                data: <?php echo json_encode($type_counts); ?>,
-                backgroundColor: primary,
-              }],
-            },
-            options: {
-              indexAxis: 'y',
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: {
-                x: { beginAtZero: true, grid: { color: grid }, ticks: { precision: 0 } },
-                y: { grid: { display: false } },
-              },
-            },
-          });
+      var tries = 0;
+      var waiting = setInterval(function () {
+        if (typeof Chart !== 'undefined') {
+          clearInterval(waiting);
+          draw();
+          new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        } else if (++tries > 50) {
+          clearInterval(waiting);
+          console.warn('Chart.js failed to load');
         }
-
-        var dow = document.getElementById('chart-dow');
-        if (dow) {
-          new Chart(dow, {
-            type: 'bar',
-            data: {
-              labels: <?php echo json_encode($dow_labels); ?>,
-              datasets: [{
-                label: 'Interactions',
-                data: <?php echo json_encode($dow_values); ?>,
-                backgroundColor: primary,
-              }],
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
-              scales: {
-                x: { grid: { display: false } },
-                y: { beginAtZero: true, grid: { color: grid }, ticks: { precision: 0 } },
-              },
-            },
-          });
-        }
-      });
+      }, 100);
     });
   </script>
 </main>
