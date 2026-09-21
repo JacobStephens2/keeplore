@@ -211,8 +211,6 @@
     }
     var cells = [
       renderKeptCell(item, config),
-      el('td', { text: item.type }),
-      el('td', { text: (item.tags || []).join(', ') }),
       el('td', { className: 'artifact_title' }, [
         el('a', {
           className: 'table-action',
@@ -220,6 +218,8 @@
           text: item.title,
         }),
       ]),
+      el('td', { text: item.type }),
+      el('td', { text: (item.tags || []).join(', ') }),
       el('td', { className: 'date acquisition', text: item.acq }),
       el('td', { className: 'date most_recent_use', text: item.most_recent_use }),
       useByCell,

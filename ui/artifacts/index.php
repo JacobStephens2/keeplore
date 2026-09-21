@@ -245,9 +245,9 @@
       <thead>
         <tr id="headerRow">
           <th data-sort="is_kept">Kept</th>
+          <th data-sort="title" id="items-name-header">Name</th>
           <th data-sort="type">Type</th>
           <th data-sort="tags">Tags</th>
-          <th data-sort="title" id="items-name-header">Name</th>
           <th data-sort="acq">Tracking Start</th>
           <th data-sort="most_recent_use">Recent Interaction</th>
           <th data-sort="use_by">Interact By</th>
@@ -292,7 +292,7 @@
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=3"></script>
+    <script src="/shared/js/items-list.js?v=4"></script>
   </div>
 </main>
 

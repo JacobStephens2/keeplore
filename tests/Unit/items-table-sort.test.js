@@ -46,3 +46,19 @@ test('Tracking Start sort from a column-header click survives reload after Tags 
   const order = sort.restore(HEADERS_WITH_TAGS, storage, [{ column: 'Name', dir: 'desc' }]);
   assert.deepEqual(order[0], [4, 'desc']);
 });
+
+test('Name sort survives reload after Name moves next to Kept', () => {
+  const storage = memoryStorage();
+  sort.persist(HEADERS_WITH_TAGS, storage, [[3, 'desc']]);
+  const headersNameAfterKept = [
+    'Kept',
+    'Name (12)',
+    'Type',
+    'Tags',
+    'Tracking Start',
+    'Recent Interaction',
+    'Interact By',
+  ];
+  const order = sort.restore(headersNameAfterKept, storage, TRACKING_START_FALLBACK);
+  assert.deepEqual(order[0], [1, 'desc']);
+});
