@@ -135,7 +135,8 @@ main {
 
 /* Wide tables (interact-by, items) use the full viewport so rows have room. */
 main.useby-page,
-main.items-page {
+main.items-page,
+main.analysis-page {
   width: 100%;
   max-width: none;
 }
@@ -1699,16 +1700,191 @@ body.modal-open {
   overflow: hidden;
 }
 
+.analysis-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+}
+
+.analysis-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+  gap: 0.9rem;
+}
+
+.analysis-tiles .metric-card strong {
+  font-size: clamp(1.8rem, 2.6vw, 2.6rem);
+}
+
+.metric-note {
+  display: block;
+  margin-top: 0.45rem;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
 .analysis-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(24rem, 100%), 1fr));
   gap: 1.25rem;
+  align-items: start;
+}
+
+.analysis-split {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(min(20rem, 100%), 1fr);
+  gap: 1.25rem;
+}
+
+.analysis-split ul.fun-facts {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 900px) {
+  .analysis-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.analysis-split > .analysis-card {
+  display: flex;
+  flex-direction: column;
 }
 
 .analysis-card .chart-wrap {
   position: relative;
-  height: 260px;
+  flex: 1;
+  min-height: 300px;
   margin-top: 0.75rem;
+}
+
+table.analysis-list td.nowrap {
+  white-space: nowrap;
+}
+
+/* Activity calendar: one column per week, Sunday at the top. */
+.calendar-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+}
+
+.calendar-months {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(11px, 1fr);
+  gap: 3px;
+  min-width: 46rem;
+  margin-bottom: 0.3rem;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+
+.calendar-months span {
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(11px, 1fr);
+  gap: 3px;
+  min-width: 46rem;
+}
+
+.calendar-day {
+  display: inline-block;
+  aspect-ratio: 1;
+  min-width: 11px;
+  border-radius: 3px;
+  background: var(--surface-high);
+}
+
+.calendar-day.level-1 { background: color-mix(in srgb, var(--primary) 30%, var(--surface-high)); }
+.calendar-day.level-2 { background: color-mix(in srgb, var(--primary) 55%, var(--surface-high)); }
+.calendar-day.level-3 { background: color-mix(in srgb, var(--primary) 80%, var(--surface-high)); }
+.calendar-day.level-4 { background: var(--primary); }
+
+.calendar-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0.6rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+.calendar-legend .calendar-day {
+  width: 11px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.setting-column {
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-lowest);
+}
+
+.setting-column h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.setting-column .metric-note {
+  margin: 0.15rem 0 0.6rem;
+}
+
+.setting-column ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.setting-column li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--outline);
+}
+
+ul.bar-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: 0.55rem 0.75rem;
+  align-items: center;
+}
+
+ul.bar-list li {
+  display: contents;
+}
+
+.bar-list-track {
+  height: 0.8rem;
+}
+
+.bar-list-bar {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+  background: var(--primary);
+}
+
+.bar-list-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 table.analysis-list {
