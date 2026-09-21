@@ -1,4 +1,5 @@
 <?php
+  require_once PRIVATE_PATH . '/player_item_uses.php';
   $player_id = (int) $id;
   $user_id_int = (int) $user_id;
   $player_full_name = trim(($player['FirstName'] ?? '') . ' ' . ($player['LastName'] ?? ''));
@@ -13,25 +14,37 @@
   $record_use_date = (new DateTime('now', new DateTimeZone('America/New_York')))->format('Y-m-d');
   $record_use_setting = most_recent_use_setting($user_id_int);
 
-  $stmt_interactions = mysqli_prepare($db, "SELECT
-    uses.id AS use_id,
-    DATE(uses.use_date) AS use_date,
-    games.id AS artifactID,
-    games.Title,
-    games.type
-    FROM uses_players
-    JOIN uses ON uses.id = uses_players.use_id
-    JOIN games ON games.id = uses.artifact_id
-    WHERE uses_players.user_id = ?
-      AND uses_players.player_id = ?
-    ORDER BY uses.use_date DESC");
-  mysqli_stmt_bind_param($stmt_interactions, "ii", $user_id_int, $player_id);
-  mysqli_stmt_execute($stmt_interactions);
-  $interactionsResult = mysqli_stmt_get_result($stmt_interactions);
+  $interactions = find_player_uses($db, $user_id, $player_id);
+  $most_used_items = rank_items_by_player_uses($interactions);
 ?>
 <section id="uses">
+  <?php if (!empty($most_used_items)) { ?>
+  <section id="most-used-items">
+    <h2>
+      Most used items with
+      <?php echo h($player_full_name); ?>
+    </h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Uses</th>
+          <th>Item</th>
+          <th>Type</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($most_used_items as $row) { ?>
+          <tr>
+            <td><?php echo h($row['use_count']); ?></td>
+            <?php echo player_use_item_cells($row); ?>
+          </tr>
+        <?php } ?>
+      </tbody>
+    </table>
+  </section>
+  <?php } ?>
   <h2>
-    <span id="use-count"><?php echo $interactionsResult->num_rows; ?></span>
+    <span id="use-count"><?php echo count($interactions); ?></span>
     <?php echo h($player_full_name); ?>
     interactions are recorded
   </h2>
@@ -94,19 +107,14 @@
       </tr>
     </thead>
     <tbody>
-      <?php foreach ($interactionsResult as $row) { ?>
+      <?php foreach ($interactions as $row) { ?>
         <tr>
           <td>
             <a href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($row['use_id']))); ?>">
               <?php echo $row['use_date'] ? h($row['use_date']) : 'No date'; ?>
             </a>
           </td>
-          <td>
-            <a href="<?php echo url_for('/artifacts/edit.php?id=' . h(u($row['artifactID']))); ?>">
-              <?php echo h($row['Title']); ?>
-            </a>
-          </td>
-          <td><?php echo h($row['type']); ?></td>
+          <?php echo player_use_item_cells($row); ?>
         </tr>
       <?php } ?>
     </tbody>
