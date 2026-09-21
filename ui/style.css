@@ -1564,7 +1564,8 @@ p.copied_message {
 
 .modal-close:hover { color: var(--text); }
 
-.modal-panel label {
+.modal-panel label,
+.record-use-form label {
   display: block;
   margin-top: 0.75rem;
   margin-bottom: 0.3rem;
@@ -1577,12 +1578,17 @@ p.copied_message {
 
 .modal-panel input[type="date"],
 .modal-panel input[type="text"],
-.modal-panel textarea {
+.modal-panel textarea,
+.record-use-form input[type="search"],
+.record-use-form input[type="date"],
+.record-use-form input[type="text"],
+.record-use-form textarea {
   width: 100%;
   box-sizing: border-box;
 }
 
-.modal-actions {
+.modal-actions,
+.record-use-actions {
   display: flex;
   align-items: center;
   gap: 0.65rem;
@@ -1590,7 +1596,8 @@ p.copied_message {
   flex-wrap: wrap;
 }
 
-.modal-actions .modal-link {
+.modal-actions .modal-link,
+.record-use-actions .modal-link {
   margin-right: auto;
   font-size: 0.85rem;
   color: var(--primary);
@@ -1604,7 +1611,8 @@ p.copied_message {
   box-shadow: inset 0 0 0 1px rgba(80, 95, 118, 0.25);
 }
 
-.modal-save {
+.modal-save,
+.record-use-save {
   background: var(--primary);
   color: var(--on-primary);
 }
@@ -1628,17 +1636,6 @@ p.copied_message {
   color: var(--text-soft);
 }
 
-.record-use-form label {
-  display: block;
-  margin-top: 0.75rem;
-  margin-bottom: 0.3rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-soft);
-}
-
 .record-use-search {
   position: relative;
 }
@@ -1649,31 +1646,6 @@ p.copied_message {
   right: 0;
   z-index: 5;
   margin-top: 0.25rem;
-}
-
-.record-use-form input[type="search"],
-.record-use-form input[type="date"],
-.record-use-form input[type="text"],
-.record-use-form textarea {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.record-use-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  margin-top: 1.1rem;
-  flex-wrap: wrap;
-}
-
-.record-use-actions .modal-link {
-  margin-right: auto;
-}
-
-.record-use-save {
-  background: var(--primary);
-  color: var(--on-primary);
 }
 
 #record-modal-users {
