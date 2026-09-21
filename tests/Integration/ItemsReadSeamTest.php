@@ -32,6 +32,7 @@ final class ItemsReadSeamTest extends TestCase
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
         require_once PRIVATE_PATH . '/database.php';
+        require_once PRIVATE_PATH . '/kept_status.php';
         require_once PRIVATE_PATH . '/query_functions/artifact_queries.php';
         $GLOBALS['db'] = $this->db;
         $_SESSION['user_id'] = 1;
@@ -72,5 +73,19 @@ final class ItemsReadSeamTest extends TestCase
         $this->assertSame([10, 11], $this->fetchIds(find_artifacts_by_user_id('yes', [], 90)));
         $this->assertSame([12, 13], $this->fetchIds(find_artifacts_by_user_id('no', [], 90)));
         $this->assertSame([12], $this->fetchIds(find_artifacts_by_user_id('secondary_only', [], 90)));
+    }
+
+    public function test_to_get_rid_of_list_includes_is_kept_under_strict_group_by(): void
+    {
+        $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
+        $result = find_artifacts_to_get_rid_of();
+        $rows = [];
+        while ($row = mysqli_fetch_assoc($result)) {
+            $rows[] = $row;
+        }
+        $this->assertCount(1, $rows);
+        $this->assertSame(11, (int) $rows[0]['id']);
+        $this->assertArrayHasKey('is_kept', $rows[0]);
+        $this->assertTrue(artifact_is_kept($rows[0]));
     }
 }
