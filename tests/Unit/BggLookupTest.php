@@ -250,6 +250,18 @@ class BggLookupTest extends TestCase
         );
     }
 
+    public function test_preferred_candidate_matches_when_the_query_omits_a_colon(): void
+    {
+        $candidates = [
+            ['id' => 146508, 'name' => 'T.I.M.E Stories'],
+            ['id' => 189686, 'name' => 'T.I.M.E Stories: Under the Mask'],
+        ];
+        $this->assertSame(
+            ['id' => 189686, 'name' => 'T.I.M.E Stories: Under the Mask'],
+            bgg_preferred_candidate($candidates, 't.i.m.e stories under the mask')
+        );
+    }
+
     public function test_preferred_exact_name_picks_bgg_over_rpgg(): void
     {
         $candidates = [
@@ -303,6 +315,59 @@ class BggLookupTest extends TestCase
         });
         $this->assertFalse($result['ok']);
         $this->assertSame('No BoardGameGeek match for that name.', $result['error']);
+    }
+
+    public function test_search_finds_a_colon_title_when_the_query_omits_the_colon(): void
+    {
+        $hit = json_encode([
+            'items' => [
+                ['objectid' => '189686', 'name' => 'T.I.M.E Stories: Under the Mask'],
+            ],
+        ]);
+        $called = [];
+        $result = bgg_search('t.i.m.e stories under the mask', function ($url) use ($hit, &$called) {
+            $called[] = $url;
+            if (str_contains($url, rawurlencode('t.i.m.e stories: under the mask'))) {
+                return $hit;
+            }
+            return '{"items":[]}';
+        });
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame(189686, $result['preferred']['id']);
+        $this->assertSame('T.I.M.E Stories: Under the Mask', $result['preferred']['name']);
+        $this->assertStringContainsString(rawurlencode('t.i.m.e stories under the mask'), $called[0]);
+        $this->assertContains(
+            bgg_api_root() . '/geekitems?objecttype=thing&search=' . rawurlencode('t.i.m.e stories: under the mask') . '&showcount=20',
+            $called
+        );
+    }
+
+    public function test_search_keeps_looking_when_an_earlier_colon_variant_is_a_different_title(): void
+    {
+        $unrelated = json_encode([
+            'items' => [
+                ['objectid' => '1', 'name' => 'Something Else'],
+            ],
+        ]);
+        $hit = json_encode([
+            'items' => [
+                ['objectid' => '189686', 'name' => 'T.I.M.E Stories: Under the Mask'],
+            ],
+        ]);
+        $result = bgg_search('t.i.m.e stories under the mask', function ($url) use ($unrelated, $hit) {
+            if (str_contains($url, rawurlencode('t.i.m.e: stories under the mask'))) {
+                return $unrelated;
+            }
+            if (str_contains($url, rawurlencode('t.i.m.e stories: under the mask'))) {
+                return $hit;
+            }
+            return '{"items":[]}';
+        });
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame(189686, $result['preferred']['id']);
+        $this->assertSame('T.I.M.E Stories: Under the Mask', $result['preferred']['name']);
     }
 
     public function test_search_reports_unreachable_bgg(): void

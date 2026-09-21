@@ -22,21 +22,33 @@ function bgg_search_candidates_from_json($json) {
   return $candidates;
 }
 
+function bgg_comparable_name($name) {
+  $name = strtolower(trim((string) $name));
+  $name = str_replace(':', ' ', $name);
+  $name = preg_replace('/\s+/', ' ', $name);
+  return trim($name);
+}
+
 function bgg_preferred_candidate($candidates, $query) {
   if (!is_array($candidates) || $candidates === []) {
     return null;
   }
   $needle = strtolower(trim((string) $query));
+  $comparable_needle = bgg_comparable_name($query);
   $exact = [];
+  $comparable = [];
   foreach ($candidates as $candidate) {
     if (!is_array($candidate) || !isset($candidate['name'])) {
       continue;
     }
-    if (strtolower((string) $candidate['name']) === $needle) {
+    $name = (string) $candidate['name'];
+    if (strtolower($name) === $needle) {
       $exact[] = $candidate;
+    } elseif (bgg_comparable_name($name) === $comparable_needle) {
+      $comparable[] = $candidate;
     }
   }
-  $pool = $exact !== [] ? $exact : $candidates;
+  $pool = $exact !== [] ? $exact : ($comparable !== [] ? $comparable : $candidates);
   foreach ($pool as $candidate) {
     if (($candidate['source'] ?? '') === 'BGG') {
       return $candidate;
@@ -248,6 +260,29 @@ function bgg_fetch($url, $get_json) {
   return $getter($url);
 }
 
+function bgg_search_query_variants($query) {
+  $query = trim((string) $query);
+  if ($query === '') {
+    return [];
+  }
+  $variants = [$query];
+  if (str_contains($query, ':')) {
+    return $variants;
+  }
+  $words = preg_split('/\s+/', $query, -1, PREG_SPLIT_NO_EMPTY);
+  $count = count($words);
+  if ($count < 2) {
+    return $variants;
+  }
+  for ($i = 1; $i < $count; $i++) {
+    $with_colon = implode(' ', array_slice($words, 0, $i)) . ': ' . implode(' ', array_slice($words, $i));
+    if ($with_colon !== $query) {
+      $variants[] = $with_colon;
+    }
+  }
+  return $variants;
+}
+
 function bgg_search($query, $get_json = null) {
   $query = trim((string) $query);
   if ($query === '') {
@@ -258,18 +293,40 @@ function bgg_search($query, $get_json = null) {
     ];
   }
 
-  $url = bgg_api_root() . '/geekitems?objecttype=thing&search=' . rawurlencode($query) . '&showcount=20';
-  try {
-    $json = bgg_fetch($url, $get_json);
-  } catch (Throwable $e) {
-    return [
-      'ok' => false,
-      'error' => 'Could not reach BoardGameGeek.',
-      'candidates' => [],
-    ];
+  $candidates = [];
+  $fallback = [];
+  $comparable_query = bgg_comparable_name($query);
+  foreach (bgg_search_query_variants($query) as $index => $variant) {
+    $url = bgg_api_root() . '/geekitems?objecttype=thing&search=' . rawurlencode($variant) . '&showcount=20';
+    try {
+      $json = bgg_fetch($url, $get_json);
+    } catch (Throwable $e) {
+      if ($index === 0) {
+        return [
+          'ok' => false,
+          'error' => 'Could not reach BoardGameGeek.',
+          'candidates' => [],
+        ];
+      }
+      continue;
+    }
+    $found = bgg_search_candidates_from_json($json);
+    if ($found === []) {
+      continue;
+    }
+    if ($fallback === []) {
+      $fallback = $found;
+    }
+    $preferred = bgg_preferred_candidate($found, $query);
+    if ($preferred !== null && bgg_comparable_name($preferred['name']) === $comparable_query) {
+      $candidates = $found;
+      break;
+    }
+  }
+  if ($candidates === []) {
+    $candidates = $fallback;
   }
 
-  $candidates = bgg_search_candidates_from_json($json);
   if ($candidates === []) {
     return [
       'ok' => false,
