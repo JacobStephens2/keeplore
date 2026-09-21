@@ -40,6 +40,7 @@ class UsersListTest extends TestCase
             $source,
             'The users table must not initialize DataTables.'
         );
+        $this->assertStringContainsString('/shared/js/list-table.js', $source);
         $this->assertStringContainsString('/shared/js/users-list.js', $source);
         $queries = file_get_contents(PROJECT_PATH . '/private/query_functions/player_queries.php');
         $this->assertNotFalse($queries);
@@ -80,6 +81,14 @@ class UsersListTest extends TestCase
     public function test_users_list_search_and_sort_behavior(): void
     {
         $script = PROJECT_PATH . '/tests/Unit/users-list.test.js';
+        $cmd = 'node --test ' . escapeshellarg($script) . ' 2>&1';
+        exec($cmd, $output, $code);
+        $this->assertSame(0, $code, implode("\n", $output));
+    }
+
+    public function test_shared_list_table_search_and_sort(): void
+    {
+        $script = PROJECT_PATH . '/tests/Unit/list-table.test.js';
         $cmd = 'node --test ' . escapeshellarg($script) . ' 2>&1';
         exec($cmd, $output, $code);
         $this->assertSame(0, $code, implode("\n", $output));

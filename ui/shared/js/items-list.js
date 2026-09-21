@@ -1,5 +1,6 @@
 (function () {
-  var PAGE_LENGTH = 100;
+  var ListTable = window.KeeploreListTable;
+  var el = ListTable.el;
   var SORT_FALLBACK = [
     { column: 'Tracking Start', dir: 'desc' },
     { column: 'Recent Interaction', dir: 'desc' },
@@ -64,12 +65,12 @@
   }
 
   function configFromPage() {
-    var el = document.getElementById('items-list-config');
-    if (!el) {
+    var node = document.getElementById('items-list-config');
+    if (!node) {
       return null;
     }
     try {
-      return JSON.parse(el.textContent);
+      return JSON.parse(node.textContent);
     } catch (err) {
       console.error('[ItemsList] invalid config', err);
       return null;
@@ -77,18 +78,11 @@
   }
 
   function itemMatchesSearch(item, query) {
-    var q = String(query || '').trim().toLowerCase();
-    if (!q) {
-      return true;
-    }
-    var haystack = [
+    return ListTable.fieldsMatchSearch([
       item.title || '',
       item.type || '',
       (item.tags || []).join(' '),
-    ].join(' ').toLowerCase();
-    return q.split(/\s+/).every(function (part) {
-      return haystack.indexOf(part) !== -1;
-    });
+    ], query);
   }
 
   function compareItems(a, b, key, dir) {
@@ -116,58 +110,7 @@
       av = av == null ? '' : av;
       bv = bv == null ? '' : bv;
     }
-    if (av < bv) {
-      return dir === 'desc' ? 1 : -1;
-    }
-    if (av > bv) {
-      return dir === 'desc' ? -1 : 1;
-    }
-    return 0;
-  }
-
-  function sortItems(items, sorts) {
-    var copy = items.slice();
-    copy.sort(function (a, b) {
-      for (var i = 0; i < sorts.length; i++) {
-        var result = compareItems(a, b, sorts[i].key, sorts[i].dir);
-        if (result !== 0) {
-          return result;
-        }
-      }
-      return a.id - b.id;
-    });
-    return copy;
-  }
-
-  function el(tag, attrs, children) {
-    var node = document.createElement(tag);
-    if (attrs) {
-      Object.keys(attrs).forEach(function (name) {
-        var value = attrs[name];
-        if (value === null || value === undefined || value === false) {
-          return;
-        }
-        if (name === 'className') {
-          node.className = value;
-        } else if (name === 'dataset') {
-          Object.keys(value).forEach(function (key) {
-            node.dataset[key] = value[key];
-          });
-        } else if (name === 'text') {
-          node.textContent = value;
-        } else if (value === true) {
-          node.setAttribute(name, '');
-        } else {
-          node.setAttribute(name, value);
-        }
-      });
-    }
-    (children || []).forEach(function (child) {
-      if (child) {
-        node.appendChild(child);
-      }
-    });
-    return node;
+    return ListTable.compareValues(av, bv, dir);
   }
 
   function renderKeptCell(item, config) {
@@ -238,12 +181,6 @@
     return config.showAttributes ? 10 : 7;
   }
 
-  function statusRow(config, message) {
-    return el('tr', { className: 'items-list-status' }, [
-      el('td', { colspan: String(columnCount(config)), text: message }),
-    ]);
-  }
-
   function showToast(toastEl, message, kind) {
     if (!toastEl) {
       window.alert(message);
@@ -270,127 +207,33 @@
     var nameHeader = document.getElementById('items-name-header');
     var pager = document.getElementById('items-list-pager');
     var toastEl = document.getElementById('items-toast');
-    if (!config || !search || !tbody || !table) {
+    if (!config || !search || !tbody || !table || !ListTable) {
       return;
     }
 
     var keys = columnKeys(table);
     var headers = headerTexts(table);
-    var state = {
-      items: [],
-      loaded: false,
+    var items = [];
+    var list = ListTable.mount({
+      search: search,
+      table: table,
+      tbody: tbody,
+      nameHeader: nameHeader,
+      pager: pager,
+      match: itemMatchesSearch,
+      compare: compareItems,
       sorts: restoreSorts(headers, keys),
-      page: 0,
-    };
-
-    function applyAriaSort() {
-      table.querySelectorAll('thead th[data-sort]').forEach(function (th) {
-        th.removeAttribute('aria-sort');
-      });
-      var primary = state.sorts[0];
-      if (!primary) {
-        return;
-      }
-      var active = table.querySelector('thead th[data-sort="' + primary.key + '"]');
-      if (active) {
-        active.setAttribute('aria-sort', primary.dir === 'desc' ? 'descending' : 'ascending');
-      }
-    }
-    applyAriaSort();
-
-    function filteredItems() {
-      var query = search.value;
-      var matched = state.items.filter(function (item) {
-        return itemMatchesSearch(item, query);
-      });
-      return sortItems(matched, state.sorts);
-    }
-
-    function render() {
-      tbody.textContent = '';
-      if (!state.loaded) {
-        tbody.appendChild(statusRow(config, 'Loading items…'));
-        if (pager) {
-          pager.textContent = '';
-        }
-        return;
-      }
-      var rows = filteredItems();
-      var total = state.items.length;
-      var shown = rows.length;
-      if (nameHeader) {
-        nameHeader.textContent = search.value.trim()
-          ? 'Name (' + shown + ' of ' + total + ')'
-          : 'Name (' + total + ')';
-      }
-      if (rows.length === 0) {
-        tbody.appendChild(statusRow(
-          config,
-          search.value.trim() ? 'No items match.' : 'No items yet.'
-        ));
-        if (pager) {
-          pager.textContent = '';
-        }
-        return;
-      }
-      var pageLength = config.pageLength || PAGE_LENGTH;
-      var pageCount = Math.max(1, Math.ceil(rows.length / pageLength));
-      if (state.page >= pageCount) {
-        state.page = pageCount - 1;
-      }
-      if (state.page < 0) {
-        state.page = 0;
-      }
-      var start = state.page * pageLength;
-      var pageRows = rows.slice(start, start + pageLength);
-      var fragment = document.createDocumentFragment();
-      pageRows.forEach(function (item) {
-        fragment.appendChild(renderRow(item, config));
-      });
-      tbody.appendChild(fragment);
-
-      if (pager) {
-        pager.textContent = '';
-        var end = Math.min(start + pageRows.length, rows.length);
-        pager.appendChild(el('span', {
-          text: 'Showing ' + (start + 1) + ' to ' + end + ' of ' + rows.length,
-        }));
-        if (pageCount > 1) {
-          var prev = el('button', { type: 'button', text: 'Previous' });
-          prev.disabled = state.page === 0;
-          prev.addEventListener('click', function () {
-            state.page -= 1;
-            render();
-          });
-          var next = el('button', { type: 'button', text: 'Next' });
-          next.disabled = state.page >= pageCount - 1;
-          next.addEventListener('click', function () {
-            state.page += 1;
-            render();
-          });
-          pager.appendChild(prev);
-          pager.appendChild(next);
-        }
-      }
-    }
-
-    search.addEventListener('input', function () {
-      state.page = 0;
-      if (state.loaded) {
-        render();
-      }
-    });
-
-    table.querySelectorAll('thead th[data-sort]').forEach(function (th) {
-      th.addEventListener('click', function () {
-        var key = th.getAttribute('data-sort');
-        var current = state.sorts[0];
-        var dir = current && current.key === key && current.dir === 'desc' ? 'asc' : 'desc';
-        state.sorts = [{ key: key, dir: dir }];
-        applyAriaSort();
-        persistSorts(headers, state.sorts, keys);
-        render();
-      });
+      row: function (item) {
+        return renderRow(item, config);
+      },
+      columnCount: columnCount(config),
+      pageLength: config.pageLength || 100,
+      emptyMessage: 'No items yet.',
+      noMatchMessage: 'No items match.',
+      status: 'Loading items…',
+      onSort: function (sorts) {
+        persistSorts(headers, sorts, keys);
+      },
     });
 
     tbody.addEventListener('submit', function (event) {
@@ -418,7 +261,7 @@
         .then(function (result) {
           if (result.ok && result.data && result.data.ok) {
             var isKept = result.data.is_kept === 1;
-            var item = state.items.find(function (row) {
+            var item = items.find(function (row) {
               return row.id === artifactId;
             });
             if (item) {
@@ -440,8 +283,6 @@
         });
     });
 
-    render();
-
     fetch(config.dataUrl, { credentials: 'include', headers: { Accept: 'application/json' } })
       .then(function (response) {
         if (!response.ok) {
@@ -450,14 +291,11 @@
         return response.json();
       })
       .then(function (data) {
-        state.items = Array.isArray(data.items) ? data.items : [];
-        state.loaded = true;
-        state.page = 0;
-        render();
+        items = Array.isArray(data.items) ? data.items : [];
+        list.setRecords(items);
       })
       .catch(function (error) {
-        tbody.textContent = '';
-        tbody.appendChild(statusRow(config, 'Could not load items: ' + error.message));
+        list.setStatus('Could not load items: ' + error.message);
       });
   }
 

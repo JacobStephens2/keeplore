@@ -28,14 +28,14 @@ test('search also matches gender and id', () => {
 });
 
 test('fresh list sorts most recent id first', () => {
-  const sorted = usersList.sortUsers([ADA, ALAN, GRACE], [{ key: 'id', dir: 'desc' }]);
+  const sorted = usersList.sortUsers([ADA, ALAN, GRACE], { key: 'id', dir: 'desc' });
   assert.deepEqual(sorted.map((user) => user.id), [20, 12, 3]);
 });
 
 test('name sort is case-insensitive and missing age sorts last when age desc', () => {
-  const byName = usersList.sortUsers([GRACE, ADA, ALAN], [{ key: 'name', dir: 'asc' }]);
+  const byName = usersList.sortUsers([GRACE, ADA, ALAN], { key: 'name', dir: 'asc' });
   assert.deepEqual(byName.map((user) => user.name), ['Ada Lovelace', 'Alan Turing', 'Grace Hopper']);
 
-  const byAge = usersList.sortUsers([GRACE, ADA, ALAN], [{ key: 'age', dir: 'desc' }]);
+  const byAge = usersList.sortUsers([GRACE, ADA, ALAN], { key: 'age', dir: 'desc' });
   assert.deepEqual(byAge.map((user) => user.name), ['Alan Turing', 'Ada Lovelace', 'Grace Hopper']);
 });

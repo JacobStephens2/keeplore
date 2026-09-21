@@ -19,9 +19,9 @@ include(SHARED_PATH . '/header.php');
       </div>
     </header>
 
-    <label class="items-search-wrap">
+    <label class="list-search-wrap">
       <span class="sr-only">Search users</span>
-      <input type="search" id="users-search" class="items-search" data-shortcut="search" placeholder="Search by name" autocomplete="off" spellcheck="false" autofocus>
+      <input type="search" id="users-search" class="list-search" data-shortcut="search" placeholder="Search by name" autocomplete="off" spellcheck="false" autofocus>
     </label>
 
     <?php if ($player_set->num_rows === 0) { ?>
@@ -72,10 +72,11 @@ include(SHARED_PATH . '/header.php');
 
   	</table>
     </div>
-    <div id="users-list-pager" class="items-list-pager"></div>
+    <div id="users-list-pager" class="list-pager"></div>
     <?php } ?>
 
-    <script src="<?php echo url_for('/shared/js/users-list.js'); ?>?v=1"></script>
+    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=1"></script>
+    <script src="<?php echo url_for('/shared/js/users-list.js'); ?>?v=2"></script>
     <?php mysqli_free_result($player_set); ?>
   </div>
 

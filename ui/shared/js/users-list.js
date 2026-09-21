@@ -1,32 +1,25 @@
-// Filter, sort, and page the /users/ table. Search lives in the page HTML
+// Users adapter for KeeploreListTable. Search lives in the page HTML
 // so it can autofocus before this script runs. Rows stay server-rendered.
 (function (root, factory) {
-  var api = factory();
+  var listTable = root.KeeploreListTable;
+  if (!listTable && typeof require === 'function') {
+    listTable = require('./list-table.js');
+  }
+  var api = factory(listTable);
   if (typeof module === 'object' && module.exports) {
     module.exports = api;
   }
   root.KeeploreUsersList = api;
-}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (ListTable) {
   'use strict';
 
-  var PAGE_LENGTH = 100;
-  var COLUMN_COUNT = 5;
-  var DEFAULT_SORTS = [{ key: 'id', dir: 'desc' }];
-
   function userMatchesSearch(user, query) {
-    var q = String(query || '').trim().toLowerCase();
-    if (!q) {
-      return true;
-    }
-    var haystack = [
+    return ListTable.fieldsMatchSearch([
       user.name || '',
       user.gender || '',
       user.age == null || user.age === '' ? '' : String(user.age),
       user.id == null ? '' : String(user.id),
-    ].join(' ').toLowerCase();
-    return q.split(/\s+/).every(function (part) {
-      return haystack.indexOf(part) !== -1;
-    });
+    ], query);
   }
 
   function compareUsers(a, b, key, dir) {
@@ -53,55 +46,11 @@
       av = String(av || '').toLowerCase();
       bv = String(bv || '').toLowerCase();
     }
-    if (av < bv) {
-      return dir === 'desc' ? 1 : -1;
-    }
-    if (av > bv) {
-      return dir === 'desc' ? -1 : 1;
-    }
-    return 0;
+    return ListTable.compareValues(av, bv, dir);
   }
 
-  function sortUsers(users, sorts) {
-    var copy = users.slice();
-    copy.sort(function (a, b) {
-      var list = sorts && sorts.length ? sorts : DEFAULT_SORTS;
-      for (var i = 0; i < list.length; i++) {
-        var result = compareUsers(a, b, list[i].key, list[i].dir);
-        if (result !== 0) {
-          return result;
-        }
-      }
-      return (Number(a.id) || 0) - (Number(b.id) || 0);
-    });
-    return copy;
-  }
-
-  function el(tag, attrs, children) {
-    var node = document.createElement(tag);
-    if (attrs) {
-      Object.keys(attrs).forEach(function (name) {
-        var value = attrs[name];
-        if (value === null || value === undefined || value === false) {
-          return;
-        }
-        if (name === 'className') {
-          node.className = value;
-        } else if (name === 'text') {
-          node.textContent = value;
-        } else if (value === true) {
-          node.setAttribute(name, '');
-        } else {
-          node.setAttribute(name, value);
-        }
-      });
-    }
-    (children || []).forEach(function (child) {
-      if (child) {
-        node.appendChild(child);
-      }
-    });
-    return node;
+  function sortUsers(users, sort) {
+    return ListTable.sortRecords(users, sort ? [sort] : [], compareUsers);
   }
 
   function parseAge(raw) {
@@ -124,13 +73,7 @@
     });
   }
 
-  function statusRow(message) {
-    return el('tr', { className: 'items-list-status' }, [
-      el('td', { colspan: String(COLUMN_COUNT), text: message }),
-    ]);
-  }
-
-  function mount(doc) {
+  function bind(doc) {
     var search = doc.getElementById('users-search');
     var tbody = doc.getElementById('users-list-body');
     var table = doc.getElementById('users');
@@ -143,130 +86,43 @@
         }
       });
     }
-    if (!search || !tbody || !table) {
+    if (!search || !tbody || !table || !ListTable) {
       return;
     }
 
-    var state = {
-      users: usersFromTable(tbody),
-      sorts: DEFAULT_SORTS.slice(),
-      page: 0,
-    };
-
-    function applyAriaSort() {
-      table.querySelectorAll('thead th[data-sort]').forEach(function (th) {
-        th.removeAttribute('aria-sort');
-      });
-      var primary = state.sorts[0];
-      if (!primary) {
-        return;
-      }
-      var active = table.querySelector('thead th[data-sort="' + primary.key + '"]');
-      if (active) {
-        active.setAttribute('aria-sort', primary.dir === 'desc' ? 'descending' : 'ascending');
-      }
-    }
-    applyAriaSort();
-
-    function filteredUsers() {
-      var matched = state.users.filter(function (user) {
-        return userMatchesSearch(user, search.value);
-      });
-      return sortUsers(matched, state.sorts);
-    }
-
-    function render() {
-      tbody.textContent = '';
-      var rows = filteredUsers();
-      var total = state.users.length;
-      var shown = rows.length;
-      if (nameHeader) {
-        nameHeader.textContent = search.value.trim()
-          ? 'Name (' + shown + ' of ' + total + ')'
-          : 'Name (' + total + ')';
-      }
-      if (rows.length === 0) {
-        tbody.appendChild(statusRow(
-          search.value.trim() ? 'No users match.' : 'No users yet.'
-        ));
-        if (pager) {
-          pager.textContent = '';
-        }
-        return;
-      }
-      var pageLength = Number(table.getAttribute('data-page-length')) || PAGE_LENGTH;
-      var pageCount = Math.max(1, Math.ceil(rows.length / pageLength));
-      if (state.page >= pageCount) {
-        state.page = pageCount - 1;
-      }
-      if (state.page < 0) {
-        state.page = 0;
-      }
-      var start = state.page * pageLength;
-      var pageRows = rows.slice(start, start + pageLength);
-      var fragment = doc.createDocumentFragment();
-      pageRows.forEach(function (user) {
-        fragment.appendChild(user.row);
-      });
-      tbody.appendChild(fragment);
-
-      if (pager) {
-        pager.textContent = '';
-        var end = Math.min(start + pageRows.length, rows.length);
-        pager.appendChild(el('span', {
-          text: 'Showing ' + (start + 1) + ' to ' + end + ' of ' + rows.length,
-        }));
-        if (pageCount > 1) {
-          var prev = el('button', { type: 'button', text: 'Previous' });
-          prev.disabled = state.page === 0;
-          prev.addEventListener('click', function () {
-            state.page -= 1;
-            render();
-          });
-          var next = el('button', { type: 'button', text: 'Next' });
-          next.disabled = state.page >= pageCount - 1;
-          next.addEventListener('click', function () {
-            state.page += 1;
-            render();
-          });
-          pager.appendChild(prev);
-          pager.appendChild(next);
-        }
-      }
-    }
-
-    search.addEventListener('input', function () {
-      state.page = 0;
-      render();
+    ListTable.mount({
+      document: doc,
+      search: search,
+      table: table,
+      tbody: tbody,
+      nameHeader: nameHeader,
+      pager: pager,
+      records: usersFromTable(tbody),
+      match: userMatchesSearch,
+      compare: compareUsers,
+      sorts: [{ key: 'id', dir: 'desc' }],
+      row: function (user) {
+        return user.row;
+      },
+      columnCount: 5,
+      pageLength: Number(table.getAttribute('data-page-length')) || 100,
+      emptyMessage: 'No users yet.',
+      noMatchMessage: 'No users match.',
     });
+  }
 
-    table.querySelectorAll('thead th[data-sort]').forEach(function (th) {
-      th.addEventListener('click', function () {
-        var key = th.getAttribute('data-sort');
-        var current = state.sorts[0];
-        var dir = current && current.key === key && current.dir === 'desc' ? 'asc' : 'desc';
-        state.sorts = [{ key: key, dir: dir }];
-        applyAriaSort();
-        render();
+  if (typeof document !== 'undefined' && typeof module === 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () {
+        bind(document);
       });
-    });
-
-    render();
+    } else {
+      bind(document);
+    }
   }
 
   return {
     userMatchesSearch: userMatchesSearch,
     sortUsers: sortUsers,
-    mount: mount,
   };
 }));
-
-if (typeof document !== 'undefined' && typeof module === 'undefined') {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      KeeploreUsersList.mount(document);
-    });
-  } else {
-    KeeploreUsersList.mount(document);
-  }
-}
