@@ -37,7 +37,7 @@ function raw_u($string="") {
 }
 
 function h($string="") {
-  return htmlspecialchars($string);
+  return htmlspecialchars((string) ($string ?? ''));
 }
 
 function normalize_item_image_url($value) {

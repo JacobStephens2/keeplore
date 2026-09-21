@@ -9,7 +9,8 @@ use PHPUnit\Framework\TestCase;
  *
  * On signed-in and guest pages the Items nav link is the destination.
  * Pressing i (no modifiers, not typing in a textual field) calls go(href).
- * Pressing s focuses the Items search box marked data-shortcut="items-search".
+ * Pressing s focuses the page search box marked data-shortcut="search"
+ * or data-shortcut="items-search".
  * Pressing f toggles the filter panel by clicking #display_filters.
  */
 class ItemsShortcutTest extends TestCase
@@ -235,6 +236,7 @@ const filtersButton = {$hasFiltersJson} ? {
 const doc = {
   querySelector: (sel) => {
     if (sel === '[data-shortcut="items"]') return link;
+    if (sel === '[data-shortcut="search"], [data-shortcut="items-search"]') return search;
     if (sel === '[data-shortcut="items-search"]') return search;
     if (sel === '#display_filters') return filtersButton;
     return null;

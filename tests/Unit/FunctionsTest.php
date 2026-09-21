@@ -54,6 +54,21 @@ class FunctionsTest extends TestCase
         $this->assertSame('', h());
     }
 
+    public function test_h_with_null_returns_empty_string(): void
+    {
+        set_error_handler(static function (int $severity, string $message): bool {
+            if ($severity === E_DEPRECATED) {
+                throw new \RuntimeException($message);
+            }
+            return false;
+        });
+        try {
+            $this->assertSame('', h(null));
+        } finally {
+            restore_error_handler();
+        }
+    }
+
     public function test_h_with_safe_string(): void
     {
         $this->assertSame('hello world', h('hello world'));

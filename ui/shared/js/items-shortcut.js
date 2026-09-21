@@ -1,6 +1,7 @@
 // Keyboard shortcuts:
 //   i - open the Items page (nav link marked data-shortcut="items")
-//   s - focus the Items search box (input marked data-shortcut="items-search")
+//   s - focus the page search box (input marked data-shortcut="search"
+//       or data-shortcut="items-search")
 //   f - toggle the filter panel (button#display_filters, via the existing click handler)
 //
 // Bind is a no-op on pages with none of those targets (public landing / login).
@@ -22,7 +23,7 @@
   var ItemsShortcut = {
     bind: function (doc, go) {
       var link = doc.querySelector('[data-shortcut="items"]');
-      var search = doc.querySelector('[data-shortcut="items-search"]');
+      var search = doc.querySelector('[data-shortcut="search"], [data-shortcut="items-search"]');
       var filtersButton = doc.querySelector('#display_filters');
       var url = link ? link.getAttribute('href') : '';
       if (!url && !search && !filtersButton) return;
