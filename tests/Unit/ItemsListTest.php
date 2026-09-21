@@ -12,7 +12,7 @@ require_once PROJECT_PATH . '/private/items_list.php';
  * - items_list_present_row(): display record for one item on /artifacts/
  * - items_list_filters_from_request(): kept/type/interval/tag state for the page
  * - ui/artifacts/index.php source: search is in the first HTML, independent
- *   of the items query and of DataTables
+ *   of the items query and of DataTables; column order is Kept then Name
  */
 class ItemsListTest extends TestCase
 {
@@ -181,5 +181,24 @@ class ItemsListTest extends TestCase
         $js = file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
         $this->assertNotFalse($js);
         $this->assertStringContainsString('KeeploreItemsTableSort.restore(', $js);
+    }
+
+    public function test_item_name_is_the_second_column_after_kept(): void
+    {
+        $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
+        $this->assertNotFalse($source);
+        $this->assertMatchesRegularExpression(
+            '/<th data-sort="is_kept">Kept<\/th>\s*<th data-sort="title" id="items-name-header">Name<\/th>/',
+            $source,
+            'Name must be the second column, immediately after Kept.'
+        );
+
+        $js = file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
+        $this->assertNotFalse($js);
+        $this->assertMatchesRegularExpression(
+            '/var cells = \[\s*renderKeptCell\(item, config\),\s*el\(\'td\', \{ className: \'artifact_title\' \}/',
+            $js,
+            'Each item row must put the name cell immediately after Kept.'
+        );
     }
 }
