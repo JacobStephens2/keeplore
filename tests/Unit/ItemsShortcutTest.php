@@ -5,11 +5,11 @@ namespace Tests\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Seam: ItemsShortcut.bind(document, go).
+ * Seam: PageShortcuts.bind(document, go).
  *
  * On signed-in and guest pages the Items nav link is the destination.
  * Pressing i (no modifiers, not typing in a textual field) calls go(href).
- * Pressing s focuses the Items search box marked data-shortcut="items-search".
+ * Pressing s focuses the page search box marked data-shortcut="search".
  * Pressing f toggles the filter panel by clicking #display_filters.
  */
 class ItemsShortcutTest extends TestCase
@@ -148,11 +148,11 @@ class ItemsShortcutTest extends TestCase
         $this->assertNull($result['navigated']);
     }
 
-    public function test_header_loads_the_items_shortcut_script(): void
+    public function test_header_loads_the_page_shortcuts_script(): void
     {
         $header = file_get_contents(PROJECT_PATH . '/private/shared/header.php');
         $this->assertNotFalse($header);
-        $this->assertStringContainsString('/shared/js/items-shortcut.js', $header);
+        $this->assertStringContainsString('/shared/js/page-shortcuts.js', $header);
     }
 
     public function test_signed_in_and_guest_items_links_expose_the_shortcut_target(): void
@@ -176,7 +176,7 @@ class ItemsShortcutTest extends TestCase
         $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
         $this->assertNotFalse($source);
         $this->assertMatchesRegularExpression(
-            '/id="items-search"[^>]*data-shortcut="items-search"|data-shortcut="items-search"[^>]*id="items-search"/',
+            '/id="items-search"[^>]*data-shortcut="search"|data-shortcut="search"[^>]*id="items-search"/',
             $source,
             'The items search box must be marked so s can focus it.'
         );
@@ -210,13 +210,13 @@ class ItemsShortcutTest extends TestCase
         ];
         $event['target'] += ['tagName' => 'BODY'];
 
-        $module = json_encode(PROJECT_PATH . '/ui/shared/js/items-shortcut.js');
+        $module = json_encode(PROJECT_PATH . '/ui/shared/js/page-shortcuts.js');
         $eventJson = json_encode($event);
         $hrefJson = json_encode($itemsHref);
         $hasSearchJson = json_encode($hasSearch);
         $hasFiltersJson = json_encode($hasFilters);
         $script = <<<JS
-const ItemsShortcut = require({$module});
+const PageShortcuts = require({$module});
 let navigated = null;
 const listeners = {};
 const link = {$hrefJson} ? { getAttribute: (name) => name === 'href' ? {$hrefJson} : null } : null;
@@ -235,13 +235,13 @@ const filtersButton = {$hasFiltersJson} ? {
 const doc = {
   querySelector: (sel) => {
     if (sel === '[data-shortcut="items"]') return link;
-    if (sel === '[data-shortcut="items-search"]') return search;
+    if (sel === '[data-shortcut="search"]') return search;
     if (sel === '#display_filters') return filtersButton;
     return null;
   },
   addEventListener: (type, fn) => { listeners[type] = fn; },
 };
-ItemsShortcut.bind(doc, (url) => { navigated = url; });
+PageShortcuts.bind(doc, (url) => { navigated = url; });
 const event = {$eventJson};
 event.preventDefault = function () {};
 if (listeners.keydown) {

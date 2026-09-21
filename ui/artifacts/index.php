@@ -1,6 +1,6 @@
 <?php
-  require_once('../../private/initialize.php');
-  require_once('../../private/items_list.php');
+  require_once dirname(__DIR__, 2) . '/private/initialize.php';
+  require_once dirname(__DIR__, 2) . '/private/items_list.php';
   global $db;
   require_login_or_guest();
 
@@ -42,9 +42,9 @@
       </div>
     </header>
 
-    <label class="items-search-wrap">
+    <label class="list-search-wrap">
       <span class="sr-only">Search items</span>
-      <input type="search" id="items-search" class="items-search" data-shortcut="items-search" placeholder="Search by name" autocomplete="off" spellcheck="false" autofocus>
+      <input type="search" id="items-search" class="list-search" data-shortcut="search" placeholder="Search by name" autocomplete="off" spellcheck="false" autofocus>
     </label>
     <script>
       (function () {
@@ -270,16 +270,17 @@
       </style>
 
       <tbody id="items-list-body">
-        <tr class="items-list-status">
+        <tr class="list-status">
           <td colspan="<?php echo $showAttributes === 'yes' ? '10' : '7'; ?>">Loading items…</td>
         </tr>
       </tbody>
   	</table>
     </div>
-    <div id="items-list-pager" class="items-list-pager"></div>
+    <div id="items-list-pager" class="list-pager"></div>
 
     <div id="items-toast" class="toast" role="status" aria-live="polite"></div>
 
+    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=1"></script>
     <script src="<?php echo url_for('/artifacts/items-table-sort.js'); ?>?v=1"></script>
     <script type="application/json" id="items-list-config"><?php
       echo json_encode([
@@ -292,7 +293,7 @@
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=4"></script>
+    <script src="/shared/js/items-list.js?v=5"></script>
   </div>
 </main>
 
