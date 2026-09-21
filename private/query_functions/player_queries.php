@@ -29,7 +29,7 @@
     global $db;
 
     $user_id = (int) $_SESSION['user_id'];
-    $stmt = mysqli_prepare($db, "SELECT * FROM players WHERE user_id = ? ORDER BY id");
+    $stmt = mysqli_prepare($db, "SELECT * FROM players WHERE user_id = ? ORDER BY id DESC");
     mysqli_stmt_bind_param($stmt, "i", $user_id);
     mysqli_stmt_execute($stmt);
     $result = mysqli_stmt_get_result($stmt);

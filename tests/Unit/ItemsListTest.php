@@ -175,6 +175,7 @@ class ItemsListTest extends TestCase
             $source,
             'Search must not be created by DataTables after the table is ready.'
         );
+        $this->assertStringContainsString('/shared/js/list-table.js', $source);
         $this->assertStringContainsString('/shared/js/items-list.js', $source);
         $this->assertStringContainsString('/artifacts/items-data.php', $source);
         $this->assertStringContainsString("event.key !== 'n'", $source);

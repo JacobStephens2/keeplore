@@ -157,9 +157,7 @@
 
   <?php if (!is_guest()) { ?>
   <?php
-    $modal_default_setting = singleValueQuery(
-      "SELECT note FROM uses WHERE user_id = '" . (int) $_SESSION['user_id'] . "' ORDER BY id DESC LIMIT 1"
-    );
+    $modal_default_setting = most_recent_use_setting((int) $_SESSION['user_id']);
   ?>
   <div id="record-modal" class="modal" hidden aria-hidden="true">
     <div class="modal-backdrop" data-modal-close></div>
@@ -415,6 +413,7 @@
   </div>
 
   <?php mysqli_free_result($artifact_set); ?>
+  <script src="<?php echo url_for('/shared/js/record-use-submit.js'); ?>"></script>
   <script>
     document.querySelector('span#totalOverdue').innerText = '<?php echo $total_overdue; ?>';
     <?php
@@ -499,20 +498,9 @@
     }
 
     (function () {
-      var toastEl = document.getElementById('useby-toast');
-      var toastTimer = null;
-      function showToast(message, kind) {
-        if (!toastEl) { alert(message); return; }
-        toastEl.textContent = message;
-        toastEl.classList.remove('toast-success', 'toast-error', 'is-visible');
-        toastEl.classList.add(kind === 'error' ? 'toast-error' : 'toast-success');
-        void toastEl.offsetWidth;
-        toastEl.classList.add('is-visible');
-        if (toastTimer) clearTimeout(toastTimer);
-        toastTimer = setTimeout(function () {
-          toastEl.classList.remove('is-visible');
-        }, 3500);
-      }
+      var showToast = window.RecordUseSubmit
+        ? RecordUseSubmit.toast(document.getElementById('useby-toast'))
+        : function (message) { alert(message); };
 
       var overdueSpan = document.querySelector('span#totalOverdue');
 
@@ -585,34 +573,15 @@
         });
       });
 
-      if (recordForm) {
-        recordForm.addEventListener('submit', function (event) {
-          event.preventDefault();
-          if (modalSaveBtn) { modalSaveBtn.disabled = true; modalSaveBtn.textContent = 'Saving…'; }
-          fetch(recordForm.action, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-            body: new FormData(recordForm),
-          })
-            .then(function (response) {
-              return response.json().then(function (data) { return { ok: response.ok, data: data }; });
-            })
-            .then(function (result) {
-              if (result.ok && result.data && result.data.ok) {
-                handleRecordSuccess(result.data, currentRecordRow);
-                closeRecordModal();
-                showToast(result.data.message || 'Interaction recorded.', 'success');
-              } else {
-                var msg = (result.data && result.data.message) || ('Request failed (HTTP ' + (result.ok ? 'OK' : 'error') + ')');
-                showToast(msg, 'error');
-                if (modalSaveBtn) { modalSaveBtn.disabled = false; modalSaveBtn.textContent = 'Save'; }
-              }
-            })
-            .catch(function (error) {
-              showToast('Network error: ' + error.message, 'error');
-              if (modalSaveBtn) { modalSaveBtn.disabled = false; modalSaveBtn.textContent = 'Save'; }
-            });
+      if (recordForm && window.RecordUseSubmit) {
+        RecordUseSubmit.bind(recordForm, {
+          toast: showToast,
+          saveButton: modalSaveBtn,
+          saveLabel: 'Save',
+          onSuccess: function (data) {
+            handleRecordSuccess(data, currentRecordRow);
+            closeRecordModal();
+          }
         });
 
         // Enter saves the interaction (via the AJAX submit above) instead of

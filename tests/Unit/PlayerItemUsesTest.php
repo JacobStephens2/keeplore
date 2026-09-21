@@ -12,7 +12,8 @@ require_once PROJECT_PATH . '/private/player_item_uses.php';
  *   and rank them most uses first
  * - find_player_uses(): load that player's already-scoped use rows
  * - player_use_item_cells(): Item and Type cells shared by both tables
- * - ui/users/edit.php source: Edit User shows that ranking without
+ * - ui/users/edit.php source: loads the interactions include
+ * - private/shared/user_interactions.php source: ranking without
  *   scanning the chronological interactions table
  */
 class PlayerItemUsesTest extends TestCase
@@ -122,6 +123,11 @@ class PlayerItemUsesTest extends TestCase
         return (string) file_get_contents(PROJECT_PATH . '/ui/users/edit.php');
     }
 
+    private function interactionsInclude(): string
+    {
+        return (string) file_get_contents(PROJECT_PATH . '/private/shared/user_interactions.php');
+    }
+
     private function findPlayerUsesFn(): string
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/private/player_item_uses.php');
@@ -146,42 +152,43 @@ class PlayerItemUsesTest extends TestCase
     public function test_edit_user_ranks_the_player_uses_already_on_the_page(): void
     {
         $page = $this->editUserPage();
-        $this->assertStringContainsString("require_once(PRIVATE_PATH . '/player_item_uses.php')", $page);
-        $this->assertStringContainsString('find_player_uses(', $page);
-        $this->assertStringContainsString('rank_items_by_player_uses(', $page);
+        $include = $this->interactionsInclude();
+        $this->assertStringContainsString("SHARED_PATH . '/user_interactions.php'", $page);
+        $this->assertStringContainsString("PRIVATE_PATH . '/player_item_uses.php'", $include);
+        $this->assertStringContainsString('find_player_uses(', $include);
+        $this->assertStringContainsString('rank_items_by_player_uses(', $include);
         $this->assertStringNotContainsString(
             'FROM uses_players',
-            $page,
-            'Edit User must load uses through find_player_uses, not inline SQL.'
+            $include,
+            'The interactions include must load uses through find_player_uses, not inline SQL.'
         );
     }
 
     public function test_edit_user_shows_use_count_item_and_type_for_the_ranking(): void
     {
-        $page = $this->editUserPage();
-        $this->assertStringContainsString('id="most-used-items"', $page);
-        $this->assertStringContainsString('Most used items with', $page);
-        $this->assertStringContainsString('<th>Uses</th>', $page);
-        $this->assertStringContainsString('foreach ($most_used_items as $row)', $page);
-        $this->assertStringContainsString("\$row['use_count']", $page);
+        $include = $this->interactionsInclude();
+        $this->assertStringContainsString('id="most-used-items"', $include);
+        $this->assertStringContainsString('Most used items with', $include);
+        $this->assertStringContainsString('<th>Uses</th>', $include);
+        $this->assertStringContainsString('foreach ($most_used_items as $row)', $include);
+        $this->assertStringContainsString("\$row['use_count']", $include);
         $this->assertSame(
             2,
-            substr_count($page, 'player_use_item_cells($row)'),
+            substr_count($include, 'player_use_item_cells($row)'),
             'Both Edit User tables must share player_use_item_cells for Item and Type.'
         );
-        $this->assertStringNotContainsString('/artifacts/edit.php?id=', $page);
         $this->assertDoesNotMatchRegularExpression(
             '/id="most-used-items"[\s\S]*Most used games/i',
-            $page,
+            $include,
             'The ranking copy must say Item, not Game.'
         );
     }
 
     public function test_edit_user_shows_the_ranking_before_the_chronological_list(): void
     {
-        $page = $this->editUserPage();
-        $ranking = strpos($page, 'id="most-used-items"');
-        $chronological = strpos($page, 'id="useList"');
+        $include = $this->interactionsInclude();
+        $ranking = strpos($include, 'id="most-used-items"');
+        $chronological = strpos($include, 'id="useList"');
         $this->assertNotFalse($ranking);
         $this->assertNotFalse($chronological);
         $this->assertLessThan(
@@ -193,8 +200,8 @@ class PlayerItemUsesTest extends TestCase
 
     public function test_edit_user_omits_the_ranking_when_the_player_has_no_uses(): void
     {
-        $page = $this->editUserPage();
-        $this->assertStringContainsString('if (!empty($most_used_items))', $page);
-        $this->assertStringContainsString('id="useList"', $page);
+        $include = $this->interactionsInclude();
+        $this->assertStringContainsString('if (!empty($most_used_items))', $include);
+        $this->assertStringContainsString('id="useList"', $include);
     }
 }

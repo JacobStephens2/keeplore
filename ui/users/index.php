@@ -1,10 +1,9 @@
-<?php 
-require_once('../../private/initialize.php');
+<?php
+require_once dirname(__DIR__, 2) . '/private/initialize.php';
 require_login();
 $player_set = find_players_by_user_id();
 $page_title = 'Users';
 include(SHARED_PATH . '/header.php');
-include(SHARED_PATH . '/dataTable.html');
 ?>
 
 <main>
@@ -20,6 +19,11 @@ include(SHARED_PATH . '/dataTable.html');
       </div>
     </header>
 
+    <label class="list-search-wrap">
+      <span class="sr-only">Search users</span>
+      <input type="search" id="users-search" class="list-search" data-shortcut="search" placeholder="Search by name" autocomplete="off" spellcheck="false" autofocus>
+    </label>
+
     <?php if ($player_set->num_rows === 0) { ?>
       <div class="empty-state">
         <p class="section-label">Empty</p>
@@ -33,24 +37,33 @@ include(SHARED_PATH . '/dataTable.html');
 
       <thead>
         <tr id="headerRow">
-          <th>Name (<?php echo $player_set->num_rows; ?>)</th>
-          <th>Gender</th>
-          <th>Age</th>
+          <th data-sort="name" id="users-name-header">Name</th>
+          <th data-sort="gender">Gender</th>
+          <th data-sort="age">Age</th>
           <th></th>
-          <th>ID</th>
+          <th data-sort="id">ID</th>
         </tr>
       </thead>
 
-      <tbody>
+      <tbody id="users-list-body">
         <?php while($player = mysqli_fetch_assoc($player_set)) { ?>
-          <tr>
+          <?php
+            $user_name = trim($player['FirstName'] . ' ' . $player['LastName']);
+            $user_age = $player['birth_year'] ? (date('Y') - (int) $player['birth_year']) : '';
+          ?>
+          <tr
+            data-name="<?php echo h($user_name); ?>"
+            data-gender="<?php echo h($player['G']); ?>"
+            data-age="<?php echo h((string) $user_age); ?>"
+            data-id="<?php echo h($player['id']); ?>"
+          >
             <td>
               <a class="table-action" href="<?php echo url_for('/users/edit.php?id=' . h(u($player['id']))); ?>">
-                <?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?>
+                <?php echo h($user_name); ?>
               </a>
             </td>
             <td><?php echo h($player['G']); ?></td>
-            <td><?php echo $player['birth_year'] ? (date('Y') - (int) $player['birth_year']) : ''; ?></td>
+            <td><?php echo h((string) $user_age); ?></td>
             <td><a class="table-action" href="<?php echo url_for('/users/delete.php?id=' . h(u($player['id']))); ?>">Delete</a></td>
             <td><?php echo h($player['id']); ?></td>
           </tr>
@@ -59,15 +72,11 @@ include(SHARED_PATH . '/dataTable.html');
 
   	</table>
     </div>
-
-    <script>
-      let table = new DataTable('#users', {
-        // options
-        order: [[ 4, 'desc']] // most recent users first
-      });
-    </script>
+    <div id="users-list-pager" class="list-pager"></div>
     <?php } ?>
 
+    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=1"></script>
+    <script src="<?php echo url_for('/shared/js/users-list.js'); ?>?v=2"></script>
     <?php mysqli_free_result($player_set); ?>
   </div>
 

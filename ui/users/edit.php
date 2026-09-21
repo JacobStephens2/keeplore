@@ -1,7 +1,6 @@
 <?php
 
   require_once('../../private/initialize.php');
-  require_once(PRIVATE_PATH . '/player_item_uses.php');
   require_login();
 
   if(!isset($_GET['id'])) {
@@ -181,70 +180,7 @@
 
   </div>
 
-  <section id="uses">
-    <?php
-      $interactions = find_player_uses($db, $user_id, $_REQUEST['id']);
-      $most_used_items = rank_items_by_player_uses($interactions);
-    ?>
-    <?php if (!empty($most_used_items)) { ?>
-    <section id="most-used-items">
-      <h2>
-        Most used items with
-        <?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?>
-      </h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Uses</th>
-            <th>Item</th>
-            <th>Type</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($most_used_items as $row) { ?>
-            <tr>
-              <td><?php echo h($row['use_count']); ?></td>
-              <?php echo player_use_item_cells($row); ?>
-            </tr>
-          <?php } ?>
-        </tbody>
-      </table>
-    </section>
-    <?php } ?>
-    <h2>
-      <?php echo count($interactions); ?>
-      <?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?>
-      interactions are recorded
-    </h2>
-
-    <table id="useList" data-page-length='100'>
-      <thead>
-        <tr>
-          <th>Interaction Date</th>
-          <th>Item</th>
-          <th>Type</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($interactions as $row) { ?>
-          <tr>
-            <td>
-              <a href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($row['use_id']))); ?>">
-                <?php echo $row['use_date'] ? h($row['use_date']) : 'No date'; ?>
-              </a>
-            </td>
-            <?php echo player_use_item_cells($row); ?>
-          </tr>
-        <?php } ?>
-      </tbody>
-    </table>
-
-    <script>
-      let table = new DataTable('#useList', {
-        order: [[ 0, 'desc']]
-      });
-    </script>
-  </section>
+  <?php include(SHARED_PATH . '/user_interactions.php'); ?>
 
 </main>
 

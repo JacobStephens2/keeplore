@@ -274,9 +274,7 @@ include(SHARED_PATH . '/header.php');
 
   <?php if (!is_guest()) { ?>
   <?php
-    $dashboard_default_setting = singleValueQuery(
-      "SELECT note FROM uses WHERE user_id = '" . (int) $_SESSION['user_id'] . "' ORDER BY id DESC LIMIT 1"
-    );
+    $dashboard_default_setting = most_recent_use_setting((int) $_SESSION['user_id']);
   ?>
   <div id="dashboard-toast" class="toast" role="status" aria-live="polite"></div>
   <div id="record-modal" class="modal" hidden aria-hidden="true">
@@ -310,10 +308,11 @@ include(SHARED_PATH . '/header.php');
     </div>
   </div>
 
+  <script src="<?php echo url_for('/shared/js/record-use-submit.js'); ?>"></script>
   <script>
     (function () {
       var modal = document.getElementById('record-modal');
-      if (!modal) return;
+      if (!modal || !window.RecordUseSubmit) return;
       var form = document.getElementById('record-modal-form');
       var artifactIdInput = document.getElementById('record-modal-artifact-id');
       var artifactNameInput = document.getElementById('record-modal-artifact-name');
@@ -322,20 +321,8 @@ include(SHARED_PATH . '/header.php');
       var notesInput = document.getElementById('record-modal-notes');
       var saveBtn = form.querySelector('.modal-save');
       var fullFormLink = document.getElementById('record-modal-fullform-link');
-      var toastEl = document.getElementById('dashboard-toast');
-      var toastTimer = null;
+      var showToast = RecordUseSubmit.toast(document.getElementById('dashboard-toast'));
       var currentRow = null;
-
-      function showToast(message, kind) {
-        if (!toastEl) { alert(message); return; }
-        toastEl.textContent = message;
-        toastEl.classList.remove('toast-success', 'toast-error', 'is-visible');
-        toastEl.classList.add(kind === 'error' ? 'toast-error' : 'toast-success');
-        void toastEl.offsetWidth;
-        toastEl.classList.add('is-visible');
-        if (toastTimer) clearTimeout(toastTimer);
-        toastTimer = setTimeout(function () { toastEl.classList.remove('is-visible'); }, 3500);
-      }
 
       function todayLocal() {
         var d = new Date();
@@ -389,36 +376,14 @@ include(SHARED_PATH . '/header.php');
         });
       });
 
-      form.addEventListener('submit', function (event) {
-        event.preventDefault();
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Saving…';
-        fetch(form.action, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-          body: new FormData(form),
-        })
-          .then(function (response) {
-            return response.json().then(function (data) { return { ok: response.ok, data: data }; });
-          })
-          .then(function (result) {
-            if (result.ok && result.data && result.data.ok) {
-              handleSuccess(result.data, currentRow);
-              closeModal();
-              showToast(result.data.message || 'Interaction recorded.', 'success');
-            } else {
-              var msg = (result.data && result.data.message) || 'Request failed';
-              showToast(msg, 'error');
-              saveBtn.disabled = false;
-              saveBtn.textContent = 'Save';
-            }
-          })
-          .catch(function (error) {
-            showToast('Network error: ' + error.message, 'error');
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Save';
-          });
+      RecordUseSubmit.bind(form, {
+        toast: showToast,
+        saveButton: saveBtn,
+        saveLabel: 'Save',
+        onSuccess: function (data) {
+          handleSuccess(data, currentRow);
+          closeModal();
+        }
       });
 
       function handleSuccess(data, row) {
