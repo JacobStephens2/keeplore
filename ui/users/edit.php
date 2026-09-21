@@ -184,6 +184,15 @@
     <?php
       $player_id = (int) $_REQUEST['id'];
       $user_id_int = (int) $user_id;
+      $player_full_name = trim(($player['FirstName'] ?? '') . ' ' . ($player['LastName'] ?? ''));
+      $session_player_id = (int) ($_SESSION['player_id'] ?? 0);
+      $include_session_player = $session_player_id > 0 && $session_player_id !== $player_id;
+      $record_use_items = find_artifacts_by_user()->fetch_all(MYSQLI_ASSOC);
+      usort($record_use_items, fn($a, $b) => strcasecmp($a['Title'], $b['Title']) ?: $a['id'] <=> $b['id']);
+      $record_use_date = (new DateTime('now', new DateTimeZone('America/New_York')))->format('Y-m-d');
+      $record_use_setting = singleValueQuery(
+        "SELECT note FROM uses WHERE user_id = '" . $user_id_int . "' ORDER BY id DESC LIMIT 1"
+      );
 
       $stmt_interactions = mysqli_prepare($db, "SELECT
         uses.id AS use_id,
@@ -202,10 +211,64 @@
       $interactionsResult = mysqli_stmt_get_result($stmt_interactions);
     ?>
     <h2>
-      <?php echo $interactionsResult->num_rows; ?>
-      <?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?>
+      <span id="use-count"><?php echo $interactionsResult->num_rows; ?></span>
+      <?php echo h($player_full_name); ?>
       interactions are recorded
     </h2>
+
+    <form id="record-use-form" class="record-use-form" method="post" action="<?php echo url_for('/uses/record-new.php'); ?>">
+      <?php echo csrf_input(); ?>
+      <h3>Record a use with <?php echo h($player_full_name); ?></h3>
+      <p class="record-use-people">People: <?php
+        echo h($player_full_name);
+        if ($include_session_player) {
+          echo ' and ' . h($_SESSION['FullName'] ?? 'Me');
+        }
+      ?></p>
+      <input type="hidden" name="return_to" value="user-edit">
+      <input type="hidden" name="return_player_id" value="<?php echo h($id); ?>">
+      <input type="hidden" name="user[0][id]" value="<?php echo h($id); ?>">
+      <input type="hidden" name="user[0][name]" value="<?php echo h($player_full_name); ?>">
+      <?php if ($include_session_player) { ?>
+        <input type="hidden" name="user[1][id]" value="<?php echo h((string) $session_player_id); ?>">
+        <input type="hidden" name="user[1][name]" value="<?php echo h($_SESSION['FullName'] ?? ''); ?>">
+      <?php } ?>
+
+      <div class="record-use-search">
+        <label for="record-use-artifact-name">Item</label>
+        <input
+          type="search"
+          id="record-use-artifact-name"
+          name="artifact[name]"
+          placeholder="Search items"
+          autocomplete="off"
+        >
+        <input type="hidden" id="record-use-artifact-id" name="artifact[id]" value="">
+        <div id="record-use-artifact-results" class="searchResults" style="display: none;">
+          <ul id="record-use-artifact-results-list" class="searchResults"></ul>
+        </div>
+        <script type="application/json" id="record-use-item-options"><?php echo json_encode(
+          array_map(static fn($item) => ['id' => (int) $item['id'], 'label' => $item['Title']], $record_use_items),
+          JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE
+        ); ?></script>
+      </div>
+
+      <label for="record-use-date">Date</label>
+      <input type="date" name="useDate" id="record-use-date" value="<?php echo h($record_use_date); ?>" required>
+
+      <label for="record-use-setting">Setting</label>
+      <input type="text" name="Note" id="record-use-setting" value="<?php echo h($record_use_setting ?? ''); ?>">
+
+      <label for="record-use-notes">Notes</label>
+      <textarea name="NotesTwo" id="record-use-notes" rows="3"></textarea>
+
+      <div class="record-use-actions">
+        <a class="modal-link" href="<?php echo url_for('/uses/record-new.php'); ?>" target="_blank">Open full form</a>
+        <button type="submit" class="record-use-save">Record use</button>
+      </div>
+    </form>
+
+    <div id="record-use-toast" class="toast" role="status" aria-live="polite"></div>
 
     <table id="useList" data-page-length='100'>
       <thead>
@@ -234,10 +297,144 @@
       </tbody>
     </table>
 
+    <script type="module">
+      import SearchComponent from '/shared/js/search-component.js';
+
+      const optionsEl = document.getElementById('record-use-item-options');
+      const nameInput = document.getElementById('record-use-artifact-name');
+      const idInput = document.getElementById('record-use-artifact-id');
+      const resultsList = document.getElementById('record-use-artifact-results-list');
+      if (optionsEl && nameInput && idInput) {
+        const items = JSON.parse(optionsEl.textContent);
+
+        function setItem(item) {
+          idInput.value = String(item.id);
+          nameInput.value = item.label;
+        }
+
+        nameInput.addEventListener('input', function () {
+          idInput.value = '';
+          const typed = nameInput.value.toLowerCase();
+          const match = items.find((item) => item.label.toLowerCase() === typed);
+          if (match) {
+            idInput.value = String(match.id);
+          }
+        });
+
+        nameInput.addEventListener('keydown', function (event) {
+          if (event.key !== 'Enter' || !resultsList) {
+            return;
+          }
+          const first = resultsList.querySelector('li');
+          if (first) {
+            event.preventDefault();
+            first.click();
+          }
+        });
+
+        SearchComponent.create({
+          inputSelector: '#record-use-artifact-name',
+          resultsSelector: '#record-use-artifact-results-list',
+          wrapperSelector: '#record-use-artifact-results',
+          fetchResults: async (query) => {
+            const needle = query.toLowerCase();
+            return items.filter((item) => item.label.toLowerCase().includes(needle));
+          },
+          onSelect: setItem,
+          maxResults: 10,
+          debounceMs: 0,
+        });
+      }
+    </script>
     <script>
       let table = new DataTable('#useList', {
         order: [[ 0, 'desc']]
       });
+
+      (function () {
+        var recordForm = document.getElementById('record-use-form');
+        if (!recordForm) return;
+
+        var toastEl = document.getElementById('record-use-toast');
+        var toastTimer = null;
+        var saveBtn = recordForm.querySelector('.record-use-save');
+        var nameInput = document.getElementById('record-use-artifact-name');
+        var idInput = document.getElementById('record-use-artifact-id');
+        var notesInput = document.getElementById('record-use-notes');
+        var countEl = document.getElementById('use-count');
+
+        function showToast(message, kind) {
+          if (!toastEl) { alert(message); return; }
+          toastEl.textContent = message;
+          toastEl.classList.remove('toast-success', 'toast-error', 'is-visible');
+          toastEl.classList.add(kind === 'error' ? 'toast-error' : 'toast-success');
+          void toastEl.offsetWidth;
+          toastEl.classList.add('is-visible');
+          if (toastTimer) clearTimeout(toastTimer);
+          toastTimer = setTimeout(function () {
+            toastEl.classList.remove('is-visible');
+          }, 3500);
+        }
+
+        function escapeHtml(value) {
+          return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        }
+
+        function addUseRow(data) {
+          var dateLabel = data.use_date ? escapeHtml(data.use_date) : 'No date';
+          var dateCell = '<a href="<?php echo url_for('/uses/record-edit.php'); ?>?id='
+            + encodeURIComponent(data.use_id) + '">' + dateLabel + '</a>';
+          var itemCell = '<a href="<?php echo url_for('/artifacts/edit.php'); ?>?id='
+            + encodeURIComponent(data.artifact_id) + '">'
+            + escapeHtml(data.artifact_name || '') + '</a>';
+          table.row.add([dateCell, itemCell, escapeHtml(data.artifact_type || '')]).draw(false);
+          if (countEl) {
+            countEl.textContent = String((parseInt(countEl.textContent, 10) || 0) + 1);
+          }
+        }
+
+        recordForm.addEventListener('submit', function (event) {
+          event.preventDefault();
+          if (!idInput || !idInput.value) {
+            showToast('Please choose an item.', 'error');
+            if (nameInput) nameInput.focus();
+            return;
+          }
+          if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+          fetch(recordForm.action, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            body: new FormData(recordForm),
+          })
+            .then(function (response) {
+              return response.json().then(function (data) {
+                return { ok: response.ok, data: data };
+              });
+            })
+            .then(function (result) {
+              if (result.ok && result.data && result.data.ok) {
+                addUseRow(result.data);
+                if (nameInput) nameInput.value = '';
+                if (idInput) idInput.value = '';
+                if (notesInput) notesInput.value = '';
+                showToast(result.data.message || 'Interaction recorded.', 'success');
+              } else {
+                var msg = (result.data && result.data.message) || 'Could not record the use.';
+                showToast(msg, 'error');
+              }
+              if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Record use'; }
+            })
+            .catch(function (error) {
+              showToast('Network error: ' + error.message, 'error');
+              if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Record use'; }
+            });
+        });
+      })();
     </script>
   </section>
 

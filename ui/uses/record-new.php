@@ -39,6 +39,11 @@
     */
 
     $is_ajax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
+    $return_player_id = (int) ($_POST['return_player_id'] ?? 0);
+    $after_record = url_for('/uses/' . $formProcessingFile);
+    if (($_POST['return_to'] ?? '') === 'user-edit' && $return_player_id > 0) {
+      $after_record = url_for('/users/edit.php?id=' . $return_player_id);
+    }
 
     if ($_POST['artifact']['name'] == '') {
 
@@ -51,7 +56,7 @@
 
       $_SESSION['message'] = "Please choose an item.";
 
-      redirect_to(url_for('/uses/' . $formProcessingFile));
+      redirect_to($after_record);
 
     } else {
 
@@ -70,11 +75,16 @@
 
         if ($is_ajax) {
           $status = compute_artifact_use_by_status((int) $_POST['artifact']['id'], (int) $_SESSION['user_id']);
+          $artifact_row = find_artifact_by_id((int) $_POST['artifact']['id']);
           header('Content-Type: application/json');
           echo json_encode([
             'ok' => true,
             'message' => $message,
             'artifact_id' => (int) $_POST['artifact']['id'],
+            'artifact_name' => $_POST['artifact']['name'],
+            'artifact_type' => is_array($artifact_row) ? ($artifact_row['type'] ?? '') : '',
+            'use_id' => (int) $new_id,
+            'use_date' => $_POST['useDate'] ?? '',
             'new_use_by_date' => $status['use_by_date'],
             'most_recent_use_date' => $status['most_recent_use_date'],
             'is_overdue' => $status['is_overdue'],
@@ -83,7 +93,7 @@
         }
 
         $_SESSION['message'] = $message;
-        redirect_to(url_for('/uses/' . $formProcessingFile));
+        redirect_to($after_record);
       } else {
         if ($is_ajax) {
           header('Content-Type: application/json');
