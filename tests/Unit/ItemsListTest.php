@@ -203,31 +203,31 @@ class ItemsListTest extends TestCase
         );
     }
 
+    private function extractCssRuleBlock(string $css, string $selector): string
+    {
+        $pattern = '/' . preg_quote($selector, '/') . '[^\{]*\{(.*?)\}/s';
+        $this->assertSame(1, preg_match($pattern, $css, $match), "CSS rule for {$selector} must exist.");
+        return $match[1];
+    }
+
     public function test_kept_and_keep_buttons_have_distinct_color_styles(): void
     {
         $css = (string) file_get_contents(PROJECT_PATH . '/ui/style.css');
         $this->assertNotFalse($css);
 
+        $keptRule = $this->extractCssRuleBlock($css, '.kept-toggle-btn[aria-pressed="true"]');
+        $keepRule = $this->extractCssRuleBlock($css, '.kept-toggle-btn[aria-pressed="false"]');
+
         // Kept button styling (green / success)
-        $this->assertMatchesRegularExpression(
-            '/\.kept-toggle-btn\[aria-pressed="true"\].*?var\(--success\)/s',
-            $css,
-            'Kept button must use success/green styling when aria-pressed is true.'
-        );
+        $this->assertStringContainsString('var(--success)', $keptRule, 'Kept button must use var(--success).');
+        $this->assertStringContainsString('var(--on-primary)', $keptRule, 'Kept button must use var(--on-primary) text.');
 
         // Keep button styling (ghost / outline / unkept)
-        $this->assertMatchesRegularExpression(
-            '/\.kept-toggle-btn\[aria-pressed="false"\]/s',
-            $css,
-            'Keep button must have specific styling for aria-pressed is false.'
-        );
+        $this->assertStringContainsString('transparent', $keepRule, 'Keep button must have transparent ghost background.');
+        $this->assertStringContainsString('var(--primary)', $keepRule, 'Keep button must use var(--primary) text.');
+        $this->assertStringContainsString('var(--outline-strong)', $keepRule, 'Keep button must use var(--outline-strong) border.');
 
-        // Verify kept and keep have different background definitions
-        preg_match('/\.kept-toggle-btn\[aria-pressed="true"\][^\{]*\{(.*?)\}/s', $css, $keptMatch);
-        preg_match('/\.kept-toggle-btn\[aria-pressed="false"\][^\{]*\{(.*?)\}/s', $css, $keepMatch);
-        $this->assertNotEmpty($keptMatch, 'Kept rule block must exist in CSS.');
-        $this->assertNotEmpty($keepMatch, 'Keep rule block must exist in CSS.');
-        $this->assertNotEquals($keptMatch[1], $keepMatch[1], 'Kept and Keep buttons must have different styles.');
+        $this->assertNotEquals($keptRule, $keepRule, 'Kept and Keep buttons must have different styles.');
     }
 
     public function test_items_list_js_maintains_toggle_state_attributes(): void
