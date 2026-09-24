@@ -54,6 +54,7 @@ class AgentApiDocsTest extends TestCase
                 'list-items',
                 'show-item',
                 'list-uses',
+                'list-players',
                 'list-proposals',
                 'list-types',
                 'upcoming-interactions',
@@ -73,6 +74,40 @@ class AgentApiDocsTest extends TestCase
         $this->assertContains('query', $endpoint['body_fields']);
         $this->assertContains('tag', $endpoint['body_fields']);
         $this->assertTrue($endpoint['get_lists_first_page']);
+    }
+
+    public function test_list_items_documents_the_collection_filters_from_issue_58(): void
+    {
+        $endpoint = $this->endpointsById()['list-items'];
+        foreach (['kept', 'physical', 'digital', 'secondary_collection', 'type_id', 'fields', 'include'] as $field) {
+            $this->assertContains($field, $endpoint['body_fields']);
+        }
+        $this->assertSame(['basic', 'collection'], $endpoint['fields_values']);
+        $this->assertSame(['uses_summary'], $endpoint['include_values']);
+        $example = json_decode($endpoint['example_body'], true);
+        $this->assertTrue($example['kept']);
+        $this->assertSame('collection', $example['fields']);
+        $notes = implode(' ', $endpoint['notes']);
+        $this->assertStringContainsString('is_kept', $notes);
+        $this->assertStringContainsString('plays', $notes);
+        $this->assertStringContainsString('last_use', $notes);
+    }
+
+    public function test_tag_docs_warn_that_tags_may_be_empty(): void
+    {
+        $notes = implode(' ', $this->endpointsById()['list-items']['notes']);
+        $this->assertStringContainsString('empty', $notes);
+    }
+
+    public function test_players_and_uses_support_filtering_plays_by_person(): void
+    {
+        $players = $this->endpointsById()['list-players'];
+        $this->assertSame('GET', $players['method']);
+        $this->assertSame('/players.php', $players['path']);
+
+        $uses = $this->endpointsById()['list-uses'];
+        $this->assertContains('player_id', $uses['query_fields']);
+        $this->assertStringContainsString('players', implode(' ', $uses['notes']));
     }
 
     public function test_list_and_show_payloads_include_each_items_tags(): void

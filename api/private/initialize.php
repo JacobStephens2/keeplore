@@ -38,6 +38,7 @@ require_once('../private/kept_status.php');
 require_once('../private/item_tags.php');
 require_once('../private/agent_keys.php');
 require_once('../private/agent_api_docs.php');
+require_once('../private/collection_list.php');
 
 require_once('../private/classes/DatabaseObject.class.php');
 DatabaseObject::set_database($database);

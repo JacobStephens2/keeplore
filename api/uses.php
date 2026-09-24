@@ -35,62 +35,17 @@
   switch ($method) {
 
     case 'GET':
-      // List uses for authenticated user, with optional artifact_id filter
-      if ($user_id) {
-        if (isset($_GET['artifact_id']) && is_numeric($_GET['artifact_id'])) {
-          $artifact_id = (int) $_GET['artifact_id'];
-          $stmt = $database->prepare(
-            "SELECT uses.id, uses.artifact_id, uses.use_date, uses.note, uses.notesTwo,
-                    games.Title AS artifact_title
-             FROM uses
-             LEFT JOIN games ON uses.artifact_id = games.id
-             WHERE uses.user_id = ? AND uses.artifact_id = ?
-             ORDER BY uses.use_date DESC, uses.id DESC"
-          );
-          $stmt->bind_param("ii", $user_id, $artifact_id);
-        } else {
-          $stmt = $database->prepare(
-            "SELECT uses.id, uses.artifact_id, uses.use_date, uses.note, uses.notesTwo,
-                    games.Title AS artifact_title
-             FROM uses
-             LEFT JOIN games ON uses.artifact_id = games.id
-             WHERE uses.user_id = ?
-             ORDER BY uses.use_date DESC, uses.id DESC"
-          );
-          $stmt->bind_param("i", $user_id);
-        }
-      } else {
-        // API key auth without user_id: require artifact_id filter
-        if (isset($_GET['artifact_id']) && is_numeric($_GET['artifact_id'])) {
-          $artifact_id = (int) $_GET['artifact_id'];
-          $stmt = $database->prepare(
-            "SELECT uses.id, uses.artifact_id, uses.use_date, uses.note, uses.notesTwo,
-                    games.Title AS artifact_title
-             FROM uses
-             LEFT JOIN games ON uses.artifact_id = games.id
-             WHERE uses.artifact_id = ?
-             ORDER BY uses.use_date DESC, uses.id DESC"
-          );
-          $stmt->bind_param("i", $artifact_id);
-        } else {
-          http_response_code(400);
-          $response->message = 'artifact_id parameter is required for API key authentication.';
-          echo json_encode($response);
-          exit;
-        }
+      // List uses for authenticated user, optionally filtered by item and player
+      $artifact_id = (isset($_GET['artifact_id']) && is_numeric($_GET['artifact_id'])) ? (int) $_GET['artifact_id'] : null;
+      $player_id = (isset($_GET['player_id']) && is_numeric($_GET['player_id'])) ? (int) $_GET['player_id'] : null;
+      if (!$user_id && $artifact_id === null) {
+        http_response_code(400);
+        $response->message = 'artifact_id parameter is required for API key authentication.';
+        echo json_encode($response);
+        exit;
       }
 
-      $stmt->execute();
-      $result = $stmt->get_result();
-      $uses = [];
-      while ($record = $result->fetch_assoc()) {
-        $uses[] = $record;
-      }
-      $stmt->close();
-
-      $use_ids = array_column($uses, 'id');
-      $participant_rows = find_participants_for_uses($database, $use_ids, $user_id);
-      $response->uses = attach_participants_to_uses($uses, $participant_rows);
+      $response->uses = find_uses_with_participants($database, $user_id, $artifact_id, $player_id);
       echo json_encode($response);
       break;
 

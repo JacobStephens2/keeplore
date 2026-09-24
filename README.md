@@ -94,9 +94,10 @@ ui/                         Web-accessible frontend
 
 api/                        REST API endpoints
 ├── artifact.php            Single item CRUD
-├── artifacts.php           Item listing/search
+├── artifacts.php           Item listing/search/filters
 ├── uses.php                Interaction recording
 ├── types.php               Item types
+├── players.php             Household players (read-only)
 ├── users.php               User management
 └── private/                API-specific initialization
 

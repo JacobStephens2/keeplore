@@ -116,19 +116,17 @@ final class ItemTagsTest extends TestCase
         $this->assertSame([10], $ids);
     }
 
-    public function test_user_item_list_filters_by_tag_and_callers_attach_tags(): void
+    public function test_user_item_list_filters_by_tag_and_attaches_tags(): void
     {
-        require_once PRIVATE_PATH . '/classes/DatabaseObject.class.php';
-        require_once PRIVATE_PATH . '/classes/Artifact.class.php';
-        \DatabaseObject::set_database($this->db);
+        require_once PRIVATE_PATH . '/collection_list.php';
         replace_item_tags($this->db, 10, 1, ['beach-safe']);
         replace_item_tags($this->db, 11, 1, ['party']);
 
-        $listed = with_item_tags(
+        $listed = list_collection_items(
             $this->db,
-            \Artifact::list_artifacts_by_user(1, 1, 50, 'beach-safe'),
-            1
-        );
+            1,
+            parse_collection_list_request((object) ['tag' => 'beach-safe'])
+        )['items'];
 
         $this->assertCount(1, $listed);
         $this->assertSame(10, (int) $listed[0]['id']);
