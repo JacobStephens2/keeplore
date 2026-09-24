@@ -63,6 +63,15 @@ function artifact_is_in_secondary_collection($row) {
 }
 
 /**
+ * SQL form of the flag predicates above, for list filters: true matches
+ * only 1; false matches 0 and NULL, as artifact_is_kept() reads them.
+ * $column must be a trusted column name, never user input.
+ */
+function artifact_flag_sql($column, $value) {
+  return $value ? "{$column} = 1" : "COALESCE({$column}, 0) <> 1";
+}
+
+/**
  * Kept setter: flips kept status through the single seam. Scoped to the
  * session user. Returns true on success, false on failure.
  */

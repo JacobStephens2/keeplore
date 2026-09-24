@@ -14,7 +14,8 @@
  *
  * Pure: no database access. Each entry of $uses gains a `participants`
  * key: a list of ['id', 'FirstName', 'LastName'] arrays, one per distinct
- * player linked to that play. Rows for unknown play ids are ignored and
+ * player linked to that play, and a `players` key listing the same player
+ * ids. Rows for unknown play ids are ignored and
  * plays without participants get an empty list. Inputs are not mutated.
  */
 function attach_participants_to_uses(array $uses, array $participant_rows) {
@@ -41,6 +42,7 @@ function attach_participants_to_uses(array $uses, array $participant_rows) {
   foreach ($uses as $use) {
     $use_id = (int) ($use['id'] ?? 0);
     $use['participants'] = array_values($by_use[$use_id] ?? []);
+    $use['players'] = array_column($use['participants'], 'id');
     $attached[] = $use;
   }
   return $attached;
@@ -87,6 +89,56 @@ function find_participants_for_uses($conn, array $use_ids, $user_id = null) {
   }
   mysqli_stmt_close($stmt);
   return $rows;
+}
+
+/**
+ * Plays read behind GET /uses.php: newest first, each with deduplicated
+ * participants. Scoped to $user_id when given; a null $user_id (legacy
+ * master API key) requires $artifact_id. $player_id keeps only plays that
+ * player took part in.
+ */
+function find_uses_with_participants($conn, $user_id, $artifact_id = null, $player_id = null) {
+  $where = [];
+  $types = '';
+  $params = [];
+  if ($user_id !== null) {
+    $where[] = 'uses.user_id = ?';
+    $types .= 'i';
+    $params[] = (int) $user_id;
+  }
+  if ($artifact_id !== null) {
+    $where[] = 'uses.artifact_id = ?';
+    $types .= 'i';
+    $params[] = (int) $artifact_id;
+  }
+  if ($player_id !== null) {
+    $where[] = 'uses.id IN (SELECT use_id FROM uses_players WHERE player_id = ? AND user_id = uses.user_id)';
+    $types .= 'i';
+    $params[] = (int) $player_id;
+  }
+  if ($where === []) {
+    return [];
+  }
+  $stmt = mysqli_prepare(
+    $conn,
+    "SELECT uses.id, uses.artifact_id, uses.use_date, uses.note, uses.notesTwo,
+            games.Title AS artifact_title
+     FROM uses
+     LEFT JOIN games ON uses.artifact_id = games.id
+     WHERE " . implode(' AND ', $where) . "
+     ORDER BY uses.use_date DESC, uses.id DESC"
+  );
+  mysqli_stmt_bind_param($stmt, $types, ...$params);
+  mysqli_stmt_execute($stmt);
+  $result = mysqli_stmt_get_result($stmt);
+  $uses = [];
+  while ($row = mysqli_fetch_assoc($result)) {
+    $uses[] = $row;
+  }
+  mysqli_stmt_close($stmt);
+
+  $participant_rows = find_participants_for_uses($conn, array_column($uses, 'id'), $user_id);
+  return attach_participants_to_uses($uses, $participant_rows);
 }
 
 ?>

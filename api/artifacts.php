@@ -41,7 +41,6 @@
     $requestBody->userid = $authentication_response->user_id;
   }
 
-  $tag = isset($requestBody->tag) ? (string) $requestBody->tag : '';
   $collection_user_id = 0;
   if (isset($requestBody->userid) && $requestBody->userid != '') {
     $collection_user_id = (int) $requestBody->userid;
@@ -49,75 +48,40 @@
     $collection_user_id = (int) $authentication_response->user_id;
   }
 
-  $per_page = isset($requestBody->per_page) ? (int) $requestBody->per_page : 50;
-
-  // Determine pagination mode: cursor-based or offset-based
-  if (isset($requestBody->cursor)) {
-    // Cursor-based pagination
-    $cursor = $requestBody->cursor !== null ? (int) $requestBody->cursor : null;
-
-    if (isset($requestBody->query) && $requestBody->query != '') {
-      // Query search does not support cursor-based pagination; fall back to offset
-      $page = isset($requestBody->page) ? (int) $requestBody->page : 1;
-      $artifacts = Artifact::list_artifacts_by_query(
-        $requestBody->query,
-        $requestBody->userid,
-        $page,
-        $per_page,
-        $tag
-      );
-      $response->artifacts = $artifacts;
-      $response->page = $page;
-      $response->per_page = $per_page;
-    } elseif (isset($requestBody->userid) && $requestBody->userid != '') {
-      $result = Artifact::list_artifacts_by_user_paginated(
-        $requestBody->userid,
-        $per_page,
-        $cursor,
-        $tag
-      );
-      $response->artifacts = $result['data'];
-      $response->next_cursor = $result['next_cursor'];
-      $response->has_more = $result['has_more'];
-      $response->per_page = $per_page;
-    } else {
-      $result = Artifact::list_artifacts_paginated($per_page, $cursor);
-      $response->artifacts = $result['data'];
-      $response->next_cursor = $result['next_cursor'];
-      $response->has_more = $result['has_more'];
-      $response->per_page = $per_page;
-    }
-  } else {
-    // Offset-based pagination (existing behavior)
-    $page = isset($requestBody->page) ? (int) $requestBody->page : 1;
-
-    if (isset($requestBody->query) && $requestBody->query != '') {
-      $artifacts = Artifact::list_artifacts_by_query(
-        $requestBody->query,
-        $requestBody->userid,
-        $page,
-        $per_page,
-        $tag
-      );
-    } elseif ($is_agent_key || ($tag !== '' && $collection_user_id > 0)) {
-      $artifacts = Artifact::list_artifacts_by_user(
-        $collection_user_id > 0 ? $collection_user_id : $authentication_response->user_id,
-        $page,
-        $per_page,
-        $tag
-      );
-    } else {
-      $artifacts = Artifact::list_artifacts($page, $per_page);
-    }
-    if (!isset($response->artifacts)) {
-      $response->artifacts = $artifacts;
-      $response->page = $page;
-      $response->per_page = $per_page;
-    }
+  $request = parse_collection_list_request($requestBody);
+  if ($request['errors'] !== []) {
+    http_response_code(400);
+    $response->message = 'Invalid list request.';
+    $response->errors = $request['errors'];
+    echo json_encode($response);
+    exit;
   }
+  if ($collection_user_id === 0 && collection_list_has_filters($request)) {
+    http_response_code(400);
+    $response->message = 'Filters and extra fields need a collection: send userid.';
+    echo json_encode($response);
+    exit;
+  }
+  $response->per_page = $request['per_page'];
 
-  if ($collection_user_id > 0 && isset($response->artifacts) && is_array($response->artifacts)) {
-    $response->artifacts = with_item_tags($database, $response->artifacts, $collection_user_id);
+  if ($collection_user_id > 0) {
+    $result = list_collection_items($database, $collection_user_id, $request);
+    $response->artifacts = $result['items'];
+    $response->has_more = $result['has_more'];
+    if ($request['use_cursor']) {
+      $response->next_cursor = $result['next_cursor'];
+    } else {
+      $response->page = $request['page'];
+    }
+  } elseif ($request['use_cursor']) {
+    // Master API key without a userid: legacy all-users id/Title listing.
+    $result = Artifact::list_artifacts_paginated($request['per_page'], $request['cursor']);
+    $response->artifacts = $result['data'];
+    $response->next_cursor = $result['next_cursor'];
+    $response->has_more = $result['has_more'];
+  } else {
+    $response->artifacts = Artifact::list_artifacts($request['page'], $request['per_page']);
+    $response->page = $request['page'];
   }
 
   echo json_encode($response);

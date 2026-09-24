@@ -80,4 +80,18 @@ class KeptStatusTest extends TestCase
         $this->assertSame(1, normalize_format_flag(1));
         $this->assertSame(0, normalize_format_flag(0));
     }
+
+    // -----------------------------------------------------------------
+    // artifact_flag_sql(): SQL form of the same predicates
+    // -----------------------------------------------------------------
+
+    public function test_flag_sql_true_matches_only_one(): void
+    {
+        $this->assertSame('games.is_kept = 1', artifact_flag_sql('games.is_kept', true));
+    }
+
+    public function test_flag_sql_false_treats_null_as_unset(): void
+    {
+        $this->assertSame('COALESCE(games.is_physical, 0) <> 1', artifact_flag_sql('games.is_physical', false));
+    }
 }
