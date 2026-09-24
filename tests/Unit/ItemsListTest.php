@@ -202,4 +202,61 @@ class ItemsListTest extends TestCase
             'Each item row must put the name cell immediately after Kept.'
         );
     }
+
+    private function extractCssRuleBlock(string $css, string $selector): string
+    {
+        $pattern = '/' . preg_quote($selector, '/') . '[^\{]*\{(.*?)\}/s';
+        $this->assertSame(1, preg_match($pattern, $css, $match), "CSS rule for {$selector} must exist.");
+        return $match[1];
+    }
+
+    public function test_kept_and_keep_buttons_have_distinct_color_styles(): void
+    {
+        $css = (string) file_get_contents(PROJECT_PATH . '/ui/style.css');
+        $this->assertNotFalse($css);
+
+        $keptRule = $this->extractCssRuleBlock($css, '.kept-toggle-btn[aria-pressed="true"]');
+        $keepRule = $this->extractCssRuleBlock($css, '.kept-toggle-btn[aria-pressed="false"]');
+
+        // Kept button styling (green / success)
+        $this->assertStringContainsString('var(--success)', $keptRule, 'Kept button must use var(--success).');
+        $this->assertStringContainsString('var(--on-primary)', $keptRule, 'Kept button must use var(--on-primary) text.');
+
+        // Keep button styling (ghost / outline / unkept)
+        $this->assertStringContainsString('transparent', $keepRule, 'Keep button must have transparent ghost background.');
+        $this->assertStringContainsString('var(--primary)', $keepRule, 'Keep button must use var(--primary) text.');
+        $this->assertStringContainsString('var(--outline-strong)', $keepRule, 'Keep button must use var(--outline-strong) border.');
+
+        $this->assertNotEquals($keptRule, $keepRule, 'Kept and Keep buttons must have different styles.');
+    }
+
+    public function test_items_list_js_maintains_toggle_state_attributes(): void
+    {
+        $js = (string) file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
+        $this->assertNotFalse($js);
+
+        // Renders aria-pressed based on is_kept
+        $this->assertMatchesRegularExpression(
+            "/className:\s*'kept-toggle-btn'/",
+            $js,
+            'Button must have kept-toggle-btn class.'
+        );
+        $this->assertMatchesRegularExpression(
+            "/'aria-pressed':\s*item\.is_kept\s*\?\s*'true'\s*:\s*'false'/",
+            $js,
+            'Button must initialize aria-pressed attribute based on item.is_kept.'
+        );
+
+        // Updates aria-pressed and text on toggle
+        $this->assertMatchesRegularExpression(
+            "/button\.setAttribute\(\s*'aria-pressed',\s*isKept\s*\?\s*'true'\s*:\s*'false'\s*\)/",
+            $js,
+            'Button must update aria-pressed attribute when toggle response is received.'
+        );
+        $this->assertMatchesRegularExpression(
+            "/button\.textContent\s*=\s*isKept\s*\?\s*'Kept'\s*:\s*'Keep'/",
+            $js,
+            'Button must update textContent between Kept and Keep on toggle.'
+        );
+    }
 }
