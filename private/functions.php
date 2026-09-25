@@ -60,9 +60,22 @@ function normalize_item_bgg_url($value) {
   return $url;
 }
 
-function item_bgg_url_for_storage($value) {
-  $url = normalize_item_bgg_url($value);
-  return $url === '' ? null : $url;
+const ITEM_BGG_AGE_BASES = ['community', 'publisher'];
+
+// The BGG columns an item write stores. The vote basis only means something
+// alongside a link, so an item without one stores none.
+function item_bgg_fields_for_storage($artifact) {
+  $url = normalize_item_bgg_url($artifact['bgg_url'] ?? '');
+  if ($url === '') {
+    return ['bgg_url' => null, 'bgg_player_votes' => null, 'bgg_age_basis' => null];
+  }
+  $votes = trim((string) ($artifact['bgg_player_votes'] ?? ''));
+  $age_basis = $artifact['bgg_age_basis'] ?? null;
+  return [
+    'bgg_url' => $url,
+    'bgg_player_votes' => preg_match('/^\d{1,9}$/', $votes) ? (int) $votes : null,
+    'bgg_age_basis' => in_array($age_basis, ITEM_BGG_AGE_BASES, true) ? $age_basis : null,
+  ];
 }
 
 function item_bgg_link_html($value) {
@@ -77,6 +90,30 @@ function item_bgg_link_html($value) {
     $site = 'VideoGameGeek';
   }
   return '<p><a class="item-bgg-link" href="' . h($url) . '" target="_blank" rel="noopener noreferrer">View on ' . $site . '</a></p>';
+}
+
+// What an item's BGG numbers rest on. Player counts and Sweet Spot share
+// BGG's player-count poll; BGG does not publish the age poll's vote count.
+// Only the parts that are known are described.
+function item_bgg_basis_text($player_votes, $age_basis) {
+  $parts = [];
+  if ($player_votes !== null && $player_votes !== '') {
+    $votes = (int) $player_votes;
+    $parts[] = $votes > 0
+      ? 'player counts and Sweet Spot from ' . $votes . ' BGG community ' . ($votes === 1 ? 'vote' : 'votes')
+      : 'player counts from the BGG publisher listing (no community recommendation)';
+  }
+  if ($age_basis === 'community') {
+    $parts[] = 'minimum age from the BGG community age poll';
+  } elseif ($age_basis === 'publisher') {
+    $parts[] = 'minimum age from the BGG publisher listing';
+  }
+  return $parts === [] ? '' : ucfirst(implode('; ', $parts)) . '.';
+}
+
+function item_bgg_basis_html($item) {
+  $text = item_bgg_basis_text($item['bgg_player_votes'] ?? null, $item['bgg_age_basis'] ?? null);
+  return $text === '' ? '' : '<p class="item-bgg-basis">' . h($text) . '</p>';
 }
 
 function error_404() {

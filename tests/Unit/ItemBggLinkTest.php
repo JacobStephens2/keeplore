@@ -92,8 +92,57 @@ class ItemBggLinkTest extends TestCase
 
     public function test_stored_link_is_null_when_blank(): void
     {
-        $this->assertNull(item_bgg_url_for_storage(''));
-        $this->assertNull(item_bgg_url_for_storage('javascript:alert(1)'));
-        $this->assertSame('https://boardgamegeek.com/boardgame/171', item_bgg_url_for_storage('http://boardgamegeek.com/boardgame/171'));
+        $this->assertNull(item_bgg_fields_for_storage(['bgg_url' => ''])['bgg_url']);
+        $this->assertNull(item_bgg_fields_for_storage(['bgg_url' => 'javascript:alert(1)'])['bgg_url']);
+        $this->assertSame('https://boardgamegeek.com/boardgame/171', item_bgg_fields_for_storage(['bgg_url' => 'http://boardgamegeek.com/boardgame/171'])['bgg_url']);
+    }
+
+    public function test_writers_store_the_bgg_vote_basis(): void
+    {
+        $writers = $this->source('/private/query_functions/artifact_queries.php');
+        $this->assertMatchesRegularExpression('/INSERT INTO games\s*\([^)]*\bbgg_player_votes\b[^)]*\bbgg_age_basis\b/s', $writers);
+        $this->assertStringContainsString('bgg_player_votes=?, bgg_age_basis=?', $this->updateWriter());
+    }
+
+    public function test_forms_carry_the_bgg_vote_basis(): void
+    {
+        foreach (['/ui/artifacts/new.php', '/ui/artifacts/edit.php'] as $path) {
+            $page = $this->source($path);
+            $this->assertMatchesRegularExpression('/<input type="hidden" name="bgg_player_votes" id="bgg_player_votes"/', $page, $path);
+            $this->assertMatchesRegularExpression('/<input type="hidden" name="bgg_age_basis" id="bgg_age_basis"/', $page, $path);
+        }
+        $js = $this->source('/ui/artifacts/new-bgg.js');
+        $this->assertStringContainsString('fields.bgg_player_votes', $js);
+        $this->assertStringContainsString('fields.bgg_age_basis', $js);
+    }
+
+    public function test_item_pages_show_the_bgg_vote_basis(): void
+    {
+        foreach (['/ui/artifacts/edit.php' => '$artifact', '/ui/artifacts/show.php' => '$object'] as $path => $var) {
+            $this->assertStringContainsString("item_bgg_basis_html({$var})", $this->source($path), $path);
+        }
+    }
+
+    public function test_hand_edits_drop_the_bgg_vote_basis(): void
+    {
+        $js = $this->source('/ui/artifacts/new-bgg.js');
+        $this->assertStringContainsString('forgetBasis(playerVotesInput, ["MnP", "MxP", "SS", "bgg_url"])', $js);
+        $this->assertStringContainsString('forgetBasis(ageBasisInput, ["age", "bgg_url"])', $js);
+    }
+
+    public function test_bgg_storage_drops_the_vote_basis_without_a_link(): void
+    {
+        $this->assertSame(
+            ['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => 19, 'bgg_age_basis' => 'community'],
+            item_bgg_fields_for_storage(['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => '19', 'bgg_age_basis' => 'community'])
+        );
+        $this->assertSame(
+            ['bgg_url' => null, 'bgg_player_votes' => null, 'bgg_age_basis' => null],
+            item_bgg_fields_for_storage(['bgg_url' => '', 'bgg_player_votes' => '19', 'bgg_age_basis' => 'community'])
+        );
+        $this->assertSame(
+            ['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => null, 'bgg_age_basis' => null],
+            item_bgg_fields_for_storage(['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => 'many', 'bgg_age_basis' => 'guess'])
+        );
     }
 }

@@ -114,6 +114,38 @@ class FunctionsTest extends TestCase
         $this->assertStringContainsString('>View on VideoGameGeek<', item_bgg_link_html('https://www.videogamegeek.com/videogame/2'));
     }
 
+    public function test_item_bgg_basis_counts_the_player_votes(): void
+    {
+        $this->assertSame(
+            'Player counts and Sweet Spot from 19 BGG community votes; minimum age from the BGG community age poll.',
+            item_bgg_basis_text(19, 'community')
+        );
+        $this->assertSame(
+            'Player counts and Sweet Spot from 1 BGG community vote; minimum age from the BGG publisher listing.',
+            item_bgg_basis_text('1', 'publisher')
+        );
+    }
+
+    public function test_item_bgg_basis_falls_back_to_the_publisher(): void
+    {
+        $this->assertSame(
+            'Player counts from the BGG publisher listing (no community recommendation); minimum age from the BGG publisher listing.',
+            item_bgg_basis_text(0, 'publisher')
+        );
+    }
+
+    public function test_item_bgg_basis_describes_only_what_is_known(): void
+    {
+        $this->assertSame('Minimum age from the BGG community age poll.', item_bgg_basis_text(null, 'community'));
+        $this->assertSame('Player counts and Sweet Spot from 7 BGG community votes.', item_bgg_basis_text(7, ''));
+    }
+
+    public function test_item_bgg_basis_is_empty_without_bgg_data(): void
+    {
+        $this->assertSame('', item_bgg_basis_text(null, null));
+        $this->assertSame('', item_bgg_basis_text('', ''));
+    }
+
     public function test_normalize_item_bgg_url_rejects_other_links(): void
     {
         $this->assertSame('', normalize_item_bgg_url('https://boardgamegeek.com.evil.test/boardgame/621'));

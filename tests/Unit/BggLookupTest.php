@@ -96,6 +96,8 @@ class BggLookupTest extends TestCase
                     'Yr' => '2023',
                     'image_url' => $cover,
                     'bgg_url' => 'https://boardgamegeek.com/boardgame/373106/sky-team',
+                    'bgg_player_votes' => '0',
+                    'bgg_age_basis' => 'publisher',
                 ],
             ],
             bgg_form_fields_from_json($itemJson, $dynamicJson)
@@ -131,6 +133,8 @@ class BggLookupTest extends TestCase
         $this->assertSame('2', $fields['MnP']);
         $this->assertSame('5', $fields['MxP']);
         $this->assertSame('03,04', $fields['SS']);
+        $this->assertSame('5', $fields['bgg_player_votes']);
+        $this->assertSame('community', $fields['bgg_age_basis']);
     }
 
     public function test_publisher_age_and_players_fill_in_when_nobody_voted(): void
@@ -157,6 +161,24 @@ class BggLookupTest extends TestCase
         $this->assertSame('10', $fields['Age']);
         $this->assertSame('1', $fields['MnP']);
         $this->assertSame('4', $fields['MxP']);
+        $this->assertSame('0', $fields['bgg_player_votes']);
+        $this->assertSame('publisher', $fields['bgg_age_basis']);
+    }
+
+    public function test_votes_without_a_recommended_range_count_as_publisher_players(): void
+    {
+        $itemJson = json_encode(['item' => ['objectid' => 2, 'name' => 'Thin Poll', 'minplayers' => 2, 'maxplayers' => 6]]);
+        $dynamicJson = json_encode([
+            'item' => [
+                'polls' => [
+                    'userplayers' => ['best' => [], 'recommended' => [], 'totalvotes' => '3'],
+                ],
+            ],
+        ]);
+
+        $fields = bgg_form_fields_from_json($itemJson, $dynamicJson)['fields'];
+        $this->assertSame('2', $fields['MnP']);
+        $this->assertSame('0', $fields['bgg_player_votes']);
     }
 
     public function test_link_is_omitted_when_not_a_geek_site(): void
