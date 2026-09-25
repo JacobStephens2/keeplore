@@ -159,7 +159,8 @@ final class ItemYearWriteTest extends TestCase
 
     public function test_create_and_edit_store_the_bgg_vote_basis(): void
     {
-        $payload = $this->editPayload(['bgg_player_votes' => '19', 'bgg_age_basis' => 'community']);
+        $link = 'https://boardgamegeek.com/boardgame/621/25-words-or-less';
+        $payload = $this->editPayload(['bgg_url' => $link, 'bgg_player_votes' => '19', 'bgg_age_basis' => 'community']);
         unset($payload['id']);
         $payload['Title'] = '25 Words or Less';
         $this->assertTrue(insert_artifact($payload));
@@ -168,7 +169,12 @@ final class ItemYearWriteTest extends TestCase
         $this->assertSame(19, (int) $row['bgg_player_votes']);
         $this->assertSame('community', $row['bgg_age_basis']);
 
-        $this->assertTrue(update_artifact($this->editPayload(['id' => $id, 'bgg_player_votes' => 'many', 'bgg_age_basis' => 'guess'])));
+        $this->assertTrue(update_artifact($this->editPayload(['id' => $id, 'bgg_url' => $link, 'bgg_player_votes' => 'many', 'bgg_age_basis' => 'guess'])));
+        $row = find_artifact_by_id($id);
+        $this->assertNull($row['bgg_player_votes']);
+        $this->assertNull($row['bgg_age_basis']);
+
+        $this->assertTrue(update_artifact($this->editPayload(['id' => $id, 'bgg_url' => '', 'bgg_player_votes' => '19', 'bgg_age_basis' => 'community'])));
         $row = find_artifact_by_id($id);
         $this->assertNull($row['bgg_player_votes']);
         $this->assertNull($row['bgg_age_basis']);
