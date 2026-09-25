@@ -19,6 +19,9 @@ if ($object_id) {
 
 if (empty($result['ok'])) {
   http_response_code(422);
+} else {
+  // Edit Item shows these under the fields a match would fill.
+  $result['basis'] = item_bgg_field_bases($result['fields']);
 }
 
 echo json_encode($result);

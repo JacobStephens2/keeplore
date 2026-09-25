@@ -140,6 +140,61 @@ class FunctionsTest extends TestCase
         $this->assertSame('Player counts and Sweet Spot from 7 BGG community votes.', item_bgg_basis_text(7, ''));
     }
 
+    public function test_field_basis_counts_votes_for_player_fields(): void
+    {
+        $item = ['bgg_player_votes' => '163', 'bgg_age_basis' => 'community'];
+        $this->assertSame('From 163 BGG community votes', item_bgg_field_basis_text($item, 'players'));
+        $this->assertSame('From 1 BGG community vote', item_bgg_field_basis_text(['bgg_player_votes' => 1], 'players'));
+        $this->assertSame('From the BGG community age poll (BGG does not publish its vote count)', item_bgg_field_basis_text($item, 'age'));
+    }
+
+    public function test_field_basis_names_the_publisher_fallback(): void
+    {
+        $item = ['bgg_player_votes' => 0, 'bgg_age_basis' => 'publisher'];
+        $this->assertSame('From the BGG publisher listing (no community recommendation)', item_bgg_field_basis_text($item, 'players'));
+        $this->assertSame('From the BGG publisher listing', item_bgg_field_basis_text($item, 'age'));
+        $this->assertSame('', item_bgg_field_basis_text($item, 'sweet_spot'));
+    }
+
+    public function test_field_basis_is_empty_without_bgg_data(): void
+    {
+        $this->assertSame('', item_bgg_field_basis_text([], 'players'));
+        $this->assertSame('', item_bgg_field_basis_text(['bgg_player_votes' => null, 'bgg_age_basis' => null], 'age'));
+        $this->assertSame('', item_bgg_field_basis_text(['bgg_player_votes' => '5'], 'unknown'));
+    }
+
+    public function test_field_basis_html_describes_its_input(): void
+    {
+        $this->assertSame(
+            '<p id="MnP-bgg-basis" class="form-field-hint" data-bgg-basis="players">From 163 BGG community votes</p>',
+            item_bgg_field_basis_html(['bgg_player_votes' => '163'], 'players', 'MnP')
+        );
+        $this->assertSame(
+            '<p id="SS-bgg-basis" class="form-field-hint" data-bgg-basis="sweet_spot">From 163 BGG community votes</p>',
+            item_bgg_field_basis_html(['bgg_player_votes' => '163'], 'sweet_spot', 'SS')
+        );
+    }
+
+    public function test_field_basis_html_stays_as_a_hidden_slot_without_data(): void
+    {
+        $this->assertSame(
+            '<p id="age-bgg-basis" class="form-field-hint" data-bgg-basis="age" hidden></p>',
+            item_bgg_field_basis_html([], 'age', 'age')
+        );
+    }
+
+    public function test_field_bases_phrase_every_group_for_a_bgg_fill(): void
+    {
+        $this->assertSame(
+            [
+                'players' => 'From 5 BGG community votes',
+                'sweet_spot' => 'From 5 BGG community votes',
+                'age' => 'From the BGG community age poll (BGG does not publish its vote count)',
+            ],
+            item_bgg_field_bases(['bgg_player_votes' => '5', 'bgg_age_basis' => 'community'])
+        );
+    }
+
     public function test_item_bgg_basis_is_empty_without_bgg_data(): void
     {
         $this->assertSame('', item_bgg_basis_text(null, null));
