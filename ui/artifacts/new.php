@@ -44,7 +44,7 @@ if(is_post_request()) {
   }
   $artifact['Yr'] = trim((string) ($_POST['Yr'] ?? ''));
   $artifact['image_url'] = normalize_item_image_url($_POST['image_url'] ?? '');
-  $artifact['bgg_url'] = normalize_item_bgg_url($_POST['bgg_url'] ?? '');
+  $artifact['bgg_url'] = $_POST['bgg_url'] ?? '';
 
   $artifact['tags'] = $_POST['tags'] ?? '';
   $result = insert_artifact($artifact);
@@ -146,25 +146,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
       </div>
 
       <div class="form-field form-field-span">
-        <div class="bgg-lookup">
-          <button type="button" id="requestBggData">Request BGG Data</button>
-          <p class="bgg-lookup-status" id="bggLookupStatus" hidden></p>
-          <div class="bgg-confirm" id="bggConfirm" hidden>
-            <img id="bggMatchImage" class="bgg-match-image" alt="" hidden referrerpolicy="no-referrer">
-            <p>
-              <strong id="bggMatchName"></strong>
-              <span id="bggMatchYearWrap">(<span id="bggMatchYear"></span>)</span>
-              <span id="bggMatchSource" class="bgg-source" hidden></span>
-            </p>
-            <p>
-              <a id="bggMatchLink" href="#" target="_blank" rel="noopener">View on BoardGameGeek</a>
-            </p>
-            <div class="bgg-confirm-actions">
-              <button type="button" id="bggUseMatch">Use this game</button>
-            </div>
-            <ul class="bgg-other-matches" id="bggOtherMatches" hidden></ul>
-          </div>
-        </div>
+        <?php include(SHARED_PATH . '/bgg_lookup_panel.php'); ?>
         <?php $preview_url = normalize_item_image_url($artifact['image_url'] ?? ''); ?>
         <input type="hidden" name="image_url" id="image_url" value="<?php echo h($preview_url); ?>">
         <input type="hidden" name="bgg_url" id="bgg_url" value="<?php echo h(normalize_item_bgg_url($artifact['bgg_url'] ?? '')); ?>">
@@ -273,7 +255,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 
 </main>
 
-<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=6"></script>
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=7"></script>
 <script src="<?php echo url_for('/shared/js/form-save-shortcut.js'); ?>?v=1"></script>
 <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=1"></script>
 <script type="application/json" id="create-item-lookup-config"><?php

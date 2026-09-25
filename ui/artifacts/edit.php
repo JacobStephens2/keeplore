@@ -43,7 +43,7 @@
       $artifact['age'] = 0;
     }
     $artifact['Yr'] = trim((string) ($_POST['Yr'] ?? ''));
-    $artifact['bgg_url'] = normalize_item_bgg_url($_POST['bgg_url'] ?? '');
+    $artifact['bgg_url'] = $_POST['bgg_url'] ?? '';
 
     if ($artifact['Acq'] == '') {
       $artifact['Acq'] = date('Y-m-d');
@@ -99,12 +99,7 @@
     </p>
     <?php } ?>
 
-    <?php
-      $bgg_link = normalize_item_bgg_url($artifact['bgg_url'] ?? '');
-      if ($bgg_link !== '') {
-    ?>
-    <p><a class="item-bgg-link" href="<?php echo h($bgg_link); ?>" target="_blank" rel="noopener noreferrer">View on BoardGameGeek</a></p>
-    <?php } ?>
+    <?php echo item_bgg_link_html($artifact['bgg_url'] ?? ''); ?>
 
     <?php echo display_errors($errors); ?>
 
@@ -261,6 +256,7 @@
       </div>
 
       <div class="form-field form-field-span">
+        <?php $bgg_keep_title = true; include(SHARED_PATH . '/bgg_lookup_panel.php'); ?>
         <label for="bgg_url">BoardGameGeek Link</label>
         <input type="url" name="bgg_url" id="bgg_url" maxlength="1024"
           placeholder="https://boardgamegeek.com/boardgame/..."
@@ -349,5 +345,6 @@
   editFormDisplayButton.addEventListener('click', toggleEditFormDisplay);
 </script>
 <script src="<?php echo url_for('/shared/js/form-save-shortcut.js'); ?>?v=1"></script>
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=7"></script>
 
 <?php include(SHARED_PATH . '/footer.php'); ?>
