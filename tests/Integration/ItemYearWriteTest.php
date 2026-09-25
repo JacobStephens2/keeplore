@@ -142,7 +142,16 @@ final class ItemYearWriteTest extends TestCase
         $id = (int) $this->db->insert_id;
         $this->assertSame('https://boardgamegeek.com/boardgame/621/25-words-or-less', find_artifact_by_id($id)['bgg_url']);
 
-        $this->assertTrue(update_artifact($this->editPayload(['id' => $id, 'bgg_url' => 'javascript:alert(1)'])));
+        $this->assertSame(
+            ['BoardGameGeek Link must be a boardgamegeek.com, rpggeek.com, or videogamegeek.com page.'],
+            update_artifact($this->editPayload(['id' => $id, 'bgg_url' => 'javascript:alert(1)']))
+        );
+        $this->assertSame('https://boardgamegeek.com/boardgame/621/25-words-or-less', find_artifact_by_id($id)['bgg_url']);
+
+        $this->assertTrue(update_artifact($this->editPayload(['id' => $id, 'bgg_url' => 'http://boardgamegeek.com/boardgame/621'])));
+        $this->assertSame('https://boardgamegeek.com/boardgame/621', find_artifact_by_id($id)['bgg_url']);
+
+        $this->assertTrue(update_artifact($this->editPayload(['id' => $id, 'bgg_url' => ''])));
         $this->assertNull(find_artifact_by_id($id)['bgg_url']);
     }
 }
