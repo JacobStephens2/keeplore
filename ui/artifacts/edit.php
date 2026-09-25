@@ -43,6 +43,7 @@
       $artifact['age'] = 0;
     }
     $artifact['Yr'] = trim((string) ($_POST['Yr'] ?? ''));
+    $artifact['bgg_url'] = normalize_item_bgg_url($_POST['bgg_url'] ?? '');
 
     if ($artifact['Acq'] == '') {
       $artifact['Acq'] = date('Y-m-d');
@@ -96,6 +97,13 @@
     <p class="item-picture-wrap">
       <img class="item-picture" src="<?php echo h($picture); ?>" alt="<?php echo h($artifact['Title']); ?>" referrerpolicy="no-referrer">
     </p>
+    <?php } ?>
+
+    <?php
+      $bgg_link = normalize_item_bgg_url($artifact['bgg_url'] ?? '');
+      if ($bgg_link !== '') {
+    ?>
+    <p><a class="item-bgg-link" href="<?php echo h($bgg_link); ?>" target="_blank" rel="noopener noreferrer">View on BoardGameGeek</a></p>
     <?php } ?>
 
     <?php echo display_errors($errors); ?>
@@ -249,6 +257,14 @@
         <label for="Yr">Year</label>
         <input type="number" name="Yr" id="Yr" min="1" max="9999" step="1"
           value="<?php echo h($artifact['Yr'] ?? ''); ?>"
+        >
+      </div>
+
+      <div class="form-field form-field-span">
+        <label for="bgg_url">BoardGameGeek Link</label>
+        <input type="url" name="bgg_url" id="bgg_url" maxlength="1024"
+          placeholder="https://boardgamegeek.com/boardgame/..."
+          value="<?php echo h(normalize_item_bgg_url($artifact['bgg_url'] ?? '')); ?>"
         >
       </div>
 

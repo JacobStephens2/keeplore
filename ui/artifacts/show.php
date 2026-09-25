@@ -25,6 +25,13 @@
     <img class="item-picture" src="<?php echo h($picture); ?>" alt="<?php echo h($object['Title']); ?>" referrerpolicy="no-referrer">
   </p>
   <?php } ?>
+
+  <?php
+    $bgg_link = normalize_item_bgg_url($object['bgg_url'] ?? '');
+    if ($bgg_link !== '') {
+  ?>
+  <p><a class="item-bgg-link" href="<?php echo h($bgg_link); ?>" target="_blank" rel="noopener noreferrer">View on BoardGameGeek</a></p>
+  <?php } ?>
   
   <dl>
     <dt>Acquisition Date</dt>
