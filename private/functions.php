@@ -94,19 +94,34 @@ function item_bgg_link_html($value) {
 
 // What an item's BGG numbers rest on. Player counts and Sweet Spot share
 // BGG's player-count poll; BGG does not publish the age poll's vote count.
-// Only the parts that are known are described.
+// Each phrase is null when that part of the basis is unknown.
+function item_bgg_player_basis_phrase($player_votes) {
+  if ($player_votes === null || $player_votes === '') {
+    return null;
+  }
+  $votes = (int) $player_votes;
+  return $votes > 0
+    ? $votes . ' BGG community ' . ($votes === 1 ? 'vote' : 'votes')
+    : 'the BGG publisher listing (no community recommendation)';
+}
+
+function item_bgg_age_basis_phrase($age_basis) {
+  if ($age_basis === 'community') {
+    return 'the BGG community age poll';
+  }
+  return $age_basis === 'publisher' ? 'the BGG publisher listing' : null;
+}
+
+// One sentence for the item page.
 function item_bgg_basis_text($player_votes, $age_basis) {
   $parts = [];
-  if ($player_votes !== null && $player_votes !== '') {
-    $votes = (int) $player_votes;
-    $parts[] = $votes > 0
-      ? 'player counts and Sweet Spot from ' . $votes . ' BGG community ' . ($votes === 1 ? 'vote' : 'votes')
-      : 'player counts from the BGG publisher listing (no community recommendation)';
+  $players = item_bgg_player_basis_phrase($player_votes);
+  if ($players !== null) {
+    $parts[] = ((int) $player_votes > 0 ? 'player counts and Sweet Spot from ' : 'player counts from ') . $players;
   }
-  if ($age_basis === 'community') {
-    $parts[] = 'minimum age from the BGG community age poll';
-  } elseif ($age_basis === 'publisher') {
-    $parts[] = 'minimum age from the BGG publisher listing';
+  $age = item_bgg_age_basis_phrase($age_basis);
+  if ($age !== null) {
+    $parts[] = 'minimum age from ' . $age;
   }
   return $parts === [] ? '' : ucfirst(implode('; ', $parts)) . '.';
 }
@@ -114,6 +129,44 @@ function item_bgg_basis_text($player_votes, $age_basis) {
 function item_bgg_basis_html($item) {
   $text = item_bgg_basis_text($item['bgg_player_votes'] ?? null, $item['bgg_age_basis'] ?? null);
   return $text === '' ? '' : '<p class="item-bgg-basis">' . h($text) . '</p>';
+}
+
+// Per-field hints for Edit Item, keyed by field group. Sweet Spot has no
+// basis when the player counts fell back to the publisher.
+const ITEM_BGG_FIELD_GROUPS = ['players', 'sweet_spot', 'age'];
+
+function item_bgg_field_basis_text($item, $group) {
+  if ($group === 'age') {
+    $age = item_bgg_age_basis_phrase($item['bgg_age_basis'] ?? null);
+    if ($age === null) {
+      return '';
+    }
+    return 'From ' . $age . (($item['bgg_age_basis'] ?? null) === 'community' ? ' (BGG does not publish its vote count)' : '');
+  }
+  if (!in_array($group, ITEM_BGG_FIELD_GROUPS, true)) {
+    return '';
+  }
+  $players = item_bgg_player_basis_phrase($item['bgg_player_votes'] ?? null);
+  if ($players === null || ($group === 'sweet_spot' && (int) $item['bgg_player_votes'] <= 0)) {
+    return '';
+  }
+  return 'From ' . $players;
+}
+
+function item_bgg_field_bases($item) {
+  $bases = [];
+  foreach (ITEM_BGG_FIELD_GROUPS as $group) {
+    $bases[$group] = item_bgg_field_basis_text($item, $group);
+  }
+  return $bases;
+}
+
+// Always rendered, hidden when empty, so the input's aria-describedby
+// resolves and Request BGG Data can fill it in place.
+function item_bgg_field_basis_html($item, $group, $input_id) {
+  $text = item_bgg_field_basis_text($item, $group);
+  return '<p id="' . h($input_id) . '-bgg-basis" class="form-field-hint" data-bgg-basis="' . h($group) . '"'
+    . ($text === '' ? ' hidden' : '') . '>' . h($text) . '</p>';
 }
 
 function error_404() {

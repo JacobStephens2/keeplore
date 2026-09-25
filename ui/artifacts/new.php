@@ -261,7 +261,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 
 </main>
 
-<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=8"></script>
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=9"></script>
 <script src="<?php echo url_for('/shared/js/form-save-shortcut.js'); ?>?v=1"></script>
 <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=1"></script>
 <script type="application/json" id="create-item-lookup-config"><?php

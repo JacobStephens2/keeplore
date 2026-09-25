@@ -27,18 +27,24 @@
   // basis the page would otherwise credit to the community.
   const playerVotesInput = document.querySelector("#bgg_player_votes");
   const ageBasisInput = document.querySelector("#bgg_age_basis");
-  function forgetBasis(input, fieldIds) {
+  function forgetBasis(input, hintSelector, fieldIds) {
     fieldIds.forEach(function (id) {
       const field = document.getElementById(id);
       if (field && input) {
         field.addEventListener("input", function () {
           input.value = "";
+          hideHints(hintSelector);
         });
       }
     });
   }
-  forgetBasis(playerVotesInput, ["MnP", "MxP", "SS", "bgg_url"]);
-  forgetBasis(ageBasisInput, ["age", "bgg_url"]);
+  function hideHints(selector) {
+    document.querySelectorAll(selector).forEach(function (hint) {
+      hint.hidden = true;
+    });
+  }
+  forgetBasis(playerVotesInput, '[data-bgg-basis="players"], [data-bgg-basis="sweet_spot"]', ["MnP", "MxP", "SS", "bgg_url"]);
+  forgetBasis(ageBasisInput, '[data-bgg-basis="age"]', ["age", "bgg_url"]);
   let roster = [];
 
   requestBtn.addEventListener("click", function (event) {
@@ -58,6 +64,7 @@
       return;
     }
     fillForm(pending.fields);
+    showBases(pending.basis);
     showStatus(keepTitle
       ? "Filled from " + pending.match.name + " and linked it. Save to keep the changes."
       : "Filled from " + pending.match.name + ".");
@@ -156,6 +163,15 @@
       othersEl.appendChild(item);
     });
     othersEl.hidden = false;
+  }
+
+  // Replace each field hint with what the chosen match rests on.
+  function showBases(bases) {
+    document.querySelectorAll("[data-bgg-basis]").forEach(function (hint) {
+      const text = (bases && bases[hint.getAttribute("data-bgg-basis")]) || "";
+      hint.textContent = text;
+      hint.hidden = text === "";
+    });
   }
 
   function fillForm(fields) {

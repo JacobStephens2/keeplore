@@ -116,18 +116,42 @@ class ItemBggLinkTest extends TestCase
         $this->assertStringContainsString('fields.bgg_age_basis', $js);
     }
 
-    public function test_item_pages_show_the_bgg_vote_basis(): void
+    public function test_show_page_states_the_bgg_vote_basis(): void
     {
-        foreach (['/ui/artifacts/edit.php' => '$artifact', '/ui/artifacts/show.php' => '$object'] as $path => $var) {
-            $this->assertStringContainsString("item_bgg_basis_html({$var})", $this->source($path), $path);
+        $this->assertStringContainsString('item_bgg_basis_html($object)', $this->source('/ui/artifacts/show.php'));
+    }
+
+    public function test_edit_page_puts_the_vote_basis_under_each_bgg_field(): void
+    {
+        $edit = $this->source('/ui/artifacts/edit.php');
+        $this->assertStringNotContainsString('item_bgg_basis_html(', $edit);
+        foreach (['SS' => 'sweet_spot', 'age' => 'age', 'MnP' => 'players', 'MxP' => 'players'] as $id => $group) {
+            $this->assertMatchesRegularExpression(
+                '/id="' . $id . '"[^\n]*aria-describedby="' . $id . '-bgg-basis"[^\n]*\n\s*<\?php echo item_bgg_field_basis_html\(\$artifact, \'' . $group . '\', \'' . $id . '\'\); \?>/',
+                $edit,
+                "{$id} should be described by its {$group} basis"
+            );
         }
+    }
+
+    public function test_bgg_lookup_returns_the_field_bases(): void
+    {
+        $this->assertStringContainsString("item_bgg_field_bases(\$result['fields'])", $this->source('/ui/artifacts/bgg-data.php'));
+        $this->assertStringContainsString('showBases(pending.basis)', $this->source('/ui/artifacts/new-bgg.js'));
+    }
+
+    public function test_hand_edits_hide_the_inline_basis(): void
+    {
+        $js = $this->source('/ui/artifacts/new-bgg.js');
+        $this->assertStringContainsString('[data-bgg-basis="players"]', $js);
+        $this->assertStringContainsString('[data-bgg-basis="age"]', $js);
     }
 
     public function test_hand_edits_drop_the_bgg_vote_basis(): void
     {
         $js = $this->source('/ui/artifacts/new-bgg.js');
-        $this->assertStringContainsString('forgetBasis(playerVotesInput, ["MnP", "MxP", "SS", "bgg_url"])', $js);
-        $this->assertStringContainsString('forgetBasis(ageBasisInput, ["age", "bgg_url"])', $js);
+        $this->assertStringContainsString('["MnP", "MxP", "SS", "bgg_url"]', $js);
+        $this->assertStringContainsString('["age", "bgg_url"]', $js);
     }
 
     public function test_bgg_storage_drops_the_vote_basis_without_a_link(): void

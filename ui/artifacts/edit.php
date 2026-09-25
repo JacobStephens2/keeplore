@@ -102,7 +102,6 @@
     <?php } ?>
 
     <?php echo item_bgg_link_html($artifact['bgg_url'] ?? ''); ?>
-    <?php echo item_bgg_basis_html($artifact); ?>
 
     <?php echo display_errors($errors); ?>
 
@@ -185,12 +184,14 @@
 
       <div class="form-field">
         <label for="SS">Sweet Spot(s)</label>
-        <input type="text" name="SS" id="SS" value="<?php echo $artifact['SS']; ?>">
+        <input type="text" name="SS" id="SS" aria-describedby="SS-bgg-basis" value="<?php echo $artifact['SS']; ?>">
+        <?php echo item_bgg_field_basis_html($artifact, 'sweet_spot', 'SS'); ?>
       </div>
 
       <div class="form-field">
         <label for="age">Minimum Age</label>
-        <input type="number" name="age" id="age" value="<?php echo $artifact['Age']; ?>">
+        <input type="number" name="age" id="age" aria-describedby="age-bgg-basis" value="<?php echo $artifact['Age']; ?>">
+        <?php echo item_bgg_field_basis_html($artifact, 'age', 'age'); ?>
       </div>
 
       <?php
@@ -233,12 +234,14 @@
 
       <div class="form-field">
         <label for="MnP">Minimum User Count</label>
-        <input type="number" name="MnP" id="MnP" value="<?php echo $artifact['MnP']; ?>">
+        <input type="number" name="MnP" id="MnP" aria-describedby="MnP-bgg-basis" value="<?php echo $artifact['MnP']; ?>">
+        <?php echo item_bgg_field_basis_html($artifact, 'players', 'MnP'); ?>
       </div>
 
       <div class="form-field">
         <label for="MxP">Maximum User Count</label>
-        <input type="number" name="MxP" id="MxP" value="<?php echo $artifact['MxP']; ?>">
+        <input type="number" name="MxP" id="MxP" aria-describedby="MxP-bgg-basis" value="<?php echo $artifact['MxP']; ?>">
+        <?php echo item_bgg_field_basis_html($artifact, 'players', 'MxP'); ?>
       </div>
 
       <div class="form-field">
@@ -350,6 +353,6 @@
   editFormDisplayButton.addEventListener('click', toggleEditFormDisplay);
 </script>
 <script src="<?php echo url_for('/shared/js/form-save-shortcut.js'); ?>?v=1"></script>
-<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=8"></script>
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=9"></script>
 
 <?php include(SHARED_PATH . '/footer.php'); ?>
