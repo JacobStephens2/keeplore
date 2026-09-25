@@ -48,13 +48,35 @@ function normalize_item_image_url($value) {
   return $url;
 }
 
+// BGG-family item pages. A typed "boardgamegeek.com/..." or http:// link
+// is upgraded to https; anything else normalizes to ''.
 function normalize_item_bgg_url($value) {
   $url = trim((string) $value);
+  $url = preg_replace('#^(https?://)?#i', 'https://', $url, 1);
   if (strlen($url) > 1024
     || !preg_match('#^https://(www\.)?(boardgamegeek|rpggeek|videogamegeek)\.com(/[^\s]*)?$#i', $url)) {
     return '';
   }
   return $url;
+}
+
+function item_bgg_url_for_storage($value) {
+  $url = normalize_item_bgg_url($value);
+  return $url === '' ? null : $url;
+}
+
+function item_bgg_link_html($value) {
+  $url = normalize_item_bgg_url($value);
+  if ($url === '') {
+    return '';
+  }
+  $site = 'BoardGameGeek';
+  if (preg_match('#^https://(www\.)?rpggeek\.com#i', $url)) {
+    $site = 'RPGGeek';
+  } elseif (preg_match('#^https://(www\.)?videogamegeek\.com#i', $url)) {
+    $site = 'VideoGameGeek';
+  }
+  return '<p><a class="item-bgg-link" href="' . h($url) . '" target="_blank" rel="noopener noreferrer">View on ' . $site . '</a></p>';
 }
 
 function error_404() {

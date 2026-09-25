@@ -337,8 +337,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
     $digital = normalize_format_flag($artifact['is_digital'] ?? null);
     $physical = normalize_format_flag($artifact['is_physical'] ?? null);
     $year = normalize_artifact_year($artifact['Yr'] ?? null);
-    $bgg_url = normalize_item_bgg_url($artifact['bgg_url'] ?? '');
-    $bgg_url = $bgg_url === '' ? null : $bgg_url;
+    $bgg_url = item_bgg_url_for_storage($artifact['bgg_url'] ?? '');
 
     $stmt = mysqli_prepare($db,
       "UPDATE games SET
@@ -442,6 +441,11 @@ require_once dirname(__DIR__) . '/item_tags.php';
       }
     }
 
+    $bgg_url = trim((string) ($artifact['bgg_url'] ?? ''));
+    if($bgg_url !== '' && normalize_item_bgg_url($bgg_url) === '') {
+      $errors[] = "BoardGameGeek Link must be a boardgamegeek.com, rpggeek.com, or videogamegeek.com page.";
+    }
+
     // Interaction frequency must be positive
     if(isset($artifact['interaction_frequency_days']) && $artifact['interaction_frequency_days'] !== '') {
       if(!is_numeric($artifact['interaction_frequency_days']) || (float)$artifact['interaction_frequency_days'] <= 0) {
@@ -477,8 +481,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
     $year = normalize_artifact_year($artifact['Yr'] ?? null);
 
     $image_url = $artifact['image_url'] ?? '';
-    $bgg_url = normalize_item_bgg_url($artifact['bgg_url'] ?? '');
-    $bgg_url = $bgg_url === '' ? null : $bgg_url;
+    $bgg_url = item_bgg_url_for_storage($artifact['bgg_url'] ?? '');
     $sql = "INSERT INTO games (
         Title,
         Notes,

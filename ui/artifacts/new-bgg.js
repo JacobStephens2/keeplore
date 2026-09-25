@@ -19,6 +19,8 @@
     return;
   }
 
+  // Edit Item links an existing item, so the owner's name stays put.
+  const keepTitle = requestBtn.hasAttribute("data-keep-title");
   let pending = null;
   let roster = [];
 
@@ -39,7 +41,9 @@
       return;
     }
     fillForm(pending.fields);
-    showStatus("Filled from " + pending.match.name + ".");
+    showStatus(keepTitle
+      ? "Filled from " + pending.match.name + " and linked it. Save to keep the changes."
+      : "Filled from " + pending.match.name + ".");
     hideConfirm();
   });
 
@@ -138,7 +142,9 @@
   }
 
   function fillForm(fields) {
-    setField("Title", fields.Title);
+    if (!keepTitle) {
+      setField("Title", fields.Title);
+    }
     setField("SS", fields.SS);
     setField("MnP", fields.MnP);
     setField("MxP", fields.MxP);
@@ -147,8 +153,8 @@
     setField("age", fields.Age);
     setField("Yr", fields.Yr);
     setPicture(fields.image_url);
-    if (linkInput) {
-      linkInput.value = fields.bgg_url || "";
+    if (linkInput && fields.bgg_url) {
+      linkInput.value = fields.bgg_url;
     }
   }
 

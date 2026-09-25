@@ -26,12 +26,7 @@
   </p>
   <?php } ?>
 
-  <?php
-    $bgg_link = normalize_item_bgg_url($object['bgg_url'] ?? '');
-    if ($bgg_link !== '') {
-  ?>
-  <p><a class="item-bgg-link" href="<?php echo h($bgg_link); ?>" target="_blank" rel="noopener noreferrer">View on BoardGameGeek</a></p>
-  <?php } ?>
+  <?php echo item_bgg_link_html($object['bgg_url'] ?? ''); ?>
   
   <dl>
     <dt>Acquisition Date</dt>

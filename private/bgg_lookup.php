@@ -33,8 +33,9 @@ function bgg_preferred_candidate($candidates, $query) {
   if (!is_array($candidates) || $candidates === []) {
     return null;
   }
-  $needle = strtolower(trim((string) $query));
-  $comparable_needle = bgg_comparable_name($query);
+  $names = bgg_search_names($query);
+  $needles = array_map('strtolower', $names);
+  $comparable_needles = array_map('bgg_comparable_name', $names);
   $exact = [];
   $comparable = [];
   foreach ($candidates as $candidate) {
@@ -42,9 +43,9 @@ function bgg_preferred_candidate($candidates, $query) {
       continue;
     }
     $name = (string) $candidate['name'];
-    if (strtolower($name) === $needle) {
+    if (in_array(strtolower($name), $needles, true)) {
       $exact[] = $candidate;
-    } elseif (bgg_comparable_name($name) === $comparable_needle) {
+    } elseif (in_array(bgg_comparable_name($name), $comparable_needles, true)) {
       $comparable[] = $candidate;
     }
   }
@@ -302,20 +303,37 @@ function bgg_search_query_variants($query) {
   if ($query === '') {
     return [];
   }
-  $variants = [$query];
-  if (str_contains($query, ':')) {
-    return $variants;
-  }
-  $words = preg_split('/\s+/', $query, -1, PREG_SPLIT_NO_EMPTY);
-  $count = count($words);
-  if ($count < 2) {
-    return $variants;
-  }
-  for ($i = 1; $i < $count; $i++) {
-    $with_colon = implode(' ', array_slice($words, 0, $i)) . ': ' . implode(' ', array_slice($words, $i));
-    if ($with_colon !== $query) {
-      $variants[] = $with_colon;
+  $names = bgg_search_names($query);
+  $variants = $names;
+  foreach ($names as $name) {
+    foreach (bgg_colon_variants($name) as $variant) {
+      $variants[] = $variant;
     }
+  }
+  return array_values(array_unique($variants));
+}
+
+// Keeplore titles often carry a trailing note BGG does not, like
+// "Chess (game)" or "Magic Labyrinth (The)". The typed name stays first.
+function bgg_search_names($query) {
+  $query = trim((string) $query);
+  $names = [$query];
+  if (preg_match('/^(.*\S)\s*\((the|a|an)\)$/i', $query, $match)) {
+    $names[] = ucfirst(strtolower($match[2])) . ' ' . $match[1];
+  } elseif (preg_match('/^(.*\S)\s*\([^()]*\)$/', $query, $match)) {
+    $names[] = $match[1];
+  }
+  return $names;
+}
+
+function bgg_colon_variants($name) {
+  if (str_contains($name, ':')) {
+    return [];
+  }
+  $words = preg_split('/\s+/', $name, -1, PREG_SPLIT_NO_EMPTY);
+  $variants = [];
+  for ($i = 1; $i < count($words); $i++) {
+    $variants[] = implode(' ', array_slice($words, 0, $i)) . ': ' . implode(' ', array_slice($words, $i));
   }
   return $variants;
 }
@@ -332,7 +350,7 @@ function bgg_search($query, $get_json = null) {
 
   $candidates = [];
   $fallback = [];
-  $comparable_query = bgg_comparable_name($query);
+  $comparable_names = array_map('bgg_comparable_name', bgg_search_names($query));
   foreach (bgg_search_query_variants($query) as $index => $variant) {
     $url = bgg_api_root() . '/geekitems?objecttype=thing&search=' . rawurlencode($variant) . '&showcount=20';
     try {
@@ -355,7 +373,7 @@ function bgg_search($query, $get_json = null) {
       $fallback = $found;
     }
     $preferred = bgg_preferred_candidate($found, $query);
-    if ($preferred !== null && bgg_comparable_name($preferred['name']) === $comparable_query) {
+    if ($preferred !== null && in_array(bgg_comparable_name($preferred['name']), $comparable_names, true)) {
       $candidates = $found;
       break;
     }

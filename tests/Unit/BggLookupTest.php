@@ -308,6 +308,15 @@ class BggLookupTest extends TestCase
         );
     }
 
+    public function test_preferred_candidate_ignores_a_disambiguating_parenthetical(): void
+    {
+        $candidates = [
+            ['id' => 1, 'name' => 'Chess Variants', 'source' => 'BGG'],
+            ['id' => 171, 'name' => 'Chess', 'source' => 'BGG'],
+        ];
+        $this->assertSame(171, bgg_preferred_candidate($candidates, 'Chess (game)')['id']);
+    }
+
     public function test_preferred_candidate_falls_back_to_the_first_result(): void
     {
         $candidates = [
@@ -342,6 +351,35 @@ class BggLookupTest extends TestCase
             237728,
             bgg_preferred_candidate($candidates, 'Ravine')['id']
         );
+    }
+
+    public function test_query_variants_drop_a_disambiguating_parenthetical(): void
+    {
+        $this->assertContains('Chess', bgg_search_query_variants('Chess (game)'));
+        $this->assertContains('Lost Cities', bgg_search_query_variants('Lost Cities (simpliciter)'));
+        $this->assertSame('Chess (game)', bgg_search_query_variants('Chess (game)')[0]);
+    }
+
+    public function test_query_variants_move_a_trailing_article_to_the_front(): void
+    {
+        $this->assertContains('The Magic Labyrinth', bgg_search_query_variants('Magic Labyrinth (The)'));
+    }
+
+    public function test_search_finds_a_title_with_a_disambiguating_parenthetical(): void
+    {
+        $queries = [];
+        $result = bgg_search('Chess (game)', function ($url) use (&$queries) {
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $params);
+            $queries[] = $params['search'];
+            if ($params['search'] === 'Chess') {
+                return json_encode(['items' => [['objectid' => 171, 'name' => 'Chess']]]);
+            }
+            return json_encode(['items' => []]);
+        });
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame(171, $result['preferred']['id']);
+        $this->assertContains('Chess', $queries);
     }
 
     public function test_search_rejects_a_blank_name(): void

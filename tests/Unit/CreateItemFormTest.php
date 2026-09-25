@@ -29,9 +29,11 @@ class CreateItemFormTest extends TestCase
     {
         $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/new.php');
         $this->assertNotFalse($source);
+        $panel = file_get_contents(PRIVATE_PATH . '/shared/bgg_lookup_panel.php');
+        $this->assertNotFalse($panel);
         $this->assertMatchesRegularExpression(
             '/<img[^>]*id="bggMatchImage"/',
-            $source,
+            $panel,
             'The BGG confirm panel must include img#bggMatchImage for the found game\'s cover.'
         );
         $this->assertStringContainsString('id="image_url"', $source);
