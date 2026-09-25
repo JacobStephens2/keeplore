@@ -48,6 +48,15 @@ function normalize_item_image_url($value) {
   return $url;
 }
 
+function normalize_item_bgg_url($value) {
+  $url = trim((string) $value);
+  if (strlen($url) > 1024
+    || !preg_match('#^https://(www\.)?(boardgamegeek|rpggeek|videogamegeek)\.com(/[^\s]*)?$#i', $url)) {
+    return '';
+  }
+  return $url;
+}
+
 function error_404() {
   header($_SERVER["SERVER_PROTOCOL"] . " 404 Not Found");
   exit();

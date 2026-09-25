@@ -95,10 +95,80 @@ class BggLookupTest extends TestCase
                     'Age' => '10',
                     'Yr' => '2023',
                     'image_url' => $cover,
+                    'bgg_url' => 'https://boardgamegeek.com/boardgame/373106/sky-team',
                 ],
             ],
             bgg_form_fields_from_json($itemJson, $dynamicJson)
         );
+    }
+
+    public function test_community_age_and_player_range_win_over_the_publisher(): void
+    {
+        $itemJson = json_encode([
+            'item' => [
+                'objectid' => 326964,
+                'name' => 'Mountain Goats: Expansion Pack',
+                'minplayers' => 1,
+                'maxplayers' => 6,
+                'minage' => 14,
+            ],
+        ]);
+        $dynamicJson = json_encode([
+            'item' => [
+                'polls' => [
+                    'userplayers' => [
+                        'best' => [['min' => 3, 'max' => 4]],
+                        'recommended' => [['min' => 2, 'max' => 3], ['min' => 5, 'max' => 5]],
+                        'totalvotes' => '5',
+                    ],
+                    'playerage' => '8+',
+                ],
+            ],
+        ]);
+
+        $fields = bgg_form_fields_from_json($itemJson, $dynamicJson)['fields'];
+        $this->assertSame('8', $fields['Age']);
+        $this->assertSame('2', $fields['MnP']);
+        $this->assertSame('5', $fields['MxP']);
+        $this->assertSame('03,04', $fields['SS']);
+    }
+
+    public function test_publisher_age_and_players_fill_in_when_nobody_voted(): void
+    {
+        $itemJson = json_encode([
+            'item' => [
+                'objectid' => 1,
+                'name' => 'Unvoted',
+                'minplayers' => 1,
+                'maxplayers' => 4,
+                'minage' => 10,
+            ],
+        ]);
+        $dynamicJson = json_encode([
+            'item' => [
+                'polls' => [
+                    'userplayers' => ['best' => [], 'recommended' => [], 'totalvotes' => '0'],
+                    'playerage' => '',
+                ],
+            ],
+        ]);
+
+        $fields = bgg_form_fields_from_json($itemJson, $dynamicJson)['fields'];
+        $this->assertSame('10', $fields['Age']);
+        $this->assertSame('1', $fields['MnP']);
+        $this->assertSame('4', $fields['MxP']);
+    }
+
+    public function test_link_is_omitted_when_not_a_geek_site(): void
+    {
+        $itemJson = json_encode([
+            'item' => [
+                'objectid' => 5,
+                'name' => 'Odd Link',
+                'canonical_link' => 'https://example.com/boardgame/5',
+            ],
+        ]);
+        $this->assertArrayNotHasKey('bgg_url', bgg_form_fields_from_json($itemJson, '{}')['fields']);
     }
 
     public function test_sweet_spot_expands_a_best_with_range(): void

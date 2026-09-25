@@ -12,6 +12,7 @@
   const othersEl = document.querySelector("#bggOtherMatches");
   const titleInput = document.querySelector("#Title");
   const pictureInput = document.querySelector("#image_url");
+  const linkInput = document.querySelector("#bgg_url");
   const picturePreviewEl = document.querySelector("#itemPicturePreview");
 
   if (!requestBtn || !titleInput) {
@@ -146,6 +147,9 @@
     setField("age", fields.Age);
     setField("Yr", fields.Yr);
     setPicture(fields.image_url);
+    if (linkInput) {
+      linkInput.value = fields.bgg_url || "";
+    }
   }
 
   function showCover(img, url, name) {

@@ -44,6 +44,7 @@ if(is_post_request()) {
   }
   $artifact['Yr'] = trim((string) ($_POST['Yr'] ?? ''));
   $artifact['image_url'] = normalize_item_image_url($_POST['image_url'] ?? '');
+  $artifact['bgg_url'] = normalize_item_bgg_url($_POST['bgg_url'] ?? '');
 
   $artifact['tags'] = $_POST['tags'] ?? '';
   $result = insert_artifact($artifact);
@@ -91,6 +92,7 @@ if(is_post_request()) {
   $artifact["age"] = '';
   $artifact["Yr"] = '';
   $artifact['image_url'] = '';
+  $artifact['bgg_url'] = '';
   $artifact['tags'] = '';
 }
 
@@ -165,6 +167,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
         </div>
         <?php $preview_url = normalize_item_image_url($artifact['image_url'] ?? ''); ?>
         <input type="hidden" name="image_url" id="image_url" value="<?php echo h($preview_url); ?>">
+        <input type="hidden" name="bgg_url" id="bgg_url" value="<?php echo h(normalize_item_bgg_url($artifact['bgg_url'] ?? '')); ?>">
         <img id="itemPicturePreview" class="item-picture-preview"
           alt="<?php echo $preview_url !== '' ? h($artifact['Title']) . ' cover' : ''; ?>"
           <?php if ($preview_url !== '') { ?>src="<?php echo h($preview_url); ?>"<?php } else { ?>hidden<?php } ?>
@@ -270,7 +273,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 
 </main>
 
-<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=5"></script>
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=6"></script>
 <script src="<?php echo url_for('/shared/js/form-save-shortcut.js'); ?>?v=1"></script>
 <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=1"></script>
 <script type="application/json" id="create-item-lookup-config"><?php

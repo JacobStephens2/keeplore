@@ -46,6 +46,7 @@ final class ItemYearWriteTest extends TestCase
             SS VARCHAR(255) DEFAULT NULL,
             Notes TEXT,
             image_url VARCHAR(1024) DEFAULT NULL,
+            bgg_url VARCHAR(1024) DEFAULT NULL,
             CandidateGroupDate DATE DEFAULT NULL,
             MnT INT DEFAULT NULL,
             MxT INT DEFAULT NULL,
@@ -130,5 +131,18 @@ final class ItemYearWriteTest extends TestCase
         $row = find_artifact_by_id((int) $this->db->insert_id);
         $this->assertSame('New blank-year item', $row['Title']);
         $this->assertNull($row['Yr']);
+    }
+
+    public function test_create_and_edit_store_the_bgg_link(): void
+    {
+        $payload = $this->editPayload(['bgg_url' => 'https://boardgamegeek.com/boardgame/621/25-words-or-less']);
+        unset($payload['id']);
+        $payload['Title'] = '25 Words or Less';
+        $this->assertTrue(insert_artifact($payload));
+        $id = (int) $this->db->insert_id;
+        $this->assertSame('https://boardgamegeek.com/boardgame/621/25-words-or-less', find_artifact_by_id($id)['bgg_url']);
+
+        $this->assertTrue(update_artifact($this->editPayload(['id' => $id, 'bgg_url' => 'javascript:alert(1)'])));
+        $this->assertNull(find_artifact_by_id($id)['bgg_url']);
     }
 }

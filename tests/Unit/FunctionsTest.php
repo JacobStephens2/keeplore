@@ -87,6 +87,23 @@ class FunctionsTest extends TestCase
         $this->assertSame('', normalize_item_image_url(''));
     }
 
+    public function test_normalize_item_bgg_url_keeps_geek_site_links(): void
+    {
+        $url = 'https://boardgamegeek.com/boardgame/621/25-words-or-less';
+        $this->assertSame($url, normalize_item_bgg_url('  ' . $url . '  '));
+        $this->assertSame('https://www.rpggeek.com/rpgitem/1', normalize_item_bgg_url('https://www.rpggeek.com/rpgitem/1'));
+        $this->assertSame('https://videogamegeek.com/videogame/2', normalize_item_bgg_url('https://videogamegeek.com/videogame/2'));
+    }
+
+    public function test_normalize_item_bgg_url_rejects_other_links(): void
+    {
+        $this->assertSame('', normalize_item_bgg_url('http://boardgamegeek.com/boardgame/621'));
+        $this->assertSame('', normalize_item_bgg_url('https://boardgamegeek.com.evil.test/boardgame/621'));
+        $this->assertSame('', normalize_item_bgg_url('https://example.com/'));
+        $this->assertSame('', normalize_item_bgg_url('javascript:alert(1)'));
+        $this->assertSame('', normalize_item_bgg_url(''));
+    }
+
     // -----------------------------------------------------------------
     // u() - URL encoding
     // -----------------------------------------------------------------
