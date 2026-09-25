@@ -337,7 +337,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
     $digital = normalize_format_flag($artifact['is_digital'] ?? null);
     $physical = normalize_format_flag($artifact['is_physical'] ?? null);
     $year = normalize_artifact_year($artifact['Yr'] ?? null);
-    $bgg_url = item_bgg_url_for_storage($artifact['bgg_url'] ?? '');
+    $bgg = item_bgg_fields_for_storage($artifact);
 
     $stmt = mysqli_prepare($db,
       "UPDATE games SET
@@ -345,11 +345,12 @@ require_once dirname(__DIR__) . '/item_tags.php';
         type_id=?, type=?, SS=?, Notes=?, CandidateGroupDate=?,
         MnT=?, MxT=?, Age=?, Yr=?, is_in_secondary_collection=?, MnP=?, MxP=?,
         interaction_frequency_days=?, to_get_rid_of=?,
-        is_digital=?, is_physical=?, bgg_url=?
+        is_digital=?, is_physical=?, bgg_url=?,
+        bgg_player_votes=?, bgg_age_basis=?
       WHERE id=?
       LIMIT 1"
     );
-    mysqli_stmt_bind_param($stmt, "sisssissssssssisssisssi",
+    mysqli_stmt_bind_param($stmt, "sisssissssssssisssisssisi",
       $artifact['Title'], $kept, $artifact['Acq'],
       $artifact['Candidate'], $artifact['UsedRecUserCt'],
       $type_id, $type_name, $artifact['SS'], $artifact['Notes'],
@@ -359,7 +360,9 @@ require_once dirname(__DIR__) . '/item_tags.php';
       $to_get_rid_of,
       $digital,
       $physical,
-      $bgg_url,
+      $bgg['bgg_url'],
+      $bgg['bgg_player_votes'],
+      $bgg['bgg_age_basis'],
       $artifact['id']
     );
     $result = mysqli_stmt_execute($stmt);
@@ -481,7 +484,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
     $year = normalize_artifact_year($artifact['Yr'] ?? null);
 
     $image_url = $artifact['image_url'] ?? '';
-    $bgg_url = item_bgg_url_for_storage($artifact['bgg_url'] ?? '');
+    $bgg = item_bgg_fields_for_storage($artifact);
     $sql = "INSERT INTO games (
         Title,
         Notes,
@@ -505,11 +508,13 @@ require_once dirname(__DIR__) . '/item_tags.php';
         is_digital,
         is_physical,
         image_url,
-        bgg_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        bgg_url,
+        bgg_player_votes,
+        bgg_age_basis
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ";
     $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'sssssssssssssssssssssss',
+    mysqli_stmt_bind_param($stmt, 'sssssssssssssssssssssssis',
       $artifact['Title'],
       $artifact['Notes'],
       $artifact['Acq'],
@@ -532,7 +537,9 @@ require_once dirname(__DIR__) . '/item_tags.php';
       $digital,
       $physical,
       $image_url,
-      $bgg_url
+      $bgg['bgg_url'],
+      $bgg['bgg_player_votes'],
+      $bgg['bgg_age_basis']
     );
     $result = mysqli_stmt_execute($stmt);
     mysqli_stmt_close($stmt);

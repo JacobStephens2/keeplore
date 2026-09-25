@@ -49,6 +49,8 @@ The primary artifacts table. Despite its name, it stores all artifact types (boa
 | `Notes` | TEXT | YES | Free-form notes |
 | `image_url` | VARCHAR(1024) | YES | Cover picture URL from Request BGG Data (`https` only). Apply [`add-item-image-url.sql`](../database/migrations/add-item-image-url.sql) |
 | `bgg_url` | VARCHAR(1024) | YES | BoardGameGeek (or RPGGeek / VideoGameGeek) page for the item, `https` only. Set by Request BGG Data on Create Item and editable on Edit Item. Apply [`add-item-bgg-url.sql`](../database/migrations/add-item-bgg-url.sql) |
+| `bgg_player_votes` | INT | YES | Total votes in BGG's player-count poll when Request BGG Data filled the item. Min/Max User Count and Sweet Spot rest on it; `0` means the publisher's counts were used. Apply [`add-item-bgg-vote-basis.sql`](../database/migrations/add-item-bgg-vote-basis.sql) |
+| `bgg_age_basis` | VARCHAR(16) | YES | `community` when Minimum Age came from BGG's community age poll, `publisher` when from the box. BGG does not publish the age poll's vote count. Same migration |
 | `interaction_frequency_days` | DECIMAL/FLOAT | YES | Per-artifact override for the interaction frequency interval (in days) |
 | `to_get_rid_of` | TINYINT(1) | NO | Whether the user has marked this artifact to get rid of (1 = yes, 0 = no, default 0). Excludes from interact-by list |
 

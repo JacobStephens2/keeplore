@@ -708,6 +708,12 @@ button.untrack-btn:hover {
   margin: 0 0 1rem;
 }
 
+.item-bgg-basis {
+  margin: 0 0 1rem;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
 .bgg-confirm p {
   margin: 0 0 0.45rem;
 }

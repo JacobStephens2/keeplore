@@ -62,6 +62,7 @@ final class ItemImageWriteTest extends TestCase
         $this->db->query("INSERT INTO types VALUES (44, 'other')");
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-image-url.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-url.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-vote-basis.sql'));
 
         require_once PRIVATE_PATH . '/kept_status.php';
         require_once PRIVATE_PATH . '/cache.php';

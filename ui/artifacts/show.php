@@ -27,6 +27,7 @@
   <?php } ?>
 
   <?php echo item_bgg_link_html($object['bgg_url'] ?? ''); ?>
+  <?php echo item_bgg_basis_html($object); ?>
   
   <dl>
     <dt>Acquisition Date</dt>

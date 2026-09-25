@@ -47,6 +47,8 @@ final class ItemYearWriteTest extends TestCase
             Notes TEXT,
             image_url VARCHAR(1024) DEFAULT NULL,
             bgg_url VARCHAR(1024) DEFAULT NULL,
+            bgg_player_votes INT DEFAULT NULL,
+            bgg_age_basis VARCHAR(16) DEFAULT NULL,
             CandidateGroupDate DATE DEFAULT NULL,
             MnT INT DEFAULT NULL,
             MxT INT DEFAULT NULL,
@@ -153,5 +155,22 @@ final class ItemYearWriteTest extends TestCase
 
         $this->assertTrue(update_artifact($this->editPayload(['id' => $id, 'bgg_url' => ''])));
         $this->assertNull(find_artifact_by_id($id)['bgg_url']);
+    }
+
+    public function test_create_and_edit_store_the_bgg_vote_basis(): void
+    {
+        $payload = $this->editPayload(['bgg_player_votes' => '19', 'bgg_age_basis' => 'community']);
+        unset($payload['id']);
+        $payload['Title'] = '25 Words or Less';
+        $this->assertTrue(insert_artifact($payload));
+        $id = (int) $this->db->insert_id;
+        $row = find_artifact_by_id($id);
+        $this->assertSame(19, (int) $row['bgg_player_votes']);
+        $this->assertSame('community', $row['bgg_age_basis']);
+
+        $this->assertTrue(update_artifact($this->editPayload(['id' => $id, 'bgg_player_votes' => 'many', 'bgg_age_basis' => 'guess'])));
+        $row = find_artifact_by_id($id);
+        $this->assertNull($row['bgg_player_votes']);
+        $this->assertNull($row['bgg_age_basis']);
     }
 }

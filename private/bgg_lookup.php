@@ -90,7 +90,8 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
   $fields['MxP'] = $players !== null ? (string) $players[1] : bgg_scalar_string($item['maxplayers'] ?? '');
   $fields['MnT'] = bgg_scalar_string($item['minplaytime'] ?? '');
   $fields['MxT'] = bgg_scalar_string($item['maxplaytime'] ?? '');
-  $fields['Age'] = bgg_community_age_from_polls($dynamic) ?? bgg_scalar_string($item['minage'] ?? '');
+  $community_age = bgg_community_age_from_polls($dynamic);
+  $fields['Age'] = $community_age ?? bgg_scalar_string($item['minage'] ?? '');
   if ($year !== '') {
     $fields['Yr'] = $year;
   }
@@ -101,6 +102,11 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
   if ($link !== '') {
     $fields['bgg_url'] = $link;
   }
+  // Player counts rest on the poll only when it produced a recommended range.
+  $fields['bgg_player_votes'] = $players !== null
+    ? (string) max(0, (int) ($dynamic['polls']['userplayers']['totalvotes'] ?? 0))
+    : '0';
+  $fields['bgg_age_basis'] = $community_age !== null ? 'community' : 'publisher';
 
   $match = [
     'id' => $id,

@@ -22,6 +22,23 @@
   // Edit Item links an existing item, so the owner's name stays put.
   const keepTitle = requestBtn.hasAttribute("data-keep-title");
   let pending = null;
+
+  // A hand edit means BGG's votes no longer back that number, so drop the
+  // basis the page would otherwise credit to the community.
+  const playerVotesInput = document.querySelector("#bgg_player_votes");
+  const ageBasisInput = document.querySelector("#bgg_age_basis");
+  function forgetBasis(input, fieldIds) {
+    fieldIds.forEach(function (id) {
+      const field = document.getElementById(id);
+      if (field && input) {
+        field.addEventListener("input", function () {
+          input.value = "";
+        });
+      }
+    });
+  }
+  forgetBasis(playerVotesInput, ["MnP", "MxP", "SS", "bgg_url"]);
+  forgetBasis(ageBasisInput, ["age", "bgg_url"]);
   let roster = [];
 
   requestBtn.addEventListener("click", function (event) {
@@ -156,6 +173,8 @@
     if (linkInput && fields.bgg_url) {
       linkInput.value = fields.bgg_url;
     }
+    setField("bgg_player_votes", fields.bgg_player_votes);
+    setField("bgg_age_basis", fields.bgg_age_basis);
   }
 
   function showCover(img, url, name) {
