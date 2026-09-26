@@ -1568,6 +1568,34 @@ p.copied_message {
   white-space: nowrap;
 }
 
+/* Items page BGG rating column: the score opens the reviewer's comment. */
+#artifacts td.bgg-rating {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+#artifacts .bgg-rating-btn {
+  min-height: 0;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.bgg-rating-dialog {
+  /* .modal-panel sets position: relative, which would pull a modal dialog out of the top layer's centering. */
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  border: none;
+}
+.bgg-rating-dialog::backdrop {
+  background: rgba(15, 22, 38, 0.55);
+}
+.bgg-rating-comment {
+  white-space: pre-line;
+  line-height: 1.55;
+  margin: 0 0 1rem;
+}
+
 .modal[hidden] { display: none; }
 
 .modal {

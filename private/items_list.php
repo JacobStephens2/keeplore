@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/kept_status.php';
+require_once __DIR__ . '/bgg_ratings.php';
 
 function items_list_load_filter_defaults($user_id) {
     $default_interval = singleValueQuery(
@@ -172,6 +173,8 @@ function items_list_present_row(array $artifact, $interval, $today = null) {
         ),
         'avg_time' => (int) ceil(($mnt + $mxt) / 2),
         'candidate' => ($candidate_raw != '' && $candidate_raw != 0),
+        // Keyed by BGG username; an object even when empty so the JSON is {}.
+        'bgg_ratings' => empty($artifact['bgg_ratings']) ? new stdClass() : $artifact['bgg_ratings'],
     ];
 }
 
@@ -189,6 +192,7 @@ function items_list_payload($db, array $filters, $user_id, $today = null) {
     mysqli_free_result($artifact_set);
     $artifacts = items_list_best_at($artifacts, $filters['players']);
     $artifacts = with_item_tags($db, $artifacts, (int) $user_id);
+    $artifacts = with_item_bgg_ratings($db, $artifacts, (int) $user_id);
     $items = [];
     foreach ($artifacts as $artifact) {
         $items[] = items_list_present_row($artifact, $filters['interval'], $today);
