@@ -22,7 +22,8 @@
 
   $best_at_heading = items_list_best_at_heading($players);
   $show_players_column = $players !== null || $showAttributes === 'yes';
-  $column_count = 7 + ($show_players_column ? 1 : 0) + ($showAttributes === 'yes' ? 2 : 0);
+  $bgg_reviewers = item_bgg_reviewers($db, $_SESSION['user_id']);
+  $column_count = 7 + ($show_players_column ? 1 : 0) + count($bgg_reviewers) + ($showAttributes === 'yes' ? 2 : 0);
 
   $page_title = $best_at_heading ?? 'Items';
   if ($kept === 'secondary_only') { $page_title .= ' (Secondary Only)'; }
@@ -278,6 +279,9 @@
           <?php if ($show_players_column) { ?>
             <th data-sort="players">Players</th>
           <?php } ?>
+          <?php foreach ($bgg_reviewers as $bgg_reviewer) { ?>
+            <th data-sort="<?php echo h('bgg_rating:' . $bgg_reviewer); ?>" title="<?php echo h($bgg_reviewer . "'s BoardGameGeek rating. Select one to read the comment."); ?>"><?php echo h($bgg_reviewer); ?></th>
+          <?php } ?>
           <th data-sort="type">Type</th>
           <th data-sort="tags">Tags</th>
           <th data-sort="acq">Tracking Start</th>
@@ -311,6 +315,16 @@
 
     <div id="items-toast" class="toast" role="status" aria-live="polite"></div>
 
+    <dialog id="bgg-rating-dialog" class="modal-panel bgg-rating-dialog" aria-labelledby="bgg-rating-dialog-title">
+      <form method="dialog">
+        <button type="submit" class="modal-close" aria-label="Close">&times;</button>
+      </form>
+      <h2 id="bgg-rating-dialog-title" class="modal-title"></h2>
+      <p id="bgg-rating-dialog-score" class="modal-subtitle"></p>
+      <p id="bgg-rating-dialog-comment" class="bgg-rating-comment"></p>
+      <a id="bgg-rating-dialog-link" class="modal-link" target="_blank" rel="noopener">On BoardGameGeek</a>
+    </dialog>
+
     <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=1"></script>
     <script src="<?php echo url_for('/artifacts/items-table-sort.js'); ?>?v=1"></script>
     <script type="application/json" id="items-list-config"><?php
@@ -322,12 +336,13 @@
         'isGuest' => is_guest(),
         'showAttributes' => $showAttributes === 'yes',
         'showPlayers' => $show_players_column,
+        'bggReviewers' => $bgg_reviewers,
         'columnCount' => $column_count,
         'emptyMessage' => $players === null ? 'No items yet.' : 'No items are ' . lcfirst($best_at_heading) . '.',
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=6"></script>
+    <script src="/shared/js/items-list.js?v=7"></script>
   </div>
 </main>
 

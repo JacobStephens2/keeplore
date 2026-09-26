@@ -90,10 +90,28 @@
     return match ? Number(match[0]) : Infinity;
   }
 
+  var BGG_RATING_KEY = 'bgg_rating:';
+
+  function bggRating(item, reviewer) {
+    return (item.bgg_ratings || {})[reviewer] || null;
+  }
+
+  // 9.5 reads "9.5" and 8 reads "8"; a comment with no score reads "Comment".
+  function bggRatingLabel(rating) {
+    return rating.rating == null ? 'Comment' : String(Number(rating.rating));
+  }
+
   function compareItems(a, b, key, dir) {
     var av = a[key];
     var bv = b[key];
-    if (key === 'is_kept') {
+    if (key.indexOf(BGG_RATING_KEY) === 0) {
+      // Unrated sorts below every score, so a descending sort leads with the best.
+      var reviewer = key.slice(BGG_RATING_KEY.length);
+      var ar = bggRating(a, reviewer);
+      var br = bggRating(b, reviewer);
+      av = ar && ar.rating != null ? Number(ar.rating) : (ar ? 0 : -1);
+      bv = br && br.rating != null ? Number(br.rating) : (br ? 0 : -1);
+    } else if (key === 'is_kept') {
       av = av ? 1 : 0;
       bv = bv ? 1 : 0;
     } else if (key === 'tags') {
@@ -153,6 +171,44 @@
     return cell;
   }
 
+  function renderBggRatingCell(item, reviewer) {
+    var cell = el('td', { className: 'bgg-rating' });
+    var rating = bggRating(item, reviewer);
+    if (!rating) {
+      return cell;
+    }
+    if (!rating.comment) {
+      cell.textContent = bggRatingLabel(rating);
+      return cell;
+    }
+    cell.appendChild(el('button', {
+      type: 'button',
+      className: 'bgg-rating-btn',
+      'aria-haspopup': 'dialog',
+      'aria-label': bggRatingLabel(rating) + ', read ' + reviewer + '\'s comment on ' + item.title,
+      dataset: { itemId: String(item.id), reviewer: reviewer },
+      text: bggRatingLabel(rating),
+    }));
+    return cell;
+  }
+
+  function openBggRatingDialog(dialog, item, reviewer) {
+    var rating = bggRating(item, reviewer);
+    if (!dialog || !rating) {
+      return;
+    }
+    document.getElementById('bgg-rating-dialog-title').textContent = reviewer + ' on ' + item.title;
+    document.getElementById('bgg-rating-dialog-score').textContent = rating.rating == null
+      ? 'Commented without a rating'
+      : 'Rated ' + bggRatingLabel(rating) + ' out of 10';
+    document.getElementById('bgg-rating-dialog-comment').textContent = rating.comment || '';
+    var link = document.getElementById('bgg-rating-dialog-link');
+    link.hidden = !rating.url;
+    link.href = rating.url || '#';
+    link.textContent = item.title + ' on BoardGameGeek';
+    dialog.showModal();
+  }
+
   function renderRow(item, config) {
     var useByCell = el('td', {
       className: 'date use_by',
@@ -174,6 +230,9 @@
     if (config.showPlayers) {
       cells.push(el('td', { className: 'players', text: item.players || '' }));
     }
+    (config.bggReviewers || []).forEach(function (reviewer) {
+      cells.push(renderBggRatingCell(item, reviewer));
+    });
     cells.push(
       el('td', { text: item.type }),
       el('td', { text: (item.tags || []).join(', ') }),
@@ -216,6 +275,7 @@
     var nameHeader = document.getElementById('items-name-header');
     var pager = document.getElementById('items-list-pager');
     var toastEl = document.getElementById('items-toast');
+    var ratingDialog = document.getElementById('bgg-rating-dialog');
     if (!config || !search || !tbody || !table || !ListTable) {
       return;
     }
@@ -244,6 +304,33 @@
         persistSorts(headers, sorts, keys);
       },
     });
+
+    tbody.addEventListener('click', function (event) {
+      var button = event.target.closest('.bgg-rating-btn');
+      if (!button) {
+        return;
+      }
+      var itemId = Number(button.dataset.itemId);
+      var item = items.find(function (row) {
+        return row.id === itemId;
+      });
+      if (item) {
+        openBggRatingDialog(ratingDialog, item, button.dataset.reviewer);
+      }
+    });
+
+    if (ratingDialog) {
+      // A backdrop click targets the dialog itself, as does one on its padding,
+      // so close only when the click falls outside the panel's box.
+      ratingDialog.addEventListener('click', function (event) {
+        var box = ratingDialog.getBoundingClientRect();
+        var outside = event.clientX < box.left || event.clientX > box.right ||
+          event.clientY < box.top || event.clientY > box.bottom;
+        if (event.target === ratingDialog && outside) {
+          ratingDialog.close();
+        }
+      });
+    }
 
     tbody.addEventListener('submit', function (event) {
       var form = event.target.closest('.kept-toggle-form');
