@@ -126,7 +126,7 @@ class ItemsListTest extends TestCase
         $this->assertSame('allkeptandnot', $filters['kept']);
         $this->assertSame(['table-game' => '4', 'book' => '7'], $filters['type']);
         $this->assertSame(90, $filters['interval']);
-        $this->assertSame('', $filters['sweetSpotFilter']);
+        $this->assertNull($filters['players']);
         $this->assertSame('no', $filters['showAttributes']);
         $this->assertSame('', $filters['tagFilter']);
     }
@@ -151,7 +151,7 @@ class ItemsListTest extends TestCase
         $this->assertSame('no', $filters['kept']);
         $this->assertSame(['4' => '4'], $filters['type']);
         $this->assertSame(30, $filters['interval']);
-        $this->assertSame('3', $filters['sweetSpotFilter']);
+        $this->assertSame(3, $filters['players']);
         $this->assertSame('yes', $filters['showAttributes']);
         $this->assertSame('beach-safe', $filters['tagFilter']);
     }
@@ -258,5 +258,99 @@ class ItemsListTest extends TestCase
             $js,
             'Button must update textContent between Kept and Keep on toggle.'
         );
+    }
+    /**
+     * @dataProvider sweetSpotSpellings
+     */
+    public function test_sweet_spot_counts_read_every_stored_spelling(string $ss, array $counts): void
+    {
+        $this->assertSame($counts, items_list_sweet_spot_counts($ss));
+    }
+
+    public static function sweetSpotSpellings(): array
+    {
+        return [
+            'blank' => ['', []],
+            'bgg zero padded' => ['01', [1]],
+            'unpadded' => ['1', [1]],
+            'padded list' => ['03,04', [3, 4]],
+            'spaced list' => ['01, 2, 3, 4', [1, 2, 3, 4]],
+            'range' => ['06-8', [6, 7, 8]],
+            'spaced range' => ['3 - 5', [3, 4, 5]],
+            'runaway range capped' => ['98-2000000000', [98, 99]],
+            'range and count' => ['03-4, 6', [3, 4, 6]],
+            'trailing tab' => ["02,3\t", [2, 3]],
+            'out of order' => ['10, 5, 1', [1, 5, 10]],
+            'wide range' => ['03,10-12', [3, 10, 11, 12]],
+        ];
+    }
+
+    public function test_players_label_is_the_range_with_its_sweet_spot(): void
+    {
+        $this->assertSame('2–4 (best 3)', items_list_players_label(2, 4, '03'));
+        $this->assertSame('3–6 (best 3–5)', items_list_players_label(3, 6, '03-5'));
+        $this->assertSame('1–8 (best 3, 4, 6)', items_list_players_label(1, 8, '03,04,06'));
+        $this->assertSame('2–4', items_list_players_label(2, 4, ''));
+        $this->assertSame('2 (best 2)', items_list_players_label(2, 2, '02'));
+        $this->assertSame('best 3', items_list_players_label(null, null, '03'));
+        $this->assertSame('', items_list_players_label(null, null, null));
+    }
+
+    public function test_present_row_carries_the_players_label(): void
+    {
+        $row = items_list_present_row([
+            'id' => 1,
+            'Title' => 'Azul',
+            'Acq' => '2024-01-10',
+            'ss' => '02',
+            'mnp' => 2,
+            'mxp' => 4,
+        ], 90, '2024-06-01');
+
+        $this->assertSame('2–4 (best 2)', $row['players']);
+    }
+
+    public function test_players_count_comes_from_players_or_the_legacy_sweet_spot_parameter(): void
+    {
+        $types = ['table-game' => '4'];
+        $this->assertSame(3, items_list_filters_from_request(['players' => '3'], [], 'GET', 90, $types)['players']);
+        $this->assertSame(5, items_list_filters_from_request(['sweetSpotFilter' => '5'], [], 'GET', 90, $types)['players']);
+        $this->assertNull(items_list_filters_from_request(['players' => ''], [], 'GET', 90, $types)['players']);
+        $this->assertNull(items_list_filters_from_request(['players' => '0'], [], 'GET', 90, $types)['players']);
+        $this->assertNull(items_list_filters_from_request(['players' => 'three'], [], 'GET', 90, $types)['players']);
+    }
+
+    public function test_query_params_carry_the_players_count(): void
+    {
+        $filters = items_list_filters_from_request(['players' => '3'], [], 'GET', 90, ['table-game' => '4']);
+        $params = items_list_query_params($filters, ['table-game' => '4']);
+
+        $this->assertSame(3, $params['players']);
+        $this->assertArrayNotHasKey('sweetSpotFilter', $params);
+    }
+
+    public function test_best_at_keeps_only_items_whose_sweet_spot_holds_the_count(): void
+    {
+        $rows = [
+            ['id' => 1, 'ss' => '03'],
+            ['id' => 2, 'ss' => '06-8'],
+            ['id' => 3, 'ss' => '13'],
+            ['id' => 4, 'ss' => ''],
+            ['id' => 5, 'ss' => '02, 3, 4'],
+        ];
+
+        $this->assertSame([1, 5], array_column(items_list_best_at($rows, 3), 'id'));
+        $this->assertSame([2], array_column(items_list_best_at($rows, 7), 'id'));
+        $this->assertSame([1, 2, 3, 4, 5], array_column(items_list_best_at($rows, null), 'id'));
+    }
+
+    public function test_items_page_titles_a_chosen_count_best_at(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
+        $this->assertStringContainsString("items_list_best_at_heading(\$players)", $source);
+        $this->assertSame('Best at 3 players', items_list_best_at_heading(3));
+        $this->assertSame('Best at 1 player', items_list_best_at_heading(1));
+        $this->assertNull(items_list_best_at_heading(null));
+        $this->assertMatchesRegularExpression('/<form class="player-picker" method="get"/', $source);
     }
 }

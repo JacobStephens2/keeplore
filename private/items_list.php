@@ -71,7 +71,10 @@ function items_list_filters_from_request(
         $interval = 0 + $interval;
     }
 
-    $sweetSpotFilter = $post['sweetSpotFilter'] ?? $get['sweetSpotFilter'] ?? '';
+    // sweetSpotFilter is the old name for the count, kept so bookmarks still work.
+    $players = $post['players'] ?? $get['players']
+        ?? $post['sweetSpotFilter'] ?? $get['sweetSpotFilter'] ?? '';
+    $players = is_string($players) && preg_match('/^\s*[1-9]\d*\s*$/', $players) ? (int) $players : null;
     $showAttributes = $post['showAttributes'] ?? $get['showAttributes'] ?? 'no';
     if ($showAttributes !== 'yes') {
         $showAttributes = 'no';
@@ -82,7 +85,7 @@ function items_list_filters_from_request(
         'kept' => $kept,
         'type' => $type,
         'interval' => $interval,
-        'sweetSpotFilter' => (string) $sweetSpotFilter,
+        'players' => $players,
         'showAttributes' => $showAttributes,
         'tagFilter' => (string) $tagFilter,
     ];
@@ -107,8 +110,8 @@ function items_list_query_params(array $filters, array $all_types = []) {
     if ($type_ids !== [] && $type_ids !== $all_type_ids) {
         $params['type'] = $type_ids;
     }
-    if ($filters['sweetSpotFilter'] !== '') {
-        $params['sweetSpotFilter'] = $filters['sweetSpotFilter'];
+    if ($filters['players'] !== null) {
+        $params['players'] = $filters['players'];
     }
     if ($filters['showAttributes'] === 'yes') {
         $params['showAttributes'] = 'yes';
@@ -162,6 +165,11 @@ function items_list_present_row(array $artifact, $interval, $today = null) {
         'use_by' => $use_by,
         'use_by_overdue' => $overdue,
         'ss' => (string) ($artifact['ss'] ?? $artifact['SS'] ?? ''),
+        'players' => items_list_players_label(
+            $artifact['mnp'] ?? $artifact['MnP'] ?? null,
+            $artifact['mxp'] ?? $artifact['MxP'] ?? null,
+            $artifact['ss'] ?? $artifact['SS'] ?? null
+        ),
         'avg_time' => (int) ceil(($mnt + $mxt) / 2),
         'candidate' => ($candidate_raw != '' && $candidate_raw != 0),
     ];
@@ -172,7 +180,6 @@ function items_list_payload($db, array $filters, $user_id, $today = null) {
         $filters['kept'],
         $filters['type'],
         $filters['interval'],
-        $filters['sweetSpotFilter'],
         $filters['tagFilter']
     );
     $artifacts = [];
@@ -180,10 +187,93 @@ function items_list_payload($db, array $filters, $user_id, $today = null) {
         $artifacts[] = $row;
     }
     mysqli_free_result($artifact_set);
+    $artifacts = items_list_best_at($artifacts, $filters['players']);
     $artifacts = with_item_tags($db, $artifacts, (int) $user_id);
     $items = [];
     foreach ($artifacts as $artifact) {
         $items[] = items_list_present_row($artifact, $filters['interval'], $today);
     }
     return $items;
+}
+
+/**
+ * The player counts a sweet spot names, ascending. Stored sweet spots come in
+ * every spelling the field has had: BGG's zero-padded "03,04", hand-typed
+ * "3, 4", and ranges such as "06-8".
+ */
+function items_list_sweet_spot_counts($ss) {
+    $counts = [];
+    // Close up "3 - 6" to "3-6" first, so the split below keeps the range whole.
+    $ss = preg_replace('/\s*([-–])\s*/u', '$1', trim((string) $ss));
+    foreach (preg_split('/[,\s]+/', $ss, -1, PREG_SPLIT_NO_EMPTY) as $part) {
+        if (preg_match('/^(\d+)\s*[-–]\s*(\d+)$/u', $part, $range)) {
+            $min = (int) $range[1];
+            $max = (int) $range[2];
+        } elseif (preg_match('/^\d+$/', $part)) {
+            $min = $max = (int) $part;
+        } else {
+            continue;
+        }
+        // A mistyped range such as "1-2000000000" must not stall the list.
+        for ($n = max(1, $min); $n <= min($max, 99); $n++) {
+            $counts[$n] = true;
+        }
+    }
+    ksort($counts);
+    return array_keys($counts);
+}
+
+/**
+ * The player range with the sweet spot, as in "2–4 (best 3)". A run of three
+ * or more consecutive counts reads as a range, so "3–5" but "3, 4".
+ */
+function items_list_players_label($min, $max, $ss) {
+    $min = (int) $min;
+    $max = (int) $max;
+    if ($min <= 0 && $max <= 0) {
+        $range = '';
+    } elseif ($min <= 0 || $max <= 0 || $min === $max) {
+        $range = (string) max($min, $max);
+    } else {
+        $range = $min . '–' . $max;
+    }
+
+    $runs = [];
+    foreach (items_list_sweet_spot_counts($ss) as $n) {
+        $last = count($runs) - 1;
+        if ($last >= 0 && $runs[$last][1] === $n - 1) {
+            $runs[$last][1] = $n;
+        } else {
+            $runs[] = [$n, $n];
+        }
+    }
+    $best = implode(', ', array_map(function ($run) {
+        if ($run[1] - $run[0] >= 2) {
+            return $run[0] . '–' . $run[1];
+        }
+        return implode(', ', range($run[0], $run[1]));
+    }, $runs));
+
+    if ($best === '') {
+        return $range;
+    }
+    return $range === '' ? 'best ' . $best : $range . ' (best ' . $best . ')';
+}
+
+/** The title for a chosen count, as in "Best at 3 players", or null with none. */
+function items_list_best_at_heading($players) {
+    if ($players === null) {
+        return null;
+    }
+    return 'Best at ' . $players . ($players === 1 ? ' player' : ' players');
+}
+
+/** The rows whose sweet spot includes the count, or every row with no count. */
+function items_list_best_at(array $rows, $players) {
+    if ($players === null) {
+        return $rows;
+    }
+    return array_values(array_filter($rows, function ($row) use ($players) {
+        return in_array($players, items_list_sweet_spot_counts($row['ss'] ?? $row['SS'] ?? ''), true);
+    }));
 }

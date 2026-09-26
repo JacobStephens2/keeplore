@@ -85,6 +85,11 @@
     ], query);
   }
 
+  function fewestPlayers(label) {
+    var match = /\d+/.exec(label || '');
+    return match ? Number(match[0]) : Infinity;
+  }
+
   function compareItems(a, b, key, dir) {
     var av = a[key];
     var bv = b[key];
@@ -94,7 +99,11 @@
     } else if (key === 'tags') {
       av = (av || []).join(', ');
       bv = (bv || []).join(', ');
-    } else if (key === 'title' || key === 'type' || key === 'ss') {
+    } else if (key === 'players') {
+      // By the smallest count the label names, so "2–4" sorts before "10–12".
+      av = fewestPlayers(av);
+      bv = fewestPlayers(bv);
+    } else if (key === 'title' || key === 'type') {
       av = String(av || '').toLowerCase();
       bv = String(bv || '').toLowerCase();
     } else if (key === 'acq' || key === 'most_recent_use' || key === 'use_by') {
@@ -161,24 +170,24 @@
           text: item.title,
         }),
       ]),
+    ];
+    if (config.showPlayers) {
+      cells.push(el('td', { className: 'players', text: item.players || '' }));
+    }
+    cells.push(
       el('td', { text: item.type }),
       el('td', { text: (item.tags || []).join(', ') }),
       el('td', { className: 'date acquisition', text: item.acq }),
       el('td', { className: 'date most_recent_use', text: item.most_recent_use }),
-      useByCell,
-    ];
+      useByCell
+    );
     if (config.showAttributes) {
       cells.push(
-        el('td', { text: item.ss }),
         el('td', { text: String(item.avg_time) }),
         el('td', { text: item.candidate ? 'Yes' : 'No' })
       );
     }
     return el('tr', {}, cells);
-  }
-
-  function columnCount(config) {
-    return config.showAttributes ? 10 : 7;
   }
 
   function showToast(toastEl, message, kind) {
@@ -226,9 +235,9 @@
       row: function (item) {
         return renderRow(item, config);
       },
-      columnCount: columnCount(config),
+      columnCount: config.columnCount || 7,
       pageLength: config.pageLength || 100,
-      emptyMessage: 'No items yet.',
+      emptyMessage: config.emptyMessage || 'No items yet.',
       noMatchMessage: 'No items match.',
       status: 'Loading items…',
       onSort: function (sorts) {

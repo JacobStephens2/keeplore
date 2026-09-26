@@ -154,7 +154,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
     return $result;
   }
 
-  function find_artifacts_by_user_id($kept, $type, $interval, $sweetSpot = '', $tag = '') {
+  function find_artifacts_by_user_id($kept, $type, $interval, $tag = '') {
     global $db;
 
     $params = [];
@@ -186,36 +186,6 @@ require_once dirname(__DIR__) . '/item_tags.php';
 
         $params[] = $_SESSION['user_id'];
         $param_types .= 'i';
-
-        if (strlen($sweetSpot) > 0) {
-          $sql .= " AND games.ss LIKE ? ";
-          $params[] = '%' . $sweetSpot . '%';
-          $param_types .= 's';
-          $sql .= " AND games.ss NOT LIKE ? ";
-          $params[] = '%1' . $sweetSpot . '%';
-          $param_types .= 's';
-          $sql .= " AND games.ss NOT LIKE ? ";
-          $params[] = '%2' . $sweetSpot . '%';
-          $param_types .= 's';
-          $sql .= " AND games.ss NOT LIKE ? ";
-          $params[] = '%3' . $sweetSpot . '%';
-          $param_types .= 's';
-          $sql .= " AND games.ss NOT LIKE ? ";
-          $params[] = '%' . $sweetSpot . '0%';
-          $param_types .= 's';
-          $sql .= " AND games.ss NOT LIKE ? ";
-          $params[] = '%' . $sweetSpot . '1%';
-          $param_types .= 's';
-          $sql .= " AND games.ss NOT LIKE ? ";
-          $params[] = '%' . $sweetSpot . '2%';
-          $param_types .= 's';
-          $sql .= " AND games.ss NOT LIKE ? ";
-          $params[] = '%' . $sweetSpot . '3%';
-          $param_types .= 's';
-          $sql .= " AND games.ss NOT LIKE ? ";
-          $params[] = '%' . $sweetSpot . '4%';
-          $param_types .= 's';
-        }
 
         if (isset($type) && $type != [] && $type != '1') {
           $placeholders = implode(', ', array_fill(0, count($type), '?'));

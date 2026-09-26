@@ -109,7 +109,7 @@ final class ItemTagsTest extends TestCase
         replace_item_tags($this->db, 20, 2, ['beach-safe']);
 
         $ids = [];
-        $result = find_artifacts_by_user_id('yes', [], 90, '', 'beach-safe');
+        $result = find_artifacts_by_user_id('yes', [], 90, 'beach-safe');
         while ($row = mysqli_fetch_assoc($result)) {
             $ids[] = (int) $row['id'];
         }

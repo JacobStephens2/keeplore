@@ -16,11 +16,15 @@
   $kept = $filters['kept'];
   $type = $filters['type'];
   $interval = $filters['interval'];
-  $sweetSpotFilter = $filters['sweetSpotFilter'];
+  $players = $filters['players'];
   $showAttributes = $filters['showAttributes'];
   $tagFilter = $filters['tagFilter'];
 
-  $page_title = 'Items';
+  $best_at_heading = items_list_best_at_heading($players);
+  $show_players_column = $players !== null || $showAttributes === 'yes';
+  $column_count = 7 + ($show_players_column ? 1 : 0) + ($showAttributes === 'yes' ? 2 : 0);
+
+  $page_title = $best_at_heading ?? 'Items';
   if ($kept === 'secondary_only') { $page_title .= ' (Secondary Only)'; }
   include(SHARED_PATH . '/header.php');
 ?>
@@ -95,8 +99,8 @@
       if (!empty($switch_type_ids)) {
         $switch_base['type'] = array_combine($switch_type_ids, $switch_type_ids);
       }
-      if ($sweetSpotFilter !== '') {
-        $switch_base['sweetSpotFilter'] = $sweetSpotFilter;
+      if ($players !== null) {
+        $switch_base['players'] = $players;
       }
       if ($tagFilter !== '') {
         $switch_base['tag'] = $tagFilter;
@@ -123,6 +127,36 @@
         </a>
       <?php } ?>
     </nav>
+
+    <?php
+      // The picker is a plain GET form, so a count can be bookmarked. It carries
+      // the other filters as hidden fields, so choosing a count keeps them.
+      $picker_carry = $switch_base;
+      unset($picker_carry['players']);
+      if ($kept_switch_active !== null) {
+        $picker_carry['kept'] = $kept_switch_active;
+      } elseif ($kept === 'secondary_only') {
+        $picker_carry['kept'] = 'secondary_only';
+      }
+    ?>
+    <form class="player-picker" method="get" action="<?php echo url_for('/artifacts/index.php'); ?>">
+      <label>Best at <input type="number" name="players" min="1" inputmode="numeric"
+        value="<?php echo $players === null ? '' : h((string) $players); ?>"> players</label>
+      <?php foreach ($picker_carry as $carry_name => $carry_value) {
+        foreach ((array) $carry_value as $carry_key => $carry_item) {
+          $carry_field = is_array($carry_value) ? $carry_name . '[' . $carry_key . ']' : $carry_name; ?>
+        <input type="hidden" name="<?php echo h($carry_field); ?>" value="<?php echo h((string) $carry_item); ?>">
+      <?php } } ?>
+      <button type="submit">Show</button>
+      <?php if ($players !== null) { ?>
+        <a class="all-counts" href="<?php echo h(url_for('/artifacts/index.php' . ($picker_carry ? '?' . http_build_query($picker_carry) : ''))); ?>">All counts</a>
+      <?php } ?>
+    </form>
+
+    <?php if ($best_at_heading !== null) { ?>
+      <h2 class="best-at-heading"><?php echo h($best_at_heading); ?></h2>
+      <p class="best-at-lede">Items whose sweet spot includes <?php echo h((string) $players); ?>, with each one's player range and sweet spot.</p>
+    <?php } ?>
 
     <form class="filter-panel" action="<?php echo url_for('/artifacts/index.php'); ?>"
       method="post"
@@ -183,14 +217,9 @@
 
       </section>
 
-      <label for="sweetSpotFilter">Sweet Spot (SwS)</label>
-      <input type="text" id="sweetSpotFilter" name="sweetSpotFilter"
-        <?php
-          if ($sweetSpotFilter !== '') {
-            echo 'value="' . h($sweetSpotFilter) . '"';
-          }
-        ?>
-      >
+      <?php if ($players !== null) { ?>
+        <input type="hidden" name="players" value="<?php echo h((string) $players); ?>">
+      <?php } ?>
 
       <label for="tag">Tag</label>
       <input type="text" id="tag" name="tag" placeholder="beach-safe"
@@ -246,6 +275,9 @@
         <tr id="headerRow">
           <th data-sort="is_kept">Kept</th>
           <th data-sort="title" id="items-name-header">Name</th>
+          <?php if ($show_players_column) { ?>
+            <th data-sort="players">Players</th>
+          <?php } ?>
           <th data-sort="type">Type</th>
           <th data-sort="tags">Tags</th>
           <th data-sort="acq">Tracking Start</th>
@@ -254,7 +286,6 @@
           <?php
             if ($showAttributes === 'yes') {
               ?>
-              <th data-sort="ss">SwS</th>
               <th data-sort="avg_time">AvgT</th>
               <th class="tooltip" data-sort="candidate" title="Candidate">Candidate</th>
               <?php
@@ -271,7 +302,7 @@
 
       <tbody id="items-list-body">
         <tr class="list-status">
-          <td colspan="<?php echo $showAttributes === 'yes' ? '10' : '7'; ?>">Loading items…</td>
+          <td colspan="<?php echo $column_count; ?>">Loading items…</td>
         </tr>
       </tbody>
   	</table>
@@ -290,10 +321,13 @@
         'csrfToken' => generate_csrf_token(),
         'isGuest' => is_guest(),
         'showAttributes' => $showAttributes === 'yes',
+        'showPlayers' => $show_players_column,
+        'columnCount' => $column_count,
+        'emptyMessage' => $players === null ? 'No items yet.' : 'No items are ' . lcfirst($best_at_heading) . '.',
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=5"></script>
+    <script src="/shared/js/items-list.js?v=6"></script>
   </div>
 </main>
 
