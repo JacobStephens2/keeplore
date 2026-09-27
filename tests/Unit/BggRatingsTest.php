@@ -13,6 +13,7 @@ require_once PROJECT_PATH . '/private/items_list.php';
  * - bgg_thing_id_from_url(): the BGG object an item's link names
  * - bgg_user_from_users_json(): a BGG username resolved to its id and spelling
  * - bgg_rating_from_collection_json(): one BGG user's rating and comment on one thing
+ * - bgg_rating_from_input(): a rating typed on Edit Item
  * - items_list_present_row(): carries each imported BGG rating to /artifacts/
  */
 class BggRatingsTest extends TestCase
@@ -171,5 +172,16 @@ class BggRatingsTest extends TestCase
         }
         $this->assertStringContainsString('bgg_ratings_save_item(', $save);
         $this->assertStringContainsString('require_login()', $save);
+    }
+
+    public function test_rating_input_reads_blank_as_none_and_scores_from_one_to_ten(): void
+    {
+        $this->assertNull(bgg_rating_from_input(' '));
+        $this->assertSame(8.5, bgg_rating_from_input(' 8.5 '));
+        $this->assertSame(1.0, bgg_rating_from_input('1'));
+        $this->assertSame(10.0, bgg_rating_from_input('10.00'));
+        foreach (['0', '10.5', 'eight', '-3', '1e1', '8.125', '0x9'] as $bad) {
+            $this->assertFalse(bgg_rating_from_input($bad), $bad . ' is not a BGG score');
+        }
     }
 }

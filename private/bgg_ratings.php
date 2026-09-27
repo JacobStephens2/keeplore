@@ -57,6 +57,20 @@ function bgg_rating_from_collection_json($json) {
   ];
 }
 
+// A rating typed on Edit Item: the score, null when blank, or false when it
+// is not a BGG score. BGG scores run 1 to 10 in steps as fine as 0.01, which
+// the column holds.
+function bgg_rating_from_input($raw) {
+  $raw = trim((string) $raw);
+  if ($raw === '') {
+    return null;
+  }
+  if (!preg_match('/^\d{1,2}(\.\d{1,2})?$/', $raw) || (float) $raw < 1 || (float) $raw > 10) {
+    return false;
+  }
+  return (float) $raw;
+}
+
 // ['ok' => true, 'user' => ['id', 'username']] or ['ok' => false, 'error'].
 function bgg_ratings_find_user($username, $get_json) {
   $username = trim((string) $username);
@@ -74,6 +88,29 @@ function bgg_ratings_find_user($username, $get_json) {
   return ['ok' => true, 'user' => $bgg_user];
 }
 
+// Stores one BGG user's ['rating', 'comment', 'rated_at'] for one item,
+// replacing what the item had.
+function bgg_ratings_store_item($conn, $user_id, $artifact_id, $bgg_username, array $entry) {
+  $stmt = mysqli_prepare(
+    $conn,
+    "INSERT INTO item_bgg_ratings (user_id, artifact_id, bgg_username, rating, comment, rated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), rated_at = VALUES(rated_at)"
+  );
+  mysqli_stmt_bind_param(
+    $stmt,
+    'iisdss',
+    $user_id,
+    $artifact_id,
+    $bgg_username,
+    $entry['rating'],
+    $entry['comment'],
+    $entry['rated_at']
+  );
+  mysqli_stmt_execute($stmt);
+  mysqli_stmt_close($stmt);
+}
+
 function bgg_ratings_delete_item($conn, $user_id, $artifact_id, $bgg_username) {
   $stmt = mysqli_prepare($conn, 'DELETE FROM item_bgg_ratings WHERE user_id = ? AND artifact_id = ? AND bgg_username = ?');
   mysqli_stmt_bind_param($stmt, 'iis', $user_id, $artifact_id, $bgg_username);
@@ -83,7 +120,7 @@ function bgg_ratings_delete_item($conn, $user_id, $artifact_id, $bgg_username) {
 
 // ['ok' => true, 'thing_id'] for an owner's item that links to a BGG thing,
 // or ['ok' => false, 'error'] ready for Edit Item.
-function bgg_ratings_linked_item($conn, $user_id, $artifact_id) {
+function bgg_ratings_linked_thing_id($conn, $user_id, $artifact_id) {
   $stmt = mysqli_prepare($conn, 'SELECT bgg_url FROM games WHERE id = ? AND user_id = ?');
   mysqli_stmt_bind_param($stmt, 'ii', $artifact_id, $user_id);
   mysqli_stmt_execute($stmt);
@@ -122,24 +159,7 @@ function bgg_ratings_refresh_item($conn, $user_id, $artifact_id, $thing_id, arra
     bgg_ratings_delete_item($conn, $user_id, $artifact_id, $bgg_user['username']);
     return null;
   }
-  $stmt = mysqli_prepare(
-    $conn,
-    "INSERT INTO item_bgg_ratings (user_id, artifact_id, bgg_username, rating, comment, rated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), rated_at = VALUES(rated_at)"
-  );
-  mysqli_stmt_bind_param(
-    $stmt,
-    'iisdss',
-    $user_id,
-    $artifact_id,
-    $bgg_user['username'],
-    $entry['rating'],
-    $entry['comment'],
-    $entry['rated_at']
-  );
-  mysqli_stmt_execute($stmt);
-  mysqli_stmt_close($stmt);
+  bgg_ratings_store_item($conn, $user_id, $artifact_id, $bgg_user['username'], $entry);
   return $entry;
 }
 
@@ -209,7 +229,7 @@ function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause
 function bgg_ratings_import_item($conn, $user_id, $artifact_id, $username, $get_json = null) {
   $user_id = (int) $user_id;
   $artifact_id = (int) $artifact_id;
-  $linked = bgg_ratings_linked_item($conn, $user_id, $artifact_id);
+  $linked = bgg_ratings_linked_thing_id($conn, $user_id, $artifact_id);
   if (!$linked['ok']) {
     return $linked;
   }
@@ -244,7 +264,7 @@ function bgg_ratings_import_item($conn, $user_id, $artifact_id, $username, $get_
 function bgg_ratings_save_item($conn, $user_id, $artifact_id, $username, $rating, $comment) {
   $user_id = (int) $user_id;
   $artifact_id = (int) $artifact_id;
-  $linked = bgg_ratings_linked_item($conn, $user_id, $artifact_id);
+  $linked = bgg_ratings_linked_thing_id($conn, $user_id, $artifact_id);
   if (!$linked['ok']) {
     return $linked;
   }
@@ -258,13 +278,8 @@ function bgg_ratings_save_item($conn, $user_id, $artifact_id, $username, $rating
     return ['ok' => false, 'error' => 'No imported BoardGameGeek ratings from ' . trim((string) $username) . '.'];
   }
 
-  // BGG scores run 1 to 10 in steps as fine as 0.01, which the column holds.
-  $rating = trim((string) $rating);
-  if ($rating === '') {
-    $rating = null;
-  } elseif (preg_match('/^\d{1,2}(\.\d{1,2})?$/', $rating) && (float) $rating >= 1 && (float) $rating <= 10) {
-    $rating = (float) $rating;
-  } else {
+  $rating = bgg_rating_from_input($rating);
+  if ($rating === false) {
     return ['ok' => false, 'error' => 'A rating is a number from 1 to 10.'];
   }
   $comment = trim((string) $comment);
@@ -275,16 +290,8 @@ function bgg_ratings_save_item($conn, $user_id, $artifact_id, $username, $rating
     bgg_ratings_delete_item($conn, $user_id, $artifact_id, $reviewer);
     return ['ok' => true, 'message' => 'Removed ' . $whose . ' rating and comment.'];
   }
-  // An edit keeps rated_at, the date BGG recorded for the imported score.
-  $stmt = mysqli_prepare(
-    $conn,
-    "INSERT INTO item_bgg_ratings (user_id, artifact_id, bgg_username, rating, comment)
-     VALUES (?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment)"
-  );
-  mysqli_stmt_bind_param($stmt, 'iisds', $user_id, $artifact_id, $reviewer, $rating, $comment);
-  mysqli_stmt_execute($stmt);
-  mysqli_stmt_close($stmt);
+  // An edited score is the owner's, not BGG's, so it carries no BGG rating date.
+  bgg_ratings_store_item($conn, $user_id, $artifact_id, $reviewer, ['rating' => $rating, 'comment' => $comment, 'rated_at' => null]);
   return ['ok' => true, 'message' => 'Saved ' . $whose . ' rating and comment.'];
 }
 
