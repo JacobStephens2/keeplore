@@ -22,6 +22,12 @@ class ItemTypesTest extends TestCase
         }
     }
 
+    public function test_other_type_ids_are_the_types_named_other_in_any_case(): void
+    {
+        $this->assertSame(['44', '9'], item_other_type_ids(['book' => '4', 'other' => 44, 'Other ' => '9', 'others' => '7']));
+        $this->assertSame([], item_other_type_ids(['book' => '4']));
+    }
+
     public function test_game_type_ids_come_from_the_name_to_id_map(): void
     {
         $types = ['book' => '4', 'card game' => '81', 'game component' => '68', 'sport' => '47', 'table game' => 26];

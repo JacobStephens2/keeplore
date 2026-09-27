@@ -107,12 +107,7 @@ function items_list_filters_from_request(
  */
 function items_list_type_switch(array $all_types, array $current_type_ids) {
     $all_ids = array_map('strval', array_values($all_types));
-    $other_ids = [];
-    foreach ($all_types as $name => $id) {
-        if (strtolower(trim((string) $name)) === 'other') {
-            $other_ids[] = (string) $id;
-        }
-    }
+    $other_ids = item_other_type_ids($all_types);
     $options = ['all' => ['label' => 'All types', 'type_ids' => $all_ids]];
     $game_ids = item_game_type_ids($all_types);
     if ($game_ids !== []) {
