@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/kept_status.php';
 require_once __DIR__ . '/bgg_ratings.php';
+require_once __DIR__ . '/item_types.php';
 
 function items_list_load_filter_defaults($user_id) {
     $default_interval = singleValueQuery(
@@ -96,6 +97,49 @@ function items_list_filters_from_request(
         'showAttributes' => $showAttributes,
         'tagFilter' => (string) $tagFilter,
     ];
+}
+
+/**
+ * The Items type switch: All types, Games and Other, each with the type ids
+ * it selects, and which one the current selection matches (null for a
+ * hand-picked mix). A choice the user has no types for is left out; an empty
+ * selection means every type.
+ */
+function items_list_type_switch(array $all_types, array $current_type_ids) {
+    $all_ids = array_map('strval', array_values($all_types));
+    $other_ids = [];
+    foreach ($all_types as $name => $id) {
+        if (strtolower(trim((string) $name)) === 'other') {
+            $other_ids[] = (string) $id;
+        }
+    }
+    $options = ['all' => ['label' => 'All types', 'type_ids' => $all_ids]];
+    $game_ids = item_game_type_ids($all_types);
+    if ($game_ids !== []) {
+        $options['games'] = ['label' => 'Games', 'type_ids' => $game_ids];
+    }
+    if ($other_ids !== []) {
+        $options['other'] = ['label' => 'Other', 'type_ids' => $other_ids];
+    }
+
+    $current = [];
+    foreach ($current_type_ids as $id) {
+        if ($id !== '' && $id !== null) {
+            $current[] = (string) $id;
+        }
+    }
+    $current = $current === [] ? $all_ids : $current;
+    sort($current);
+    $active = null;
+    foreach ($options as $key => $option) {
+        $ids = $option['type_ids'];
+        sort($ids);
+        if ($ids === $current) {
+            $active = $key;
+            break;
+        }
+    }
+    return ['options' => $options, 'active' => $active];
 }
 
 /** A whole number of 1 or more typed into a filter, or null for anything else. */

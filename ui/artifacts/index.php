@@ -139,6 +139,32 @@
     </nav>
 
     <?php
+      // One click to games only, or to Other (items still waiting for a real
+      // type). Each link keeps every other filter.
+      $type_switch = items_list_type_switch($typesArray ?? [], $switch_type_ids);
+      $type_switch_base = $switch_base;
+      unset($type_switch_base['type']);
+      if ($kept_switch_active !== null) {
+        $type_switch_base['kept'] = $kept_switch_active;
+      } elseif ($kept === 'secondary_only') {
+        $type_switch_base['kept'] = 'secondary_only';
+      }
+    ?>
+    <nav class="kept-switch type-switch" aria-label="Item type">
+      <?php foreach ($type_switch['options'] as $switch_value => $switch_option) {
+        $type_query = $type_switch_base;
+        if ($switch_value !== 'all') {
+          $type_query['type'] = array_combine($switch_option['type_ids'], $switch_option['type_ids']);
+        } ?>
+        <a href="<?php echo h(url_for('/artifacts/index.php' . ($type_query ? '?' . http_build_query($type_query) : ''))); ?>"
+          <?php if ($type_switch['active'] === $switch_value) { echo 'aria-current="true"'; } ?>
+          >
+          <?php echo h($switch_option['label']); ?>
+        </a>
+      <?php } ?>
+    </nav>
+
+    <?php
       // The picker is a plain GET form, so a count or age can be bookmarked. It
       // carries the other filters as hidden fields, so choosing one keeps them.
       $picker_carry = $switch_base;

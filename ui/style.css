@@ -1539,6 +1539,10 @@ p.copied_message {
   font-weight: bold;
   border-width: 2px;
 }
+/* The type switch sits right under the kept switch. */
+.kept-switch + .type-switch {
+  margin-top: -0.5rem;
+}
 
 /* Items page player-count picker: a count, Show, and a way back to all counts, on one line. */
 .player-picker {

@@ -1,6 +1,7 @@
 <?php
 
   require_once 'artifact_type_array.php';
+  require_once dirname(__DIR__) . '/item_types.php';
   global $typesArray;
   global $type;
   // Pages that tidy their filter panel (Items, #15) set
@@ -44,7 +45,7 @@
 <div id="selectButtons">
   <button id="selectAll">Select All</button>
   <button id="deselectAll">Deselect All</button>
-  <button id="selectGames">Select Games</button>
+  <button id="selectGames" data-type-ids="<?php echo h(json_encode(item_game_type_ids($typesArray ?? []))); ?>">Select Games</button>
   <?php if (!$trimmed_shortcuts) { ?>
   <button id="selectAnalogGames">Select Analog Games</button>
   <button id="selectOnlineGames">Select Online Games</button>
@@ -104,17 +105,12 @@
   
   document.querySelector('#selectGames').addEventListener('click', function(event) {
     event.preventDefault();
-    document.querySelectorAll('#typeCheckboxes input').forEach(element => element.checked = false);
-    document.querySelector('#typeCheckboxes #childrens-game').checked = true;
-    document.querySelector('#typeCheckboxes #gambling-game').checked = true;
-    document.querySelector('#typeCheckboxes #game').checked = true;
-    document.querySelector('#typeCheckboxes #individual-display-game').checked = true;
-    document.querySelector('#typeCheckboxes #mobile-game').checked = true;
-    document.querySelector('#typeCheckboxes #role-playing-game').checked = true;
-    document.querySelector('#typeCheckboxes #shared-display-game').checked = true;
-    document.querySelector('#typeCheckboxes #sport').checked = true;
-    document.querySelector('#typeCheckboxes #table-game').checked = true;
-    document.querySelector('#typeCheckboxes #vr-game').checked = true;
+    // The game types come from item_game_type_ids(), so a new kind of game
+    // (card game) is included without editing this list.
+    var gameTypeIds = JSON.parse(this.getAttribute('data-type-ids') || '[]');
+    document.querySelectorAll('#typeCheckboxes input').forEach(function (element) {
+      element.checked = gameTypeIds.indexOf(element.value) !== -1;
+    });
   })
   
   <?php if (!$trimmed_shortcuts) { ?>

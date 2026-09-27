@@ -449,6 +449,47 @@ class ItemsListTest extends TestCase
         $this->assertSame('', items_list_present_row($base, 90, '2024-06-01')['age']);
     }
 
+    public function test_type_switch_offers_all_games_and_other(): void
+    {
+        $types = ['book' => '4', 'card game' => '81', 'other' => '44', 'table game' => '26'];
+
+        $switch = items_list_type_switch($types, ['4', '81', '44', '26']);
+
+        $this->assertSame(['all', 'games', 'other'], array_keys($switch['options']));
+        $this->assertSame(['4', '81', '44', '26'], $switch['options']['all']['type_ids']);
+        $this->assertSame(['81', '26'], $switch['options']['games']['type_ids']);
+        $this->assertSame(['44'], $switch['options']['other']['type_ids']);
+        $this->assertSame('All types', $switch['options']['all']['label']);
+        $this->assertSame('Games', $switch['options']['games']['label']);
+        $this->assertSame('Other', $switch['options']['other']['label']);
+        $this->assertSame('all', $switch['active']);
+    }
+
+    public function test_type_switch_marks_the_matching_selection_active_in_any_order(): void
+    {
+        $types = ['book' => '4', 'card game' => '81', 'other' => '44', 'table game' => '26'];
+
+        $this->assertSame('games', items_list_type_switch($types, [26, '81'])['active']);
+        $this->assertSame('other', items_list_type_switch($types, ['44'])['active']);
+        $this->assertNull(items_list_type_switch($types, ['4'])['active']);
+        $this->assertSame('all', items_list_type_switch($types, [])['active']);
+    }
+
+    public function test_type_switch_leaves_out_a_choice_the_user_has_no_types_for(): void
+    {
+        $switch = items_list_type_switch(['book' => '4', 'Other' => '9'], ['4', '9']);
+
+        $this->assertSame(['all', 'other'], array_keys($switch['options']));
+        $this->assertSame(['9'], $switch['options']['other']['type_ids']);
+    }
+
+    public function test_items_page_renders_the_type_switch(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
+        $this->assertStringContainsString('items_list_type_switch(', $source);
+        $this->assertMatchesRegularExpression('/<nav class="kept-switch type-switch" aria-label="Item type">/', $source);
+    }
+
     public function test_items_page_offers_a_youngest_age_picker_beside_the_count(): void
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
