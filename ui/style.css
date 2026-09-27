@@ -1596,6 +1596,22 @@ p.copied_message {
   margin: 0 0 1rem;
 }
 
+/* Edit Item: an imported BGG user's comment, then their score. */
+.item-bgg-rating {
+  margin: 0 0 1.25rem;
+  max-width: 44rem;
+}
+.item-bgg-rating .bgg-rating-comment {
+  margin: 0 0 0.4rem;
+  padding: 0.1rem 0 0.1rem 1rem;
+  border-left: 3px solid var(--outline-strong);
+}
+.item-bgg-rating figcaption {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .modal[hidden] { display: none; }
 
 .modal {

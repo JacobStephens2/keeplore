@@ -1,5 +1,6 @@
 <?php
   require_once('../../private/initialize.php');
+  require_once(PRIVATE_PATH . '/bgg_ratings.php');
   require_login();
   if(!isset($_GET['id'])) {
     redirect_to(url_for('/artifacts/index.php'));
@@ -102,6 +103,7 @@
     <?php } ?>
 
     <?php echo item_bgg_link_html($artifact['bgg_url'] ?? ''); ?>
+    <?php echo item_bgg_ratings_html(find_item_bgg_ratings($db, [$id], (int) $_SESSION['user_id'])[$id] ?? []); ?>
 
     <?php echo display_errors($errors); ?>
 

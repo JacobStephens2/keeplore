@@ -200,6 +200,28 @@ function item_bgg_reviewers($conn, $user_id) {
   return $reviewers;
 }
 
+// A BGG score as people write it: 9.5 reads "9.5", 8 reads "8".
+function bgg_score_text($score) {
+  return rtrim(rtrim(number_format((float) $score, 2, '.', ''), '0'), '.');
+}
+
+// One item's imported ratings, as find_item_bgg_ratings() keys them, for the
+// item pages: each reviewer's score in words, then their comment in full.
+function item_bgg_ratings_html(array $ratings_by_reviewer) {
+  $html = '';
+  foreach ($ratings_by_reviewer as $reviewer => $rating) {
+    $caption = $rating['rating'] === null
+      ? $reviewer . ' commented on BoardGameGeek'
+      : $reviewer . ' rated it ' . bgg_score_text($rating['rating']) . ' out of 10 on BoardGameGeek';
+    $html .= '<figure class="item-bgg-rating">';
+    if ((string) $rating['comment'] !== '') {
+      $html .= '<blockquote class="bgg-rating-comment">' . h($rating['comment']) . '</blockquote>';
+    }
+    $html .= '<figcaption>' . h($caption) . '</figcaption></figure>';
+  }
+  return $html;
+}
+
 function with_item_bgg_ratings($conn, array $items, $user_id) {
   $ratings = find_item_bgg_ratings($conn, array_column($items, 'id'), $user_id);
   foreach ($items as &$item) {
