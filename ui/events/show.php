@@ -13,13 +13,15 @@ if ($event === null) {
 
 // The grouping chosen last for this event stays until changed.
 $dimensions = event_plan_dimensions();
-$saved = $_SESSION['event_grouping'][$id] ?? ['by' => 'players', 'then' => 'none'];
+$saved = ($_SESSION['event_grouping'][$id] ?? []) + ['by' => 'players', 'then' => 'none', 'tags' => ''];
 $by = is_string($_GET['by'] ?? null) && isset($dimensions[$_GET['by']]) ? $_GET['by'] : $saved['by'];
 $then = is_string($_GET['then'] ?? null) && isset($dimensions[$_GET['then']]) ? $_GET['then'] : $saved['then'];
-$_SESSION['event_grouping'][$id] = ['by' => $by, 'then' => $then];
+$tags = is_string($_GET['tags'] ?? null) ? implode(', ', event_plan_chosen_tags($_GET['tags'])) : $saved['tags'];
+$_SESSION['event_grouping'][$id] = ['by' => $by, 'then' => $then, 'tags' => $tags];
+$by_tag = $by === 'tag' || $then === 'tag';
 
 $items = $event['items'];
-$groups = event_plan_groups($items, $by, $then);
+$groups = event_plan_groups($items, $by, $then, event_plan_chosen_tags($tags));
 $packed = count(array_filter(array_column($items, 'is_packed')));
 $to_add = $plans->itemsToAdd($id);
 $settings = array_values(array_unique(array_filter(array_map('trim', array_column($items, 'setting')))));
@@ -30,7 +32,7 @@ $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
 <link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=1'); ?>">
-<main class="event-page" data-event-id="<?php echo $id; ?>">
+<main class="event-page" data-event-id="<?php echo $id; ?>" data-item-url="<?php echo h(url_for('/events/item.php')); ?>">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
         <h1><?php echo h($event['name']); ?></h1>
@@ -53,9 +55,10 @@ include(SHARED_PATH . '/header.php');
                 <input type="hidden" name="action" value="add">
                 <label for="event-add-filter">Find games</label>
                 <input type="search" id="event-add-filter" placeholder="Search your collection" autocomplete="off" aria-controls="event-add-list">
+                <label class="event-choice"><input type="checkbox" id="event-add-games-only" checked> Games only</label>
                 <div class="event-add-list" id="event-add-list">
                     <?php foreach ($to_add as $candidate) { ?>
-                        <label class="event-choice" data-title="<?php echo h(mb_strtolower($candidate['Title'])); ?>">
+                        <label class="event-choice" data-game="<?php echo $candidate['is_game'] ? '1' : '0'; ?>" data-title="<?php echo h(mb_strtolower($candidate['Title'])); ?>">
                             <input type="checkbox" name="item_ids[]" value="<?php echo $candidate['id']; ?>">
                             <span><?php echo h($candidate['Title']); ?>
                                 <?php if ($candidate['facts'] !== '') { ?><small class="menu-support"><?php echo h($candidate['facts']); ?></small><?php } ?>
@@ -88,11 +91,15 @@ include(SHARED_PATH . '/header.php');
                     <?php } ?>
                 </select>
             </label>
+            <label>Only these tags
+                <input type="text" name="tags" placeholder="casual, main" value="<?php echo h($tags); ?>" aria-describedby="event-tags-help">
+            </label>
             <button type="submit">Group</button>
         </form>
-        <?php if ($by === 'players' || $then === 'players' || $by === 'tag' || $then === 'tag') { ?>
-            <p class="menu-support">A game best at several player counts, or with several tags, shows in each of those groups.</p>
-        <?php } ?>
+        <p id="event-tags-help" class="menu-support">
+            A game best at several player counts, or with several tags, shows in each of those groups.
+            To split each player count into casual and main, tag games casual or main on Edit Item, group by Sweet spot then by Tag, and enter “casual, main” so other tags are left out.
+        </p>
 
         <section class="event-plan" aria-label="Planned games">
             <?php foreach ($groups as $group) { ?>
@@ -110,7 +117,7 @@ include(SHARED_PATH . '/header.php');
                                         <input type="checkbox" class="event-packed" data-item-id="<?php echo $item['id']; ?>" <?php echo $item['is_packed'] ? 'checked' : ''; ?>>
                                         <span><?php echo h(event_plan_line($item)); ?></span>
                                     </label>
-                                    <?php if ($item['tags'] && $by !== 'tag' && $then !== 'tag') { ?><small class="menu-support"><?php echo h(implode(', ', $item['tags'])); ?></small><?php } ?>
+                                    <?php if ($item['tags'] && !$by_tag) { ?><small class="menu-support"><?php echo h(implode(', ', $item['tags'])); ?></small><?php } ?>
                                 </li>
                             <?php } ?>
                         </ul>
@@ -152,5 +159,5 @@ include(SHARED_PATH . '/header.php');
     <?php } ?>
 </main>
 <form id="event-pack-form" hidden><?php echo csrf_input(); ?></form>
-<script type="module" src="<?php echo url_for('/events/events.js?v=1'); ?>"></script>
+<script type="module" src="<?php echo url_for('/events/events.js?v=2'); ?>"></script>
 <?php include(SHARED_PATH . '/footer.php'); ?>

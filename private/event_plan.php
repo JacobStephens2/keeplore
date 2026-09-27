@@ -28,9 +28,13 @@ function event_plan_dimensions() {
  * group is ['label' => ..., 'items' => [...], 'groups' => [...]], where
  * 'groups' is empty without a second grouping. Unknown dimensions, and $then
  * repeating $by, mean no grouping at that level. Items with nothing to group
- * by collect in a last group such as "No sweet spot".
+ * by collect in a last group such as "No sweet spot"; within a group they
+ * come first and unlabelled, the way a hand-written list leaves them.
+ *
+ * $tags, when given, are the only tags that make groups, in that order, so
+ * "casual, main" splits each player count in two and ignores "beach-safe".
  */
-function event_plan_groups(array $items, $by, $then = 'none') {
+function event_plan_groups(array $items, $by, $then = 'none', array $tags = []) {
     $by = isset(event_plan_dimensions()[$by]) ? $by : 'none';
     $then = isset(event_plan_dimensions()[$then]) && $then !== $by ? $then : 'none';
     usort($items, function ($a, $b) {
@@ -38,10 +42,11 @@ function event_plan_groups(array $items, $by, $then = 'none') {
     });
 
     $groups = [];
-    foreach (event_plan_split($items, $by) as $group) {
+    $tags = event_plan_chosen_tags($tags);
+    foreach (event_plan_split($items, $by, $tags, false) as $group) {
         $group['groups'] = $then === 'none' ? [] : array_map(function ($sub) {
             return $sub + ['groups' => []];
-        }, event_plan_split($group['items'], $then));
+        }, event_plan_split($group['items'], $then, $tags, true));
         $groups[] = $group;
     }
     return $groups;
@@ -105,18 +110,31 @@ function event_plan_checklist(array $items) {
     }, $items);
 }
 
+/** Chosen tags, as typed ("casual, main") or a list, normalized and in order. */
+function event_plan_chosen_tags($tags) {
+    $chosen = [];
+    foreach (is_array($tags) ? $tags : explode(',', (string) $tags) as $tag) {
+        $tag = mb_strtolower(trim((string) $tag));
+        if ($tag !== '' && !in_array($tag, $chosen, true)) {
+            $chosen[] = $tag;
+        }
+    }
+    return $chosen;
+}
+
 /**
  * Items (already in title order) split into ordered groups by one
- * dimension, with the group for items lacking a value last.
+ * dimension. Items lacking a value form a last, labelled group, or with
+ * $is_sub a first, unlabelled one.
  */
-function event_plan_split(array $items, $by) {
+function event_plan_split(array $items, $by, array $tags, $is_sub) {
     if ($by === 'none') {
         return [['label' => '', 'items' => $items]];
     }
     $groups = [];
     $missing = [];
     foreach ($items as $item) {
-        $keys = event_plan_keys($item, $by);
+        $keys = event_plan_keys($item, $by, $tags);
         if ($keys === []) {
             $missing[] = $item;
         }
@@ -135,7 +153,9 @@ function event_plan_split(array $items, $by) {
         ksort($groups, SORT_STRING);
     }
     $groups = array_values($groups);
-    if ($missing !== []) {
+    if ($missing !== [] && $is_sub) {
+        array_unshift($groups, ['label' => '', 'items' => $missing]);
+    } elseif ($missing !== []) {
         $none = ['players' => 'No sweet spot', 'age' => 'No age recorded', 'setting' => 'No setting', 'tag' => 'Untagged'];
         $groups[] = ['label' => $none[$by], 'items' => $missing];
     }
@@ -143,7 +163,7 @@ function event_plan_split(array $items, $by) {
 }
 
 /** The groups one item belongs to, as sort key => label. */
-function event_plan_keys(array $item, $by) {
+function event_plan_keys(array $item, $by, array $tags) {
     if ($by === 'players') {
         $keys = [];
         foreach (items_list_sweet_spot_counts($item['SS'] ?? $item['ss'] ?? '') as $n) {
@@ -161,6 +181,14 @@ function event_plan_keys(array $item, $by) {
         $value = trim((string) $value);
         // A prefix keeps numeric-looking values string keys, so ksort stays alphabetical.
         $key = 'k' . mb_strtolower($value);
+        if ($by === 'tag' && $tags !== []) {
+            $position = array_search(mb_strtolower($value), $tags, true);
+            if ($position === false) {
+                continue;
+            }
+            // Zero-padded, so ksort keeps the chosen order.
+            $key = sprintf('k%04d', $position);
+        }
         if ($value !== '' && !isset($keys[$key])) {
             $keys[$key] = $value;
         }

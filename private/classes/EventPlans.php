@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__) . '/item_tags.php';
 require_once dirname(__DIR__) . '/items_list.php';
+require_once dirname(__DIR__) . '/item_types.php';
 
 /**
  * The owner's events, such as a beach week, and the items planned for each.
@@ -69,13 +70,15 @@ final class EventPlans
 
     /**
      * The owner's collection (kept or secondary) not yet planned for the
-     * event, in title order, each with its play facts line.
+     * event, in title order, each with its play facts line and whether its
+     * type is a game.
      */
     public function itemsToAdd(int $eventId): array
     {
         $items = $this->rows(
-            'SELECT g.id, g.Title, g.MnP, g.MxP, g.SS, g.Age
+            'SELECT g.id, g.Title, g.MnP, g.MxP, g.SS, g.Age, COALESCE(t.objectType, g.type) AS type_name
              FROM games g
+             LEFT JOIN types t ON t.id = g.type_id
              LEFT JOIN event_items ei ON ei.artifact_id = g.id AND ei.event_id = ?
              WHERE g.user_id = ? AND (g.is_kept = 1 OR g.is_in_secondary_collection = 1)
                 AND ei.artifact_id IS NULL
@@ -86,6 +89,7 @@ final class EventPlans
             'id' => (int) $item['id'],
             'Title' => $item['Title'],
             'facts' => items_list_play_facts($item),
+            'is_game' => item_type_is_game($item['type_name']),
         ], $items);
     }
 

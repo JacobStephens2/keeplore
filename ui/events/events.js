@@ -7,6 +7,7 @@ bindCopy();
 
 function bindAddFilter() {
   const filter = document.getElementById('event-add-filter');
+  const gamesOnly = document.getElementById('event-add-games-only');
   const list = document.getElementById('event-add-list');
   const empty = document.getElementById('event-add-empty');
   const submit = document.getElementById('event-add-submit');
@@ -22,18 +23,23 @@ function bindAddFilter() {
       : `Add ${selected} ${selected === 1 ? 'game' : 'games'}`;
   }
 
-  filter.addEventListener('input', () => {
+  function applyFilter() {
     const needle = filter.value.trim().toLowerCase();
     let shown = 0;
     choices.forEach((choice) => {
       // A ticked game stays in view so the choice is not lost from sight.
-      const match = needle === '' || choice.dataset.title.includes(needle)
-        || choice.querySelector('input').checked;
+      const match = choice.querySelector('input').checked
+        || ((needle === '' || choice.dataset.title.includes(needle))
+          && (!gamesOnly.checked || choice.dataset.game === '1'));
       choice.hidden = !match;
       shown += match ? 1 : 0;
     });
     empty.hidden = shown > 0;
-  });
+  }
+
+  filter.addEventListener('input', applyFilter);
+  gamesOnly.addEventListener('change', applyFilter);
+  applyFilter();
   // Enter in the search box would otherwise submit whatever is ticked.
   filter.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
@@ -73,7 +79,7 @@ function bindPackedMarks() {
       body.append('action', 'pack');
       body.append('is_packed', packed ? '1' : '0');
       try {
-        const response = await fetch('/events/item.php', { method: 'POST', body, credentials: 'same-origin' });
+        const response = await fetch(page.dataset.itemUrl, { method: 'POST', body, credentials: 'same-origin' });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }

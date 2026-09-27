@@ -224,5 +224,7 @@ final class EventPlansTest extends TestCase
         // Arrival is in the secondary collection; Former possession is not kept.
         $this->assertSame(['Arrival', 'Catan'], array_column($candidates, 'Title'));
         $this->assertSame('3–4 players, best 3, 4 · Age 10+', $candidates[1]['facts']);
+        $this->runSql("UPDATE types SET objectType = 'table game' WHERE id = 1");
+        $this->assertSame([false, true], array_column($this->plans()->itemsToAdd($id), 'is_game'));
     }
 }

@@ -130,17 +130,41 @@ class EventPlanTest extends TestCase
         $this->assertSame([''], $this->labels($groups));
     }
 
-    public function test_player_counts_can_be_sub_grouped_by_tag(): void
+    public function test_player_counts_can_be_sub_grouped_by_tag_with_untagged_games_first_and_unlabelled(): void
     {
         $groups = event_plan_groups([
             $this->item('Guards of Atlantis II', ['SS' => '4,6,8', 'tags' => ['strategy']]),
             $this->item('Wavelength', ['SS' => '6,8', 'tags' => ['casual']]),
+            $this->item('Senji', ['SS' => '6']),
         ], 'players', 'tag');
 
         $this->assertSame(['8 players', '6 players', '4 players'], $this->labels($groups));
         $this->assertSame(['casual', 'strategy'], $this->labels($groups[0]['groups']));
         $this->assertSame(['Wavelength'], $this->titles($groups[0]['groups'][0]));
-        $this->assertSame(['strategy'], $this->labels($groups[2]['groups']));
+        $this->assertSame(['', 'casual', 'strategy'], $this->labels($groups[1]['groups']));
+        $this->assertSame(['Senji'], $this->titles($groups[1]['groups'][0]));
+    }
+
+    public function test_only_the_chosen_tags_make_sub_groups(): void
+    {
+        $groups = event_plan_groups([
+            $this->item('Wavelength', ['SS' => '6', 'tags' => ['beach-safe', 'casual']]),
+            $this->item('Senji', ['SS' => '6', 'tags' => ['Main']]),
+            $this->item('Hot Streak', ['SS' => '6', 'tags' => ['beach-safe']]),
+        ], 'players', 'tag', ['casual', 'main']);
+
+        $this->assertSame(['', 'casual', 'Main'], $this->labels($groups[0]['groups']));
+        $this->assertSame(['Hot Streak'], $this->titles($groups[0]['groups'][0]));
+    }
+
+    public function test_the_chosen_tags_come_in_the_order_given(): void
+    {
+        $groups = event_plan_groups([
+            $this->item('Wavelength', ['tags' => ['casual']]),
+            $this->item('Senji', ['tags' => ['main']]),
+        ], 'tag', 'none', ['main', 'casual']);
+
+        $this->assertSame(['main', 'casual'], $this->labels($groups));
     }
 
     public function test_sub_grouping_by_the_same_dimension_is_ignored(): void
@@ -175,7 +199,6 @@ class EventPlanTest extends TestCase
             . "- [ ] Guards of Atlantis II, 4–8 (4, 6, 8)\n"
             . "\n"
             . "# 2 players\n"
-            . "## Untagged\n"
             . "- [ ] Sky Team, 2 (2), beach\n",
             event_plan_text($groups)
         );
