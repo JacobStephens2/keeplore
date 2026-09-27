@@ -268,6 +268,7 @@ function items_list_present_row(array $artifact, $interval, $today = null) {
             $artifact['ss'] ?? $artifact['SS'] ?? null
         ),
         'age' => $min_age === null ? '' : $min_age . '+',
+        'copy_text' => items_list_copy_text($artifact),
         'avg_time' => (int) ceil(($mnt + $mxt) / 2),
         'candidate' => ($candidate_raw != '' && $candidate_raw != 0),
         // Keyed by BGG username; an object even when empty so the JSON is {}.
@@ -326,20 +327,42 @@ function items_list_sweet_spot_counts($ss) {
 }
 
 /**
- * The player range with the sweet spot, as in "2–4 (best 3)". A run of three
- * or more consecutive counts reads as a range, so "3–5" but "3, 4".
+ * The line Items' Copy button puts on the clipboard for sharing a game:
+ * "Azul, 2–4 (2), 8 yrs", the name, the player range with its best counts,
+ * and the minimum age. A part with nothing recorded is left out.
  */
-function items_list_players_label($min, $max, $ss) {
+function items_list_copy_text(array $artifact) {
+    $parts = [(string) ($artifact['Title'] ?? '')];
+    $range = items_list_player_range($artifact['mnp'] ?? $artifact['MnP'] ?? null, $artifact['mxp'] ?? $artifact['MxP'] ?? null);
+    $best = items_list_best_counts_label($artifact['ss'] ?? $artifact['SS'] ?? '');
+    if ($range !== '') {
+        $parts[] = $best === '' ? $range : $range . ' (' . $best . ')';
+    }
+    $min_age = items_list_min_age($artifact);
+    if ($min_age !== null) {
+        $parts[] = $min_age . ' yrs';
+    }
+    return implode(', ', $parts);
+}
+
+/** The player range, as in "2–4", "3" or '' when none is recorded. */
+function items_list_player_range($min, $max) {
     $min = (int) $min;
     $max = (int) $max;
     if ($min <= 0 && $max <= 0) {
-        $range = '';
-    } elseif ($min <= 0 || $max <= 0 || $min === $max) {
-        $range = (string) max($min, $max);
-    } else {
-        $range = $min . '–' . $max;
+        return '';
     }
+    if ($min <= 0 || $max <= 0 || $min === $max) {
+        return (string) max($min, $max);
+    }
+    return $min . '–' . $max;
+}
 
+/**
+ * The sweet spot's counts, as in "3" or "3, 4". A run of three or more
+ * consecutive counts reads as a range, so "3–5" but "3, 4".
+ */
+function items_list_best_counts_label($ss) {
     $runs = [];
     foreach (items_list_sweet_spot_counts($ss) as $n) {
         $last = count($runs) - 1;
@@ -349,13 +372,18 @@ function items_list_players_label($min, $max, $ss) {
             $runs[] = [$n, $n];
         }
     }
-    $best = implode(', ', array_map(function ($run) {
+    return implode(', ', array_map(function ($run) {
         if ($run[1] - $run[0] >= 2) {
             return $run[0] . '–' . $run[1];
         }
         return implode(', ', range($run[0], $run[1]));
     }, $runs));
+}
 
+/** The player range with the sweet spot, as in "2–4 (best 3)". */
+function items_list_players_label($min, $max, $ss) {
+    $range = items_list_player_range($min, $max);
+    $best = items_list_best_counts_label($ss);
     if ($best === '') {
         return $range;
     }

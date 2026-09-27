@@ -1581,6 +1581,15 @@ p.copied_message {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+/* Items: copy a game's name, players and age for sharing. */
+#artifacts .copy-item-btn {
+  min-height: 0;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  vertical-align: middle;
+}
 #artifacts .bgg-rating-btn {
   min-height: 0;
   padding: 0.15rem 0.6rem;

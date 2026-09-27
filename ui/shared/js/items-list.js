@@ -230,6 +230,15 @@
             href: config.itemUrlPrefix + encodeURIComponent(item.id),
             text: item.title,
           }),
+          // "Azul, 2–4 (2), 8 yrs" for sharing, from items_list_copy_text().
+          item.copy_text ? el('button', {
+            type: 'button',
+            className: 'copy-item-btn',
+            title: 'Copy "' + item.copy_text + '"',
+            'aria-label': 'Copy ' + item.title + "'s name, players and age",
+            dataset: { copyText: item.copy_text },
+            text: 'Copy',
+          }) : null,
         ]);
       case 'tags':
         return el('td', { text: (item.tags || []).join(', ') });
@@ -317,6 +326,20 @@
     });
 
     tbody.addEventListener('click', function (event) {
+      var copyButton = event.target.closest('.copy-item-btn');
+      if (copyButton) {
+        var text = copyButton.dataset.copyText;
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          window.prompt('Copy this:', text);
+          return;
+        }
+        navigator.clipboard.writeText(text).then(function () {
+          showToast(toastEl, 'Copied "' + text + '"', 'success');
+        }, function () {
+          window.prompt('Copy this:', text);
+        });
+        return;
+      }
       var button = event.target.closest('.bgg-rating-btn');
       if (!button) {
         return;

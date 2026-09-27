@@ -524,6 +524,38 @@ class ItemsListTest extends TestCase
         $this->assertMatchesRegularExpression('/<nav class="kept-switch type-switch" aria-label="Item type">/', $source);
     }
 
+    public function test_copy_text_is_name_player_range_with_best_counts_and_minimum_age(): void
+    {
+        $row = function (array $fields) {
+            return items_list_present_row($fields + ['id' => 1, 'Title' => 'Azul', 'Acq' => '2024-01-10'], 90, '2024-06-01');
+        };
+
+        $this->assertSame('Azul, 2–4 (2), 8 yrs', $row(['mnp' => 2, 'mxp' => 4, 'ss' => '02', 'Age' => 8])['copy_text']);
+        $this->assertSame('Azul, 3–8 (5–7), 14 yrs', $row(['mnp' => 3, 'mxp' => 8, 'ss' => '05,06,07', 'Age' => 14])['copy_text']);
+        $this->assertSame('Azul, 2–5 (3, 4), 10 yrs', $row(['mnp' => 2, 'mxp' => 5, 'ss' => '3, 4', 'Age' => 10])['copy_text']);
+        $this->assertSame('Azul, 1–4, 8 yrs', $row(['mnp' => 1, 'mxp' => 4, 'ss' => '', 'Age' => 8])['copy_text']);
+        $this->assertSame('Azul, 2–4 (2)', $row(['mnp' => 2, 'mxp' => 4, 'ss' => '02', 'Age' => 0])['copy_text']);
+        $this->assertSame('Azul, 8 yrs', $row(['Age' => 8])['copy_text']);
+        $this->assertSame('Azul', $row([])['copy_text']);
+    }
+
+    public function test_players_label_still_reads_best_after_extracting_the_best_counts(): void
+    {
+        $this->assertSame('3, 4', items_list_best_counts_label('03,04'));
+        $this->assertSame('5–7', items_list_best_counts_label('05,06,07'));
+        $this->assertSame('', items_list_best_counts_label(''));
+        $this->assertSame('2–5 (best 3, 4)', items_list_players_label(2, 5, '3, 4'));
+        $this->assertSame('best 3', items_list_players_label(0, 0, '3'));
+    }
+
+    public function test_each_items_row_offers_a_copy_button(): void
+    {
+        $js = (string) file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
+        $this->assertStringContainsString('item.copy_text', $js);
+        $this->assertStringContainsString('navigator.clipboard.writeText', $js);
+        $this->assertStringContainsString("'copy-item-btn'", $js);
+    }
+
     public function test_items_page_offers_a_youngest_age_picker_beside_the_count(): void
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
