@@ -78,6 +78,8 @@ function items_list_filters_from_request(
     $players = items_list_positive_int($players);
     // The youngest player's age: items must be recommended for this age or younger.
     $age = items_list_positive_int($post['age'] ?? $get['age'] ?? '');
+    // Whether the age filter also keeps items with no recorded minimum age.
+    $age_unknown = ($post['age_unknown'] ?? $get['age_unknown'] ?? 'no') === 'yes';
     $showAttributes = $post['showAttributes'] ?? $get['showAttributes'] ?? 'no';
     if ($showAttributes !== 'yes') {
         $showAttributes = 'no';
@@ -90,6 +92,7 @@ function items_list_filters_from_request(
         'interval' => $interval,
         'players' => $players,
         'age' => $age,
+        'ageUnknown' => $age_unknown,
         'showAttributes' => $showAttributes,
         'tagFilter' => (string) $tagFilter,
     ];
@@ -124,6 +127,9 @@ function items_list_query_params(array $filters, array $all_types = []) {
     }
     if ($filters['age'] !== null) {
         $params['age'] = $filters['age'];
+        if ($filters['ageUnknown']) {
+            $params['age_unknown'] = 'yes';
+        }
     }
     if ($filters['showAttributes'] === 'yes') {
         $params['showAttributes'] = 'yes';
@@ -204,7 +210,7 @@ function items_list_payload($db, array $filters, $user_id, $today = null) {
     }
     mysqli_free_result($artifact_set);
     $artifacts = items_list_best_at($artifacts, $filters['players']);
-    $artifacts = items_list_suitable_for_age($artifacts, $filters['age']);
+    $artifacts = items_list_suitable_for_age($artifacts, $filters['age'], $filters['ageUnknown']);
     $artifacts = with_item_tags($db, $artifacts, (int) $user_id);
     $artifacts = with_item_bgg_ratings($db, $artifacts, (int) $user_id);
     $items = [];
@@ -301,15 +307,16 @@ function items_list_min_age(array $row) {
 
 /**
  * The rows recommended for the age or younger, or every row with no age. An
- * item with no recorded minimum age is left out, since nothing vouches for it.
+ * item with no recorded minimum age is left out, since nothing vouches for it,
+ * unless the caller asks to include unknown ages.
  */
-function items_list_suitable_for_age(array $rows, $age) {
+function items_list_suitable_for_age(array $rows, $age, $include_unknown = false) {
     if ($age === null) {
         return $rows;
     }
-    return array_values(array_filter($rows, function ($row) use ($age) {
+    return array_values(array_filter($rows, function ($row) use ($age, $include_unknown) {
         $min_age = items_list_min_age($row);
-        return $min_age !== null && $min_age <= $age;
+        return $min_age === null ? $include_unknown : $min_age <= $age;
     }));
 }
 

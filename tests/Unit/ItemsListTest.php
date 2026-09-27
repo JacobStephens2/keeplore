@@ -398,6 +398,48 @@ class ItemsListTest extends TestCase
         $this->assertSame([1, 2, 3, 4, 5, 6, 7], array_column(items_list_suitable_for_age($rows, null), 'id'));
     }
 
+    public function test_include_unknown_ages_comes_from_age_unknown_yes(): void
+    {
+        $types = ['table-game' => '4'];
+        $this->assertTrue(items_list_filters_from_request(['age' => '2', 'age_unknown' => 'yes'], [], 'GET', 90, $types)['ageUnknown']);
+        $this->assertTrue(items_list_filters_from_request([], ['age' => '2', 'age_unknown' => 'yes'], 'POST', 90, $types)['ageUnknown']);
+        $this->assertFalse(items_list_filters_from_request(['age' => '2', 'age_unknown' => 'no'], [], 'GET', 90, $types)['ageUnknown']);
+        $this->assertFalse(items_list_filters_from_request(['age' => '2'], [], 'GET', 90, $types)['ageUnknown']);
+    }
+
+    public function test_query_params_carry_include_unknown_ages_only_with_an_age(): void
+    {
+        $types = ['table-game' => '4'];
+        $with = items_list_query_params(items_list_filters_from_request(['age' => '2', 'age_unknown' => 'yes'], [], 'GET', 90, $types), $types);
+        $no_age = items_list_query_params(items_list_filters_from_request(['age_unknown' => 'yes'], [], 'GET', 90, $types), $types);
+        $off = items_list_query_params(items_list_filters_from_request(['age' => '2'], [], 'GET', 90, $types), $types);
+
+        $this->assertSame('yes', $with['age_unknown']);
+        $this->assertArrayNotHasKey('age_unknown', $no_age);
+        $this->assertArrayNotHasKey('age_unknown', $off);
+    }
+
+    public function test_suitable_for_age_can_include_items_with_no_recorded_age(): void
+    {
+        $rows = [
+            ['id' => 1, 'Age' => 8],
+            ['id' => 2, 'Age' => 2],
+            ['id' => 3, 'Age' => 0],
+            ['id' => 4, 'Age' => null],
+            ['id' => 5],
+        ];
+
+        $this->assertSame([2, 3, 4, 5], array_column(items_list_suitable_for_age($rows, 2, true), 'id'));
+        $this->assertSame([2], array_column(items_list_suitable_for_age($rows, 2, false), 'id'));
+        $this->assertSame([1, 2, 3, 4, 5], array_column(items_list_suitable_for_age($rows, null, true), 'id'));
+    }
+
+    public function test_items_page_offers_an_include_unknown_ages_checkbox(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
+        $this->assertMatchesRegularExpression('/<input type="checkbox" name="age_unknown" value="yes"/', $source);
+    }
+
     public function test_present_row_carries_the_minimum_age_label(): void
     {
         $base = ['id' => 1, 'Title' => 'Azul', 'Acq' => '2024-01-10'];

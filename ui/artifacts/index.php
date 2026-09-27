@@ -18,6 +18,7 @@
   $interval = $filters['interval'];
   $players = $filters['players'];
   $age = $filters['age'];
+  $age_unknown = $filters['ageUnknown'];
   $showAttributes = $filters['showAttributes'];
   $tagFilter = $filters['tagFilter'];
 
@@ -107,6 +108,9 @@
       }
       if ($age !== null) {
         $switch_base['age'] = $age;
+        if ($age_unknown) {
+          $switch_base['age_unknown'] = 'yes';
+        }
       }
       if ($tagFilter !== '') {
         $switch_base['tag'] = $tagFilter;
@@ -138,7 +142,7 @@
       // The picker is a plain GET form, so a count or age can be bookmarked. It
       // carries the other filters as hidden fields, so choosing one keeps them.
       $picker_carry = $switch_base;
-      unset($picker_carry['players'], $picker_carry['age']);
+      unset($picker_carry['players'], $picker_carry['age'], $picker_carry['age_unknown']);
       if ($kept_switch_active !== null) {
         $picker_carry['kept'] = $kept_switch_active;
       } elseif ($kept === 'secondary_only') {
@@ -148,8 +152,10 @@
     <form class="player-picker" method="get" action="<?php echo url_for('/artifacts/index.php'); ?>">
       <label>Best at <input type="number" name="players" min="1" inputmode="numeric"
         value="<?php echo $players === null ? '' : h((string) $players); ?>"> players</label>
-      <label title="Shows items recommended for this age or younger. Items with no recorded age are left out.">Youngest age <input type="number" name="age" min="1" inputmode="numeric"
+      <label title="Shows items recommended for this age or younger.">Youngest age <input type="number" name="age" min="1" inputmode="numeric"
         value="<?php echo $age === null ? '' : h((string) $age); ?>"></label>
+      <label title="With a youngest age, also show items that have no recorded minimum age."><input type="checkbox" name="age_unknown" value="yes"
+        <?php if ($age_unknown) { echo 'checked'; } ?>> Include unknown ages</label>
       <?php foreach ($picker_carry as $carry_name => $carry_value) {
         foreach ((array) $carry_value as $carry_key => $carry_item) {
           $carry_field = is_array($carry_value) ? $carry_name . '[' . $carry_key . ']' : $carry_name; ?>
@@ -167,7 +173,8 @@
         <p class="best-at-lede">Items whose sweet spot includes <?php echo h((string) $players); ?>, with each one's player range and sweet spot.</p>
       <?php } ?>
       <?php if ($age !== null) { ?>
-        <p class="best-at-lede">Items recommended for age <?php echo h((string) $age); ?> or younger. Items with no recorded minimum age are left out.</p>
+        <p class="best-at-lede">Items recommended for age <?php echo h((string) $age); ?> or younger.
+          <?php echo $age_unknown ? 'Items with no recorded minimum age are included, with a blank Age.' : 'Items with no recorded minimum age are left out.'; ?></p>
       <?php } ?>
     <?php } ?>
 
@@ -235,6 +242,9 @@
       <?php } ?>
       <?php if ($age !== null) { ?>
         <input type="hidden" name="age" value="<?php echo h((string) $age); ?>">
+        <?php if ($age_unknown) { ?>
+          <input type="hidden" name="age_unknown" value="yes">
+        <?php } ?>
       <?php } ?>
 
       <label for="tag">Tag</label>
