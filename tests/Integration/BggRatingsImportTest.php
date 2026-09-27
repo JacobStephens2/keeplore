@@ -36,6 +36,9 @@ final class BggRatingsImportTest extends TestCase
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-url.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings-manual.sql'));
+        // Rerunning the migration must be harmless.
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings-manual.sql'));
         require_once PRIVATE_PATH . '/bgg_ratings.php';
 
         // Fixture items 10-13 belong to user 1, item 20 to user 2.
@@ -110,6 +113,7 @@ final class BggRatingsImportTest extends TestCase
                 'rating' => 9.5,
                 'comment' => 'The best card game ever.',
                 'url' => 'https://boardgamegeek.com/boardgame/147154/blue-moon-legends',
+                'manual' => false,
             ]],
         ], $ratings);
         $this->assertSame(['Gyges'], item_bgg_reviewers($this->db, 1));
@@ -286,6 +290,7 @@ final class BggRatingsImportTest extends TestCase
             'rating' => null,
             'comment' => 'Comment only.',
             'url' => 'https://boardgamegeek.com/boardgame/29107',
+            'manual' => true,
         ]], find_item_bgg_ratings($this->db, [11], 1)[11]);
     }
 
@@ -311,20 +316,73 @@ final class BggRatingsImportTest extends TestCase
         $this->assertSame(9.5, find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['rating']);
     }
 
-    public function test_editing_refuses_unknown_reviewers_and_unowned_or_unlinked_items(): void
+    public function test_owner_adds_a_rating_to_an_item_with_no_bgg_link(): void
+    {
+        $this->importGygesOnBlueMoon();
+
+        // Item 12 has no BGG link and no Gyges row.
+        $result = bgg_ratings_save_item($this->db, 1, 12, 'Gyges', '7', 'Fun with kids.');
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame(
+            ['rating' => 7.0, 'comment' => 'Fun with kids.', 'url' => '', 'manual' => true],
+            find_item_bgg_ratings($this->db, [12], 1)[12]['Gyges']
+        );
+    }
+
+    public function test_bulk_import_leaves_hand_entries_alone(): void
+    {
+        $this->importGygesOnBlueMoon();
+        bgg_ratings_save_item($this->db, 1, 10, 'Gyges', '4', 'My own take.');
+        bgg_ratings_save_item($this->db, 1, 11, 'Gyges', '5', 'BGG has nothing.');
+        bgg_ratings_save_item($this->db, 1, 12, 'Gyges', '6', 'No link at all.');
+
+        $result = bgg_ratings_import($this->db, 1, 'Gyges', $this->fakeBgg([
+            147154 => $this->blueMoonEntry(9.5, 'From BGG.'),
+        ]), 0);
+
+        $this->assertSame(0, $result['removed']);
+        $ratings = find_item_bgg_ratings($this->db, [10, 11, 12], 1);
+        $this->assertSame('My own take.', $ratings[10]['Gyges']['comment']);
+        $this->assertSame('BGG has nothing.', $ratings[11]['Gyges']['comment']);
+        $this->assertSame('No link at all.', $ratings[12]['Gyges']['comment']);
+    }
+
+    public function test_requesting_one_item_keeps_a_hand_entry_bgg_has_nothing_for(): void
+    {
+        $this->importGygesOnBlueMoon();
+        bgg_ratings_save_item($this->db, 1, 11, 'Gyges', '5', 'Mine.');
+
+        $result = bgg_ratings_import_item($this->db, 1, 11, 'Gyges', $this->fakeBgg([]));
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame('Gyges has not rated or commented on this item on BoardGameGeek, so your entry stays.', $result['message']);
+        $this->assertSame('Mine.', find_item_bgg_ratings($this->db, [11], 1)[11]['Gyges']['comment']);
+    }
+
+    public function test_requesting_one_item_replaces_a_hand_entry_with_bgg_data(): void
+    {
+        $this->importGygesOnBlueMoon();
+        bgg_ratings_save_item($this->db, 1, 10, 'Gyges', '5', 'Mine.');
+
+        $this->importGygesOnBlueMoon();
+
+        $rating = find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges'];
+        $this->assertSame('The best card game ever.', $rating['comment']);
+        $this->assertFalse($rating['manual']);
+    }
+
+    public function test_editing_refuses_unknown_reviewers_and_unowned_items(): void
     {
         $this->importGygesOnBlueMoon();
 
         $stranger = bgg_ratings_save_item($this->db, 1, 10, 'Someone', '7', '');
-        $unlinked = bgg_ratings_save_item($this->db, 1, 12, 'Gyges', '7', '');
         $not_owned = bgg_ratings_save_item($this->db, 1, 20, 'Gyges', '7', '');
         $other_owner = bgg_ratings_save_item($this->db, 2, 20, 'Gyges', '7', '');
 
         $this->assertSame('No imported BoardGameGeek ratings from Someone.', $stranger['error']);
-        $this->assertSame('Add a BoardGameGeek link to this item first.', $unlinked['error']);
         $this->assertSame('Item not found.', $not_owned['error']);
         $this->assertSame('No imported BoardGameGeek ratings from Gyges.', $other_owner['error']);
-        $this->assertSame([], find_item_bgg_ratings($this->db, [12], 1));
         $this->assertSame([], find_item_bgg_ratings($this->db, [20], 2));
     }
 

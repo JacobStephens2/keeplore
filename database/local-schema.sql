@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS item_bgg_ratings (
   rating DECIMAL(4,2) NULL DEFAULT NULL,
   comment TEXT NULL DEFAULT NULL,
   rated_at DATETIME NULL DEFAULT NULL,
+  is_manual TINYINT(1) NOT NULL DEFAULT 0,
   imported_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_item_bgg_ratings_user_artifact_bgg_user (user_id, artifact_id, bgg_username),
   KEY idx_item_bgg_ratings_user_bgg_user (user_id, bgg_username),

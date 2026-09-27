@@ -174,6 +174,27 @@ class BggRatingsTest extends TestCase
         $this->assertStringContainsString('require_login()', $save);
     }
 
+    public function test_item_page_marks_a_hand_entry_as_not_from_bgg(): void
+    {
+        $rated = item_bgg_ratings_html(['Gyges' => ['rating' => 7.0, 'comment' => 'Mine.', 'url' => '', 'manual' => true]]);
+        $comment_only = item_bgg_ratings_html(['Gyges' => ['rating' => null, 'comment' => 'Mine.', 'url' => '', 'manual' => true]]);
+
+        $this->assertStringContainsString('Gyges rated it 7 out of 10 (entered by hand)', $rated);
+        $this->assertStringNotContainsString('on BoardGameGeek', $rated);
+        $this->assertStringContainsString('Gyges commented (entered by hand)', $comment_only);
+    }
+
+    public function test_edit_item_offers_the_editor_whether_or_not_the_item_links_to_bgg(): void
+    {
+        $edit = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/edit.php');
+        $editor_at = strpos($edit, "url_for('/artifacts/bgg-rating-save.php')");
+        $link_check_at = strpos($edit, 'bgg_thing_id_from_url(');
+
+        $this->assertNotFalse($editor_at);
+        $this->assertNotFalse($link_check_at);
+        $this->assertLessThan($link_check_at, $editor_at, 'the editor must not sit inside the BGG-link check');
+    }
+
     public function test_rating_input_reads_blank_as_none_and_scores_from_one_to_ten(): void
     {
         $this->assertNull(bgg_rating_from_input(' '));

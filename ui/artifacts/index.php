@@ -375,7 +375,7 @@
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=13"></script>
+    <script src="/shared/js/items-list.js?v=14"></script>
   </div>
 </main>
 
