@@ -1,0 +1,41 @@
+#!/usr/bin/env php
+<?php
+// Import a BoardGameGeek user's ratings and comments onto a Keeplore owner's
+// items that link to BGG. They show as a column on Items. Rerun to refresh.
+// Usage: bin/import-bgg-ratings <keeplore-email> <bgg-username>
+
+if (PHP_SAPI !== 'cli') {
+  exit(1);
+}
+if ($argc !== 3) {
+  fwrite(STDERR, "Usage: bin/import-bgg-ratings <keeplore-email> <bgg-username>\n");
+  exit(2);
+}
+
+require_once dirname(__DIR__) . '/private/initialize.php';
+require_once PRIVATE_PATH . '/bgg_ratings.php';
+ob_end_flush();
+
+$stmt = mysqli_prepare($db, 'SELECT id FROM users WHERE email = ?');
+mysqli_stmt_bind_param($stmt, 's', $argv[1]);
+mysqli_stmt_execute($stmt);
+$owner = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+if (!$owner) {
+  fwrite(STDERR, "No Keeplore user with email {$argv[1]}.\n");
+  exit(1);
+}
+
+$result = bgg_ratings_import($db, (int) $owner['id'], $argv[2]);
+if (!$result['ok']) {
+  fwrite(STDERR, $result['error'] . "\n");
+  exit(1);
+}
+printf(
+  "%s: checked %d linked items, imported %d, removed %d, failed %d.\n",
+  $result['username'],
+  $result['checked'],
+  $result['imported'],
+  $result['removed'],
+  $result['failed']
+);
+exit($result['failed'] > 0 ? 1 : 0);

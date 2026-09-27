@@ -77,6 +77,26 @@ Owner-managed free-form tags on items (issue #28). Distinct from BGG rating meta
 
 ---
 
+### `item_bgg_ratings`
+
+Another BoardGameGeek user's rating and comment on an owner's item, matched through the item's `games.bgg_url`. `bin/import-bgg-ratings <keeplore-email> <bgg-username>` fills it; rerunning refreshes it. Items shows one column per imported BGG user. Apply [`add-item-bgg-ratings.sql`](../database/migrations/add-item-bgg-ratings.sql); it is safe to rerun.
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | INT UNSIGNED, AUTO_INCREMENT | NO | Primary key |
+| `user_id` | INT | NO | Owner whose item was rated |
+| `artifact_id` | INT | NO | Rated item, `games.id` |
+| `bgg_username` | VARCHAR(64) | NO | BGG user, as BGG spells it, e.g. `Gyges` |
+| `rating` | DECIMAL(4,2) | YES | Their 1-10 rating, NULL when they only commented |
+| `comment` | TEXT | YES | Their collection comment, NULL when they only rated |
+| `rated_at` | DATETIME | YES | When they rated it on BGG |
+| `imported_at` | DATETIME | NO | Last import that wrote the row |
+
+**Primary key:** `id`
+**Uniqueness:** `(user_id, artifact_id, bgg_username)` is unique.
+
+---
+
 ### `users`
 
 Authentication and account records for application users.
