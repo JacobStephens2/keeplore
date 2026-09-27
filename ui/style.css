@@ -1606,6 +1606,9 @@ p.copied_message {
   padding: 0.1rem 0 0.1rem 1rem;
   border-left: 3px solid var(--outline-strong);
 }
+.bgg-rating-request {
+  margin: 0 0 1.25rem;
+}
 .item-bgg-rating figcaption {
   color: var(--text-soft);
   font-size: 0.9rem;
