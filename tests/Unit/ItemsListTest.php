@@ -588,10 +588,19 @@ class ItemsListTest extends TestCase
     {
         $edit = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/edit.php');
         $this->assertMatchesRegularExpression(
-            '/<h1>Edit <\?php echo h\(\$artifact\[\'Title\'\]\); \?><\/h1>\s*<\?php \$play_facts = items_list_play_facts\(\$artifact\);/',
+            '/<h1>Edit <\?php echo h\(\$artifact\[\'Title\'\]\); \?><\/h1>\s*<\?php \$play_facts = /',
             $edit
         );
         $this->assertStringContainsString('class="item-play-facts"', $edit);
+        // Blank player fields save as 5-240 on Edit Item, so a book would
+        // headline "5–240 players"; the line is for games only.
+        $this->assertStringContainsString("item_type_is_game(\$artifact['type'] ?? '')", $edit);
+    }
+
+    public function test_the_play_facts_rule_does_not_swallow_the_picture_selectors(): void
+    {
+        $css = (string) file_get_contents(PROJECT_PATH . '/ui/style.css');
+        $this->assertMatchesRegularExpression('/\.bgg-match-image,\s*\.item-picture-preview,\s*\.item-picture\s*\{/', $css);
     }
 
     public function test_items_page_offers_a_youngest_age_picker_beside_the_count(): void

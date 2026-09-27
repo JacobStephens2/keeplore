@@ -93,7 +93,7 @@
 
   <div id="editArtifact" class="object edit">
     <h1>Edit <?php echo h($artifact['Title']); ?></h1>
-    <?php $play_facts = items_list_play_facts($artifact); ?>
+    <?php $play_facts = item_type_is_game($artifact['type'] ?? '') ? items_list_play_facts($artifact) : ''; ?>
     <?php if ($play_facts !== '') { ?>
       <p class="item-play-facts"><?php echo h($play_facts); ?></p>
     <?php } ?>
