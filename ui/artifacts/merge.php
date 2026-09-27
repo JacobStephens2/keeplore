@@ -14,10 +14,11 @@ if (!is_post_request() || !$survivor_id) {
 if (($_POST['merge_confirm'] ?? '') !== 'yes') {
   $_SESSION['message'] = 'Tick the box to confirm the merge.';
 } else {
-  $loser_title = find_item_for_merge($db, (int) ($_POST['merge_loser_id'] ?? 0))['Title'] ?? '';
-  $result = merge_items($db, $survivor_id, (int) ($_POST['merge_loser_id'] ?? 0), (int) $_SESSION['user_id']);
+  $loser_id = (int) ($_POST['merge_loser_id'] ?? 0);
+  $result = merge_items($db, $survivor_id, $loser_id, (int) $_SESSION['user_id']);
+  // Duplicates share a name, so the message names the deleted record's id.
   $_SESSION['message'] = $result === true
-    ? 'Merged ' . $loser_title . ' into this item.'
+    ? 'Merged item #' . $loser_id . ' into this item and deleted it.'
     : implode(' ', $result);
 }
 // Edit Item answers 404 for an item the user does not own, so returning

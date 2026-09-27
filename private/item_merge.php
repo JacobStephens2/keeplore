@@ -102,6 +102,12 @@ function merge_items($conn, $survivor_id, $loser_id, $user_id) {
       mysqli_stmt_execute($stmt);
       mysqli_stmt_close($stmt);
     }
+    // Where the loser was chosen instead of the survivor, that choice is now
+    // the item itself, which says nothing, so the link goes.
+    $stmt = mysqli_prepare($conn, 'UPDATE proposal_outcomes SET chosen_item_id = NULL WHERE item_id = ? AND chosen_item_id = item_id');
+    mysqli_stmt_bind_param($stmt, 'i', $survivor_id);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
     foreach (['item_tags', 'item_bgg_ratings'] as $table) {
       $stmt = mysqli_prepare($conn, "DELETE FROM {$table} WHERE artifact_id = ?");
       mysqli_stmt_bind_param($stmt, 'i', $loser_id);
@@ -112,10 +118,16 @@ function merge_items($conn, $survivor_id, $loser_id, $user_id) {
     $stmt = mysqli_prepare($conn, 'DELETE FROM games WHERE id = ? AND user_id = ? LIMIT 1');
     mysqli_stmt_bind_param($stmt, 'ii', $loser_id, $user_id);
     mysqli_stmt_execute($stmt);
+    $deleted = mysqli_stmt_affected_rows($stmt);
     mysqli_stmt_close($stmt);
+    // Deleted since the check above: keep everything as it was.
+    if ($deleted !== 1) {
+      throw new RuntimeException('item ' . $loser_id . ' vanished mid-merge');
+    }
     mysqli_commit($conn);
   } catch (Throwable $e) {
     mysqli_rollback($conn);
+    error_log('merge_items(' . $survivor_id . ', ' . $loser_id . '): ' . $e->getMessage());
     return ['The merge could not be completed.'];
   }
   return true;

@@ -101,6 +101,17 @@ final class ItemMergeTest extends TestCase
         );
     }
 
+    public function test_a_proposal_where_the_loser_was_chosen_instead_of_the_survivor_loses_that_link(): void
+    {
+        $this->runSql("INSERT INTO proposal_outcomes (id, user_id, item_id, proposal_date, outcome, note, chosen_item_id) VALUES
+            (3, 1, 10, '2026-04-03', 'chose_something_else', '', 11);");
+
+        merge_items($this->db, 10, 11, 1);
+
+        $this->assertSame(['10'], $this->column('SELECT item_id FROM proposal_outcomes WHERE id = 3'));
+        $this->assertSame([null], $this->column('SELECT chosen_item_id FROM proposal_outcomes WHERE id = 3'), 'an item is never chosen instead of itself');
+    }
+
     public function test_merging_another_owners_item_changes_nothing(): void
     {
         $result = merge_items($this->db, 10, 20, 1);

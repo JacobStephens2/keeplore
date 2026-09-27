@@ -352,14 +352,16 @@
     <h2>Merge another item into this one</h2>
     <p>
       The chosen item's uses, proposals, tags and BoardGameGeek ratings move to
-      <?php echo h($artifact['Title']); ?>, which keeps its own details. The
-      chosen item is then deleted. This cannot be undone.
+      <?php echo h($artifact['Title']); ?>, which keeps its own details; the
+      chosen item's details (players, age, BGG link, notes) are discarded
+      with it. This cannot be undone.
     </p>
     <form method="post" action="<?php echo url_for('/artifacts/merge.php'); ?>">
       <?php echo csrf_input(); ?>
       <input type="hidden" name="artifact_id" value="<?php echo h((string) $id); ?>">
       <label for="merge_loser_id">Item to merge in and delete</label>
-      <select id="merge_loser_id" name="merge_loser_id">
+      <select id="merge_loser_id" name="merge_loser_id" required>
+        <option value="">Choose an item</option>
         <?php foreach ($merge_candidates as $candidate) { ?>
           <option value="<?php echo h((string) $candidate['id']); ?>">
             <?php echo h($candidate['Title'] . ' (#' . $candidate['id'] . ')' . ($candidate['same_name'] ? ' - same name' : '')); ?>

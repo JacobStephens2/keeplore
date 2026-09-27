@@ -51,7 +51,7 @@ class ItemMergeTest extends TestCase
     {
         $edit = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/edit.php');
         $this->assertStringContainsString("url_for('/artifacts/merge.php')", $edit);
-        $this->assertMatchesRegularExpression('/<select id="merge_loser_id" name="merge_loser_id"/', $edit);
+        $this->assertMatchesRegularExpression('/<select id="merge_loser_id" name="merge_loser_id" required>\s*<option value="">Choose an item<\/option>/', $edit);
         $this->assertMatchesRegularExpression('/<input type="checkbox" id="merge_confirm" name="merge_confirm" value="yes"/', $edit);
 
         $merge = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/merge.php');
