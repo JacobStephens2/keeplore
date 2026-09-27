@@ -347,6 +347,30 @@ function items_list_copy_text(array $artifact) {
     return implode(', ', $parts);
 }
 
+/**
+ * The line under Edit Item's heading, so the facts people look up most sit
+ * above the fold even in a half-width window: "2–4 players, best 3 · Age 8+".
+ * A part with nothing recorded is left out; '' when nothing is.
+ */
+function items_list_play_facts(array $artifact) {
+    $min = $artifact['MnP'] ?? $artifact['mnp'] ?? null;
+    $max = $artifact['MxP'] ?? $artifact['mxp'] ?? null;
+    $range = items_list_player_range($min, $max);
+    $best = items_list_best_counts_label($artifact['SS'] ?? $artifact['ss'] ?? '');
+    $parts = [];
+    if ($range !== '') {
+        $players = $range . ($range === '1' ? ' player' : ' players');
+        $parts[] = $best === '' ? $players : $players . ', best ' . $best;
+    } elseif ($best !== '') {
+        $parts[] = 'Best at ' . $best;
+    }
+    $min_age = items_list_min_age($artifact);
+    if ($min_age !== null) {
+        $parts[] = 'Age ' . $min_age . '+';
+    }
+    return implode(' · ', $parts);
+}
+
 /** The player range, as in "2–4", "3" or '' when none is recorded. */
 function items_list_player_range($min, $max) {
     $min = (int) $min;

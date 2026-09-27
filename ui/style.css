@@ -687,6 +687,14 @@ button.untrack-btn:hover {
 
 .bgg-match-image,
 .item-picture-preview,
+/* Edit Item: players, best count and age right under the heading. */
+.item-play-facts {
+  margin: -0.25rem 0 0.9rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
 .item-picture {
   display: block;
   max-width: 12rem;

@@ -573,6 +573,27 @@ class ItemsListTest extends TestCase
         $this->assertSame('Azul, best 3, 8 yrs', $row['copy_text']);
     }
 
+    public function test_play_facts_read_players_best_count_and_age_from_an_item_record(): void
+    {
+        // Edit Item reads the games row as stored: MnP, MxP, SS, Age.
+        $this->assertSame('2–4 players, best 3 · Age 8+', items_list_play_facts(['MnP' => 2, 'MxP' => 4, 'SS' => '03', 'Age' => 8]));
+        $this->assertSame('1–5 players, best 3, 4 · Age 10+', items_list_play_facts(['MnP' => 1, 'MxP' => 5, 'SS' => '03,04', 'Age' => 10]));
+        $this->assertSame('2 players · Age 8+', items_list_play_facts(['MnP' => 2, 'MxP' => 2, 'SS' => '', 'Age' => 8]));
+        $this->assertSame('1 player', items_list_play_facts(['MnP' => 1, 'MxP' => 1, 'SS' => '', 'Age' => 0]));
+        $this->assertSame('Best at 3 · Age 6+', items_list_play_facts(['SS' => '3', 'Age' => 6]));
+        $this->assertSame('', items_list_play_facts(['Title' => 'Hat']));
+    }
+
+    public function test_edit_item_shows_the_play_facts_right_under_its_heading(): void
+    {
+        $edit = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/edit.php');
+        $this->assertMatchesRegularExpression(
+            '/<h1>Edit <\?php echo h\(\$artifact\[\'Title\'\]\); \?><\/h1>\s*<\?php \$play_facts = items_list_play_facts\(\$artifact\);/',
+            $edit
+        );
+        $this->assertStringContainsString('class="item-play-facts"', $edit);
+    }
+
     public function test_items_page_offers_a_youngest_age_picker_beside_the_count(): void
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
