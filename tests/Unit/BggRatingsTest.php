@@ -159,4 +159,17 @@ class BggRatingsTest extends TestCase
         $this->assertEquals(new \stdClass(), $row['bgg_ratings']);
         $this->assertSame('{}', json_encode($row['bgg_ratings']));
     }
+
+    public function test_edit_item_offers_an_editor_for_each_imported_reviewer(): void
+    {
+        $edit = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/edit.php');
+        $save = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/bgg-rating-save.php');
+
+        $this->assertStringContainsString("url_for('/artifacts/bgg-rating-save.php')", $edit);
+        foreach (['artifact_id', 'bgg_username', 'rating', 'comment'] as $field) {
+            $this->assertMatchesRegularExpression('/name="' . $field . '"/', $edit);
+        }
+        $this->assertStringContainsString('bgg_ratings_save_item(', $save);
+        $this->assertStringContainsString('require_login()', $save);
+    }
 }
