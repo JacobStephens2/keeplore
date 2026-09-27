@@ -343,6 +343,38 @@
 
   <?php include(SHARED_PATH . '/proposal_history.php'); ?>
 
+  <?php
+    require_once PRIVATE_PATH . '/item_merge.php';
+    $merge_candidates = item_merge_candidates(find_items_for_merge($db, (int) $_SESSION['user_id']), $artifact);
+  ?>
+  <?php if ($merge_candidates !== []) { ?>
+  <section class="item-merge">
+    <h2>Merge another item into this one</h2>
+    <p>
+      The chosen item's uses, proposals, tags and BoardGameGeek ratings move to
+      <?php echo h($artifact['Title']); ?>, which keeps its own details. The
+      chosen item is then deleted. This cannot be undone.
+    </p>
+    <form method="post" action="<?php echo url_for('/artifacts/merge.php'); ?>">
+      <?php echo csrf_input(); ?>
+      <input type="hidden" name="artifact_id" value="<?php echo h((string) $id); ?>">
+      <label for="merge_loser_id">Item to merge in and delete</label>
+      <select id="merge_loser_id" name="merge_loser_id">
+        <?php foreach ($merge_candidates as $candidate) { ?>
+          <option value="<?php echo h((string) $candidate['id']); ?>">
+            <?php echo h($candidate['Title'] . ' (#' . $candidate['id'] . ')' . ($candidate['same_name'] ? ' - same name' : '')); ?>
+          </option>
+        <?php } ?>
+      </select>
+      <label for="merge_confirm">
+        <input type="checkbox" id="merge_confirm" name="merge_confirm" value="yes">
+        Yes, merge the chosen item into <?php echo h($artifact['Title']); ?> and delete it
+      </label>
+      <button type="submit">Merge Items</button>
+    </form>
+  </section>
+  <?php } ?>
+
   <p id="deleteArtifact">
     <a class="action" href="<?php echo url_for('/artifacts/delete.php?id=' . h(u($_REQUEST['id']))); ?>">
       Delete 

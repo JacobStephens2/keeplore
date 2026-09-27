@@ -3511,3 +3511,21 @@ html[data-theme="dark"] .modal-panel {
   box-shadow: var(--shadow);
   cursor: pointer;
 }
+
+/* Edit Item: merge a duplicate item into this one. */
+.item-merge {
+  margin: 2rem 0;
+  max-width: 44rem;
+}
+.item-merge form {
+  display: grid;
+  gap: 0.6rem;
+}
+.item-merge label[for="merge_confirm"] {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.item-merge button {
+  justify-self: start;
+}
