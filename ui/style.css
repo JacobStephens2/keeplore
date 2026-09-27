@@ -2304,6 +2304,34 @@ ul.fun-facts .fact-aside {
 table.list thead th[data-sort] {
   cursor: pointer;
 }
+/* A multi-level sort numbers its columns: 1 leads, 2 breaks its ties. */
+table.list thead th[data-sort-rank]::after {
+  content: attr(data-sort-rank);
+  margin-left: 0.3rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--outline-strong);
+  font-size: 0.75rem;
+  vertical-align: super;
+}
+.list-sort-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.5rem 0 0.25rem;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+.list-sort-summary select {
+  width: auto;
+  margin: 0;
+}
+.list-sort-hint {
+  margin: 0 0 0.5rem;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
 
 .list-pager {
   display: flex;

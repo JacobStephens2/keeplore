@@ -297,6 +297,7 @@
       tbody: tbody,
       nameHeader: nameHeader,
       pager: pager,
+      sortSummary: document.getElementById('items-sort-summary'),
       match: itemMatchesSearch,
       compare: compareItems,
       sorts: restoreSorts(headers, keys),

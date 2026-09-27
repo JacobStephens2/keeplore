@@ -321,6 +321,8 @@
       <p>The items list needs JavaScript.</p>
     </noscript>
 
+    <p id="items-sort-summary" class="list-sort-summary" aria-live="polite"></p>
+    <p class="list-sort-hint">Shift-click a column heading to sort by it next, as in Tags then Gyges.</p>
     <div class="table-scroll">
   	<table class="list" id="artifacts" data-page-length='100'>
       <thead>
@@ -379,7 +381,7 @@
       <a id="bgg-rating-dialog-link" class="modal-link" target="_blank" rel="noopener">On BoardGameGeek</a>
     </dialog>
 
-    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=1"></script>
+    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=2"></script>
     <script src="<?php echo url_for('/artifacts/items-table-sort.js'); ?>?v=1"></script>
     <script type="application/json" id="items-list-config"><?php
       echo json_encode([
@@ -397,7 +399,7 @@
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=8"></script>
+    <script src="/shared/js/items-list.js?v=10"></script>
   </div>
 </main>
 
