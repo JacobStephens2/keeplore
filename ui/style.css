@@ -1613,6 +1613,35 @@ p.copied_message {
 .bgg-rating-request {
   margin: 0 0 1.25rem;
 }
+/* Edit Item: the owner's own correction to an imported rating and comment. */
+.bgg-rating-edit {
+  margin: 0 0 1.25rem;
+  max-width: 44rem;
+}
+.bgg-rating-edit summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.bgg-rating-edit form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+.bgg-rating-edit label {
+  display: grid;
+  gap: 0.3rem;
+}
+.bgg-rating-edit input[type="number"] {
+  max-width: 8rem;
+}
+.bgg-rating-edit-note {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+.bgg-rating-edit button {
+  justify-self: start;
+}
 .item-bgg-rating figcaption {
   color: var(--text-soft);
   font-size: 0.9rem;

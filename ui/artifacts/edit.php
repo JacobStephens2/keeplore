@@ -103,15 +103,35 @@
     <?php } ?>
 
     <?php echo item_bgg_link_html($artifact['bgg_url'] ?? ''); ?>
-    <?php echo item_bgg_ratings_html(find_item_bgg_ratings($db, [$id], (int) $_SESSION['user_id'])[$id] ?? []); ?>
+    <?php $item_bgg_ratings = find_item_bgg_ratings($db, [$id], (int) $_SESSION['user_id'])[$id] ?? []; ?>
+    <?php echo item_bgg_ratings_html($item_bgg_ratings); ?>
     <?php if (bgg_thing_id_from_url($artifact['bgg_url'] ?? '') > 0) {
-      foreach (item_bgg_reviewers($db, (int) $_SESSION['user_id']) as $bgg_reviewer) { ?>
+      foreach (item_bgg_reviewers($db, (int) $_SESSION['user_id']) as $bgg_reviewer) {
+        $bgg_rating = $item_bgg_ratings[$bgg_reviewer] ?? ['rating' => null, 'comment' => null]; ?>
       <form class="bgg-rating-request" method="post" action="<?php echo url_for('/artifacts/bgg-rating-request.php'); ?>">
         <?php echo csrf_input(); ?>
         <input type="hidden" name="artifact_id" value="<?php echo h((string) $id); ?>">
         <input type="hidden" name="bgg_username" value="<?php echo h($bgg_reviewer); ?>">
         <button type="submit">Request <?php echo h($bgg_reviewer); ?> data</button>
       </form>
+      <details class="bgg-rating-edit">
+        <summary>Edit <?php echo h($bgg_reviewer); ?> rating and comment</summary>
+        <form method="post" action="<?php echo url_for('/artifacts/bgg-rating-save.php'); ?>">
+          <?php echo csrf_input(); ?>
+          <input type="hidden" name="artifact_id" value="<?php echo h((string) $id); ?>">
+          <input type="hidden" name="bgg_username" value="<?php echo h($bgg_reviewer); ?>">
+          <label>
+            Rating (1 to 10)
+            <input type="number" name="rating" min="1" max="10" step="0.01" value="<?php echo $bgg_rating['rating'] === null ? '' : h(bgg_score_text($bgg_rating['rating'])); ?>">
+          </label>
+          <label>
+            Comment
+            <textarea name="comment" rows="6"><?php echo h((string) $bgg_rating['comment']); ?></textarea>
+          </label>
+          <p class="bgg-rating-edit-note">Clear both to remove it. Requesting <?php echo h($bgg_reviewer); ?> data or rerunning the import replaces this with what BoardGameGeek has.</p>
+          <button type="submit">Save <?php echo h($bgg_reviewer); ?> rating</button>
+        </form>
+      </details>
     <?php } } ?>
 
     <?php echo display_errors($errors); ?>
