@@ -23,10 +23,8 @@
   $tagFilter = $filters['tagFilter'];
 
   $filter_heading = items_list_heading($players, $age);
-  $show_players_column = $players !== null || $showAttributes === 'yes';
-  $show_age_column = $age !== null || $showAttributes === 'yes';
   $bgg_reviewers = item_bgg_reviewers($db, $_SESSION['user_id']);
-  $column_count = 7 + ($show_players_column ? 1 : 0) + ($show_age_column ? 1 : 0) + count($bgg_reviewers) + ($showAttributes === 'yes' ? 2 : 0);
+  $columns = items_list_columns($filters, $bgg_reviewers);
 
   $page_title = $filter_heading ?? 'Items';
   if ($kept === 'secondary_only') { $page_title .= ' (Secondary Only)'; }
@@ -327,30 +325,12 @@
   	<table class="list" id="artifacts" data-page-length='100'>
       <thead>
         <tr id="headerRow">
-          <th data-sort="is_kept">Kept</th>
-          <th data-sort="title" id="items-name-header">Name</th>
-          <?php if ($show_players_column) { ?>
-            <th data-sort="players">Players</th>
+          <?php foreach ($columns as $column) { ?>
+            <th data-sort="<?php echo h($column['key']); ?>"<?php
+              if ($column['key'] === 'title') { echo ' id="items-name-header"'; }
+              if ($column['title'] !== '') { echo ' title="' . h($column['title']) . '"'; }
+            ?>><?php echo h($column['label']); ?></th>
           <?php } ?>
-          <?php if ($show_age_column) { ?>
-            <th data-sort="age" title="Recommended minimum age">Age</th>
-          <?php } ?>
-          <?php foreach ($bgg_reviewers as $bgg_reviewer) { ?>
-            <th data-sort="<?php echo h('bgg_rating:' . $bgg_reviewer); ?>" title="<?php echo h($bgg_reviewer . "'s BoardGameGeek rating. Select one to read the comment."); ?>"><?php echo h($bgg_reviewer); ?></th>
-          <?php } ?>
-          <th data-sort="type">Type</th>
-          <th data-sort="tags">Tags</th>
-          <th data-sort="acq">Tracking Start</th>
-          <th data-sort="most_recent_use">Recent Interaction</th>
-          <th data-sort="use_by">Interact By</th>
-          <?php
-            if ($showAttributes === 'yes') {
-              ?>
-              <th data-sort="avg_time">AvgT</th>
-              <th class="tooltip" data-sort="candidate" title="Candidate">Candidate</th>
-              <?php
-            }
-          ?>
         </tr>
       </thead>
 
@@ -362,7 +342,7 @@
 
       <tbody id="items-list-body">
         <tr class="list-status">
-          <td colspan="<?php echo $column_count; ?>">Loading items…</td>
+          <td colspan="<?php echo count($columns); ?>">Loading items…</td>
         </tr>
       </tbody>
   	</table>
@@ -390,16 +370,12 @@
         'keptToggleUrl' => url_for('/artifacts/set-tracked.php'),
         'csrfToken' => generate_csrf_token(),
         'isGuest' => is_guest(),
-        'showAttributes' => $showAttributes === 'yes',
-        'showPlayers' => $show_players_column,
-        'showAge' => $show_age_column,
-        'bggReviewers' => $bgg_reviewers,
-        'columnCount' => $column_count,
+        'columns' => array_column($columns, 'key'),
         'emptyMessage' => $filter_heading === null ? 'No items yet.' : 'No items are ' . lcfirst($filter_heading) . '.',
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=10"></script>
+    <script src="/shared/js/items-list.js?v=11"></script>
   </div>
 </main>
 

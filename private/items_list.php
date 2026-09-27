@@ -137,6 +137,45 @@ function items_list_type_switch(array $all_types, array $current_type_ids) {
     return ['options' => $options, 'active' => $active];
 }
 
+/**
+ * The Items table's columns in order, each ['key' (its sort key and cell
+ * kind), 'label', 'title' (tooltip or '')]. The page draws its headings and
+ * items-list.js its cells from this one list. Recent Interaction sits left of
+ * Type and Tracking Start so it shows without scrolling. A players or age
+ * search, or item attributes, adds Age and the player range with its best
+ * count.
+ */
+function items_list_columns(array $filters, array $bgg_reviewers) {
+    $attributes = $filters['showAttributes'] === 'yes';
+    $columns = [
+        ['key' => 'is_kept', 'label' => 'Kept', 'title' => ''],
+        ['key' => 'title', 'label' => 'Name', 'title' => ''],
+    ];
+    if ($filters['age'] !== null || $attributes) {
+        $columns[] = ['key' => 'age', 'label' => 'Age', 'title' => 'Recommended minimum age'];
+    }
+    if ($filters['players'] !== null || $filters['age'] !== null || $attributes) {
+        $columns[] = ['key' => 'players', 'label' => 'Players', 'title' => 'Player range, with the best count in brackets'];
+    }
+    foreach ($bgg_reviewers as $reviewer) {
+        $columns[] = [
+            'key' => 'bgg_rating:' . $reviewer,
+            'label' => $reviewer,
+            'title' => $reviewer . "'s BoardGameGeek rating. Select one to read the comment.",
+        ];
+    }
+    $columns[] = ['key' => 'tags', 'label' => 'Tags', 'title' => ''];
+    $columns[] = ['key' => 'most_recent_use', 'label' => 'Recent Interaction', 'title' => ''];
+    $columns[] = ['key' => 'type', 'label' => 'Type', 'title' => ''];
+    $columns[] = ['key' => 'acq', 'label' => 'Tracking Start', 'title' => ''];
+    $columns[] = ['key' => 'use_by', 'label' => 'Interact By', 'title' => ''];
+    if ($attributes) {
+        $columns[] = ['key' => 'avg_time', 'label' => 'AvgT', 'title' => 'Average play time in minutes'];
+        $columns[] = ['key' => 'candidate', 'label' => 'Candidate', 'title' => ''];
+    }
+    return $columns;
+}
+
 /** A whole number of 1 or more typed into a filter, or null for anything else. */
 function items_list_positive_int($value) {
     return is_string($value) && preg_match('/^\s*[1-9]\d*\s*$/', $value) ? (int) $value : null;
