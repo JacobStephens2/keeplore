@@ -89,7 +89,7 @@ Another BoardGameGeek user's rating and comment on an owner's item, matched thro
 | `bgg_username` | VARCHAR(64) | NO | BGG user, as BGG spells it, e.g. `Gyges` |
 | `rating` | DECIMAL(4,2) | YES | Their 1-10 rating, NULL when they only commented |
 | `comment` | TEXT | YES | Their collection comment, NULL when they only rated |
-| `rated_at` | DATETIME | YES | When they rated it on BGG |
+| `rated_at` | DATETIME | YES | When they rated it on BGG; NULL once the owner edits the row on Edit Item |
 | `imported_at` | DATETIME | NO | Last import that wrote the row |
 
 **Primary key:** `id`
