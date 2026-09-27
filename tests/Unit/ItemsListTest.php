@@ -184,23 +184,57 @@ class ItemsListTest extends TestCase
         $this->assertStringContainsString('KeeploreItemsTableSort.restore(', $js);
     }
 
+    private function columnLabels(array $get, array $reviewers = []): array
+    {
+        $filters = items_list_filters_from_request($get, [], 'GET', 90, ['table-game' => '4']);
+        return array_column(items_list_columns($filters, $reviewers), 'label');
+    }
+
     public function test_item_name_is_the_second_column_after_kept(): void
     {
-        $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
-        $this->assertNotFalse($source);
-        $this->assertMatchesRegularExpression(
-            '/<th data-sort="is_kept">Kept<\/th>\s*<th data-sort="title" id="items-name-header">Name<\/th>/',
-            $source,
-            'Name must be the second column, immediately after Kept.'
-        );
+        $this->assertSame(['Kept', 'Name'], array_slice($this->columnLabels([]), 0, 2));
+    }
 
-        $js = file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
-        $this->assertNotFalse($js);
-        $this->assertMatchesRegularExpression(
-            '/var cells = \[\s*renderKeptCell\(item, config\),\s*el\(\'td\', \{ className: \'artifact_title\' \}/',
-            $js,
-            'Each item row must put the name cell immediately after Kept.'
+    public function test_recent_interaction_comes_before_type_and_tracking_start(): void
+    {
+        $this->assertSame(
+            ['Kept', 'Name', 'Gyges', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By'],
+            $this->columnLabels([], ['Gyges'])
         );
+    }
+
+    public function test_an_age_search_shows_age_then_the_player_range_and_best_count(): void
+    {
+        $this->assertSame(
+            ['Kept', 'Name', 'Age', 'Players', 'Gyges', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By'],
+            $this->columnLabels(['age' => '6'], ['Gyges'])
+        );
+        $this->assertSame(['Kept', 'Name', 'Players', 'Tags'], array_slice($this->columnLabels(['players' => '3']), 0, 4));
+        $this->assertSame(
+            ['Kept', 'Name', 'Age', 'Players', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By', 'AvgT', 'Candidate'],
+            $this->columnLabels(['showAttributes' => 'yes'])
+        );
+    }
+
+    public function test_columns_carry_their_sort_key_and_reviewer_columns_their_rating_key(): void
+    {
+        $filters = items_list_filters_from_request([], [], 'GET', 90, ['table-game' => '4']);
+        $columns = items_list_columns($filters, ['Gyges']);
+
+        $this->assertSame(
+            ['is_kept', 'title', 'bgg_rating:Gyges', 'tags', 'most_recent_use', 'type', 'acq', 'use_by'],
+            array_column($columns, 'key')
+        );
+    }
+
+    public function test_items_page_draws_headers_and_cells_from_the_one_column_list(): void
+    {
+        $page = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
+        $js = (string) file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
+
+        $this->assertStringContainsString('items_list_columns(', $page);
+        $this->assertStringContainsString("'columns' =>", $page);
+        $this->assertStringContainsString('config.columns', $js);
     }
 
     private function extractCssRuleBlock(string $css, string $selector): string
@@ -449,10 +483,129 @@ class ItemsListTest extends TestCase
         $this->assertSame('', items_list_present_row($base, 90, '2024-06-01')['age']);
     }
 
+    public function test_type_switch_offers_all_games_and_other(): void
+    {
+        $types = ['book' => '4', 'card game' => '81', 'other' => '44', 'table game' => '26'];
+
+        $switch = items_list_type_switch($types, ['4', '81', '44', '26']);
+
+        $this->assertSame(['all', 'games', 'other'], array_keys($switch['options']));
+        $this->assertSame(['4', '81', '44', '26'], $switch['options']['all']['type_ids']);
+        $this->assertSame(['81', '26'], $switch['options']['games']['type_ids']);
+        $this->assertSame(['44'], $switch['options']['other']['type_ids']);
+        $this->assertSame('All types', $switch['options']['all']['label']);
+        $this->assertSame('Games', $switch['options']['games']['label']);
+        $this->assertSame('Other', $switch['options']['other']['label']);
+        $this->assertSame('all', $switch['active']);
+    }
+
+    public function test_type_switch_marks_the_matching_selection_active_in_any_order(): void
+    {
+        $types = ['book' => '4', 'card game' => '81', 'other' => '44', 'table game' => '26'];
+
+        $this->assertSame('games', items_list_type_switch($types, [26, '81'])['active']);
+        $this->assertSame('other', items_list_type_switch($types, ['44'])['active']);
+        $this->assertNull(items_list_type_switch($types, ['4'])['active']);
+        $this->assertSame('all', items_list_type_switch($types, [])['active']);
+    }
+
+    public function test_type_switch_leaves_out_a_choice_the_user_has_no_types_for(): void
+    {
+        $switch = items_list_type_switch(['book' => '4', 'Other' => '9'], ['4', '9']);
+
+        $this->assertSame(['all', 'other'], array_keys($switch['options']));
+        $this->assertSame(['9'], $switch['options']['other']['type_ids']);
+    }
+
+    public function test_items_page_renders_the_type_switch(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
+        $this->assertStringContainsString('items_list_type_switch(', $source);
+        $this->assertMatchesRegularExpression('/<nav class="kept-switch type-switch" aria-label="Item type">/', $source);
+    }
+
+    public function test_copy_text_is_name_player_range_with_best_counts_and_minimum_age(): void
+    {
+        $row = function (array $fields) {
+            return items_list_present_row($fields + ['id' => 1, 'Title' => 'Azul', 'Acq' => '2024-01-10'], 90, '2024-06-01');
+        };
+
+        $this->assertSame('Azul, 2–4 (2), 8 yrs', $row(['mnp' => 2, 'mxp' => 4, 'ss' => '02', 'Age' => 8])['copy_text']);
+        $this->assertSame('Azul, 3–8 (5–7), 14 yrs', $row(['mnp' => 3, 'mxp' => 8, 'ss' => '05,06,07', 'Age' => 14])['copy_text']);
+        $this->assertSame('Azul, 2–5 (3, 4), 10 yrs', $row(['mnp' => 2, 'mxp' => 5, 'ss' => '3, 4', 'Age' => 10])['copy_text']);
+        $this->assertSame('Azul, 1–4, 8 yrs', $row(['mnp' => 1, 'mxp' => 4, 'ss' => '', 'Age' => 8])['copy_text']);
+        $this->assertSame('Azul, 2–4 (2)', $row(['mnp' => 2, 'mxp' => 4, 'ss' => '02', 'Age' => 0])['copy_text']);
+        $this->assertSame('Azul, 8 yrs', $row(['Age' => 8])['copy_text']);
+        $this->assertSame('Azul', $row([])['copy_text']);
+    }
+
+    public function test_players_label_still_reads_best_after_extracting_the_best_counts(): void
+    {
+        $this->assertSame('3, 4', items_list_best_counts_label('03,04'));
+        $this->assertSame('5–7', items_list_best_counts_label('05,06,07'));
+        $this->assertSame('', items_list_best_counts_label(''));
+        $this->assertSame('2–5 (best 3, 4)', items_list_players_label(2, 5, '3, 4'));
+        $this->assertSame('best 3', items_list_players_label(0, 0, '3'));
+    }
+
+    public function test_each_items_row_offers_a_copy_button(): void
+    {
+        $js = (string) file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
+        $this->assertStringContainsString('item.copy_text', $js);
+        $this->assertStringContainsString('navigator.clipboard.writeText', $js);
+        $this->assertStringContainsString("'copy-item-btn'", $js);
+    }
+
+    public function test_the_rating_dialog_stays_fixed_so_opening_it_keeps_the_scroll_position(): void
+    {
+        // .modal-panel (position: relative) comes later in the file; a modal
+        // dialog left relative computes to absolute, opens at the top of the
+        // document and focusing it scrolls the page there.
+        $css = (string) file_get_contents(PROJECT_PATH . '/ui/style.css');
+        $this->assertSame(1, preg_match('/\.modal-panel\.bgg-rating-dialog\s*\{([^}]*)\}/', $css, $rule));
+        $this->assertStringContainsString('position: fixed', $rule[1]);
+    }
+
+    public function test_copy_text_keeps_the_best_count_when_no_range_is_recorded(): void
+    {
+        $row = items_list_present_row(['id' => 1, 'Title' => 'Azul', 'Acq' => '2024-01-10', 'ss' => '03', 'Age' => 8], 90, '2024-06-01');
+
+        $this->assertSame('Azul, best 3, 8 yrs', $row['copy_text']);
+    }
+
+    public function test_play_facts_read_players_best_count_and_age_from_an_item_record(): void
+    {
+        // Edit Item reads the games row as stored: MnP, MxP, SS, Age.
+        $this->assertSame('2–4 players, best 3 · Age 8+', items_list_play_facts(['MnP' => 2, 'MxP' => 4, 'SS' => '03', 'Age' => 8]));
+        $this->assertSame('1–5 players, best 3, 4 · Age 10+', items_list_play_facts(['MnP' => 1, 'MxP' => 5, 'SS' => '03,04', 'Age' => 10]));
+        $this->assertSame('2 players · Age 8+', items_list_play_facts(['MnP' => 2, 'MxP' => 2, 'SS' => '', 'Age' => 8]));
+        $this->assertSame('1 player', items_list_play_facts(['MnP' => 1, 'MxP' => 1, 'SS' => '', 'Age' => 0]));
+        $this->assertSame('Best at 3 · Age 6+', items_list_play_facts(['SS' => '3', 'Age' => 6]));
+        $this->assertSame('', items_list_play_facts(['Title' => 'Hat']));
+    }
+
+    public function test_edit_item_shows_the_play_facts_right_under_its_heading(): void
+    {
+        $edit = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/edit.php');
+        $this->assertMatchesRegularExpression(
+            '/<h1>Edit <\?php echo h\(\$artifact\[\'Title\'\]\); \?><\/h1>\s*<\?php \$play_facts = /',
+            $edit
+        );
+        $this->assertStringContainsString('class="item-play-facts"', $edit);
+        // Blank player fields save as 5-240 on Edit Item, so a book would
+        // headline "5–240 players"; the line is for games only.
+        $this->assertStringContainsString("item_type_is_game(\$artifact['type'] ?? '')", $edit);
+    }
+
+    public function test_the_play_facts_rule_does_not_swallow_the_picture_selectors(): void
+    {
+        $css = (string) file_get_contents(PROJECT_PATH . '/ui/style.css');
+        $this->assertMatchesRegularExpression('/\.bgg-match-image,\s*\.item-picture-preview,\s*\.item-picture\s*\{/', $css);
+    }
+
     public function test_items_page_offers_a_youngest_age_picker_beside_the_count(): void
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
         $this->assertMatchesRegularExpression('/<input type="number" name="age"/', $source);
-        $this->assertStringContainsString("'showAge' =>", $source);
     }
 }

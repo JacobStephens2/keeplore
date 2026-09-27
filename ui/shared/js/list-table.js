@@ -47,6 +47,38 @@
     return copy;
   }
 
+  /**
+   * The sort list after a header click. A plain click sorts by that column
+   * alone, flipping it when it already leads alone; an additive (Shift) click
+   * adds it as the next tie-breaker, or flips it where it already sits.
+   */
+  function nextSorts(sorts, key, additive) {
+    var list = (sorts || []).map(function (sort) {
+      return { key: sort.key, dir: sort.dir };
+    });
+    if (!additive) {
+      var current = list[0];
+      return [{ key: key, dir: current && current.key === key && current.dir === 'desc' ? 'asc' : 'desc' }];
+    }
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].key === key) {
+        list[i].dir = list[i].dir === 'desc' ? 'asc' : 'desc';
+        return list;
+      }
+    }
+    list.push({ key: key, dir: 'desc' });
+    return list;
+  }
+
+  // "Sorted by Tags (descending), then Gyges (descending)", or '' with no sort.
+  function describeSorts(sorts, labels) {
+    return (sorts || []).map(function (sort, index) {
+      var label = (labels && labels[sort.key]) || sort.key;
+      return (index === 0 ? 'Sorted by ' : 'then ') + label
+        + (sort.dir === 'desc' ? ' (descending)' : ' (ascending)');
+    }).join(', ');
+  }
+
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     if (attrs) {
@@ -99,6 +131,7 @@
     var emptyMessage = opts.emptyMessage || 'No rows yet.';
     var noMatchMessage = opts.noMatchMessage || 'No rows match.';
     var onSort = opts.onSort;
+    var sortSummary = opts.sortSummary;
     var state = {
       records: opts.records || [],
       sorts: (opts.sorts && opts.sorts.length) ? opts.sorts.slice() : [],
@@ -106,18 +139,84 @@
       status: opts.status || null,
     };
 
-    function applyAriaSort() {
-      table.querySelectorAll('thead th[data-sort]').forEach(function (th) {
-        th.removeAttribute('aria-sort');
+    var sortHeaders = Array.prototype.slice.call(table.querySelectorAll('thead th[data-sort]'));
+
+    function headerLabels() {
+      var labels = {};
+      sortHeaders.forEach(function (th) {
+        labels[th.getAttribute('data-sort')] = String(th.textContent || '')
+          .replace(/\s+/g, ' ')
+          .replace(/\s*\(\d+( of \d+)?\)\s*$/, '')
+          .trim();
       });
-      var primary = state.sorts[0];
-      if (!primary) {
+      return labels;
+    }
+
+    // The summary line, plus a "Then by" menu so a touch screen, which has
+    // no Shift key, can add a tie-breaker too.
+    function renderSortSummary() {
+      if (!sortSummary) {
         return;
       }
-      var active = table.querySelector('thead th[data-sort="' + primary.key + '"]');
-      if (active) {
-        active.setAttribute('aria-sort', primary.dir === 'desc' ? 'descending' : 'ascending');
+      var labels = headerLabels();
+      // Rebuilding replaces the menu, so hand focus to the new one.
+      var hadFocus = !!(doc.activeElement && sortSummary.contains(doc.activeElement));
+      sortSummary.textContent = '';
+      sortSummary.appendChild(el('span', { text: describeSorts(state.sorts, labels) }));
+      var sorted = {};
+      state.sorts.forEach(function (sort) {
+        sorted[sort.key] = true;
+      });
+      var choices = sortHeaders.filter(function (th) {
+        return !sorted[th.getAttribute('data-sort')];
+      });
+      if (!state.sorts.length || !choices.length) {
+        return;
       }
+      var select = el('select', { 'aria-label': 'Then sort by' }, [el('option', { value: '', text: 'Then by…' })]
+        .concat(choices.map(function (th) {
+          var key = th.getAttribute('data-sort');
+          return el('option', { value: key, text: labels[key] });
+        })));
+      select.addEventListener('change', function () {
+        if (select.value) {
+          setSorts(nextSorts(state.sorts, select.value, true));
+        }
+      });
+      sortSummary.appendChild(select);
+      if (hadFocus) {
+        select.focus();
+      }
+    }
+
+    function applyAriaSort() {
+      sortHeaders.forEach(function (th) {
+        th.removeAttribute('aria-sort');
+        th.removeAttribute('data-sort-rank');
+      });
+      state.sorts.forEach(function (sort, index) {
+        var th = table.querySelector('thead th[data-sort="' + sort.key + '"]');
+        if (!th) {
+          return;
+        }
+        if (index === 0) {
+          th.setAttribute('aria-sort', sort.dir === 'desc' ? 'descending' : 'ascending');
+        }
+        // Numbered only when there are levels to tell apart.
+        if (state.sorts.length > 1) {
+          th.setAttribute('data-sort-rank', String(index + 1));
+        }
+      });
+      renderSortSummary();
+    }
+
+    function setSorts(sorts) {
+      state.sorts = sorts;
+      applyAriaSort();
+      if (typeof onSort === 'function') {
+        onSort(state.sorts);
+      }
+      render();
     }
 
     function render() {
@@ -198,17 +297,15 @@
       });
     }
 
-    table.querySelectorAll('thead th[data-sort]').forEach(function (th) {
-      th.addEventListener('click', function () {
-        var key = th.getAttribute('data-sort');
-        var current = state.sorts[0];
-        var dir = current && current.key === key && current.dir === 'desc' ? 'asc' : 'desc';
-        state.sorts = [{ key: key, dir: dir }];
-        applyAriaSort();
-        if (typeof onSort === 'function') {
-          onSort(state.sorts);
+    sortHeaders.forEach(function (th) {
+      // Shift+mousedown would otherwise extend the text selection across the row.
+      th.addEventListener('mousedown', function (event) {
+        if (event.shiftKey) {
+          event.preventDefault();
         }
-        render();
+      });
+      th.addEventListener('click', function (event) {
+        setSorts(nextSorts(state.sorts, th.getAttribute('data-sort'), !!(event && event.shiftKey)));
       });
     });
 
@@ -232,6 +329,8 @@
   return {
     fieldsMatchSearch: fieldsMatchSearch,
     compareValues: compareValues,
+    nextSorts: nextSorts,
+    describeSorts: describeSorts,
     sortRecords: sortRecords,
     el: el,
     mount: mount,

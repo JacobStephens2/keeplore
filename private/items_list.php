@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/kept_status.php';
 require_once __DIR__ . '/bgg_ratings.php';
+require_once __DIR__ . '/item_types.php';
 
 function items_list_load_filter_defaults($user_id) {
     $default_interval = singleValueQuery(
@@ -96,6 +97,83 @@ function items_list_filters_from_request(
         'showAttributes' => $showAttributes,
         'tagFilter' => (string) $tagFilter,
     ];
+}
+
+/**
+ * The Items type switch: All types, Games and Other, each with the type ids
+ * it selects, and which one the current selection matches (null for a
+ * hand-picked mix). A choice the user has no types for is left out; an empty
+ * selection means every type.
+ */
+function items_list_type_switch(array $all_types, array $current_type_ids) {
+    $all_ids = array_map('strval', array_values($all_types));
+    $other_ids = item_other_type_ids($all_types);
+    $options = ['all' => ['label' => 'All types', 'type_ids' => $all_ids]];
+    $game_ids = item_game_type_ids($all_types);
+    if ($game_ids !== []) {
+        $options['games'] = ['label' => 'Games', 'type_ids' => $game_ids];
+    }
+    if ($other_ids !== []) {
+        $options['other'] = ['label' => 'Other', 'type_ids' => $other_ids];
+    }
+
+    $current = [];
+    foreach ($current_type_ids as $id) {
+        if ($id !== '' && $id !== null) {
+            $current[] = (string) $id;
+        }
+    }
+    $current = $current === [] ? $all_ids : $current;
+    sort($current);
+    $active = null;
+    foreach ($options as $key => $option) {
+        $ids = $option['type_ids'];
+        sort($ids);
+        if ($ids === $current) {
+            $active = $key;
+            break;
+        }
+    }
+    return ['options' => $options, 'active' => $active];
+}
+
+/**
+ * The Items table's columns in order, each ['key' (its sort key and cell
+ * kind), 'label', 'tooltip' (or '')]. The page draws its headings and
+ * items-list.js its cells from this one list. Recent Interaction sits left of
+ * Type and Tracking Start so it shows without scrolling. A players or age
+ * search, or item attributes, adds Age and the player range with its best
+ * count.
+ */
+function items_list_columns(array $filters, array $bgg_reviewers) {
+    $attributes = $filters['showAttributes'] === 'yes';
+    $columns = [
+        ['key' => 'is_kept', 'label' => 'Kept', 'tooltip' => ''],
+        ['key' => 'title', 'label' => 'Name', 'tooltip' => ''],
+    ];
+    if ($filters['age'] !== null || $attributes) {
+        $columns[] = ['key' => 'age', 'label' => 'Age', 'tooltip' => 'Recommended minimum age'];
+    }
+    if ($filters['players'] !== null || $filters['age'] !== null || $attributes) {
+        $columns[] = ['key' => 'players', 'label' => 'Players', 'tooltip' => 'Player range, with the best count in brackets'];
+    }
+    foreach ($bgg_reviewers as $reviewer) {
+        $columns[] = [
+            'key' => 'bgg_rating:' . $reviewer,
+            'label' => $reviewer,
+            'tooltip' => $reviewer . "'s BoardGameGeek rating. Select one to read the comment.",
+        ];
+    }
+    $columns[] = ['key' => 'tags', 'label' => 'Tags', 'tooltip' => ''];
+    $columns[] = ['key' => 'most_recent_use', 'label' => 'Recent Interaction', 'tooltip' => ''];
+    $columns[] = ['key' => 'type', 'label' => 'Type', 'tooltip' => ''];
+    $columns[] = ['key' => 'acq', 'label' => 'Tracking Start', 'tooltip' => ''];
+    $columns[] = ['key' => 'use_by', 'label' => 'Interact By', 'tooltip' => ''];
+    if ($attributes) {
+        $columns[] = ['key' => 'avg_time', 'label' => 'AvgT', 'tooltip' => 'Average play time in minutes'];
+        $columns[] = ['key' => 'candidate', 'label' => 'Candidate', 'tooltip' => ''];
+    }
+    return $columns;
 }
 
 /** A whole number of 1 or more typed into a filter, or null for anything else. */
@@ -190,6 +268,7 @@ function items_list_present_row(array $artifact, $interval, $today = null) {
             $artifact['ss'] ?? $artifact['SS'] ?? null
         ),
         'age' => $min_age === null ? '' : $min_age . '+',
+        'copy_text' => items_list_copy_text($artifact),
         'avg_time' => (int) ceil(($mnt + $mxt) / 2),
         'candidate' => ($candidate_raw != '' && $candidate_raw != 0),
         // Keyed by BGG username; an object even when empty so the JSON is {}.
@@ -248,20 +327,68 @@ function items_list_sweet_spot_counts($ss) {
 }
 
 /**
- * The player range with the sweet spot, as in "2–4 (best 3)". A run of three
- * or more consecutive counts reads as a range, so "3–5" but "3, 4".
+ * The line Items' Copy button puts on the clipboard for sharing a game:
+ * "Azul, 2–4 (2), 8 yrs", the name, the player range with its best counts,
+ * and the minimum age. A part with nothing recorded is left out.
  */
-function items_list_players_label($min, $max, $ss) {
+function items_list_copy_text(array $artifact) {
+    $parts = [(string) ($artifact['Title'] ?? '')];
+    $range = items_list_player_range($artifact['mnp'] ?? $artifact['MnP'] ?? null, $artifact['mxp'] ?? $artifact['MxP'] ?? null);
+    $best = items_list_best_counts_label($artifact['ss'] ?? $artifact['SS'] ?? '');
+    if ($range !== '') {
+        $parts[] = $best === '' ? $range : $range . ' (' . $best . ')';
+    } elseif ($best !== '') {
+        $parts[] = 'best ' . $best;
+    }
+    $min_age = items_list_min_age($artifact);
+    if ($min_age !== null) {
+        $parts[] = $min_age . ' yrs';
+    }
+    return implode(', ', $parts);
+}
+
+/**
+ * The line under Edit Item's heading, so the facts people look up most sit
+ * above the fold even in a half-width window: "2–4 players, best 3 · Age 8+".
+ * A part with nothing recorded is left out; '' when nothing is.
+ */
+function items_list_play_facts(array $artifact) {
+    $min = $artifact['MnP'] ?? $artifact['mnp'] ?? null;
+    $max = $artifact['MxP'] ?? $artifact['mxp'] ?? null;
+    $range = items_list_player_range($min, $max);
+    $best = items_list_best_counts_label($artifact['SS'] ?? $artifact['ss'] ?? '');
+    $parts = [];
+    if ($range !== '') {
+        $players = $range . ($range === '1' ? ' player' : ' players');
+        $parts[] = $best === '' ? $players : $players . ', best ' . $best;
+    } elseif ($best !== '') {
+        $parts[] = 'Best at ' . $best;
+    }
+    $min_age = items_list_min_age($artifact);
+    if ($min_age !== null) {
+        $parts[] = 'Age ' . $min_age . '+';
+    }
+    return implode(' · ', $parts);
+}
+
+/** The player range, as in "2–4", "3" or '' when none is recorded. */
+function items_list_player_range($min, $max) {
     $min = (int) $min;
     $max = (int) $max;
     if ($min <= 0 && $max <= 0) {
-        $range = '';
-    } elseif ($min <= 0 || $max <= 0 || $min === $max) {
-        $range = (string) max($min, $max);
-    } else {
-        $range = $min . '–' . $max;
+        return '';
     }
+    if ($min <= 0 || $max <= 0 || $min === $max) {
+        return (string) max($min, $max);
+    }
+    return $min . '–' . $max;
+}
 
+/**
+ * The sweet spot's counts, as in "3" or "3, 4". A run of three or more
+ * consecutive counts reads as a range, so "3–5" but "3, 4".
+ */
+function items_list_best_counts_label($ss) {
     $runs = [];
     foreach (items_list_sweet_spot_counts($ss) as $n) {
         $last = count($runs) - 1;
@@ -271,13 +398,18 @@ function items_list_players_label($min, $max, $ss) {
             $runs[] = [$n, $n];
         }
     }
-    $best = implode(', ', array_map(function ($run) {
+    return implode(', ', array_map(function ($run) {
         if ($run[1] - $run[0] >= 2) {
             return $run[0] . '–' . $run[1];
         }
         return implode(', ', range($run[0], $run[1]));
     }, $runs));
+}
 
+/** The player range with the sweet spot, as in "2–4 (best 3)". */
+function items_list_players_label($min, $max, $ss) {
+    $range = items_list_player_range($min, $max);
+    $best = items_list_best_counts_label($ss);
     if ($best === '') {
         return $range;
     }

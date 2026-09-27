@@ -23,10 +23,8 @@
   $tagFilter = $filters['tagFilter'];
 
   $filter_heading = items_list_heading($players, $age);
-  $show_players_column = $players !== null || $showAttributes === 'yes';
-  $show_age_column = $age !== null || $showAttributes === 'yes';
   $bgg_reviewers = item_bgg_reviewers($db, $_SESSION['user_id']);
-  $column_count = 7 + ($show_players_column ? 1 : 0) + ($show_age_column ? 1 : 0) + count($bgg_reviewers) + ($showAttributes === 'yes' ? 2 : 0);
+  $columns = items_list_columns($filters, $bgg_reviewers);
 
   $page_title = $filter_heading ?? 'Items';
   if ($kept === 'secondary_only') { $page_title .= ' (Secondary Only)'; }
@@ -134,6 +132,32 @@
           <?php if ($kept_switch_active === $switch_value) { echo 'aria-current="true"'; } ?>
           >
           <?php echo h($switch_label); ?>
+        </a>
+      <?php } ?>
+    </nav>
+
+    <?php
+      // One click to games only, or to Other (items still waiting for a real
+      // type). Each link keeps every other filter.
+      $type_switch = items_list_type_switch($typesArray ?? [], $switch_type_ids);
+      $type_switch_base = $switch_base;
+      unset($type_switch_base['type']);
+      if ($kept_switch_active !== null) {
+        $type_switch_base['kept'] = $kept_switch_active;
+      } elseif ($kept === 'secondary_only') {
+        $type_switch_base['kept'] = 'secondary_only';
+      }
+    ?>
+    <nav class="kept-switch type-switch" aria-label="Item type">
+      <?php foreach ($type_switch['options'] as $switch_value => $switch_option) {
+        $type_query = $type_switch_base;
+        if ($switch_value !== 'all') {
+          $type_query['type'] = array_combine($switch_option['type_ids'], $switch_option['type_ids']);
+        } ?>
+        <a href="<?php echo h(url_for('/artifacts/index.php' . ($type_query ? '?' . http_build_query($type_query) : ''))); ?>"
+          <?php if ($type_switch['active'] === $switch_value) { echo 'aria-current="true"'; } ?>
+          >
+          <?php echo h($switch_option['label']); ?>
         </a>
       <?php } ?>
     </nav>
@@ -295,34 +319,18 @@
       <p>The items list needs JavaScript.</p>
     </noscript>
 
+    <p id="items-sort-summary" class="list-sort-summary" aria-live="polite"></p>
+    <p class="list-sort-hint">To sort by two columns, click the first heading (Tags), then Shift-click the second (Gyges), or pick it from Then by.</p>
     <div class="table-scroll">
   	<table class="list" id="artifacts" data-page-length='100'>
       <thead>
         <tr id="headerRow">
-          <th data-sort="is_kept">Kept</th>
-          <th data-sort="title" id="items-name-header">Name</th>
-          <?php if ($show_players_column) { ?>
-            <th data-sort="players">Players</th>
+          <?php foreach ($columns as $column) { ?>
+            <th data-sort="<?php echo h($column['key']); ?>"<?php
+              if ($column['key'] === 'title') { echo ' id="items-name-header"'; }
+              if ($column['tooltip'] !== '') { echo ' title="' . h($column['tooltip']) . '"'; }
+            ?>><?php echo h($column['label']); ?></th>
           <?php } ?>
-          <?php if ($show_age_column) { ?>
-            <th data-sort="age" title="Recommended minimum age">Age</th>
-          <?php } ?>
-          <?php foreach ($bgg_reviewers as $bgg_reviewer) { ?>
-            <th data-sort="<?php echo h('bgg_rating:' . $bgg_reviewer); ?>" title="<?php echo h($bgg_reviewer . "'s BoardGameGeek rating. Select one to read the comment."); ?>"><?php echo h($bgg_reviewer); ?></th>
-          <?php } ?>
-          <th data-sort="type">Type</th>
-          <th data-sort="tags">Tags</th>
-          <th data-sort="acq">Tracking Start</th>
-          <th data-sort="most_recent_use">Recent Interaction</th>
-          <th data-sort="use_by">Interact By</th>
-          <?php
-            if ($showAttributes === 'yes') {
-              ?>
-              <th data-sort="avg_time">AvgT</th>
-              <th class="tooltip" data-sort="candidate" title="Candidate">Candidate</th>
-              <?php
-            }
-          ?>
         </tr>
       </thead>
 
@@ -334,7 +342,7 @@
 
       <tbody id="items-list-body">
         <tr class="list-status">
-          <td colspan="<?php echo $column_count; ?>">Loading items…</td>
+          <td colspan="<?php echo count($columns); ?>">Loading items…</td>
         </tr>
       </tbody>
   	</table>
@@ -353,7 +361,7 @@
       <a id="bgg-rating-dialog-link" class="modal-link" target="_blank" rel="noopener">On BoardGameGeek</a>
     </dialog>
 
-    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=1"></script>
+    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=3"></script>
     <script src="<?php echo url_for('/artifacts/items-table-sort.js'); ?>?v=1"></script>
     <script type="application/json" id="items-list-config"><?php
       echo json_encode([
@@ -362,16 +370,12 @@
         'keptToggleUrl' => url_for('/artifacts/set-tracked.php'),
         'csrfToken' => generate_csrf_token(),
         'isGuest' => is_guest(),
-        'showAttributes' => $showAttributes === 'yes',
-        'showPlayers' => $show_players_column,
-        'showAge' => $show_age_column,
-        'bggReviewers' => $bgg_reviewers,
-        'columnCount' => $column_count,
+        'columns' => array_column($columns, 'key'),
         'emptyMessage' => $filter_heading === null ? 'No items yet.' : 'No items are ' . lcfirst($filter_heading) . '.',
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=9"></script>
+    <script src="/shared/js/items-list.js?v=14"></script>
   </div>
 </main>
 
