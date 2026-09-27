@@ -139,7 +139,7 @@ function items_list_type_switch(array $all_types, array $current_type_ids) {
 
 /**
  * The Items table's columns in order, each ['key' (its sort key and cell
- * kind), 'label', 'title' (tooltip or '')]. The page draws its headings and
+ * kind), 'label', 'tooltip' (or '')]. The page draws its headings and
  * items-list.js its cells from this one list. Recent Interaction sits left of
  * Type and Tracking Start so it shows without scrolling. A players or age
  * search, or item attributes, adds Age and the player range with its best
@@ -148,30 +148,30 @@ function items_list_type_switch(array $all_types, array $current_type_ids) {
 function items_list_columns(array $filters, array $bgg_reviewers) {
     $attributes = $filters['showAttributes'] === 'yes';
     $columns = [
-        ['key' => 'is_kept', 'label' => 'Kept', 'title' => ''],
-        ['key' => 'title', 'label' => 'Name', 'title' => ''],
+        ['key' => 'is_kept', 'label' => 'Kept', 'tooltip' => ''],
+        ['key' => 'title', 'label' => 'Name', 'tooltip' => ''],
     ];
     if ($filters['age'] !== null || $attributes) {
-        $columns[] = ['key' => 'age', 'label' => 'Age', 'title' => 'Recommended minimum age'];
+        $columns[] = ['key' => 'age', 'label' => 'Age', 'tooltip' => 'Recommended minimum age'];
     }
     if ($filters['players'] !== null || $filters['age'] !== null || $attributes) {
-        $columns[] = ['key' => 'players', 'label' => 'Players', 'title' => 'Player range, with the best count in brackets'];
+        $columns[] = ['key' => 'players', 'label' => 'Players', 'tooltip' => 'Player range, with the best count in brackets'];
     }
     foreach ($bgg_reviewers as $reviewer) {
         $columns[] = [
             'key' => 'bgg_rating:' . $reviewer,
             'label' => $reviewer,
-            'title' => $reviewer . "'s BoardGameGeek rating. Select one to read the comment.",
+            'tooltip' => $reviewer . "'s BoardGameGeek rating. Select one to read the comment.",
         ];
     }
-    $columns[] = ['key' => 'tags', 'label' => 'Tags', 'title' => ''];
-    $columns[] = ['key' => 'most_recent_use', 'label' => 'Recent Interaction', 'title' => ''];
-    $columns[] = ['key' => 'type', 'label' => 'Type', 'title' => ''];
-    $columns[] = ['key' => 'acq', 'label' => 'Tracking Start', 'title' => ''];
-    $columns[] = ['key' => 'use_by', 'label' => 'Interact By', 'title' => ''];
+    $columns[] = ['key' => 'tags', 'label' => 'Tags', 'tooltip' => ''];
+    $columns[] = ['key' => 'most_recent_use', 'label' => 'Recent Interaction', 'tooltip' => ''];
+    $columns[] = ['key' => 'type', 'label' => 'Type', 'tooltip' => ''];
+    $columns[] = ['key' => 'acq', 'label' => 'Tracking Start', 'tooltip' => ''];
+    $columns[] = ['key' => 'use_by', 'label' => 'Interact By', 'tooltip' => ''];
     if ($attributes) {
-        $columns[] = ['key' => 'avg_time', 'label' => 'AvgT', 'title' => 'Average play time in minutes'];
-        $columns[] = ['key' => 'candidate', 'label' => 'Candidate', 'title' => ''];
+        $columns[] = ['key' => 'avg_time', 'label' => 'AvgT', 'tooltip' => 'Average play time in minutes'];
+        $columns[] = ['key' => 'candidate', 'label' => 'Candidate', 'tooltip' => ''];
     }
     return $columns;
 }

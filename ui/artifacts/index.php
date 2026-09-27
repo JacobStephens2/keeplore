@@ -328,7 +328,7 @@
           <?php foreach ($columns as $column) { ?>
             <th data-sort="<?php echo h($column['key']); ?>"<?php
               if ($column['key'] === 'title') { echo ' id="items-name-header"'; }
-              if ($column['title'] !== '') { echo ' title="' . h($column['title']) . '"'; }
+              if ($column['tooltip'] !== '') { echo ' title="' . h($column['tooltip']) . '"'; }
             ?>><?php echo h($column['label']); ?></th>
           <?php } ?>
         </tr>
@@ -375,7 +375,7 @@
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=12"></script>
+    <script src="/shared/js/items-list.js?v=13"></script>
   </div>
 </main>
 

@@ -256,8 +256,11 @@
         return el('td', { text: String(item.avg_time) });
       case 'candidate':
         return el('td', { text: item.candidate ? 'Yes' : 'No' });
+      case 'type':
+        // No class: td.type elsewhere caps width at 12ch, which would wrap it.
+        return el('td', { text: item.type });
       default:
-        // players, age, type: plain text, with the key as the class.
+        // players, age: plain text, with the key as the class.
         return el('td', { className: key, text: item[key] == null ? '' : String(item[key]) });
     }
   }
