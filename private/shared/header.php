@@ -158,6 +158,7 @@
             <a class="nav-link" href="<?php echo url_for('/uses/interactions'); ?>">Interactions</a>
             <a class="nav-link" href="<?php echo url_for('/artifacts'); ?>" data-shortcut="items">Items</a>
             <a class="nav-link" href="<?php echo url_for('/artifacts/to-get-rid-of'); ?>">To&nbsp;Get&nbsp;Rid&nbsp;Of</a>
+            <a class="nav-link" href="<?php echo url_for('/events'); ?>">Events</a>
             <a class="nav-link" href="<?php echo url_for('/analysis'); ?>">Analysis</a>
           </div>
 

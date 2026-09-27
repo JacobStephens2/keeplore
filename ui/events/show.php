@@ -1,0 +1,156 @@
+<?php
+require_once('../../private/initialize.php');
+require_login();
+require_once(PRIVATE_PATH . '/classes/EventPlans.php');
+require_once(PRIVATE_PATH . '/event_plan.php');
+
+$plans = new EventPlans($db, (int) $_SESSION['user_id']);
+$id = filter_var($_GET['id'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+$event = $id ? $plans->find($id) : null;
+if ($event === null) {
+    error_404();
+}
+
+// The grouping chosen last for this event stays until changed.
+$dimensions = event_plan_dimensions();
+$saved = $_SESSION['event_grouping'][$id] ?? ['by' => 'players', 'then' => 'none'];
+$by = is_string($_GET['by'] ?? null) && isset($dimensions[$_GET['by']]) ? $_GET['by'] : $saved['by'];
+$then = is_string($_GET['then'] ?? null) && isset($dimensions[$_GET['then']]) ? $_GET['then'] : $saved['then'];
+$_SESSION['event_grouping'][$id] = ['by' => $by, 'then' => $then];
+
+$items = $event['items'];
+$groups = event_plan_groups($items, $by, $then);
+$packed = count(array_filter(array_column($items, 'is_packed')));
+$to_add = $plans->itemsToAdd($id);
+$settings = array_values(array_unique(array_filter(array_map('trim', array_column($items, 'setting')))));
+sort($settings, SORT_NATURAL | SORT_FLAG_CASE);
+$dates = event_dates_label($event['starts_on'], $event['ends_on']);
+
+$page_title = $event['name'];
+include(SHARED_PATH . '/header.php');
+?>
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=1'); ?>">
+<main class="event-page" data-event-id="<?php echo $id; ?>">
+    <header class="page-header">
+        <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
+        <h1><?php echo h($event['name']); ?></h1>
+        <?php if ($dates !== '') { ?><p class="page-lede"><?php echo h($dates); ?></p><?php } ?>
+        <?php if ($event['notes'] !== '') { ?><p class="event-notes"><?php echo h($event['notes']); ?></p><?php } ?>
+        <p><a href="<?php echo url_for('/events/edit.php?id=' . $id); ?>">Edit event</a></p>
+    </header>
+
+    <p class="event-total" aria-live="polite">
+        <strong><?php echo count($items); ?></strong> <?php echo count($items) === 1 ? 'game' : 'games'; ?> planned<?php if ($items) { ?>,
+        <strong id="event-packed-count"><?php echo $packed; ?></strong> packed<?php } ?>
+    </p>
+
+    <details class="event-add" <?php echo $items ? '' : 'open'; ?>>
+        <summary>Add games from your collection</summary>
+        <?php if ($to_add) { ?>
+            <form method="post" action="<?php echo url_for('/events/item.php'); ?>">
+                <?php echo csrf_input(); ?>
+                <input type="hidden" name="event_id" value="<?php echo $id; ?>">
+                <input type="hidden" name="action" value="add">
+                <label for="event-add-filter">Find games</label>
+                <input type="search" id="event-add-filter" placeholder="Search your collection" autocomplete="off" aria-controls="event-add-list">
+                <div class="event-add-list" id="event-add-list">
+                    <?php foreach ($to_add as $candidate) { ?>
+                        <label class="event-choice" data-title="<?php echo h(mb_strtolower($candidate['Title'])); ?>">
+                            <input type="checkbox" name="item_ids[]" value="<?php echo $candidate['id']; ?>">
+                            <span><?php echo h($candidate['Title']); ?>
+                                <?php if ($candidate['facts'] !== '') { ?><small class="menu-support"><?php echo h($candidate['facts']); ?></small><?php } ?>
+                            </span>
+                        </label>
+                    <?php } ?>
+                </div>
+                <p id="event-add-empty" class="menu-support" hidden>No games match.</p>
+                <button type="submit" id="event-add-submit">Add selected games</button>
+            </form>
+        <?php } else { ?>
+            <p class="menu-support">Every item in your collection is already planned for this event.</p>
+        <?php } ?>
+    </details>
+
+    <?php if ($items) { ?>
+        <form class="event-grouping" method="get" action="<?php echo url_for('/events/show.php'); ?>">
+            <input type="hidden" name="id" value="<?php echo $id; ?>">
+            <label>Group by
+                <select name="by">
+                    <?php foreach ($dimensions as $key => $label) { ?>
+                        <option value="<?php echo h($key); ?>" <?php echo $by === $key ? 'selected' : ''; ?>><?php echo h($label); ?></option>
+                    <?php } ?>
+                </select>
+            </label>
+            <label>Then by
+                <select name="then">
+                    <?php foreach ($dimensions as $key => $label) { ?>
+                        <option value="<?php echo h($key); ?>" <?php echo $then === $key ? 'selected' : ''; ?>><?php echo h($label); ?></option>
+                    <?php } ?>
+                </select>
+            </label>
+            <button type="submit">Group</button>
+        </form>
+        <?php if ($by === 'players' || $then === 'players' || $by === 'tag' || $then === 'tag') { ?>
+            <p class="menu-support">A game best at several player counts, or with several tags, shows in each of those groups.</p>
+        <?php } ?>
+
+        <section class="event-plan" aria-label="Planned games">
+            <?php foreach ($groups as $group) { ?>
+                <div class="event-group">
+                    <?php if ($group['label'] !== '') { ?>
+                        <h2><?php echo h($group['label']); ?> <small class="menu-support"><?php echo count($group['items']); ?></small></h2>
+                    <?php } ?>
+                    <?php $subs = $group['groups'] ?: [['label' => '', 'items' => $group['items']]]; ?>
+                    <?php foreach ($subs as $sub) { ?>
+                        <?php if ($sub['label'] !== '') { ?><h3><?php echo h($sub['label']); ?></h3><?php } ?>
+                        <ul class="event-checklist">
+                            <?php foreach ($sub['items'] as $item) { ?>
+                                <li>
+                                    <label>
+                                        <input type="checkbox" class="event-packed" data-item-id="<?php echo $item['id']; ?>" <?php echo $item['is_packed'] ? 'checked' : ''; ?>>
+                                        <span><?php echo h(event_plan_line($item)); ?></span>
+                                    </label>
+                                    <?php if ($item['tags'] && $by !== 'tag' && $then !== 'tag') { ?><small class="menu-support"><?php echo h(implode(', ', $item['tags'])); ?></small><?php } ?>
+                                </li>
+                            <?php } ?>
+                        </ul>
+                    <?php } ?>
+                </div>
+            <?php } ?>
+        </section>
+
+        <details class="event-text">
+            <summary>Plain-text list</summary>
+            <textarea id="event-text" rows="12" readonly><?php echo h(event_plan_text($groups)); ?></textarea>
+            <button type="button" id="event-text-copy">Copy list</button>
+            <span id="event-text-status" class="menu-support" aria-live="polite"></span>
+        </details>
+
+        <section class="event-manage" aria-labelledby="event-manage-heading">
+            <h2 id="event-manage-heading">Setting and notes</h2>
+            <p class="menu-support">A setting, such as beach, groups games by where they will be played. A note, such as “requested by mom”, rides along on the list.</p>
+            <datalist id="event-settings">
+                <?php foreach ($settings as $setting) { ?><option value="<?php echo h($setting); ?>"><?php } ?>
+            </datalist>
+            <?php foreach ($items as $item) { ?>
+                <form class="event-item-row" method="post" action="<?php echo url_for('/events/item.php'); ?>">
+                    <?php echo csrf_input(); ?>
+                    <input type="hidden" name="event_id" value="<?php echo $id; ?>">
+                    <input type="hidden" name="item_id" value="<?php echo $item['id']; ?>">
+                    <a class="event-item-title" href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>"><?php echo h($item['Title']); ?></a>
+                    <label><span class="sr-only">Setting for <?php echo h($item['Title']); ?></span>
+                        <input type="text" name="setting" maxlength="64" list="event-settings" placeholder="Setting" value="<?php echo h($item['setting']); ?>">
+                    </label>
+                    <label><span class="sr-only">Note for <?php echo h($item['Title']); ?></span>
+                        <input type="text" name="note" maxlength="255" placeholder="Note" value="<?php echo h($item['note']); ?>">
+                    </label>
+                    <button type="submit" name="action" value="update">Save</button>
+                    <button type="submit" name="action" value="remove" class="event-remove">Remove</button>
+                </form>
+            <?php } ?>
+        </section>
+    <?php } ?>
+</main>
+<form id="event-pack-form" hidden><?php echo csrf_input(); ?></form>
+<script type="module" src="<?php echo url_for('/events/events.js?v=1'); ?>"></script>
+<?php include(SHARED_PATH . '/footer.php'); ?>

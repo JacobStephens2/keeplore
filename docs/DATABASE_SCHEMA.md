@@ -97,6 +97,34 @@ Another BoardGameGeek user's rating and comment on an owner's item, matched thro
 
 ---
 
+### `events` and `event_items`
+
+An owner's event, such as a beach week, and the items planned for it. `/events` groups an event's items by sweet spot, age, setting or tag and writes them out as a packing checklist. Apply [`add-events.sql`](../database/migrations/add-events.sql); it is safe to rerun.
+
+`events`:
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | INT UNSIGNED, AUTO_INCREMENT | NO | Primary key |
+| `user_id` | INT | NO | Owner; events never cross collections |
+| `name` | VARCHAR(255) | NO | e.g. `Beach week` |
+| `starts_on`, `ends_on` | DATE | YES | Optional dates; `ends_on` is never before `starts_on` |
+| `notes` | TEXT | YES | Free text |
+
+`event_items`:
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `event_id` | INT UNSIGNED | NO | `events.id`; deleting the event deletes its rows |
+| `artifact_id` | INT | NO | Planned item, `games.id`; deleting or merging the item removes or moves the row |
+| `setting` | VARCHAR(64) | NO | Where it will be played at this event, e.g. `beach`; `''` when unset |
+| `note` | VARCHAR(255) | NO | e.g. `requested by mom`; `''` when unset |
+| `is_packed` | TINYINT(1) | NO | Ticked on the event's checklist |
+
+**Primary key:** `(event_id, artifact_id)`
+
+---
+
 ### `users`
 
 Authentication and account records for application users.

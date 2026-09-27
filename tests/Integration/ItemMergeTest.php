@@ -34,6 +34,7 @@ final class ItemMergeTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-proposal-outcomes.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-events.sql'));
         $this->runSql('CREATE TABLE sweetspots (id INT AUTO_INCREMENT PRIMARY KEY, Title INT NOT NULL, SwS VARCHAR(50) DEFAULT NULL) ENGINE=InnoDB;');
         require_once PRIVATE_PATH . '/item_merge.php';
 
@@ -98,6 +99,19 @@ final class ItemMergeTest extends TestCase
             ['Gyges 9.00', 'Other 7.00'],
             $this->column("SELECT CONCAT(bgg_username, ' ', rating) FROM item_bgg_ratings WHERE artifact_id = 10 ORDER BY bgg_username"),
             "the survivor's own rating wins"
+        );
+    }
+
+    public function test_the_losers_event_plans_move_to_the_survivor_unless_it_is_already_planned(): void
+    {
+        $this->runSql("INSERT INTO events (id, user_id, name) VALUES (1, 1, 'Beach week'), (2, 1, 'Game night');
+            INSERT INTO event_items (event_id, artifact_id, note) VALUES (1, 10, 'survivor'), (1, 11, 'loser'), (2, 11, 'loser');");
+
+        merge_items($this->db, 10, 11, 1);
+
+        $this->assertSame(
+            ['1 10 survivor', '2 10 loser'],
+            $this->column("SELECT CONCAT(event_id, ' ', artifact_id, ' ', note) FROM event_items ORDER BY event_id, artifact_id")
         );
     }
 

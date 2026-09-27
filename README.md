@@ -51,6 +51,17 @@ Formerly **Artifact Manager** — see [docs/keeplore-app-name.md](docs/keeplore-
 - Compare separate outcome counts from Analysis, with date filters and collection scope
 - Keep proposal history separate from actual uses and interact-by dates
 
+### Event Planning
+
+- Create events (a beach week, a game day) and pick the games to bring from your collection
+- Group the plan by sweet spot, age, setting or tag, then by a second of those; a game best at 6 and 8 shows under both counts
+- Record a setting and note per game, tick games off as packed, and see the total planned
+- Copy the plan as a plain-text checklist
+
+Before deploying events, apply
+[`database/migrations/add-events.sql`](database/migrations/add-events.sql). It only creates the
+`events` and `event_items` tables and can be rerun.
+
 ### Player & Playgroup Management
 
 - Player profiles with priority and menu ordering
@@ -88,6 +99,7 @@ ui/                         Web-accessible frontend
 ├── users/                  User management
 ├── settings/               User settings
 ├── explore/                Candidate exploration
+├── events/                 Event planning
 ├── aversions/              Aversion tracking
 ├── shared/                 Header/footer templates
 └── style.css               Global stylesheet

@@ -89,10 +89,11 @@ function merge_items($conn, $survivor_id, $loser_id, $user_id) {
     'UPDATE sweetspots SET Title = ? WHERE Title = ?',
     'UPDATE proposal_outcomes SET item_id = ? WHERE item_id = ?',
     'UPDATE proposal_outcomes SET chosen_item_id = ? WHERE chosen_item_id = ?',
-    // IGNORE skips a tag or rating the survivor already has; the delete
+    // IGNORE skips a tag, rating or event plan the survivor already has; the delete
     // below then drops the loser's copy.
     'UPDATE IGNORE item_tags SET artifact_id = ? WHERE artifact_id = ?',
     'UPDATE IGNORE item_bgg_ratings SET artifact_id = ? WHERE artifact_id = ?',
+    'UPDATE IGNORE event_items SET artifact_id = ? WHERE artifact_id = ?',
   ];
   try {
     mysqli_begin_transaction($conn);
@@ -108,7 +109,7 @@ function merge_items($conn, $survivor_id, $loser_id, $user_id) {
     mysqli_stmt_bind_param($stmt, 'i', $survivor_id);
     mysqli_stmt_execute($stmt);
     mysqli_stmt_close($stmt);
-    foreach (['item_tags', 'item_bgg_ratings'] as $table) {
+    foreach (['item_tags', 'item_bgg_ratings', 'event_items'] as $table) {
       $stmt = mysqli_prepare($conn, "DELETE FROM {$table} WHERE artifact_id = ?");
       mysqli_stmt_bind_param($stmt, 'i', $loser_id);
       mysqli_stmt_execute($stmt);
