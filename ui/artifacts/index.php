@@ -320,7 +320,7 @@
     </noscript>
 
     <p id="items-sort-summary" class="list-sort-summary" aria-live="polite"></p>
-    <p class="list-sort-hint">Shift-click a column heading to sort by it next, as in Tags then Gyges.</p>
+    <p class="list-sort-hint">To sort by two columns, click the first heading (Tags), then Shift-click the second (Gyges), or pick it from Then by.</p>
     <div class="table-scroll">
   	<table class="list" id="artifacts" data-page-length='100'>
       <thead>
@@ -361,7 +361,7 @@
       <a id="bgg-rating-dialog-link" class="modal-link" target="_blank" rel="noopener">On BoardGameGeek</a>
     </dialog>
 
-    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=2"></script>
+    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=3"></script>
     <script src="<?php echo url_for('/artifacts/items-table-sort.js'); ?>?v=1"></script>
     <script type="application/json" id="items-list-config"><?php
       echo json_encode([

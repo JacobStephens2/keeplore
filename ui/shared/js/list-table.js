@@ -159,6 +159,8 @@
         return;
       }
       var labels = headerLabels();
+      // Rebuilding replaces the menu, so hand focus to the new one.
+      var hadFocus = !!(doc.activeElement && sortSummary.contains(doc.activeElement));
       sortSummary.textContent = '';
       sortSummary.appendChild(el('span', { text: describeSorts(state.sorts, labels) }));
       var sorted = {};
@@ -182,6 +184,9 @@
         }
       });
       sortSummary.appendChild(select);
+      if (hadFocus) {
+        select.focus();
+      }
     }
 
     function applyAriaSort() {
@@ -293,6 +298,12 @@
     }
 
     sortHeaders.forEach(function (th) {
+      // Shift+mousedown would otherwise extend the text selection across the row.
+      th.addEventListener('mousedown', function (event) {
+        if (event.shiftKey) {
+          event.preventDefault();
+        }
+      });
       th.addEventListener('click', function (event) {
         setSorts(nextSorts(state.sorts, th.getAttribute('data-sort'), !!(event && event.shiftKey)));
       });

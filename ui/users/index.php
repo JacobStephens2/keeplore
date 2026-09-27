@@ -75,7 +75,7 @@ include(SHARED_PATH . '/header.php');
     <div id="users-list-pager" class="list-pager"></div>
     <?php } ?>
 
-    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=1"></script>
+    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=3"></script>
     <script src="<?php echo url_for('/shared/js/users-list.js'); ?>?v=2"></script>
     <?php mysqli_free_result($player_set); ?>
   </div>
