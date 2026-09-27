@@ -79,7 +79,7 @@ Owner-managed free-form tags on items (issue #28). Distinct from BGG rating meta
 
 ### `item_bgg_ratings`
 
-Another BoardGameGeek user's rating and comment on an owner's item, matched through the item's `games.bgg_url`. `bin/import-bgg-ratings <keeplore-email> <bgg-username>` fills it; rerunning refreshes it. Items shows one column per imported BGG user. Apply [`add-item-bgg-ratings.sql`](../database/migrations/add-item-bgg-ratings.sql); it is safe to rerun.
+Another BoardGameGeek user's rating and comment on an owner's item, matched through the item's `games.bgg_url`. `bin/import-bgg-ratings <keeplore-email> <bgg-username>` fills it; rerunning refreshes it. Items shows one column per imported BGG user. Edit Item can also enter a user's rating and comment by hand, with or without a BGG link, and the import then leaves it alone. Apply [`add-item-bgg-ratings.sql`](../database/migrations/add-item-bgg-ratings.sql), then [`add-item-bgg-ratings-manual.sql`](../database/migrations/add-item-bgg-ratings-manual.sql); both are safe to rerun.
 
 | Column | Type | Nullable | Description |
 |---|---|---|---|
@@ -90,6 +90,7 @@ Another BoardGameGeek user's rating and comment on an owner's item, matched thro
 | `rating` | DECIMAL(4,2) | YES | Their 1-10 rating, NULL when they only commented |
 | `comment` | TEXT | YES | Their collection comment, NULL when they only rated |
 | `rated_at` | DATETIME | YES | When they rated it on BGG; NULL once the owner edits the row on Edit Item |
+| `is_manual` | TINYINT(1) | NO | 1 when the owner entered or edited the row on Edit Item. The bulk import skips it; Request data on Edit Item replaces it only when BGG has an entry |
 | `imported_at` | DATETIME | NO | Last import that wrote the row |
 
 **Primary key:** `id`

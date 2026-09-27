@@ -206,6 +206,9 @@
     document.getElementById('bgg-rating-dialog-score').textContent = rating.rating == null
       ? 'Commented without a rating'
       : 'Rated ' + bggRatingLabel(rating) + ' out of 10';
+    if (rating.manual) {
+      document.getElementById('bgg-rating-dialog-score').textContent += ' (entered by hand)';
+    }
     document.getElementById('bgg-rating-dialog-comment').textContent = rating.comment || '';
     var link = document.getElementById('bgg-rating-dialog-link');
     link.hidden = !rating.url;
