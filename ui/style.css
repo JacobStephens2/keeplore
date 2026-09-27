@@ -1596,8 +1596,10 @@ p.copied_message {
   border-radius: 999px;
   font-variant-numeric: tabular-nums;
 }
-.bgg-rating-dialog {
-  /* .modal-panel sets position: relative, which would pull a modal dialog out of the top layer's centering. */
+/* .modal-panel comes later and sets position: relative, which Chrome turns
+   into absolute for a modal dialog: it opened at the top of the document and
+   focusing it scrolled the page there. Two classes outrank it. */
+.modal-panel.bgg-rating-dialog {
   position: fixed;
   inset: 0;
   margin: auto;

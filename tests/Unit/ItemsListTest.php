@@ -556,6 +556,23 @@ class ItemsListTest extends TestCase
         $this->assertStringContainsString("'copy-item-btn'", $js);
     }
 
+    public function test_the_rating_dialog_stays_fixed_so_opening_it_keeps_the_scroll_position(): void
+    {
+        // .modal-panel (position: relative) comes later in the file; a modal
+        // dialog left relative computes to absolute, opens at the top of the
+        // document and focusing it scrolls the page there.
+        $css = (string) file_get_contents(PROJECT_PATH . '/ui/style.css');
+        $this->assertSame(1, preg_match('/\.modal-panel\.bgg-rating-dialog\s*\{([^}]*)\}/', $css, $rule));
+        $this->assertStringContainsString('position: fixed', $rule[1]);
+    }
+
+    public function test_copy_text_keeps_the_best_count_when_no_range_is_recorded(): void
+    {
+        $row = items_list_present_row(['id' => 1, 'Title' => 'Azul', 'Acq' => '2024-01-10', 'ss' => '03', 'Age' => 8], 90, '2024-06-01');
+
+        $this->assertSame('Azul, best 3, 8 yrs', $row['copy_text']);
+    }
+
     public function test_items_page_offers_a_youngest_age_picker_beside_the_count(): void
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');

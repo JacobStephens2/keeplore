@@ -337,6 +337,8 @@ function items_list_copy_text(array $artifact) {
     $best = items_list_best_counts_label($artifact['ss'] ?? $artifact['SS'] ?? '');
     if ($range !== '') {
         $parts[] = $best === '' ? $range : $range . ' (' . $best . ')';
+    } elseif ($best !== '') {
+        $parts[] = 'best ' . $best;
     }
     $min_age = items_list_min_age($artifact);
     if ($min_age !== null) {
