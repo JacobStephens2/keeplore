@@ -96,6 +96,37 @@ class BggRatingsTest extends TestCase
         ]]])));
     }
 
+    public function test_item_page_shows_each_reviewers_score_and_comment(): void
+    {
+        $html = item_bgg_ratings_html([
+            'Gyges' => [
+                'rating' => 9.5,
+                'comment' => "The best card game ever.\nA <towering> testament & more.",
+                'url' => 'https://boardgamegeek.com/boardgame/147154/blue-moon-legends',
+            ],
+        ]);
+
+        $this->assertStringContainsString('Gyges rated it 9.5 out of 10 on BoardGameGeek', $html);
+        $this->assertStringContainsString("The best card game ever.\nA &lt;towering&gt; testament &amp; more.", $html);
+        $this->assertStringNotContainsString('<towering>', $html);
+    }
+
+    public function test_item_page_reads_whole_scores_without_decimals_and_handles_missing_parts(): void
+    {
+        $rated_only = item_bgg_ratings_html(['Gyges' => ['rating' => 8.0, 'comment' => null, 'url' => '']]);
+        $comment_only = item_bgg_ratings_html(['Gyges' => ['rating' => null, 'comment' => 'Thoughts.', 'url' => '']]);
+
+        $this->assertStringContainsString('Gyges rated it 8 out of 10 on BoardGameGeek', $rated_only);
+        $this->assertStringNotContainsString('<blockquote', $rated_only);
+        $this->assertStringContainsString('Gyges commented on BoardGameGeek', $comment_only);
+        $this->assertStringContainsString('Thoughts.', $comment_only);
+    }
+
+    public function test_item_page_without_imported_ratings_shows_nothing(): void
+    {
+        $this->assertSame('', item_bgg_ratings_html([]));
+    }
+
     public function test_list_row_carries_imported_ratings_by_reviewer(): void
     {
         $row = items_list_present_row([

@@ -177,6 +177,82 @@ final class BggRatingsImportTest extends TestCase
         $this->assertSame('Kept through an outage.', find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['comment']);
     }
 
+    public function test_one_item_import_stores_that_items_rating_only(): void
+    {
+        $result = bgg_ratings_import_item($this->db, 1, 10, 'gyges', $this->fakeBgg([
+            147154 => $this->blueMoonEntry(9.5, 'Imported alone.'),
+            29107 => $this->blueMoonEntry(6.0, 'Not asked for.'),
+        ]));
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame('Gyges rated it 9.5 out of 10.', $result['message']);
+        $this->assertSame([10], array_keys(find_item_bgg_ratings($this->db, [10, 11], 1)));
+        $this->assertSame('Imported alone.', find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['comment']);
+    }
+
+    public function test_one_item_import_with_no_bgg_entry_clears_the_old_one(): void
+    {
+        bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $this->fakeBgg([
+            147154 => $this->blueMoonEntry(9.5, 'Withdrawn later.'),
+        ]));
+
+        $result = bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $this->fakeBgg([]));
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame('Gyges has not rated or commented on this item on BoardGameGeek.', $result['message']);
+        $this->assertSame([], find_item_bgg_ratings($this->db, [10], 1));
+    }
+
+    public function test_one_item_import_refuses_unlinked_and_other_owners_items(): void
+    {
+        $bgg = $this->fakeBgg([421 => $this->blueMoonEntry(7.0, 'Private.')]);
+
+        $unlinked = bgg_ratings_import_item($this->db, 1, 12, 'Gyges', $bgg);
+        $not_owned = bgg_ratings_import_item($this->db, 1, 20, 'Gyges', $bgg);
+
+        $this->assertFalse($unlinked['ok']);
+        $this->assertSame('Add a BoardGameGeek link to this item first.', $unlinked['error']);
+        $this->assertFalse($not_owned['ok']);
+        $this->assertSame('Item not found.', $not_owned['error']);
+        $this->assertSame([], find_item_bgg_ratings($this->db, [20], 2));
+    }
+
+    public function test_one_item_import_keeps_the_old_rating_when_bgg_fails(): void
+    {
+        bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $this->fakeBgg([
+            147154 => $this->blueMoonEntry(9.5, 'Survives.'),
+        ]));
+
+        $result = bgg_ratings_import_item($this->db, 1, 10, 'Gyges', function (string $url) {
+            if (str_contains($url, '/users?')) {
+                return '[{"userid":63428,"username":"Gyges"}]';
+            }
+            throw new \RuntimeException('BoardGameGeek HTTP 503');
+        });
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('Could not reach BoardGameGeek.', $result['error']);
+        $this->assertSame('Survives.', find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['comment']);
+    }
+
+    public function test_an_empty_or_garbled_bgg_answer_keeps_the_old_rating(): void
+    {
+        bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $this->fakeBgg([
+            147154 => $this->blueMoonEntry(9.5, 'Not wiped by a queued reply.'),
+        ]));
+
+        $queued = function (string $url) {
+            return str_contains($url, '/users?') ? '[{"userid":63428,"username":"Gyges"}]' : '';
+        };
+        $result = bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $queued);
+        $bulk = bgg_ratings_import($this->db, 1, 'Gyges', $queued, 0);
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame(2, $bulk['failed']);
+        $this->assertSame(0, $bulk['removed']);
+        $this->assertSame('Not wiped by a queued reply.', find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['comment']);
+    }
+
     public function test_unknown_username_imports_nothing(): void
     {
         $result = bgg_ratings_import($this->db, 1, 'nosuchuser', function () {

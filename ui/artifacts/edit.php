@@ -1,5 +1,6 @@
 <?php
   require_once('../../private/initialize.php');
+  require_once(PRIVATE_PATH . '/bgg_ratings.php');
   require_login();
   if(!isset($_GET['id'])) {
     redirect_to(url_for('/artifacts/index.php'));
@@ -102,6 +103,16 @@
     <?php } ?>
 
     <?php echo item_bgg_link_html($artifact['bgg_url'] ?? ''); ?>
+    <?php echo item_bgg_ratings_html(find_item_bgg_ratings($db, [$id], (int) $_SESSION['user_id'])[$id] ?? []); ?>
+    <?php if (bgg_thing_id_from_url($artifact['bgg_url'] ?? '') > 0) {
+      foreach (item_bgg_reviewers($db, (int) $_SESSION['user_id']) as $bgg_reviewer) { ?>
+      <form class="bgg-rating-request" method="post" action="<?php echo url_for('/artifacts/bgg-rating-request.php'); ?>">
+        <?php echo csrf_input(); ?>
+        <input type="hidden" name="artifact_id" value="<?php echo h((string) $id); ?>">
+        <input type="hidden" name="bgg_username" value="<?php echo h($bgg_reviewer); ?>">
+        <button type="submit">Request <?php echo h($bgg_reviewer); ?> data</button>
+      </form>
+    <?php } } ?>
 
     <?php echo display_errors($errors); ?>
 

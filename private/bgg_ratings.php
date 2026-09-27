@@ -57,14 +57,8 @@ function bgg_rating_from_collection_json($json) {
   ];
 }
 
-/**
- * Looks up $username's entry for every owner item with a BGG link and stores
- * what they rated or commented on. An item BGG answered with no entry loses
- * its old row; an item whose lookup failed keeps it. $pause_ms spaces the
- * requests out so a full collection does not hammer BGG.
- */
-function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause_ms = 250) {
-  $user_id = (int) $user_id;
+// ['ok' => true, 'user' => ['id', 'username']] or ['ok' => false, 'error'].
+function bgg_ratings_find_user($username, $get_json) {
   $username = trim((string) $username);
   try {
     $bgg_user = bgg_user_from_users_json(
@@ -77,6 +71,67 @@ function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause
   if ($bgg_user === null) {
     return ['ok' => false, 'error' => 'No BoardGameGeek user named ' . $username . '.'];
   }
+  return ['ok' => true, 'user' => $bgg_user];
+}
+
+/**
+ * Fetches one BGG user's entry for one item and stores it. Returns the entry
+ * (null when they have none, which clears the item's old row), or false when
+ * BGG could not be reached, which leaves the old row alone.
+ */
+function bgg_ratings_refresh_item($conn, $user_id, $artifact_id, $thing_id, array $bgg_user, $get_json) {
+  $url = bgg_api_root() . '/collections?objectid=' . (int) $thing_id . '&objecttype=thing&userid=' . $bgg_user['id'];
+  try {
+    $json = bgg_fetch($url, $get_json);
+  } catch (Throwable $e) {
+    return false;
+  }
+  // Only a real {"items": [...]} answer may clear a rating. An empty or
+  // garbled body, as BGG sends while it queues a request, counts as a failure.
+  $data = json_decode((string) $json, true);
+  if (!is_array($data) || !is_array($data['items'] ?? null)) {
+    return false;
+  }
+  $entry = bgg_rating_from_collection_json($json);
+  if ($entry === null) {
+    $stmt = mysqli_prepare($conn, 'DELETE FROM item_bgg_ratings WHERE user_id = ? AND artifact_id = ? AND bgg_username = ?');
+    mysqli_stmt_bind_param($stmt, 'iis', $user_id, $artifact_id, $bgg_user['username']);
+  } else {
+    $stmt = mysqli_prepare(
+      $conn,
+      "INSERT INTO item_bgg_ratings (user_id, artifact_id, bgg_username, rating, comment, rated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), rated_at = VALUES(rated_at)"
+    );
+    mysqli_stmt_bind_param(
+      $stmt,
+      'iisdss',
+      $user_id,
+      $artifact_id,
+      $bgg_user['username'],
+      $entry['rating'],
+      $entry['comment'],
+      $entry['rated_at']
+    );
+  }
+  mysqli_stmt_execute($stmt);
+  mysqli_stmt_close($stmt);
+  return $entry;
+}
+
+/**
+ * Looks up $username's entry for every owner item with a BGG link and stores
+ * what they rated or commented on. An item BGG answered with no entry loses
+ * its old row; an item whose lookup failed keeps it. $pause_ms spaces the
+ * requests out so a full collection does not hammer BGG.
+ */
+function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause_ms = 250) {
+  $user_id = (int) $user_id;
+  $found = bgg_ratings_find_user($username, $get_json);
+  if (!$found['ok']) {
+    return $found;
+  }
+  $bgg_user = $found['user'];
 
   $stmt = mysqli_prepare($conn, "SELECT id, bgg_url FROM games WHERE user_id = ? AND bgg_url IS NOT NULL AND bgg_url <> '' ORDER BY id");
   mysqli_stmt_bind_param($stmt, 'i', $user_id);
@@ -90,47 +145,22 @@ function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause
   }
   mysqli_stmt_close($stmt);
 
-  $upsert = mysqli_prepare(
-    $conn,
-    "INSERT INTO item_bgg_ratings (user_id, artifact_id, bgg_username, rating, comment, rated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), rated_at = VALUES(rated_at)"
-  );
-  $delete = mysqli_prepare($conn, 'DELETE FROM item_bgg_ratings WHERE user_id = ? AND artifact_id = ? AND bgg_username = ?');
+  $had_rating = find_item_bgg_ratings($conn, array_keys($linked), $user_id);
   $result = ['ok' => true, 'username' => $bgg_user['username'], 'checked' => 0, 'imported' => 0, 'removed' => 0, 'failed' => 0];
   foreach ($linked as $artifact_id => $thing_id) {
     if ($result['checked'] > 0 && $pause_ms > 0) {
       usleep($pause_ms * 1000);
     }
     $result['checked']++;
-    $url = bgg_api_root() . '/collections?objectid=' . $thing_id . '&objecttype=thing&userid=' . $bgg_user['id'];
-    try {
-      $entry = bgg_rating_from_collection_json(bgg_fetch($url, $get_json));
-    } catch (Throwable $e) {
+    $entry = bgg_ratings_refresh_item($conn, $user_id, $artifact_id, $thing_id, $bgg_user, $get_json);
+    if ($entry === false) {
       $result['failed']++;
-      continue;
+    } elseif ($entry !== null) {
+      $result['imported']++;
+    } elseif (isset($had_rating[$artifact_id][$bgg_user['username']])) {
+      $result['removed']++;
     }
-    if ($entry === null) {
-      mysqli_stmt_bind_param($delete, 'iis', $user_id, $artifact_id, $bgg_user['username']);
-      mysqli_stmt_execute($delete);
-      $result['removed'] += mysqli_stmt_affected_rows($delete);
-      continue;
-    }
-    mysqli_stmt_bind_param(
-      $upsert,
-      'iisdss',
-      $user_id,
-      $artifact_id,
-      $bgg_user['username'],
-      $entry['rating'],
-      $entry['comment'],
-      $entry['rated_at']
-    );
-    mysqli_stmt_execute($upsert);
-    $result['imported']++;
   }
-  mysqli_stmt_close($upsert);
-  mysqli_stmt_close($delete);
 
   // An item whose link was removed or no longer names a thing keeps no rating.
   $sql = 'DELETE FROM item_bgg_ratings WHERE user_id = ? AND bgg_username = ?';
@@ -145,6 +175,46 @@ function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause
   $result['removed'] += mysqli_stmt_affected_rows($unlinked);
   mysqli_stmt_close($unlinked);
   return $result;
+}
+
+/**
+ * Edit Item's "Request <user> data": one item's entry, fetched now. The item
+ * must belong to the owner and link to a BGG thing. On success 'message' says
+ * what BGG had, ready for the page.
+ */
+function bgg_ratings_import_item($conn, $user_id, $artifact_id, $username, $get_json = null) {
+  $user_id = (int) $user_id;
+  $artifact_id = (int) $artifact_id;
+  $stmt = mysqli_prepare($conn, 'SELECT bgg_url FROM games WHERE id = ? AND user_id = ?');
+  mysqli_stmt_bind_param($stmt, 'ii', $artifact_id, $user_id);
+  mysqli_stmt_execute($stmt);
+  $item = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+  mysqli_stmt_close($stmt);
+  if (!$item) {
+    return ['ok' => false, 'error' => 'Item not found.'];
+  }
+  $thing_id = bgg_thing_id_from_url($item['bgg_url']);
+  if ($thing_id <= 0) {
+    return ['ok' => false, 'error' => 'Add a BoardGameGeek link to this item first.'];
+  }
+
+  $found = bgg_ratings_find_user($username, $get_json);
+  if (!$found['ok']) {
+    return $found;
+  }
+  $bgg_user = $found['user'];
+  $entry = bgg_ratings_refresh_item($conn, $user_id, $artifact_id, $thing_id, $bgg_user, $get_json);
+  if ($entry === false) {
+    return ['ok' => false, 'error' => 'Could not reach BoardGameGeek.'];
+  }
+  if ($entry === null) {
+    $message = $bgg_user['username'] . ' has not rated or commented on this item on BoardGameGeek.';
+  } elseif ($entry['rating'] === null) {
+    $message = $bgg_user['username'] . ' commented on this item without rating it.';
+  } else {
+    $message = $bgg_user['username'] . ' rated it ' . bgg_score_text($entry['rating']) . ' out of 10.';
+  }
+  return ['ok' => true, 'username' => $bgg_user['username'], 'message' => $message];
 }
 
 // [artifact_id => [bgg_username => ['rating', 'comment', 'url']]] for the owner.
@@ -198,6 +268,28 @@ function item_bgg_reviewers($conn, $user_id) {
   }
   mysqli_stmt_close($stmt);
   return $reviewers;
+}
+
+// A BGG score as people write it: 9.5 reads "9.5", 8 reads "8".
+function bgg_score_text($score) {
+  return rtrim(rtrim(number_format((float) $score, 2, '.', ''), '0'), '.');
+}
+
+// One item's imported ratings, as find_item_bgg_ratings() keys them, for the
+// item pages: each reviewer's score in words, then their comment in full.
+function item_bgg_ratings_html(array $ratings_by_reviewer) {
+  $html = '';
+  foreach ($ratings_by_reviewer as $reviewer => $rating) {
+    $caption = $rating['rating'] === null
+      ? $reviewer . ' commented on BoardGameGeek'
+      : $reviewer . ' rated it ' . bgg_score_text($rating['rating']) . ' out of 10 on BoardGameGeek';
+    $html .= '<figure class="item-bgg-rating">';
+    if ((string) $rating['comment'] !== '') {
+      $html .= '<blockquote class="bgg-rating-comment">' . h($rating['comment']) . '</blockquote>';
+    }
+    $html .= '<figcaption>' . h($caption) . '</figcaption></figure>';
+  }
+  return $html;
 }
 
 function with_item_bgg_ratings($conn, array $items, $user_id) {
