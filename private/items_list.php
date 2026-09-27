@@ -75,7 +75,9 @@ function items_list_filters_from_request(
     // sweetSpotFilter is the old name for the count, kept so bookmarks still work.
     $players = $post['players'] ?? $get['players']
         ?? $post['sweetSpotFilter'] ?? $get['sweetSpotFilter'] ?? '';
-    $players = is_string($players) && preg_match('/^\s*[1-9]\d*\s*$/', $players) ? (int) $players : null;
+    $players = items_list_positive_int($players);
+    // The youngest player's age: items must be recommended for this age or younger.
+    $age = items_list_positive_int($post['age'] ?? $get['age'] ?? '');
     $showAttributes = $post['showAttributes'] ?? $get['showAttributes'] ?? 'no';
     if ($showAttributes !== 'yes') {
         $showAttributes = 'no';
@@ -87,9 +89,15 @@ function items_list_filters_from_request(
         'type' => $type,
         'interval' => $interval,
         'players' => $players,
+        'age' => $age,
         'showAttributes' => $showAttributes,
         'tagFilter' => (string) $tagFilter,
     ];
+}
+
+/** A whole number of 1 or more typed into a filter, or null for anything else. */
+function items_list_positive_int($value) {
+    return is_string($value) && preg_match('/^\s*[1-9]\d*\s*$/', $value) ? (int) $value : null;
 }
 
 function items_list_query_params(array $filters, array $all_types = []) {
@@ -113,6 +121,9 @@ function items_list_query_params(array $filters, array $all_types = []) {
     }
     if ($filters['players'] !== null) {
         $params['players'] = $filters['players'];
+    }
+    if ($filters['age'] !== null) {
+        $params['age'] = $filters['age'];
     }
     if ($filters['showAttributes'] === 'yes') {
         $params['showAttributes'] = 'yes';
@@ -154,6 +165,7 @@ function items_list_present_row(array $artifact, $interval, $today = null) {
     $mnt = (float) ($artifact['mnt'] ?? $artifact['MnT'] ?? 0);
     $mxt = (float) ($artifact['mxt'] ?? $artifact['MxT'] ?? 0);
     $candidate_raw = $artifact['Candidate'] ?? '';
+    $min_age = items_list_min_age($artifact);
 
     return [
         'id' => (int) ($artifact['id'] ?? 0),
@@ -171,6 +183,7 @@ function items_list_present_row(array $artifact, $interval, $today = null) {
             $artifact['mxp'] ?? $artifact['MxP'] ?? null,
             $artifact['ss'] ?? $artifact['SS'] ?? null
         ),
+        'age' => $min_age === null ? '' : $min_age . '+',
         'avg_time' => (int) ceil(($mnt + $mxt) / 2),
         'candidate' => ($candidate_raw != '' && $candidate_raw != 0),
         // Keyed by BGG username; an object even when empty so the JSON is {}.
@@ -191,6 +204,7 @@ function items_list_payload($db, array $filters, $user_id, $today = null) {
     }
     mysqli_free_result($artifact_set);
     $artifacts = items_list_best_at($artifacts, $filters['players']);
+    $artifacts = items_list_suitable_for_age($artifacts, $filters['age']);
     $artifacts = with_item_tags($db, $artifacts, (int) $user_id);
     $artifacts = with_item_bgg_ratings($db, $artifacts, (int) $user_id);
     $items = [];
@@ -264,12 +278,39 @@ function items_list_players_label($min, $max, $ss) {
     return $range === '' ? 'best ' . $best : $range . ' (best ' . $best . ')';
 }
 
-/** The title for a chosen count, as in "Best at 3 players", or null with none. */
-function items_list_best_at_heading($players) {
-    if ($players === null) {
-        return null;
+/**
+ * The title for a chosen count and youngest age, as in "Best at 3 players,
+ * suitable for age 2", or null with neither.
+ */
+function items_list_heading($players, $age) {
+    $parts = [];
+    if ($players !== null) {
+        $parts[] = 'Best at ' . $players . ($players === 1 ? ' player' : ' players');
     }
-    return 'Best at ' . $players . ($players === 1 ? ' player' : ' players');
+    if ($age !== null) {
+        $parts[] = ($parts ? 'suitable' : 'Suitable') . ' for age ' . $age;
+    }
+    return $parts ? implode(', ', $parts) : null;
+}
+
+/** An item's recommended minimum age, or null when none is recorded. */
+function items_list_min_age(array $row) {
+    $age = (int) ($row['Age'] ?? $row['age'] ?? 0);
+    return $age > 0 ? $age : null;
+}
+
+/**
+ * The rows recommended for the age or younger, or every row with no age. An
+ * item with no recorded minimum age is left out, since nothing vouches for it.
+ */
+function items_list_suitable_for_age(array $rows, $age) {
+    if ($age === null) {
+        return $rows;
+    }
+    return array_values(array_filter($rows, function ($row) use ($age) {
+        $min_age = items_list_min_age($row);
+        return $min_age !== null && $min_age <= $age;
+    }));
 }
 
 /** The rows whose sweet spot includes the count, or every row with no count. */

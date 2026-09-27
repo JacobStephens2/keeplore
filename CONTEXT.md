@@ -49,5 +49,9 @@ An item flagged for removal, whether or not it is kept.
 **Physical item**:
 An item with a physical form. Independent of whether it is kept.
 
+**Youngest age**:
+The age of the youngest person expected to use an item, as chosen on the Items page. It keeps items whose recorded minimum recommended age is at or below it; an item with no recorded minimum age is left out.
+_Avoid_: Minimum age (that is the item's own recommended floor).
+
 **Digital item**:
 An item with a digital form. Independent of whether it is kept. An item can be both physical and digital.

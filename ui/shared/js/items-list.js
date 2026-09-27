@@ -121,6 +121,11 @@
       // By the smallest count the label names, so "2–4" sorts before "10–12".
       av = fewestPlayers(av);
       bv = fewestPlayers(bv);
+    } else if (key === 'age') {
+      // "8+" sorts as 8; an unrecorded age sorts after every known one either way.
+      var unknownAge = dir === 'desc' ? -Infinity : Infinity;
+      av = parseInt(av, 10) || unknownAge;
+      bv = parseInt(bv, 10) || unknownAge;
     } else if (key === 'title' || key === 'type') {
       av = String(av || '').toLowerCase();
       bv = String(bv || '').toLowerCase();
@@ -229,6 +234,9 @@
     ];
     if (config.showPlayers) {
       cells.push(el('td', { className: 'players', text: item.players || '' }));
+    }
+    if (config.showAge) {
+      cells.push(el('td', { className: 'age', text: item.age || '' }));
     }
     (config.bggReviewers || []).forEach(function (reviewer) {
       cells.push(renderBggRatingCell(item, reviewer));

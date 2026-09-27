@@ -17,15 +17,17 @@
   $type = $filters['type'];
   $interval = $filters['interval'];
   $players = $filters['players'];
+  $age = $filters['age'];
   $showAttributes = $filters['showAttributes'];
   $tagFilter = $filters['tagFilter'];
 
-  $best_at_heading = items_list_best_at_heading($players);
+  $filter_heading = items_list_heading($players, $age);
   $show_players_column = $players !== null || $showAttributes === 'yes';
+  $show_age_column = $age !== null || $showAttributes === 'yes';
   $bgg_reviewers = item_bgg_reviewers($db, $_SESSION['user_id']);
-  $column_count = 7 + ($show_players_column ? 1 : 0) + count($bgg_reviewers) + ($showAttributes === 'yes' ? 2 : 0);
+  $column_count = 7 + ($show_players_column ? 1 : 0) + ($show_age_column ? 1 : 0) + count($bgg_reviewers) + ($showAttributes === 'yes' ? 2 : 0);
 
-  $page_title = $best_at_heading ?? 'Items';
+  $page_title = $filter_heading ?? 'Items';
   if ($kept === 'secondary_only') { $page_title .= ' (Secondary Only)'; }
   include(SHARED_PATH . '/header.php');
 ?>
@@ -103,6 +105,9 @@
       if ($players !== null) {
         $switch_base['players'] = $players;
       }
+      if ($age !== null) {
+        $switch_base['age'] = $age;
+      }
       if ($tagFilter !== '') {
         $switch_base['tag'] = $tagFilter;
       }
@@ -130,10 +135,10 @@
     </nav>
 
     <?php
-      // The picker is a plain GET form, so a count can be bookmarked. It carries
-      // the other filters as hidden fields, so choosing a count keeps them.
+      // The picker is a plain GET form, so a count or age can be bookmarked. It
+      // carries the other filters as hidden fields, so choosing one keeps them.
       $picker_carry = $switch_base;
-      unset($picker_carry['players']);
+      unset($picker_carry['players'], $picker_carry['age']);
       if ($kept_switch_active !== null) {
         $picker_carry['kept'] = $kept_switch_active;
       } elseif ($kept === 'secondary_only') {
@@ -143,20 +148,27 @@
     <form class="player-picker" method="get" action="<?php echo url_for('/artifacts/index.php'); ?>">
       <label>Best at <input type="number" name="players" min="1" inputmode="numeric"
         value="<?php echo $players === null ? '' : h((string) $players); ?>"> players</label>
+      <label title="Shows items recommended for this age or younger. Items with no recorded age are left out.">Youngest age <input type="number" name="age" min="1" inputmode="numeric"
+        value="<?php echo $age === null ? '' : h((string) $age); ?>"></label>
       <?php foreach ($picker_carry as $carry_name => $carry_value) {
         foreach ((array) $carry_value as $carry_key => $carry_item) {
           $carry_field = is_array($carry_value) ? $carry_name . '[' . $carry_key . ']' : $carry_name; ?>
         <input type="hidden" name="<?php echo h($carry_field); ?>" value="<?php echo h((string) $carry_item); ?>">
       <?php } } ?>
       <button type="submit">Show</button>
-      <?php if ($players !== null) { ?>
-        <a class="all-counts" href="<?php echo h(url_for('/artifacts/index.php' . ($picker_carry ? '?' . http_build_query($picker_carry) : ''))); ?>">All counts</a>
+      <?php if ($players !== null || $age !== null) { ?>
+        <a class="all-counts" href="<?php echo h(url_for('/artifacts/index.php' . ($picker_carry ? '?' . http_build_query($picker_carry) : ''))); ?>">Clear</a>
       <?php } ?>
     </form>
 
-    <?php if ($best_at_heading !== null) { ?>
-      <h2 class="best-at-heading"><?php echo h($best_at_heading); ?></h2>
-      <p class="best-at-lede">Items whose sweet spot includes <?php echo h((string) $players); ?>, with each one's player range and sweet spot.</p>
+    <?php if ($filter_heading !== null) { ?>
+      <h2 class="best-at-heading"><?php echo h($filter_heading); ?></h2>
+      <?php if ($players !== null) { ?>
+        <p class="best-at-lede">Items whose sweet spot includes <?php echo h((string) $players); ?>, with each one's player range and sweet spot.</p>
+      <?php } ?>
+      <?php if ($age !== null) { ?>
+        <p class="best-at-lede">Items recommended for age <?php echo h((string) $age); ?> or younger. Items with no recorded minimum age are left out.</p>
+      <?php } ?>
     <?php } ?>
 
     <form class="filter-panel" action="<?php echo url_for('/artifacts/index.php'); ?>"
@@ -221,6 +233,9 @@
       <?php if ($players !== null) { ?>
         <input type="hidden" name="players" value="<?php echo h((string) $players); ?>">
       <?php } ?>
+      <?php if ($age !== null) { ?>
+        <input type="hidden" name="age" value="<?php echo h((string) $age); ?>">
+      <?php } ?>
 
       <label for="tag">Tag</label>
       <input type="text" id="tag" name="tag" placeholder="beach-safe"
@@ -279,6 +294,9 @@
           <?php if ($show_players_column) { ?>
             <th data-sort="players">Players</th>
           <?php } ?>
+          <?php if ($show_age_column) { ?>
+            <th data-sort="age" title="Recommended minimum age">Age</th>
+          <?php } ?>
           <?php foreach ($bgg_reviewers as $bgg_reviewer) { ?>
             <th data-sort="<?php echo h('bgg_rating:' . $bgg_reviewer); ?>" title="<?php echo h($bgg_reviewer . "'s BoardGameGeek rating. Select one to read the comment."); ?>"><?php echo h($bgg_reviewer); ?></th>
           <?php } ?>
@@ -336,13 +354,14 @@
         'isGuest' => is_guest(),
         'showAttributes' => $showAttributes === 'yes',
         'showPlayers' => $show_players_column,
+        'showAge' => $show_age_column,
         'bggReviewers' => $bgg_reviewers,
         'columnCount' => $column_count,
-        'emptyMessage' => $players === null ? 'No items yet.' : 'No items are ' . lcfirst($best_at_heading) . '.',
+        'emptyMessage' => $filter_heading === null ? 'No items yet.' : 'No items are ' . lcfirst($filter_heading) . '.',
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
-    <script src="/shared/js/items-list.js?v=7"></script>
+    <script src="/shared/js/items-list.js?v=8"></script>
   </div>
 </main>
 

@@ -347,10 +347,70 @@ class ItemsListTest extends TestCase
     public function test_items_page_titles_a_chosen_count_best_at(): void
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
-        $this->assertStringContainsString("items_list_best_at_heading(\$players)", $source);
-        $this->assertSame('Best at 3 players', items_list_best_at_heading(3));
-        $this->assertSame('Best at 1 player', items_list_best_at_heading(1));
-        $this->assertNull(items_list_best_at_heading(null));
+        $this->assertStringContainsString("items_list_heading(\$players, \$age)", $source);
+        $this->assertSame('Best at 3 players', items_list_heading(3, null));
+        $this->assertSame('Best at 1 player', items_list_heading(1, null));
+        $this->assertNull(items_list_heading(null, null));
         $this->assertMatchesRegularExpression('/<form class="player-picker" method="get"/', $source);
+    }
+
+    public function test_items_page_titles_a_chosen_age_and_both_together(): void
+    {
+        $this->assertSame('Suitable for age 7', items_list_heading(null, 7));
+        $this->assertSame('Best at 3 players, suitable for age 2', items_list_heading(3, 2));
+    }
+
+    public function test_age_comes_from_the_age_parameter_as_a_positive_whole_number(): void
+    {
+        $types = ['table-game' => '4'];
+        $this->assertSame(7, items_list_filters_from_request(['age' => '7'], [], 'GET', 90, $types)['age']);
+        $this->assertSame(2, items_list_filters_from_request([], ['age' => ' 2 '], 'POST', 90, $types)['age']);
+        $this->assertNull(items_list_filters_from_request([], [], 'GET', 90, $types)['age']);
+        $this->assertNull(items_list_filters_from_request(['age' => ''], [], 'GET', 90, $types)['age']);
+        $this->assertNull(items_list_filters_from_request(['age' => '0'], [], 'GET', 90, $types)['age']);
+        $this->assertNull(items_list_filters_from_request(['age' => 'seven'], [], 'GET', 90, $types)['age']);
+    }
+
+    public function test_query_params_carry_the_age_only_when_chosen(): void
+    {
+        $types = ['table-game' => '4'];
+        $with = items_list_query_params(items_list_filters_from_request(['age' => '7'], [], 'GET', 90, $types), $types);
+        $without = items_list_query_params(items_list_filters_from_request([], [], 'GET', 90, $types), $types);
+
+        $this->assertSame(7, $with['age']);
+        $this->assertArrayNotHasKey('age', $without);
+    }
+
+    public function test_suitable_for_age_keeps_items_whose_minimum_age_is_known_and_at_most_the_age(): void
+    {
+        $rows = [
+            ['id' => 1, 'Age' => 8],
+            ['id' => 2, 'Age' => 7],
+            ['id' => 3, 'Age' => 2],
+            ['id' => 4, 'Age' => 0],
+            ['id' => 5, 'Age' => null],
+            ['id' => 6],
+            ['id' => 7, 'age' => '3'],
+        ];
+
+        $this->assertSame([2, 3, 7], array_column(items_list_suitable_for_age($rows, 7), 'id'));
+        $this->assertSame([3], array_column(items_list_suitable_for_age($rows, 2), 'id'));
+        $this->assertSame([1, 2, 3, 4, 5, 6, 7], array_column(items_list_suitable_for_age($rows, null), 'id'));
+    }
+
+    public function test_present_row_carries_the_minimum_age_label(): void
+    {
+        $base = ['id' => 1, 'Title' => 'Azul', 'Acq' => '2024-01-10'];
+
+        $this->assertSame('8+', items_list_present_row($base + ['Age' => 8], 90, '2024-06-01')['age']);
+        $this->assertSame('', items_list_present_row($base + ['Age' => 0], 90, '2024-06-01')['age']);
+        $this->assertSame('', items_list_present_row($base, 90, '2024-06-01')['age']);
+    }
+
+    public function test_items_page_offers_a_youngest_age_picker_beside_the_count(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
+        $this->assertMatchesRegularExpression('/<input type="number" name="age"/', $source);
+        $this->assertStringContainsString("'showAge' =>", $source);
     }
 }
