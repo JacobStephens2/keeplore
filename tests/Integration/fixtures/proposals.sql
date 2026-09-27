@@ -18,6 +18,7 @@ CREATE TABLE games (
     mxp INT DEFAULT NULL,
     mnt INT DEFAULT NULL,
     mxt INT DEFAULT NULL,
+    Age INT DEFAULT NULL,
     UsedRecUserCt INT DEFAULT NULL,
     type VARCHAR(100) DEFAULT NULL,
     to_get_rid_of TINYINT DEFAULT 0,

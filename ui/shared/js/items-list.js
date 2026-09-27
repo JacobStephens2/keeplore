@@ -121,6 +121,11 @@
       // By the smallest count the label names, so "2–4" sorts before "10–12".
       av = fewestPlayers(av);
       bv = fewestPlayers(bv);
+    } else if (key === 'age') {
+      // "8+" sorts as 8; an unrecorded age sorts after every known one either way.
+      var unknownAge = dir === 'desc' ? -Infinity : Infinity;
+      av = parseInt(av, 10) || unknownAge;
+      bv = parseInt(bv, 10) || unknownAge;
     } else if (key === 'title' || key === 'type') {
       av = String(av || '').toLowerCase();
       bv = String(bv || '').toLowerCase();
@@ -209,44 +214,61 @@
     dialog.showModal();
   }
 
+  // One cell per key in config.columns, the list items_list_columns() gives
+  // the page, so headings and cells never fall out of step.
+  function renderCell(item, config, key) {
+    if (key.indexOf(BGG_RATING_KEY) === 0) {
+      return renderBggRatingCell(item, key.slice(BGG_RATING_KEY.length));
+    }
+    switch (key) {
+      case 'is_kept':
+        return renderKeptCell(item, config);
+      case 'title':
+        return el('td', { className: 'artifact_title' }, [
+          el('a', {
+            className: 'table-action',
+            href: config.itemUrlPrefix + encodeURIComponent(item.id),
+            text: item.title,
+          }),
+          // "Azul, 2–4 (2), 8 yrs" for sharing, from items_list_copy_text().
+          item.copy_text ? el('button', {
+            type: 'button',
+            className: 'copy-item-btn',
+            title: 'Copy "' + item.copy_text + '"',
+            'aria-label': 'Copy ' + item.title + "'s name, players and age",
+            dataset: { copyText: item.copy_text },
+            text: 'Copy',
+          }) : null,
+        ]);
+      case 'tags':
+        return el('td', { text: (item.tags || []).join(', ') });
+      case 'acq':
+        return el('td', { className: 'date acquisition', text: item.acq });
+      case 'most_recent_use':
+        return el('td', { className: 'date most_recent_use', text: item.most_recent_use });
+      case 'use_by':
+        var useByCell = el('td', { className: 'date use_by', text: item.use_by });
+        if (item.use_by_overdue) {
+          useByCell.style.color = 'red';
+        }
+        return useByCell;
+      case 'avg_time':
+        return el('td', { text: String(item.avg_time) });
+      case 'candidate':
+        return el('td', { text: item.candidate ? 'Yes' : 'No' });
+      case 'type':
+        // No class: td.type elsewhere caps width at 12ch, which would wrap it.
+        return el('td', { text: item.type });
+      default:
+        // players, age: plain text, with the key as the class.
+        return el('td', { className: key, text: item[key] == null ? '' : String(item[key]) });
+    }
+  }
+
   function renderRow(item, config) {
-    var useByCell = el('td', {
-      className: 'date use_by',
-      text: item.use_by,
-    });
-    if (item.use_by_overdue) {
-      useByCell.style.color = 'red';
-    }
-    var cells = [
-      renderKeptCell(item, config),
-      el('td', { className: 'artifact_title' }, [
-        el('a', {
-          className: 'table-action',
-          href: config.itemUrlPrefix + encodeURIComponent(item.id),
-          text: item.title,
-        }),
-      ]),
-    ];
-    if (config.showPlayers) {
-      cells.push(el('td', { className: 'players', text: item.players || '' }));
-    }
-    (config.bggReviewers || []).forEach(function (reviewer) {
-      cells.push(renderBggRatingCell(item, reviewer));
-    });
-    cells.push(
-      el('td', { text: item.type }),
-      el('td', { text: (item.tags || []).join(', ') }),
-      el('td', { className: 'date acquisition', text: item.acq }),
-      el('td', { className: 'date most_recent_use', text: item.most_recent_use }),
-      useByCell
-    );
-    if (config.showAttributes) {
-      cells.push(
-        el('td', { text: String(item.avg_time) }),
-        el('td', { text: item.candidate ? 'Yes' : 'No' })
-      );
-    }
-    return el('tr', {}, cells);
+    return el('tr', {}, (config.columns || []).map(function (key) {
+      return renderCell(item, config, key);
+    }));
   }
 
   function showToast(toastEl, message, kind) {
@@ -289,13 +311,14 @@
       tbody: tbody,
       nameHeader: nameHeader,
       pager: pager,
+      sortSummary: document.getElementById('items-sort-summary'),
       match: itemMatchesSearch,
       compare: compareItems,
       sorts: restoreSorts(headers, keys),
       row: function (item) {
         return renderRow(item, config);
       },
-      columnCount: config.columnCount || 7,
+      columnCount: (config.columns || []).length || 1,
       pageLength: config.pageLength || 100,
       emptyMessage: config.emptyMessage || 'No items yet.',
       noMatchMessage: 'No items match.',
@@ -306,6 +329,20 @@
     });
 
     tbody.addEventListener('click', function (event) {
+      var copyButton = event.target.closest('.copy-item-btn');
+      if (copyButton) {
+        var text = copyButton.dataset.copyText;
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          window.prompt('Copy this:', text);
+          return;
+        }
+        navigator.clipboard.writeText(text).then(function () {
+          showToast(toastEl, 'Copied "' + text + '"', 'success');
+        }, function () {
+          window.prompt('Copy this:', text);
+        });
+        return;
+      }
       var button = event.target.closest('.bgg-rating-btn');
       if (!button) {
         return;

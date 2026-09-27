@@ -169,6 +169,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
         games.Candidate,
         games.UsedRecUserCt,
         games.ss AS ss,
+        games.Age,
         games.id,
         games.is_kept,
         games.is_in_secondary_collection,

@@ -685,6 +685,14 @@ button.untrack-btn:hover {
   box-shadow: inset 0 0 0 1px var(--outline);
 }
 
+/* Edit Item: players, best count and age right under the heading. */
+.item-play-facts {
+  margin: -0.25rem 0 0.9rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
 .bgg-match-image,
 .item-picture-preview,
 .item-picture {
@@ -1539,6 +1547,10 @@ p.copied_message {
   font-weight: bold;
   border-width: 2px;
 }
+/* The type switch sits right under the kept switch. */
+.kept-switch + .type-switch {
+  margin-top: -0.5rem;
+}
 
 /* Items page player-count picker: a count, Show, and a way back to all counts, on one line. */
 .player-picker {
@@ -1558,6 +1570,10 @@ p.copied_message {
   width: 4.5rem;
   margin: 0;
 }
+.player-picker input[type=checkbox] {
+  width: auto;
+  margin: 0;
+}
 .best-at-heading {
   margin: 1.25rem 0 0.25rem;
 }
@@ -1573,14 +1589,25 @@ p.copied_message {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+/* Items: copy a game's name, players and age for sharing. */
+#artifacts .copy-item-btn {
+  min-height: 0;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  vertical-align: middle;
+}
 #artifacts .bgg-rating-btn {
   min-height: 0;
   padding: 0.15rem 0.6rem;
   border-radius: 999px;
   font-variant-numeric: tabular-nums;
 }
-.bgg-rating-dialog {
-  /* .modal-panel sets position: relative, which would pull a modal dialog out of the top layer's centering. */
+/* .modal-panel comes later and sets position: relative, which Chrome turns
+   into absolute for a modal dialog: it opened at the top of the document and
+   focusing it scrolled the page there. Two classes outrank it. */
+.modal-panel.bgg-rating-dialog {
   position: fixed;
   inset: 0;
   margin: auto;
@@ -2324,6 +2351,34 @@ ul.fun-facts .fact-aside {
 
 table.list thead th[data-sort] {
   cursor: pointer;
+}
+/* A multi-level sort numbers its columns: 1 leads, 2 breaks its ties. */
+table.list thead th[data-sort-rank]::after {
+  content: attr(data-sort-rank);
+  margin-left: 0.3rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--outline-strong);
+  font-size: 0.75rem;
+  vertical-align: super;
+}
+.list-sort-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.5rem 0 0.25rem;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+.list-sort-summary select {
+  width: auto;
+  margin: 0;
+}
+.list-sort-hint {
+  margin: 0 0 0.5rem;
+  color: var(--text-soft);
+  font-size: 0.85rem;
 }
 
 .list-pager {
@@ -3531,4 +3586,22 @@ html[data-theme="dark"] .modal-panel {
   text-transform: uppercase;
   box-shadow: var(--shadow);
   cursor: pointer;
+}
+
+/* Edit Item: merge a duplicate item into this one. */
+.item-merge {
+  margin: 2rem 0;
+  max-width: 44rem;
+}
+.item-merge form {
+  display: grid;
+  gap: 0.6rem;
+}
+.item-merge label[for="merge_confirm"] {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.item-merge button {
+  justify-self: start;
 }
