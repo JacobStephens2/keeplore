@@ -53,24 +53,33 @@ include(SHARED_PATH . '/header.php');
   <?php } elseif ($games === []) { ?>
     <div class="empty-state"><p>No indexed game matches.</p></div>
   <?php } else { ?>
-    <p><?php echo $more ? 'More than ' . BGG_POLL_SEARCH_LIMIT : count($games); ?> <?php echo count($games) === 1 ? 'game' : 'games'; ?>, best BGG rank first<?php echo $more ? ' (first ' . BGG_POLL_SEARCH_LIMIT . ' shown)' : ''; ?>.</p>
+    <p><?php echo $more ? 'More than ' . BGG_POLL_SEARCH_LIMIT : count($games); ?> <?php echo count($games) === 1 ? 'game' : 'games'; ?>, <?php echo $more ? ' (the ' . BGG_POLL_SEARCH_LIMIT . ' best ranked shown)' : ''; ?>. Click a column heading to sort; Shift-click adds a tie-breaker.</p>
+    <p class="list-sort-summary" id="bgg-search-sort-summary" aria-live="polite"></p>
     <div class="surface-panel">
     <div class="table-scroll">
-    <table class="list bgg-search-results">
+    <table class="list bgg-search-results" id="bgg-search-results">
       <thead>
         <tr>
-          <th>Game</th>
-          <th>Best with</th>
-          <th>Player-poll votes</th>
-          <th>Community age</th>
-          <th>BGG rank</th>
-          <th>Average</th>
-          <th>Kept</th>
+          <th data-sort="name">Game</th>
+          <th data-sort="best">Best with</th>
+          <th data-sort="votes">Player-poll votes</th>
+          <th data-sort="age">Community age</th>
+          <th data-sort="rank">BGG rank</th>
+          <th data-sort="average">Average</th>
+          <th data-sort="kept">Kept</th>
         </tr>
       </thead>
       <tbody>
         <?php foreach ($games as $game) { ?>
-          <tr>
+          <tr
+            data-name="<?php echo h($game['name']); ?>"
+            data-best="<?php echo h((string) (int) $game['best_players']); ?>"
+            data-votes="<?php echo h((string) $game['player_votes']); ?>"
+            data-age="<?php echo h((string) $game['community_age']); ?>"
+            data-rank="<?php echo h((string) $game['bgg_rank']); ?>"
+            data-average="<?php echo h((string) $game['average']); ?>"
+            data-kept="<?php echo isset($kept[$game['thing_id']]) ? '1' : '0'; ?>"
+          >
             <td class="name">
               <a href="<?php echo h($game['url']); ?>" target="_blank" rel="noopener"><?php echo h($game['name']); ?></a>
               <?php if ($game['year_published'] !== null) { ?><span class="menu-support">(<?php echo h($game['year_published']); ?>)</span><?php } ?>
@@ -92,6 +101,8 @@ include(SHARED_PATH . '/header.php');
     </table>
     </div>
     </div>
+    <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=3"></script>
+    <script src="<?php echo url_for('/bgg-search/bgg-search.js'); ?>?v=1"></script>
   <?php } ?>
 
   <p class="menu-support bgg-search-source">
