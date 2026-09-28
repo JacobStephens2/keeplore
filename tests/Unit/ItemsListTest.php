@@ -203,15 +203,15 @@ class ItemsListTest extends TestCase
         );
     }
 
-    public function test_an_age_search_shows_age_then_the_player_range_and_best_count(): void
+    public function test_an_age_search_shows_age_then_the_player_range_and_best_count_then_play_time(): void
     {
         $this->assertSame(
-            ['Kept', 'Name', 'Age', 'Players', 'Gyges', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By'],
+            ['Kept', 'Name', 'Age', 'Players', 'Time', 'Gyges', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By'],
             $this->columnLabels(['age' => '6'], ['Gyges'])
         );
-        $this->assertSame(['Kept', 'Name', 'Players', 'Tags'], array_slice($this->columnLabels(['players' => '3']), 0, 4));
+        $this->assertSame(['Kept', 'Name', 'Players', 'Time', 'Tags'], array_slice($this->columnLabels(['players' => '3']), 0, 5));
         $this->assertSame(
-            ['Kept', 'Name', 'Age', 'Players', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By', 'AvgT', 'Candidate'],
+            ['Kept', 'Name', 'Age', 'Players', 'Time', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By', 'AvgT', 'Candidate'],
             $this->columnLabels(['showAttributes' => 'yes'])
         );
     }
@@ -573,7 +573,7 @@ class ItemsListTest extends TestCase
         $this->assertSame('Azul, best 3, 8 yrs', $row['copy_text']);
     }
 
-    public function test_play_facts_read_players_best_count_and_age_from_an_item_record(): void
+    public function test_play_facts_read_players_best_count_time_and_age_from_an_item_record(): void
     {
         // Edit Item reads the games row as stored: MnP, MxP, SS, Age.
         $this->assertSame('2–4 players, best 3 · Age 8+', items_list_play_facts(['MnP' => 2, 'MxP' => 4, 'SS' => '03', 'Age' => 8]));
@@ -582,6 +582,9 @@ class ItemsListTest extends TestCase
         $this->assertSame('1 player', items_list_play_facts(['MnP' => 1, 'MxP' => 1, 'SS' => '', 'Age' => 0]));
         $this->assertSame('Best at 3 · Age 6+', items_list_play_facts(['SS' => '3', 'Age' => 6]));
         $this->assertSame('', items_list_play_facts(['Title' => 'Hat']));
+        $this->assertSame('2–7 players, best 4, 5 · 15–20 min · Age 6+',
+            items_list_play_facts(['MnP' => 2, 'MxP' => 7, 'SS' => '4,5', 'MnT' => 15, 'MxT' => 20, 'Age' => 6]));
+        $this->assertSame('30 min', items_list_play_facts(['mnt' => 30, 'mxt' => 30]));
     }
 
     public function test_edit_item_shows_the_play_facts_right_under_its_heading(): void
@@ -607,5 +610,14 @@ class ItemsListTest extends TestCase
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
         $this->assertMatchesRegularExpression('/<input type="number" name="age"/', $source);
+    }
+
+    public function test_a_row_gives_its_play_time_range_in_minutes(): void
+    {
+        $base = ['id' => 1, 'Title' => 'Ra', 'Acq' => '2024-01-10'];
+
+        $this->assertSame('45–60 min', items_list_present_row($base + ['MnT' => 45, 'MxT' => 60], 90, '2024-06-01')['time']);
+        $this->assertSame('30 min', items_list_present_row($base + ['mnt' => 30, 'mxt' => 30], 90, '2024-06-01')['time']);
+        $this->assertSame('', items_list_present_row($base, 90, '2024-06-01')['time']);
     }
 }

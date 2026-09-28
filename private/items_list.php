@@ -142,8 +142,8 @@ function items_list_type_switch(array $all_types, array $current_type_ids) {
  * kind), 'label', 'tooltip' (or '')]. The page draws its headings and
  * items-list.js its cells from this one list. Recent Interaction sits left of
  * Type and Tracking Start so it shows without scrolling. A players or age
- * search, or item attributes, adds Age and the player range with its best
- * count.
+ * search, or item attributes, adds Age, the player range with its best
+ * count, and the play time.
  */
 function items_list_columns(array $filters, array $bgg_reviewers) {
     $attributes = $filters['showAttributes'] === 'yes';
@@ -156,6 +156,7 @@ function items_list_columns(array $filters, array $bgg_reviewers) {
     }
     if ($filters['players'] !== null || $filters['age'] !== null || $attributes) {
         $columns[] = ['key' => 'players', 'label' => 'Players', 'tooltip' => 'Player range, with the best count in brackets'];
+        $columns[] = ['key' => 'time', 'label' => 'Time', 'tooltip' => 'Play time in minutes'];
     }
     foreach ($bgg_reviewers as $reviewer) {
         $columns[] = [
@@ -269,6 +270,7 @@ function items_list_present_row(array $artifact, $interval, $today = null) {
         ),
         'age' => $min_age === null ? '' : $min_age . '+',
         'copy_text' => items_list_copy_text($artifact),
+        'time' => items_list_play_time($artifact['mnt'] ?? $artifact['MnT'] ?? null, $artifact['mxt'] ?? $artifact['MxT'] ?? null),
         'avg_time' => (int) ceil(($mnt + $mxt) / 2),
         'candidate' => ($candidate_raw != '' && $candidate_raw != 0),
         // Keyed by BGG username; an object even when empty so the JSON is {}.
@@ -349,7 +351,8 @@ function items_list_copy_text(array $artifact) {
 
 /**
  * The line under Edit Item's heading, so the facts people look up most sit
- * above the fold even in a half-width window: "2–4 players, best 3 · Age 8+".
+ * above the fold even in a half-width window: "2–4 players, best 3 ·
+ * 30–60 min · Age 8+".
  * A part with nothing recorded is left out; '' when nothing is.
  */
 function items_list_play_facts(array $artifact) {
@@ -363,6 +366,10 @@ function items_list_play_facts(array $artifact) {
         $parts[] = $best === '' ? $players : $players . ', best ' . $best;
     } elseif ($best !== '') {
         $parts[] = 'Best at ' . $best;
+    }
+    $time = items_list_play_time($artifact['MnT'] ?? $artifact['mnt'] ?? null, $artifact['MxT'] ?? $artifact['mxt'] ?? null);
+    if ($time !== '') {
+        $parts[] = $time;
     }
     $min_age = items_list_min_age($artifact);
     if ($min_age !== null) {
@@ -382,6 +389,13 @@ function items_list_player_range($min, $max) {
         return (string) max($min, $max);
     }
     return $min . '–' . $max;
+}
+
+/** The play time, as in "30–60 min", "45 min", or '' when none is recorded. */
+function items_list_play_time($min, $max) {
+    // A time range reads like a player range: "30–60", or "45" with one end.
+    $range = items_list_player_range($min, $max);
+    return $range === '' ? '' : $range . ' min';
 }
 
 /**
