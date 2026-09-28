@@ -102,7 +102,8 @@ function event_plan_line(array $item) {
             $parts[] = $value;
         }
     }
-    if (($item['is_kept'] ?? true) === false) {
+    // Only a row that says it is not kept is marked; rows without the field are left alone.
+    if (array_key_exists('is_kept', $item) && !$item['is_kept']) {
         $parts[] = 'not kept';
     }
     return implode(', ', $parts);

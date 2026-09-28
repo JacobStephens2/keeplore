@@ -23,7 +23,7 @@ include(SHARED_PATH . '/header.php');
 ?>
 <main>
     <h1>Delete event</h1>
-    <p>Delete <strong><?php echo h($event['name']); ?></strong> and its list of <?php echo count($event['items']); ?> planned games? The games stay in your collection.</p>
+    <p>Delete <strong><?php echo h($event['name']); ?></strong> and its list of <?php echo count($event['items']); ?> planned games? The games themselves stay in Keeplore.</p>
     <form method="post" action="<?php echo url_for('/events/delete.php?id=' . $id); ?>">
         <?php echo csrf_input(); ?>
         <button type="submit">Delete event</button>

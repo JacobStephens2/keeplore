@@ -8,7 +8,7 @@ require_once dirname(__DIR__) . '/kept_status.php';
 /**
  * The owner's events, such as a beach week, and the items planned for each.
  * An event item carries the event's own setting, note and packed mark; the
- * item's facts (players, sweet spot, age, tags) come from the collection.
+ * item's facts (players, sweet spot, age, tags) come from the item.
  * Another user's event reads as absent and throws OutOfBoundsException on
  * change; bad input throws InvalidArgumentException.
  */
@@ -142,12 +142,12 @@ final class EventPlans
             return 0;
         }
         $placeholders = implode(',', array_fill(0, count($itemIds), '?'));
-        $owned = $this->rows(
+        $mine = $this->rows(
             "SELECT id FROM games WHERE user_id = ? AND id IN ($placeholders)",
             str_repeat('i', count($itemIds) + 1), array_merge([$this->userId], $itemIds)
         );
-        if (count($owned) !== count($itemIds)) {
-            throw new InvalidArgumentException('Choose items from your own collection.');
+        if (count($mine) !== count($itemIds)) {
+            throw new InvalidArgumentException('Choose items from your own items in Keeplore.');
         }
         $added = 0;
         foreach ($itemIds as $itemId) {
