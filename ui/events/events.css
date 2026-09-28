@@ -61,3 +61,4 @@
 .event-spare { margin: .75rem 0 1rem; }
 .event-spare p { margin: .35rem 0; }
 .event-can-stay-home { border-style: dashed; }
+.event-shopping-list small { display: block; }

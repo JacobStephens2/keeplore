@@ -38,7 +38,7 @@ $dates = event_dates_label($event['starts_on'], $event['ends_on']);
 $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=10'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=11'); ?>">
 <main class="event-page" data-event-id="<?php echo $id; ?>" data-item-url="<?php echo h(url_for('/events/item.php')); ?>">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
@@ -110,7 +110,8 @@ include(SHARED_PATH . '/header.php');
             <p class="menu-support">The planned games you don't keep yet, to buy or borrow before the event.</p>
             <ul class="event-shopping-list">
                 <?php foreach ($shopping['items'] as $item) { ?>
-                    <li><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?><?php if (isset($spare_ids[$item['id']])) { ?> <span class="event-not-kept event-can-stay-home">Can stay home</span><?php } ?></li>
+                    <li><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?><?php if (isset($spare_ids[$item['id']])) { ?> <span class="event-not-kept event-can-stay-home">Can stay home</span><?php } ?>
+                        <?php if ($item['tags']) { ?><small class="menu-support"><?php echo h(implode(', ', $item['tags'])); ?></small><?php } ?></li>
                 <?php } ?>
             </ul>
             <textarea id="event-shopping-text" rows="<?php echo min(12, $not_kept + 1); ?>" readonly><?php echo h($shopping['text']); ?></textarea>
