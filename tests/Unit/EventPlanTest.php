@@ -12,6 +12,7 @@ require_once PROJECT_PATH . '/private/event_plan.php';
  * - event_plan_groups(): an event's items grouped by one dimension, then
  *   optionally by another
  * - event_plan_text(): those groups as a plain-text packing checklist
+ * - event_plan_grouping(): the grouping a request asks for, over the saved one
  */
 class EventPlanTest extends TestCase
 {
@@ -239,5 +240,36 @@ class EventPlanTest extends TestCase
 
         $this->assertSame(', 2–5 (4), 10 yrs, beach, requested by mom, not kept', event_plan_details($hanabi));
         $this->assertSame('', event_plan_details($this->item('Hive Pocket')));
+    }
+
+    public function test_naming_tags_sub_groups_by_tag_when_no_second_grouping_is_chosen(): void
+    {
+        $this->assertSame(
+            ['by' => 'players', 'then' => 'tag', 'tags' => 'casual, main'],
+            event_plan_grouping(['by' => 'players', 'then' => 'none', 'tags' => 'Casual,main'], [])
+        );
+    }
+
+    public function test_naming_tags_leaves_a_chosen_second_grouping_or_a_tag_grouping_alone(): void
+    {
+        $this->assertSame('age', event_plan_grouping(['by' => 'players', 'then' => 'age', 'tags' => 'casual'], [])['then']);
+        $this->assertSame('none', event_plan_grouping(['by' => 'tag', 'then' => 'none', 'tags' => 'casual'], [])['then']);
+    }
+
+    public function test_the_saved_grouping_fills_in_what_the_request_leaves_out(): void
+    {
+        $saved = ['by' => 'age', 'then' => 'tag', 'tags' => 'casual, main'];
+
+        $this->assertSame($saved, event_plan_grouping([], $saved));
+        $this->assertSame(['by' => 'players', 'then' => 'none', 'tags' => ''], event_plan_grouping([], []));
+        $this->assertSame('players', event_plan_grouping(['by' => 'colour'], [])['by']);
+    }
+
+    public function test_clearing_the_tags_keeps_the_chosen_second_grouping(): void
+    {
+        $this->assertSame(
+            ['by' => 'players', 'then' => 'none', 'tags' => ''],
+            event_plan_grouping(['by' => 'players', 'then' => 'none', 'tags' => ''], ['by' => 'players', 'then' => 'tag', 'tags' => 'casual'])
+        );
     }
 }

@@ -52,6 +52,32 @@ function event_plan_groups(array $items, $by, $then = 'none', array $tags = []) 
     return $groups;
 }
 
+/**
+ * The grouping a request asks for (by, then, tags), each part falling back to
+ * the saved one and then to "Sweet spot, nothing, no tags". Naming tags with
+ * no second grouping sub-groups by tag, since the tags would otherwise do
+ * nothing.
+ */
+function event_plan_grouping(array $request, array $saved) {
+    $saved += ['by' => 'players', 'then' => 'none', 'tags' => ''];
+    $dimensions = event_plan_dimensions();
+    $pick = function ($key) use ($request, $saved, $dimensions) {
+        $value = $request[$key] ?? null;
+        if (is_string($value) && isset($dimensions[$value])) {
+            return $value;
+        }
+        return isset($dimensions[$saved[$key]]) ? $saved[$key] : ($key === 'by' ? 'players' : 'none');
+    };
+    $by = $pick('by');
+    $then = $pick('then');
+    $tags = is_string($request['tags'] ?? null) ? $request['tags'] : (string) $saved['tags'];
+    $tags = implode(', ', event_plan_chosen_tags($tags));
+    if ($tags !== '' && $by !== 'tag' && $then === 'none') {
+        $then = 'tag';
+    }
+    return ['by' => $by, 'then' => $then, 'tags' => $tags];
+}
+
 /** An event's dates as "Jul 3 – Jul 10, 2027", or '' with neither. */
 function event_dates_label($starts_on, $ends_on) {
     $format = function ($date, $with_year = true) {
