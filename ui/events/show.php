@@ -15,12 +15,16 @@ if ($event === null) {
 $dimensions = event_plan_dimensions();
 $grouping = event_plan_grouping($_GET, $_SESSION['event_grouping'][$id] ?? []);
 $_SESSION['event_grouping'][$id] = $grouping;
-['by' => $by, 'then' => $then, 'tags' => $tags] = $grouping;
+['by' => $by, 'then' => $then, 'tags' => $tags, 'at_least' => $at_least, 'count_tags' => $count_tags] = $grouping;
 $by_tag = $by === 'tag' || $then === 'tag';
 
 $items = $event['items'];
 $players = $event['players'];
-$groups = event_plan_groups($items, $by, $then, event_plan_chosen_tags($tags), array_column($players, 'age'));
+$chosen_tags = event_plan_chosen_tags($tags);
+$player_ages = array_column($players, 'age');
+$groups = event_plan_groups($items, $by, $then, $chosen_tags, $player_ages);
+$spare = event_plan_spare($items, $by, $then, $chosen_tags, $player_ages, $at_least, event_plan_chosen_tags($count_tags));
+$spare_ids = array_flip(array_column($spare['spare'], 'id'));
 $packed = count(array_filter(array_column($items, 'is_packed')));
 $shopping = event_plan_shopping_list($items);
 $not_kept = count($shopping['items']);
@@ -34,7 +38,7 @@ $dates = event_dates_label($event['starts_on'], $event['ends_on']);
 $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=9'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=10'); ?>">
 <main class="event-page" data-event-id="<?php echo $id; ?>" data-item-url="<?php echo h(url_for('/events/item.php')); ?>">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
@@ -167,6 +171,14 @@ include(SHARED_PATH . '/header.php');
                 <label>Only these tags
                     <input type="text" name="tags" placeholder="casual, main" value="<?php echo h($tags); ?>" aria-describedby="event-tags-help">
                 </label>
+                <label>Games in each group
+                    <input type="number" name="at_least" min="0" max="99" inputmode="numeric" placeholder="Any" value="<?php echo $at_least ?: ''; ?>" aria-describedby="event-at-least-help">
+                </label>
+                <?php if ($by_tag) { ?>
+                    <label>For these tags
+                        <input type="text" name="count_tags" placeholder="All of them" value="<?php echo h($count_tags); ?>" aria-describedby="event-at-least-help">
+                    </label>
+                <?php } ?>
                 <button type="submit">Group</button>
             </form>
             <p id="event-tags-help" class="menu-support">
@@ -174,6 +186,33 @@ include(SHARED_PATH . '/header.php');
                 Players' ages makes a group for each child's age coming and one for adults, and puts each game under the youngest of them old enough for it.
                 To split each player count into casual and main, tag games casual or main on Edit Item, group by Sweet spot, and enter “casual, main” here. Then by switches to Tag on its own, and other tags are left out.
             </p>
+            <p id="event-at-least-help" class="menu-support">
+                Games in each group marks the games you could leave home and still have that many in every group, such as 2 casual and 2 main at each player count. Games outside every group, such as ones with none of the chosen tags, count toward none. For these tags, such as “casual, main”, holds the count to those tags' groups and lets the rest, such as kids, go short.
+            </p>
+            <?php if ($at_least > 0) { ?>
+                <div class="event-spare" aria-live="polite">
+                    <?php if ($spare['spare']) { ?>
+                        <p>Bringing <strong><?php echo count($spare['needed']); ?></strong> of <?php echo count($items); ?> games still gives at least <?php echo $at_least; ?> in each group.
+                            The <strong><?php echo count($spare['spare']); ?></strong> marked <span class="event-not-kept event-can-stay-home">Can stay home</span> aren't needed for that, though a different <?php echo count($spare['needed']); ?> could do it too.</p>
+                    <?php } else { ?>
+                        <p>Every game is needed for at least <?php echo $at_least; ?> in each group.</p>
+                    <?php } ?>
+                    <?php if ($spare['short']) { ?>
+                        <p class="menu-support">These groups have fewer than <?php echo $at_least; ?>, so every game in them is needed:
+                            <?php echo h(implode(', ', array_map(function ($short) {
+                                return $short['label'] . ' (' . $short['count'] . ')';
+                            }, $spare['short']))); ?>.</p>
+                    <?php } ?>
+                    <?php if ($spare['spare']) { ?>
+                        <details class="event-text" data-fold="smaller-list">
+                            <summary>Smaller list <small class="menu-support"><?php echo count($spare['needed']); ?> games</small></summary>
+                            <textarea id="event-smaller-text" rows="12" readonly><?php echo h(event_plan_text(event_plan_groups($spare['needed'], $by, $then, $chosen_tags, $player_ages))); ?></textarea>
+                            <button type="button" class="event-copy" data-copy="event-smaller-text">Copy smaller list</button>
+                            <span class="menu-support" aria-live="polite"></span>
+                        </details>
+                    <?php } ?>
+                </div>
+            <?php } ?>
 
             <section class="event-plan">
                 <?php foreach ($groups as $group) { ?>
@@ -189,7 +228,7 @@ include(SHARED_PATH . '/header.php');
                                     <li>
                                         <div class="event-line">
                                             <input type="checkbox" class="event-packed" data-item-id="<?php echo $item['id']; ?>" aria-label="Packed: <?php echo h($item['Title']); ?>" <?php echo $item['is_packed'] ? 'checked' : ''; ?>>
-                                            <span><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?></span>
+                                            <span><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?><?php if (isset($spare_ids[$item['id']])) { ?> <span class="event-not-kept event-can-stay-home">Can stay home</span><?php } ?></span>
                                             <form class="event-line-remove event-keep-scroll" method="post" action="<?php echo url_for('/events/item.php'); ?>">
                                                 <?php echo csrf_input(); ?>
                                                 <input type="hidden" name="event_id" value="<?php echo $id; ?>">

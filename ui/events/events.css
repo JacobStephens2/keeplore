@@ -58,3 +58,6 @@
 
 /* Remove buttons stay thin: the site's buttons are at least 3.2rem tall. */
 .event-page button.event-remove { min-height: 0; padding: .1rem .55rem; font-size: .75rem; line-height: 1.4; box-shadow: none; }
+.event-spare { margin: .75rem 0 1rem; }
+.event-spare p { margin: .35rem 0; }
+.event-can-stay-home { border-style: dashed; }

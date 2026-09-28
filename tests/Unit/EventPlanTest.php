@@ -17,6 +17,8 @@ require_once PROJECT_PATH . '/private/event_plan.php';
  * - event_plan_groups() by 'player_age': games under the youngest player
  *   old enough for them
  * - event_plan_shopping_list(): the planned games not kept, as a list to buy
+ * - event_plan_spare(): the games a smaller plan can leave home and still
+ *   have enough in every group
  */
 class EventPlanTest extends TestCase
 {
@@ -249,7 +251,7 @@ class EventPlanTest extends TestCase
     public function test_naming_tags_sub_groups_by_tag_when_no_second_grouping_is_chosen(): void
     {
         $this->assertSame(
-            ['by' => 'players', 'then' => 'tag', 'tags' => 'casual, main'],
+            ['by' => 'players', 'then' => 'tag', 'tags' => 'casual, main', 'at_least' => 0, 'count_tags' => ''],
             event_plan_grouping(['by' => 'players', 'then' => 'none', 'tags' => 'Casual,main'], [])
         );
     }
@@ -262,17 +264,17 @@ class EventPlanTest extends TestCase
 
     public function test_the_saved_grouping_fills_in_what_the_request_leaves_out(): void
     {
-        $saved = ['by' => 'age', 'then' => 'tag', 'tags' => 'casual, main'];
+        $saved = ['by' => 'age', 'then' => 'tag', 'tags' => 'casual, main', 'at_least' => 2, 'count_tags' => 'main'];
 
         $this->assertSame($saved, event_plan_grouping([], $saved));
-        $this->assertSame(['by' => 'players', 'then' => 'none', 'tags' => ''], event_plan_grouping([], []));
+        $this->assertSame(['by' => 'players', 'then' => 'none', 'tags' => '', 'at_least' => 0, 'count_tags' => ''], event_plan_grouping([], []));
         $this->assertSame('players', event_plan_grouping(['by' => 'colour'], [])['by']);
     }
 
     public function test_clearing_the_tags_keeps_the_chosen_second_grouping(): void
     {
         $this->assertSame(
-            ['by' => 'players', 'then' => 'none', 'tags' => ''],
+            ['by' => 'players', 'then' => 'none', 'tags' => '', 'at_least' => 0, 'count_tags' => ''],
             event_plan_grouping(['by' => 'players', 'then' => 'none', 'tags' => ''], ['by' => 'players', 'then' => 'tag', 'tags' => 'casual'])
         );
     }
@@ -383,5 +385,156 @@ class EventPlanTest extends TestCase
         $list = event_plan_shopping_list([$this->item('Catan', ['is_kept' => true])]);
 
         $this->assertSame(['items' => [], 'text' => ''], $list);
+    }
+
+    private function spareTitles(array $spare): array
+    {
+        return array_column($spare['spare'], 'Title');
+    }
+
+    public function test_a_game_is_spare_when_every_group_it_is_in_has_enough_without_it(): void
+    {
+        $spare = event_plan_spare([
+            $this->item('Wavelength', ['SS' => '6']),
+            $this->item('Senji', ['SS' => '6']),
+            $this->item('Hot Streak', ['SS' => '6']),
+            $this->item('Sky Team', ['SS' => '2']),
+        ], 'players', 'none', [], [], 2);
+
+        // Any one of the three 6-player games can stay home; Sky Team can't.
+        $this->assertCount(1, $spare['spare']);
+        $this->assertNotSame('Sky Team', $spare['spare'][0]['Title']);
+        $this->assertSame([['label' => '2 players', 'count' => 1]], $spare['short']);
+    }
+
+    public function test_one_game_covering_several_groups_replaces_two(): void
+    {
+        // Wavelength alone covers both counts, so Senji and Ra can stay home.
+        $spare = event_plan_spare([
+            $this->item('Wavelength', ['SS' => '4,6']),
+            $this->item('Senji', ['SS' => '6']),
+            $this->item('Ra', ['SS' => '4']),
+        ], 'players', 'none', [], [], 1);
+
+        $this->assertSame(['Wavelength'], array_column($spare['needed'], 'Title'));
+        $this->assertSame(['Ra', 'Senji'], $this->spareTitles($spare));
+    }
+
+    public function test_groups_are_each_player_count_and_chosen_tag_together(): void
+    {
+        $spare = event_plan_spare([
+            $this->item('Wavelength', ['SS' => '6', 'tags' => ['casual']]),
+            $this->item('Just One', ['SS' => '6', 'tags' => ['casual']]),
+            $this->item('Senji', ['SS' => '6', 'tags' => ['main']]),
+            $this->item('Hot Streak', ['SS' => '6', 'tags' => ['beach-safe']]),
+        ], 'players', 'tag', ['casual', 'main'], [], 1);
+
+        // Hot Streak has no chosen tag, so it counts toward no group.
+        $this->assertCount(2, $spare['needed']);
+        $this->assertContains('Senji', array_column($spare['needed'], 'Title'));
+        $this->assertContains('Hot Streak', $this->spareTitles($spare));
+    }
+
+    public function test_a_group_with_too_few_games_needs_all_of_them_and_says_so(): void
+    {
+        $spare = event_plan_spare([
+            $this->item('Wavelength', ['SS' => '8', 'tags' => ['casual']]),
+            $this->item('Senji', ['SS' => '6', 'tags' => ['main']]),
+            $this->item('Inis', ['SS' => '6', 'tags' => ['main']]),
+            $this->item('Ra', ['SS' => '6', 'tags' => ['main']]),
+        ], 'players', 'tag', ['casual', 'main'], [], 2);
+
+        $this->assertSame([['label' => '8 players · casual', 'count' => 1]], $spare['short']);
+        $this->assertContains('Wavelength', array_column($spare['needed'], 'Title'));
+        $this->assertCount(1, $spare['spare']);
+    }
+
+    public function test_short_groups_follow_the_plans_group_order(): void
+    {
+        $spare = event_plan_spare([
+            $this->item('Sky Team', ['SS' => '2']),
+            $this->item('Wavelength', ['SS' => '8']),
+        ], 'players', 'none', [], [], 2);
+
+        $this->assertSame(['8 players', '2 players'], array_column($spare['short'], 'label'));
+    }
+
+    public function test_a_kept_game_stays_ahead_of_one_to_buy(): void
+    {
+        $spare = event_plan_spare([
+            $this->item('Blood on the Clocktower', ['SS' => '8', 'is_kept' => false]),
+            $this->item('Werewolf', ['SS' => '8', 'is_kept' => true]),
+        ], 'players', 'none', [], [], 1);
+
+        $this->assertSame(['Werewolf'], array_column($spare['needed'], 'Title'));
+    }
+
+    public function test_the_needed_games_are_no_more_than_the_groups_require(): void
+    {
+        // Greedy picks Big first (covers 3 counts); pruning keeps no game
+        // whose groups are all covered without it.
+        $spare = event_plan_spare([
+            $this->item('Big', ['SS' => '2-4']),
+            $this->item('Two', ['SS' => '2']),
+            $this->item('Three', ['SS' => '3']),
+            $this->item('Four', ['SS' => '4']),
+        ], 'players', 'none', [], [], 2);
+
+        $this->assertSame(['Big', 'Four', 'Three', 'Two'], array_column($spare['needed'], 'Title'));
+        $this->assertSame([], $spare['spare']);
+
+        $spare = event_plan_spare([
+            $this->item('A', ['SS' => '2-3']),
+            $this->item('B', ['SS' => '3-4']),
+            $this->item('C', ['SS' => '2,4']),
+            $this->item('D', ['SS' => '2-4']),
+        ], 'players', 'none', [], [], 1);
+
+        $this->assertSame(['D'], array_column($spare['needed'], 'Title'));
+    }
+
+    public function test_without_grouping_the_count_is_for_the_whole_plan(): void
+    {
+        $spare = event_plan_spare([
+            $this->item('Ra'),
+            $this->item('Inis'),
+            $this->item('Senji'),
+        ], 'none', 'none', [], [], 2);
+
+        $this->assertCount(2, $spare['needed']);
+        $this->assertCount(1, $spare['spare']);
+    }
+
+    public function test_asking_for_no_games_per_group_leaves_nothing_spare(): void
+    {
+        $items = [$this->item('Ra', ['SS' => '3'])];
+
+        $this->assertSame(['needed' => $items, 'spare' => [], 'short' => []], event_plan_spare($items, 'players', 'none', [], [], 0));
+    }
+
+    public function test_the_count_per_group_is_a_whole_number_from_zero_to_ninety_nine(): void
+    {
+        $this->assertSame(2, event_plan_grouping(['at_least' => '2'], [])['at_least']);
+        $this->assertSame(0, event_plan_grouping(['at_least' => ''], ['at_least' => 3])['at_least']);
+        $this->assertSame(3, event_plan_grouping(['at_least' => 'many'], ['at_least' => 3])['at_least']);
+        $this->assertSame(3, event_plan_grouping([], ['at_least' => 3])['at_least']);
+        $this->assertSame(0, event_plan_grouping(['at_least' => '-1'], [])['at_least']);
+    }
+
+    public function test_the_count_can_hold_for_only_some_of_the_chosen_tags(): void
+    {
+        $spare = event_plan_spare([
+            $this->item('Wavelength', ['SS' => '6', 'tags' => ['casual']]),
+            $this->item('Senji', ['SS' => '6', 'tags' => ['main']]),
+            $this->item('Outfoxed', ['SS' => '6', 'tags' => ['kids']]),
+        ], 'players', 'tag', ['casual', 'main', 'kids'], [], 1, ['Main', 'casual']);
+
+        $this->assertSame(['Outfoxed'], $this->spareTitles($spare));
+    }
+
+    public function test_the_tags_the_count_holds_for_are_saved_with_the_grouping(): void
+    {
+        $this->assertSame('casual, main', event_plan_grouping(['count_tags' => 'Casual,main'], [])['count_tags']);
+        $this->assertSame('main', event_plan_grouping([], ['count_tags' => 'main'])['count_tags']);
     }
 }
