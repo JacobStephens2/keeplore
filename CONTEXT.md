@@ -59,5 +59,8 @@ An item with a digital form. Independent of whether it is kept. An item can be b
 **Event**:
 An occasion the user plans which items to bring to, such as a beach week. Each planned item can carry the event's own setting (where it will be played), a note, and a packed mark. The players coming to it are chosen from the user's people list.
 
+**Adult**:
+A player 18 or older in the year an event starts, counted from their birth year alone. An event's players are summarized as adults, then children by age.
+
 **Event setting**:
 Where a planned item will be used at an event, such as the beach. Belongs to the event, not the item, and is distinct from a use's Setting.

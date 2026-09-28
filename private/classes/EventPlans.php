@@ -43,8 +43,8 @@ final class EventPlans
     }
 
     /**
-     * The event with its items in title order and its players in name order,
-     * or null when it is not the owner's.
+     * The event with its items in title order and its players oldest first,
+     * those without a birth year last, or null when it is not the owner's.
      */
     public function find(int $id): ?array
     {
@@ -74,7 +74,12 @@ final class EventPlans
             $item['is_kept'] = artifact_is_kept($item);
         }
         $event['items'] = with_item_tags($this->db, $items, $this->userId);
-        $event['players'] = $this->players($id, true, $this->year($event['starts_on']));
+        $players = $this->players($id, true, $this->year($event['starts_on']));
+        // Unknown ages last, then oldest first; usort is stable (PHP 8), so
+        // players of one age stay in name order.
+        $key = fn($player) => [$player['age'] === null, -($player['age'] ?? 0)];
+        usort($players, fn($a, $b) => $key($a) <=> $key($b));
+        $event['players'] = $players;
         return $event;
     }
 
@@ -215,7 +220,7 @@ final class EventPlans
 
     /**
      * The owner's players coming to the event, or with $coming false those
-     * not, named "First Last", in name order. Each age is the one the player
+     * not, named "First Last", in name order (find() reorders by age). Each age is the one the player
      * turns in $year, or null without a birth year.
      */
     private function players(int $eventId, bool $coming, int $year): array

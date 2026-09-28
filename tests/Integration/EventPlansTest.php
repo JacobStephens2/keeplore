@@ -244,7 +244,7 @@ final class EventPlansTest extends TestCase
         $this->assertSame([true, false], array_column($items, 'is_kept'));
     }
 
-    public function test_owner_can_add_players_and_they_come_back_in_name_order(): void
+    public function test_owner_can_add_players_and_those_without_ages_come_back_in_name_order(): void
     {
         $id = $this->plans()->save(['name' => 'Beach week']);
 
@@ -350,8 +350,22 @@ final class EventPlansTest extends TestCase
         $undated = $this->plans()->save(['name' => 'Someday']);
         $this->plans()->addPlayers($dated, [100, 101]);
 
-        $this->assertSame([null, 12], array_column($this->plans()->find($dated)['players'], 'age'));
+        $this->assertSame([12, null], array_column($this->plans()->find($dated)['players'], 'age'));
         // An undated event counts from this year.
         $this->assertSame((int) date('Y') - 2015, $this->plans()->playersToAdd($undated)[1]['age']);
+    }
+
+    public function test_an_events_players_come_back_oldest_first_and_unknown_ages_last(): void
+    {
+        $this->runSql("INSERT INTO players (id, user_id, FirstName, LastName) VALUES (102, 1, 'Al', 'Young'), (103, 1, 'Bo', 'Twin');
+            UPDATE players SET birth_year = 2015 WHERE id IN (100, 103);
+            UPDATE players SET birth_year = 2020 WHERE id = 102");
+        $id = $this->plans()->save(['name' => 'Beach week', 'starts_on' => '2027-07-03']);
+        $this->plans()->addPlayers($id, [100, 101, 102, 103]);
+
+        $this->assertSame(
+            ['Bo Twin', 'Sam Lee', 'Al Young', 'Jo Smith'],
+            array_column($this->plans()->find($id)['players'], 'name')
+        );
     }
 }

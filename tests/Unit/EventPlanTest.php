@@ -13,6 +13,7 @@ require_once PROJECT_PATH . '/private/event_plan.php';
  *   optionally by another
  * - event_plan_text(): those groups as a plain-text packing checklist
  * - event_plan_grouping(): the grouping a request asks for, over the saved one
+ * - event_player_ages(): how many players are adults, and children at each age
  */
 class EventPlanTest extends TestCase
 {
@@ -281,5 +282,25 @@ class EventPlanTest extends TestCase
             event_plan_details($this->item('Ra', ['MnT' => 30, 'MxT' => 60, 'setting' => 'beach'])));
         $this->assertSame(', 45 min', event_plan_details($this->item('Senji', ['MxT' => 45])));
         $this->assertSame('', event_plan_details($this->item('Hive Pocket', ['MnT' => 0, 'MxT' => null])));
+    }
+
+    private function players(array $ages): array
+    {
+        return array_map(fn($age) => ['id' => 1, 'name' => 'Someone', 'age' => $age], $ages);
+    }
+
+    public function test_player_ages_count_adults_then_children_oldest_first(): void
+    {
+        $this->assertSame(
+            '2 adults (18+) · 4 children: 1 age 17, 1 age 12, 2 age 8 · 1 age unknown',
+            event_player_ages($this->players([40, 8, 18, 12, 8, null, 17]))
+        );
+    }
+
+    public function test_player_ages_leave_out_what_is_not_there(): void
+    {
+        $this->assertSame('1 adult (18+)', event_player_ages($this->players([30])));
+        $this->assertSame('1 child: 1 age 5', event_player_ages($this->players([5])));
+        $this->assertSame('', event_player_ages([]));
     }
 }

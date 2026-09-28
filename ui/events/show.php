@@ -25,6 +25,7 @@ $not_kept = count(array_filter($items, fn($item) => !$item['is_kept']));
 $to_add = $plans->itemsToAdd($id);
 $players = $event['players'];
 $players_to_add = $plans->playersToAdd($id);
+$player_ages = event_player_ages($players);
 $settings = array_values(array_unique(array_filter(array_map('trim', array_column($items, 'setting')))));
 sort($settings, SORT_NATURAL | SORT_FLAG_CASE);
 $dates = event_dates_label($event['starts_on'], $event['ends_on']);
@@ -32,7 +33,7 @@ $dates = event_dates_label($event['starts_on'], $event['ends_on']);
 $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=4'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=5'); ?>">
 <main class="event-page" data-event-id="<?php echo $id; ?>" data-item-url="<?php echo h(url_for('/events/item.php')); ?>">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
@@ -44,7 +45,10 @@ include(SHARED_PATH . '/header.php');
 
     <section class="event-players" aria-labelledby="event-players-heading">
         <h2 id="event-players-heading">Players <small class="menu-support"><?php echo count($players); ?></small></h2>
-        <?php if ($players && $event['starts_on']) { ?><p class="menu-support">Ages are as of <?php echo h(substr($event['starts_on'], 0, 4)); ?>, the year the event starts.</p><?php } ?>
+        <?php if ($player_ages !== '') { ?>
+            <p class="event-player-ages"><?php echo h($player_ages); ?><?php if ($event['starts_on']) { ?>
+                <small class="menu-support">Ages as of <?php echo h(substr($event['starts_on'], 0, 4)); ?>, the year the event starts.</small><?php } ?></p>
+        <?php } ?>
         <?php if ($players) { ?>
             <ul class="event-player-list">
                 <?php foreach ($players as $player) { ?>

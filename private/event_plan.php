@@ -93,6 +93,48 @@ function event_dates_label($starts_on, $ends_on) {
     return $format($starts_on, !$same_year) . ' – ' . $format($ends_on);
 }
 
+/** The age from which an event's player counts as an adult. */
+const EVENT_ADULT_AGE = 18;
+
+/**
+ * How old an event's players are, as "2 adults (18+) · 3 children: 1 age
+ * 12, 2 age 8 · 1 age unknown", children oldest first, or '' with no
+ * players. Players are rows with an 'age', null without a birth year.
+ */
+function event_player_ages(array $players) {
+    $adults = 0;
+    $unknown = 0;
+    $children = [];
+    foreach ($players as $player) {
+        $age = $player['age'] ?? null;
+        if ($age === null) {
+            $unknown++;
+        } elseif ($age >= EVENT_ADULT_AGE) {
+            $adults++;
+        } else {
+            $children[$age] = ($children[$age] ?? 0) + 1;
+        }
+    }
+    krsort($children);
+
+    $parts = [];
+    if ($adults > 0) {
+        $parts[] = $adults . ($adults === 1 ? ' adult' : ' adults') . ' (' . EVENT_ADULT_AGE . '+)';
+    }
+    if ($children) {
+        $count = array_sum($children);
+        $by_age = [];
+        foreach ($children as $age => $n) {
+            $by_age[] = $n . ' age ' . $age;
+        }
+        $parts[] = $count . ($count === 1 ? ' child: ' : ' children: ') . implode(', ', $by_age);
+    }
+    if ($unknown > 0) {
+        $parts[] = $unknown . ' age unknown';
+    }
+    return implode(' · ', $parts);
+}
+
 /** The items as a checklist: "# group", "## sub-group", "- [ ] line". */
 function event_plan_text(array $groups) {
     $blocks = [];
