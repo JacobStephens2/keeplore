@@ -110,7 +110,7 @@ include(SHARED_PATH . '/header.php');
             <p class="menu-support">The planned games you don't keep yet, to buy or borrow before the event.</p>
             <ul class="event-shopping-list">
                 <?php foreach ($shopping['items'] as $item) { ?>
-                    <li><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?></li>
+                    <li><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?><?php if (isset($spare_ids[$item['id']])) { ?> <span class="event-not-kept event-can-stay-home">Can stay home</span><?php } ?></li>
                 <?php } ?>
             </ul>
             <textarea id="event-shopping-text" rows="<?php echo min(12, $not_kept + 1); ?>" readonly><?php echo h($shopping['text']); ?></textarea>
