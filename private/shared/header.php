@@ -167,6 +167,7 @@
               <summary class="nav-link nav-more-summary" aria-haspopup="menu">More</summary>
               <div class="nav-more-panel" role="menu" aria-label="More destinations">
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('/types'); ?>">Types</a>
+                <a class="nav-link" role="menuitem" href="<?php echo url_for('/bgg-search'); ?>">Search&nbsp;BGG</a>
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('/users'); ?>">Users</a>
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('/api-docs'); ?>">API</a>
                 <a class="nav-link" role="menuitem" href="<?php echo url_for('/support'); ?>">Support</a>

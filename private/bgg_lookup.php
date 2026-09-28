@@ -257,6 +257,11 @@ function bgg_api_root() {
   return 'https://api.geekdo.com/api';
 }
 
+// A thing's community polls, stats and ranks.
+function bgg_dynamic_info_url($object_id) {
+  return bgg_api_root() . '/dynamicinfo?objectid=' . (int) $object_id . '&objecttype=thing';
+}
+
 function bgg_curl_options() {
   return [
     CURLOPT_RETURNTRANSFER => true,
@@ -428,7 +433,7 @@ function bgg_fields_for_id($object_id, $get_json = null) {
   }
 
   $item_url = bgg_api_root() . '/geekitems?objectid=' . $object_id . '&objecttype=thing';
-  $dynamic_url = bgg_api_root() . '/dynamicinfo?objectid=' . $object_id . '&objecttype=thing';
+  $dynamic_url = bgg_dynamic_info_url($object_id);
   try {
     $item_json = bgg_fetch($item_url, $get_json);
     $dynamic_json = bgg_fetch($dynamic_url, $get_json);

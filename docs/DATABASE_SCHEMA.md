@@ -98,6 +98,31 @@ Another BoardGameGeek user's rating and comment on an owner's item, matched thro
 
 ---
 
+### `bgg_poll_games` and `bgg_poll_best_players`
+
+BoardGameGeek's ranked games with their community poll results, for `/bgg-search`. BGG has no search on its polls, so `bin/refresh-bgg-poll-index [per-subdomain]` lists the top 500 games (by default) of each BGG subdomain from the geekdo JSON API and copies each game's polls from `dynamicinfo`. Rerunning refreshes the lists, refetches polls older than 30 days, and, when every list page answered, drops games no longer on any list. The index describes BGG, not an owner's collection, so it has no `user_id`. Apply [`add-bgg-poll-index.sql`](../database/migrations/add-bgg-poll-index.sql); it is safe to rerun.
+
+`bgg_poll_games`:
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `thing_id` | INT UNSIGNED | NO | BGG thing id; primary key |
+| `name` | VARCHAR(255) | NO | BGG primary name |
+| `year_published` | SMALLINT | YES | Year published |
+| `bgg_rank` | INT UNSIGNED | YES | Overall BGG rank, NULL when unranked |
+| `average` | DECIMAL(6,4) | YES | BGG average rating |
+| `users_rated` | INT UNSIGNED | NO | Number of BGG ratings |
+| `image_url` | VARCHAR(500) | YES | BGG thumbnail |
+| `subdomains` | VARCHAR(255) | NO | Subdomain lists the game was found in, e.g. `Party, Family` |
+| `best_players` | VARCHAR(64) | NO | Best player counts as written, e.g. `6, 8`, `6-7`, `9+` |
+| `player_votes` | INT UNSIGNED | NO | Everyone who voted on the player-count poll |
+| `community_age` | TINYINT UNSIGNED | YES | Community poll age, `6` for "6+"; NULL when nobody voted. BGG's JSON gives no vote count for it |
+| `polls_fetched_at` | DATETIME | YES | When the polls were last fetched; NULL until they are |
+
+`bgg_poll_best_players`: one row `(thing_id, players)` per player count voted Best, cascading from `bgg_poll_games`. An open-ended Best such as 9+ is stored as every count from 9 to 20.
+
+---
+
 ### `events` and `event_items`
 
 An owner's event, such as a beach week, and the items planned for it. `/events` groups an event's items by sweet spot, age, setting or tag and writes them out as a packing checklist. Apply [`add-events.sql`](../database/migrations/add-events.sql); it is safe to rerun.
