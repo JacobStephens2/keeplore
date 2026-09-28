@@ -19,13 +19,13 @@ $_SESSION['event_grouping'][$id] = $grouping;
 $by_tag = $by === 'tag' || $then === 'tag';
 
 $items = $event['items'];
-$groups = event_plan_groups($items, $by, $then, event_plan_chosen_tags($tags));
+$players = $event['players'];
+$groups = event_plan_groups($items, $by, $then, event_plan_chosen_tags($tags), array_column($players, 'age'));
 $packed = count(array_filter(array_column($items, 'is_packed')));
 $not_kept = count(array_filter($items, fn($item) => !$item['is_kept']));
 $to_add = $plans->itemsToAdd($id);
-$players = $event['players'];
 $players_to_add = $plans->playersToAdd($id);
-$player_ages = event_player_ages($players);
+$player_ages_label = event_player_ages($players);
 $settings = array_values(array_unique(array_filter(array_map('trim', array_column($items, 'setting')))));
 sort($settings, SORT_NATURAL | SORT_FLAG_CASE);
 $dates = event_dates_label($event['starts_on'], $event['ends_on']);
@@ -45,8 +45,8 @@ include(SHARED_PATH . '/header.php');
 
     <section class="event-players" aria-labelledby="event-players-heading">
         <h2 id="event-players-heading">Players <small class="menu-support"><?php echo count($players); ?></small></h2>
-        <?php if ($player_ages !== '') { ?>
-            <p class="event-player-ages"><?php echo h($player_ages); ?><?php if ($event['starts_on']) { ?>
+        <?php if ($player_ages_label !== '') { ?>
+            <p class="event-player-ages"><?php echo h($player_ages_label); ?><?php if ($event['starts_on']) { ?>
                 <small class="menu-support">Ages as of <?php echo h(substr($event['starts_on'], 0, 4)); ?>, the year the event starts.</small><?php } ?></p>
         <?php } ?>
         <?php if ($players) { ?>
@@ -153,6 +153,7 @@ include(SHARED_PATH . '/header.php');
         </form>
         <p id="event-tags-help" class="menu-support">
             A game best at several player counts, or with several tags, shows in each of those groups.
+            Players' ages makes a group for each child's age coming and one for adults, and puts each game under the youngest of them old enough for it.
             To split each player count into casual and main, tag games casual or main on Edit Item, group by Sweet spot, and enter “casual, main” here. Then by switches to Tag on its own, and other tags are left out.
         </p>
 

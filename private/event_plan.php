@@ -1,7 +1,8 @@
 <?php
 
 /**
- * An event's games grouped for planning: by sweet spot, age, setting or tag,
+ * An event's games grouped for planning: by sweet spot, age, the ages of the
+ * players coming, setting or tag,
  * then optionally by a second of those, and written out as a packing
  * checklist. A game belongs to every group its values name, so one best at
  * 6 and 8 shows under both "8 players" and "6 players".
@@ -18,6 +19,7 @@ function event_plan_dimensions() {
         'none' => 'Nothing',
         'players' => 'Sweet spot',
         'age' => 'Age',
+        'player_age' => "Players' ages",
         'setting' => 'Setting',
         'tag' => 'Tag',
     ];
@@ -33,8 +35,12 @@ function event_plan_dimensions() {
  *
  * $tags, when given, are the only tags that make groups, in that order, so
  * "casual, main" splits each player count in two and ignores "beach-safe".
+ *
+ * $player_ages are the ages of the players coming (null when unknown). By
+ * 'player_age', each distinct child age and "Adults" make a group, and a
+ * game shows once, under the youngest of them old enough for it.
  */
-function event_plan_groups(array $items, $by, $then = 'none', array $tags = []) {
+function event_plan_groups(array $items, $by, $then = 'none', array $tags = [], array $player_ages = []) {
     $by = isset(event_plan_dimensions()[$by]) ? $by : 'none';
     $then = isset(event_plan_dimensions()[$then]) && $then !== $by ? $then : 'none';
     usort($items, function ($a, $b) {
@@ -43,10 +49,11 @@ function event_plan_groups(array $items, $by, $then = 'none', array $tags = []) 
 
     $groups = [];
     $tags = event_plan_chosen_tags($tags);
-    foreach (event_plan_split($items, $by, $tags, false) as $group) {
+    $ages = event_plan_age_groups($player_ages);
+    foreach (event_plan_split($items, $by, $tags, $ages, false) as $group) {
         $group['groups'] = $then === 'none' ? [] : array_map(function ($sub) {
             return $sub + ['groups' => []];
-        }, event_plan_split($group['items'], $then, $tags, true));
+        }, event_plan_split($group['items'], $then, $tags, $ages, true));
         $groups[] = $group;
     }
     return $groups;
@@ -135,6 +142,23 @@ function event_player_ages(array $players) {
     return implode(' · ', $parts);
 }
 
+/**
+ * The age groups the players make, youngest first: each distinct child age,
+ * then EVENT_ADULT_AGE standing for every adult. Unknown ages are left out.
+ */
+function event_plan_age_groups(array $player_ages) {
+    $groups = [];
+    foreach ($player_ages as $age) {
+        if ($age !== null) {
+            // A birth year after the event would make a negative age.
+            $groups[] = max(0, min((int) $age, EVENT_ADULT_AGE));
+        }
+    }
+    $groups = array_values(array_unique($groups));
+    sort($groups);
+    return $groups;
+}
+
 /** The items as a checklist: "# group", "## sub-group", "- [ ] line". */
 function event_plan_text(array $groups) {
     $blocks = [];
@@ -215,14 +239,14 @@ function event_plan_chosen_tags($tags) {
  * dimension. Items lacking a value form a last, labelled group, or with
  * $is_sub a first, unlabelled one.
  */
-function event_plan_split(array $items, $by, array $tags, $is_sub) {
+function event_plan_split(array $items, $by, array $tags, array $ages, $is_sub) {
     if ($by === 'none') {
         return [['label' => '', 'items' => $items]];
     }
     $groups = [];
     $missing = [];
     foreach ($items as $item) {
-        $keys = event_plan_keys($item, $by, $tags);
+        $keys = event_plan_keys($item, $by, $tags, $ages);
         if ($keys === []) {
             $missing[] = $item;
         }
@@ -235,7 +259,7 @@ function event_plan_split(array $items, $by, array $tags, $is_sub) {
     }
     if ($by === 'players') {
         krsort($groups, SORT_NUMERIC);
-    } elseif ($by === 'age') {
+    } elseif ($by === 'age' || $by === 'player_age') {
         ksort($groups, SORT_NUMERIC);
     } else {
         ksort($groups, SORT_STRING);
@@ -244,20 +268,34 @@ function event_plan_split(array $items, $by, array $tags, $is_sub) {
     if ($missing !== [] && $is_sub) {
         array_unshift($groups, ['label' => '', 'items' => $missing]);
     } elseif ($missing !== []) {
-        $none = ['players' => 'No sweet spot', 'age' => 'No age recorded', 'setting' => 'No setting', 'tag' => 'Untagged'];
+        $none = ['players' => 'No sweet spot', 'age' => 'No age recorded', 'setting' => 'No setting', 'tag' => 'Untagged',
+            'player_age' => $ages === [] ? 'No player ages recorded' : 'No age recorded'];
         $groups[] = ['label' => $none[$by], 'items' => $missing];
     }
     return $groups;
 }
 
 /** The groups one item belongs to, as sort key => label. */
-function event_plan_keys(array $item, $by, array $tags) {
+function event_plan_keys(array $item, $by, array $tags, array $ages) {
     if ($by === 'players') {
         $keys = [];
         foreach (items_list_sweet_spot_counts($item['SS'] ?? $item['ss'] ?? '') as $n) {
             $keys[$n] = $n . ($n === 1 ? ' player' : ' players');
         }
         return $keys;
+    }
+    if ($by === 'player_age') {
+        $age = items_list_min_age($item);
+        if ($age === null || $ages === []) {
+            return [];
+        }
+        foreach ($ages as $group) {
+            // Adults can play whatever age a game asks.
+            if ($group >= $age || $group === EVENT_ADULT_AGE) {
+                return [$group => $group === EVENT_ADULT_AGE ? 'Adults' : 'Age ' . $group];
+            }
+        }
+        return [EVENT_ADULT_AGE + 1 => "Older than the players' known ages"];
     }
     if ($by === 'age') {
         $age = items_list_min_age($item);

@@ -62,5 +62,8 @@ An occasion the user plans which items to bring to, such as a beach week. Each p
 **Adult**:
 A player 18 or older in the year an event starts, counted from their birth year alone. An event's players are summarized as adults, then children by age.
 
+**Players' ages grouping**:
+An event's games grouped by who is coming: a group for each child's age and one for adults, each game under the youngest of them its minimum age allows. Distinct from Youngest age, which filters the Items page rather than grouping.
+
 **Event setting**:
 Where a planned item will be used at an event, such as the beach. Belongs to the event, not the item, and is distinct from a use's Setting.
