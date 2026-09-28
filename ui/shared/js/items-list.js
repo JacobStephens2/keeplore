@@ -117,8 +117,9 @@
     } else if (key === 'tags') {
       av = (av || []).join(', ');
       bv = (bv || []).join(', ');
-    } else if (key === 'players') {
-      // By the smallest count the label names, so "2–4" sorts before "10–12".
+    } else if (key === 'players' || key === 'time') {
+      // By the smallest number the label names, so "2–4" sorts before "10–12"
+      // and "20 min" before "120 min".
       av = fewestPlayers(av);
       bv = fewestPlayers(bv);
     } else if (key === 'age') {
@@ -267,7 +268,7 @@
         // No class: td.type elsewhere caps width at 12ch, which would wrap it.
         return el('td', { text: item.type });
       default:
-        // players, age: plain text, with the key as the class.
+        // players, time, age: plain text, with the key as the class.
         return el('td', { className: key, text: item[key] == null ? '' : String(item[key]) });
     }
   }
