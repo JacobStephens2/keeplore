@@ -53,7 +53,8 @@ include(SHARED_PATH . '/header.php');
   <?php } elseif ($games === []) { ?>
     <div class="empty-state"><p>No indexed game matches.</p></div>
   <?php } else { ?>
-    <p><?php echo $more ? 'More than ' . BGG_POLL_SEARCH_LIMIT : count($games); ?> <?php echo count($games) === 1 ? 'game' : 'games'; ?>, <?php echo $more ? ' (the ' . BGG_POLL_SEARCH_LIMIT . ' best ranked shown)' : ''; ?>. Click a column heading to sort; Shift-click adds a tie-breaker.</p>
+    <p><?php echo $more ? 'The ' . BGG_POLL_SEARCH_LIMIT . ' best-ranked of more than ' . BGG_POLL_SEARCH_LIMIT . ' games.' : count($games) . ' ' . (count($games) === 1 ? 'game.' : 'games.'); ?></p>
+    <p class="list-sort-hint">Click a column heading to sort by it; Shift-click adds a tie-breaker.</p>
     <p class="list-sort-summary" id="bgg-search-sort-summary" aria-live="polite"></p>
     <div class="surface-panel">
     <div class="table-scroll">
@@ -73,7 +74,7 @@ include(SHARED_PATH . '/header.php');
         <?php foreach ($games as $game) { ?>
           <tr
             data-name="<?php echo h($game['name']); ?>"
-            data-best="<?php echo h((string) (int) $game['best_players']); ?>"
+            data-best="<?php echo $game['best_players'] === '' ? '' : (int) $game['best_players']; ?>"
             data-votes="<?php echo h((string) $game['player_votes']); ?>"
             data-age="<?php echo h((string) $game['community_age']); ?>"
             data-rank="<?php echo h((string) $game['bgg_rank']); ?>"

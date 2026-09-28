@@ -25,5 +25,8 @@ class BggSearchSortTest extends TestCase
         }
         $this->assertStringContainsString('/shared/js/list-table.js', $page);
         $this->assertStringContainsString('/bgg-search/bgg-search.js', $page);
+        // Sorting by Best uses the lowest Best count ("6-7" sorts as 6); a
+        // game with no Best vote leaves it blank so it sorts last.
+        $this->assertStringContainsString("\$game['best_players'] === '' ? '' : (int) \$game['best_players']", $page);
     }
 }
