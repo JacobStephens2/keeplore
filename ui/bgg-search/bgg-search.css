@@ -1,0 +1,7 @@
+.bgg-search-form { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem 1.5rem; }
+.bgg-search-form label { display: flex; flex-direction: column; gap: .35rem; }
+.bgg-search-form input[type="number"] { width: 7rem; }
+.bgg-search-help { flex-basis: 100%; margin: 0; }
+.bgg-search-results .name small { display: block; }
+.bgg-search-results td:not(.name) { white-space: nowrap; }
+.bgg-search-source { margin-top: 1.5rem; }
