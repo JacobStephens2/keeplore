@@ -136,6 +136,10 @@
     } else if (key === 'avg_time') {
       av = Number(av) || 0;
       bv = Number(bv) || 0;
+    } else if (key === 'bgg_average') {
+      // Unrated sorts below every score, so a descending sort leads with the best.
+      av = av === '' || av == null || !isFinite(Number(av)) ? -1 : Number(av);
+      bv = bv === '' || bv == null || !isFinite(Number(bv)) ? -1 : Number(bv);
     } else if (key === 'candidate') {
       av = av ? 1 : 0;
       bv = bv ? 1 : 0;

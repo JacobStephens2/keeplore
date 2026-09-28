@@ -100,8 +100,8 @@ class ItemBggLinkTest extends TestCase
     public function test_writers_store_the_bgg_vote_basis(): void
     {
         $writers = $this->source('/private/query_functions/artifact_queries.php');
-        $this->assertMatchesRegularExpression('/INSERT INTO games\s*\([^)]*\bbgg_player_votes\b[^)]*\bbgg_age_basis\b/s', $writers);
-        $this->assertStringContainsString('bgg_player_votes=?, bgg_age_basis=?', $this->updateWriter());
+        $this->assertMatchesRegularExpression('/INSERT INTO games\s*\([^)]*\bbgg_player_votes\b[^)]*\bbgg_age_basis\b[^)]*\bBGG_Rat\b/s', $writers);
+        $this->assertStringContainsString('bgg_player_votes=?, bgg_age_basis=?, BGG_Rat=?', $this->updateWriter());
     }
 
     public function test_forms_carry_the_bgg_vote_basis(): void
@@ -110,10 +110,12 @@ class ItemBggLinkTest extends TestCase
             $page = $this->source($path);
             $this->assertMatchesRegularExpression('/<input type="hidden" name="bgg_player_votes" id="bgg_player_votes"/', $page, $path);
             $this->assertMatchesRegularExpression('/<input type="hidden" name="bgg_age_basis" id="bgg_age_basis"/', $page, $path);
+            $this->assertMatchesRegularExpression('/<input type="hidden" name="BGG_Rat" id="BGG_Rat"/', $page, $path);
         }
         $js = $this->source('/ui/artifacts/new-bgg.js');
         $this->assertStringContainsString('fields.bgg_player_votes', $js);
         $this->assertStringContainsString('fields.bgg_age_basis', $js);
+        $this->assertStringContainsString('fields.BGG_Rat', $js);
     }
 
     public function test_show_page_states_the_bgg_vote_basis(): void
@@ -157,16 +159,16 @@ class ItemBggLinkTest extends TestCase
     public function test_bgg_storage_drops_the_vote_basis_without_a_link(): void
     {
         $this->assertSame(
-            ['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => 19, 'bgg_age_basis' => 'community'],
-            item_bgg_fields_for_storage(['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => '19', 'bgg_age_basis' => 'community'])
+            ['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => 19, 'bgg_age_basis' => 'community', 'BGG_Rat' => '7.09'],
+            item_bgg_fields_for_storage(['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => '19', 'bgg_age_basis' => 'community', 'BGG_Rat' => '7.09024'])
         );
         $this->assertSame(
-            ['bgg_url' => null, 'bgg_player_votes' => null, 'bgg_age_basis' => null],
-            item_bgg_fields_for_storage(['bgg_url' => '', 'bgg_player_votes' => '19', 'bgg_age_basis' => 'community'])
+            ['bgg_url' => null, 'bgg_player_votes' => null, 'bgg_age_basis' => null, 'BGG_Rat' => null],
+            item_bgg_fields_for_storage(['bgg_url' => '', 'bgg_player_votes' => '19', 'bgg_age_basis' => 'community', 'BGG_Rat' => '7.09'])
         );
         $this->assertSame(
-            ['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => null, 'bgg_age_basis' => null],
-            item_bgg_fields_for_storage(['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => 'many', 'bgg_age_basis' => 'guess'])
+            ['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => null, 'bgg_age_basis' => null, 'BGG_Rat' => null],
+            item_bgg_fields_for_storage(['bgg_url' => 'https://boardgamegeek.com/boardgame/621', 'bgg_player_votes' => 'many', 'bgg_age_basis' => 'guess', 'BGG_Rat' => 'nope'])
         );
     }
 }

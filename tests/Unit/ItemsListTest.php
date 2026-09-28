@@ -198,7 +198,7 @@ class ItemsListTest extends TestCase
     public function test_recent_interaction_comes_before_type_and_tracking_start(): void
     {
         $this->assertSame(
-            ['Kept', 'Name', 'Gyges', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By'],
+            ['Kept', 'Name', 'BGG', 'Gyges', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By'],
             $this->columnLabels([], ['Gyges'])
         );
     }
@@ -206,12 +206,12 @@ class ItemsListTest extends TestCase
     public function test_an_age_search_shows_age_then_the_player_range_and_best_count_then_play_time(): void
     {
         $this->assertSame(
-            ['Kept', 'Name', 'Age', 'Players', 'Time', 'Gyges', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By'],
+            ['Kept', 'Name', 'Age', 'Players', 'Time', 'BGG', 'Gyges', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By'],
             $this->columnLabels(['age' => '6'], ['Gyges'])
         );
-        $this->assertSame(['Kept', 'Name', 'Players', 'Time', 'Tags'], array_slice($this->columnLabels(['players' => '3']), 0, 5));
+        $this->assertSame(['Kept', 'Name', 'Players', 'Time', 'BGG', 'Tags'], array_slice($this->columnLabels(['players' => '3']), 0, 6));
         $this->assertSame(
-            ['Kept', 'Name', 'Age', 'Players', 'Time', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By', 'AvgT', 'Candidate'],
+            ['Kept', 'Name', 'Age', 'Players', 'Time', 'BGG', 'Tags', 'Recent Interaction', 'Type', 'Tracking Start', 'Interact By', 'AvgT', 'Candidate'],
             $this->columnLabels(['showAttributes' => 'yes'])
         );
     }
@@ -222,9 +222,33 @@ class ItemsListTest extends TestCase
         $columns = items_list_columns($filters, ['Gyges']);
 
         $this->assertSame(
-            ['is_kept', 'title', 'bgg_rating:Gyges', 'tags', 'most_recent_use', 'type', 'acq', 'use_by'],
+            ['is_kept', 'title', 'bgg_average', 'bgg_rating:Gyges', 'tags', 'most_recent_use', 'type', 'acq', 'use_by'],
             array_column($columns, 'key')
         );
+        $bgg = $columns[2];
+        $this->assertSame('BGG', $bgg['label']);
+        $this->assertSame('BoardGameGeek average rating', $bgg['tooltip']);
+    }
+
+    public function test_list_row_carries_the_overall_bgg_rating_for_sorting(): void
+    {
+        $row = items_list_present_row([
+            'id' => 13,
+            'Title' => 'Catan',
+            'Acq' => '2024-01-10',
+            'BGG_Rat' => '7.09024',
+        ], 90, '2024-06-01');
+        $this->assertSame('7.09', $row['bgg_average']);
+
+        $blank = items_list_present_row([
+            'id' => 14,
+            'Title' => 'Unrated',
+            'Acq' => '2024-01-10',
+        ], 90, '2024-06-01');
+        $this->assertSame('', $blank['bgg_average']);
+
+        $js = (string) file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
+        $this->assertStringContainsString("key === 'bgg_average'", $js);
     }
 
     public function test_items_page_draws_headers_and_cells_from_the_one_column_list(): void

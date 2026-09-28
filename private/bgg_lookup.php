@@ -107,6 +107,10 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
     ? (string) max(0, (int) ($dynamic['polls']['userplayers']['totalvotes'] ?? 0))
     : '0';
   $fields['bgg_age_basis'] = $community_age !== null ? 'community' : 'publisher';
+  $overall = bgg_overall_rating_text($dynamic['stats']['average'] ?? null);
+  if ($overall !== null) {
+    $fields['BGG_Rat'] = $overall;
+  }
 
   $match = [
     'id' => $id,
@@ -123,6 +127,17 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
     'match' => $match,
     'fields' => $fields,
   ];
+}
+
+// The community average from a dynamicinfo body, or null when that body
+// names an item with no average. False when the body is not that answer,
+// which is what BGG sends while a request is still queued.
+function bgg_overall_rating_from_dynamic_json($json) {
+  $data = json_decode((string) $json, true);
+  if (!is_array($data) || !is_array($data['item'] ?? null) || !is_array($data['item']['stats'] ?? null)) {
+    return false;
+  }
+  return bgg_overall_rating_text($data['item']['stats']['average'] ?? null);
 }
 
 function bgg_image_url_from_item($item) {

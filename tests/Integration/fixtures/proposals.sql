@@ -23,7 +23,8 @@ CREATE TABLE games (
     type VARCHAR(100) DEFAULT NULL,
     to_get_rid_of TINYINT DEFAULT 0,
     Acq DATE DEFAULT '2026-01-01',
-    interaction_frequency_days INT DEFAULT 90
+    interaction_frequency_days INT DEFAULT 90,
+    BGG_Rat VARCHAR(10) DEFAULT NULL
 ) ENGINE=InnoDB;
 CREATE TABLE players (
     id INT PRIMARY KEY,

@@ -27,6 +27,7 @@
   // basis the page would otherwise credit to the community.
   const playerVotesInput = document.querySelector("#bgg_player_votes");
   const ageBasisInput = document.querySelector("#bgg_age_basis");
+  const overallRatingInput = document.querySelector("#BGG_Rat");
   function forgetBasis(input, hintSelector, fieldIds) {
     fieldIds.forEach(function (id) {
       const field = document.getElementById(id);
@@ -45,6 +46,12 @@
   }
   forgetBasis(playerVotesInput, '[data-bgg-basis="players"], [data-bgg-basis="sweet_spot"]', ["MnP", "MxP", "SS", "bgg_url"]);
   forgetBasis(ageBasisInput, '[data-bgg-basis="age"]', ["age", "bgg_url"]);
+  // The average belongs to the linked thing. A hand-edited link no longer does.
+  if (linkInput && overallRatingInput) {
+    linkInput.addEventListener("input", function () {
+      overallRatingInput.value = "";
+    });
+  }
   let roster = [];
 
   requestBtn.addEventListener("click", function (event) {
@@ -191,6 +198,9 @@
     }
     setField("bgg_player_votes", fields.bgg_player_votes);
     setField("bgg_age_basis", fields.bgg_age_basis);
+    if (overallRatingInput) {
+      overallRatingInput.value = fields.BGG_Rat || "";
+    }
   }
 
   function showCover(img, url, name) {

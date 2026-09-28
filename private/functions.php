@@ -62,19 +62,38 @@ function normalize_item_bgg_url($value) {
 
 const ITEM_BGG_AGE_BASES = ['community', 'publisher'];
 
-// The BGG columns an item write stores. The vote basis only means something
-// alongside a link, so an item without one stores none.
+// BGG's average of user ratings, as the Items list shows it: 7.09 stays
+// "7.09", 8.00 reads "8". Null when it is blank or not a 1-10 score.
+// This is the community average, not the Bayesian Geek Rating.
+function bgg_overall_rating_text($value) {
+  if (is_string($value)) {
+    $value = trim($value);
+  }
+  if ($value === null || $value === '' || !is_numeric($value)) {
+    return null;
+  }
+  $rating = round((float) $value, 2);
+  if ($rating < 1 || $rating > 10) {
+    return null;
+  }
+  return rtrim(rtrim(number_format($rating, 2, '.', ''), '0'), '.');
+}
+
+// The BGG columns an item write stores. The vote basis and the average only
+// mean something alongside a link, so an item without one stores none.
 function item_bgg_fields_for_storage($artifact) {
   $url = normalize_item_bgg_url($artifact['bgg_url'] ?? '');
   if ($url === '') {
-    return ['bgg_url' => null, 'bgg_player_votes' => null, 'bgg_age_basis' => null];
+    return ['bgg_url' => null, 'bgg_player_votes' => null, 'bgg_age_basis' => null, 'BGG_Rat' => null];
   }
   $votes = trim((string) ($artifact['bgg_player_votes'] ?? ''));
   $age_basis = $artifact['bgg_age_basis'] ?? null;
+  $rating = $artifact['BGG_Rat'] ?? $artifact['bgg_rat'] ?? null;
   return [
     'bgg_url' => $url,
     'bgg_player_votes' => preg_match('/^\d{1,9}$/', $votes) ? (int) $votes : null,
     'bgg_age_basis' => in_array($age_basis, ITEM_BGG_AGE_BASES, true) ? $age_basis : null,
+    'BGG_Rat' => bgg_overall_rating_text($rating),
   ];
 }
 
