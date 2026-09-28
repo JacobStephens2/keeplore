@@ -64,19 +64,22 @@ include(SHARED_PATH . '/header.php');
         <details class="event-add">
             <summary>Add players</summary>
             <?php if ($players_to_add) { ?>
-                <form method="post" action="<?php echo url_for('/events/player.php'); ?>">
+                <form class="event-add-form" data-noun="player" method="post" action="<?php echo url_for('/events/player.php'); ?>">
                     <?php echo csrf_input(); ?>
                     <input type="hidden" name="event_id" value="<?php echo $id; ?>">
                     <input type="hidden" name="action" value="add">
-                    <div class="event-add-list">
+                    <label for="event-player-filter">Find players</label>
+                    <input type="search" id="event-player-filter" class="event-add-filter" placeholder="Search your people" autocomplete="off" aria-controls="event-player-list">
+                    <div class="event-add-list" id="event-player-list">
                         <?php foreach ($players_to_add as $candidate) { ?>
-                            <label class="event-choice">
+                            <label class="event-choice" data-title="<?php echo h(mb_strtolower($candidate['name'])); ?>">
                                 <input type="checkbox" name="player_ids[]" value="<?php echo $candidate['id']; ?>">
                                 <span><?php echo h($candidate['name']); ?></span>
                             </label>
                         <?php } ?>
                     </div>
-                    <button type="submit">Add selected players</button>
+                    <p class="event-add-empty menu-support" hidden>No players match.</p>
+                    <button type="submit" class="event-add-submit">Add selected players</button>
                 </form>
             <?php } else { ?>
                 <p class="menu-support"><?php echo $players ? 'Everyone in your people list is coming.' : 'Your people list is empty.'; ?>
@@ -95,13 +98,13 @@ include(SHARED_PATH . '/header.php');
         <summary>Add games from Keeplore</summary>
         <p class="menu-support">Games you don't keep are listed too, so a game you are thinking of buying can be tried in the plan. Add it on the Items page first if Keeplore doesn't have it yet.</p>
         <?php if ($to_add) { ?>
-            <form method="post" action="<?php echo url_for('/events/item.php'); ?>">
+            <form class="event-add-form" data-noun="game" method="post" action="<?php echo url_for('/events/item.php'); ?>">
                 <?php echo csrf_input(); ?>
                 <input type="hidden" name="event_id" value="<?php echo $id; ?>">
                 <input type="hidden" name="action" value="add">
                 <label for="event-add-filter">Find games</label>
-                <input type="search" id="event-add-filter" placeholder="Search your items" autocomplete="off" aria-controls="event-add-list">
-                <label class="event-choice"><input type="checkbox" id="event-add-games-only" checked> Games only</label>
+                <input type="search" id="event-add-filter" class="event-add-filter" placeholder="Search your items" autocomplete="off" aria-controls="event-add-list">
+                <label class="event-choice"><input type="checkbox" class="event-add-games-only" checked> Games only</label>
                 <div class="event-add-list" id="event-add-list">
                     <?php foreach ($to_add as $candidate) { ?>
                         <label class="event-choice" data-game="<?php echo $candidate['is_game'] ? '1' : '0'; ?>" data-title="<?php echo h(mb_strtolower($candidate['Title'])); ?>">
@@ -113,8 +116,8 @@ include(SHARED_PATH . '/header.php');
                         </label>
                     <?php } ?>
                 </div>
-                <p id="event-add-empty" class="menu-support" hidden>No games match.</p>
-                <button type="submit" id="event-add-submit">Add selected games</button>
+                <p class="event-add-empty menu-support" hidden>No games match.</p>
+                <button type="submit" class="event-add-submit">Add selected games</button>
             </form>
         <?php } else { ?>
             <p class="menu-support">Every item in Keeplore is already planned for this event.</p>
@@ -206,5 +209,5 @@ include(SHARED_PATH . '/header.php');
     <?php } ?>
 </main>
 <form id="event-pack-form" hidden><?php echo csrf_input(); ?></form>
-<script type="module" src="<?php echo url_for('/events/events.js?v=2'); ?>"></script>
+<script type="module" src="<?php echo url_for('/events/events.js?v=3'); ?>"></script>
 <?php include(SHARED_PATH . '/footer.php'); ?>

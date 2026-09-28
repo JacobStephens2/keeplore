@@ -1,36 +1,43 @@
-// Event page: filter the games to add, save packed marks as they are
-// ticked, and copy the plain-text list.
+// Event page: filter the games and players to add, save packed marks as
+// they are ticked, and copy the plain-text list.
 
 bindAddFilter();
 bindPackedMarks();
 bindCopy();
 
 function bindAddFilter() {
-  const filter = document.getElementById('event-add-filter');
-  const gamesOnly = document.getElementById('event-add-games-only');
-  const list = document.getElementById('event-add-list');
-  const empty = document.getElementById('event-add-empty');
-  const submit = document.getElementById('event-add-submit');
+  document.querySelectorAll('.event-add-form').forEach(bindAddForm);
+}
+
+// One add list, games or players: type to filter, and the submit button
+// counts what is ticked. data-noun names what the list holds.
+function bindAddForm(form) {
+  const filter = form.querySelector('.event-add-filter');
+  const gamesOnly = form.querySelector('.event-add-games-only');
+  const list = form.querySelector('.event-add-list');
+  const empty = form.querySelector('.event-add-empty');
+  const submit = form.querySelector('.event-add-submit');
   if (!filter || !list) {
     return;
   }
+  const noun = form.dataset.noun;
   const choices = [...list.querySelectorAll('.event-choice')];
 
   function updateSubmit() {
     const selected = list.querySelectorAll('input:checked').length;
     submit.disabled = selected === 0;
-    submit.textContent = selected === 0 ? 'Add selected games'
-      : `Add ${selected} ${selected === 1 ? 'game' : 'games'}`;
+    submit.textContent = selected === 0 ? `Add selected ${noun}s`
+      : `Add ${selected} ${selected === 1 ? noun : `${noun}s`}`;
   }
 
   function applyFilter() {
     const needle = filter.value.trim().toLowerCase();
     let shown = 0;
     choices.forEach((choice) => {
-      // A ticked game stays in view so the choice is not lost from sight.
+      // A ticked choice stays in view so it is not lost from sight.
       const match = choice.querySelector('input').checked
         || ((needle === '' || choice.dataset.title.includes(needle))
-          && (!gamesOnly.checked || choice.dataset.game === '1'));
+          && (!gamesOnly || !gamesOnly.checked || choice.dataset.game === '1'));
       choice.hidden = !match;
       shown += match ? 1 : 0;
     });
@@ -38,7 +45,9 @@ function bindAddFilter() {
   }
 
   filter.addEventListener('input', applyFilter);
-  gamesOnly.addEventListener('change', applyFilter);
+  if (gamesOnly) {
+    gamesOnly.addEventListener('change', applyFilter);
+  }
   applyFilter();
   // Enter in the search box would otherwise submit whatever is ticked.
   filter.addEventListener('keydown', (event) => {
