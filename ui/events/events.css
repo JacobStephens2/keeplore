@@ -42,3 +42,4 @@
   .event-item-row { grid-template-columns: 1fr 1fr; }
   .event-item-title { grid-column: 1 / -1; }
 }
+.event-not-kept { display: inline-block; margin-left: .4rem; padding: 0 .45rem; border: 1px solid rgba(148, 163, 184, 0.6); border-radius: 999px; font-size: .75rem; font-weight: 600; vertical-align: middle; }

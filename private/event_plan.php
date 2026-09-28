@@ -6,8 +6,8 @@
  * checklist. A game belongs to every group its values name, so one best at
  * 6 and 8 shows under both "8 players" and "6 players".
  *
- * Items are rows with Title, MnP, MxP, SS, Age, tags, and the event's own
- * setting, note and is_packed.
+ * Items are rows with Title, MnP, MxP, SS, Age, tags, is_kept, and the
+ * event's own setting, note and is_packed.
  */
 
 require_once __DIR__ . '/items_list.php';
@@ -91,7 +91,8 @@ function event_plan_text(array $groups) {
 
 /**
  * One game as the checklist names it: "Hanabi, 2–5 (4), 10 yrs, beach,
- * requested by mom", the Items copy line plus the event's setting and note.
+ * requested by mom", the Items copy line plus the event's setting and note,
+ * and "not kept" for a game planned before it is bought.
  */
 function event_plan_line(array $item) {
     $parts = [items_list_copy_text($item)];
@@ -100,6 +101,9 @@ function event_plan_line(array $item) {
         if ($value !== '') {
             $parts[] = $value;
         }
+    }
+    if (($item['is_kept'] ?? true) === false) {
+        $parts[] = 'not kept';
     }
     return implode(', ', $parts);
 }

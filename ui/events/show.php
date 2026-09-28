@@ -23,6 +23,7 @@ $by_tag = $by === 'tag' || $then === 'tag';
 $items = $event['items'];
 $groups = event_plan_groups($items, $by, $then, event_plan_chosen_tags($tags));
 $packed = count(array_filter(array_column($items, 'is_packed')));
+$not_kept = count(array_filter($items, fn($item) => !$item['is_kept']));
 $to_add = $plans->itemsToAdd($id);
 $settings = array_values(array_unique(array_filter(array_map('trim', array_column($items, 'setting')))));
 sort($settings, SORT_NATURAL | SORT_FLAG_CASE);
@@ -31,7 +32,7 @@ $dates = event_dates_label($event['starts_on'], $event['ends_on']);
 $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=1'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=2'); ?>">
 <main class="event-page" data-event-id="<?php echo $id; ?>" data-item-url="<?php echo h(url_for('/events/item.php')); ?>">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
@@ -43,24 +44,27 @@ include(SHARED_PATH . '/header.php');
 
     <p class="event-total" aria-live="polite">
         <strong><?php echo count($items); ?></strong> <?php echo count($items) === 1 ? 'game' : 'games'; ?> planned<?php if ($items) { ?>,
-        <strong id="event-packed-count"><?php echo $packed; ?></strong> packed<?php } ?>
+        <strong id="event-packed-count"><?php echo $packed; ?></strong> packed<?php } ?><?php if ($not_kept > 0) { ?>,
+        <strong><?php echo $not_kept; ?></strong> not kept<?php } ?>
     </p>
 
     <details class="event-add" <?php echo $items ? '' : 'open'; ?>>
-        <summary>Add games from your collection</summary>
+        <summary>Add games from Keeplore</summary>
+        <p class="menu-support">Games you don't keep are listed too, so a game you are thinking of buying can be tried in the plan. Add it on the Items page first if Keeplore doesn't have it yet.</p>
         <?php if ($to_add) { ?>
             <form method="post" action="<?php echo url_for('/events/item.php'); ?>">
                 <?php echo csrf_input(); ?>
                 <input type="hidden" name="event_id" value="<?php echo $id; ?>">
                 <input type="hidden" name="action" value="add">
                 <label for="event-add-filter">Find games</label>
-                <input type="search" id="event-add-filter" placeholder="Search your collection" autocomplete="off" aria-controls="event-add-list">
+                <input type="search" id="event-add-filter" placeholder="Search your items" autocomplete="off" aria-controls="event-add-list">
                 <label class="event-choice"><input type="checkbox" id="event-add-games-only" checked> Games only</label>
                 <div class="event-add-list" id="event-add-list">
                     <?php foreach ($to_add as $candidate) { ?>
                         <label class="event-choice" data-game="<?php echo $candidate['is_game'] ? '1' : '0'; ?>" data-title="<?php echo h(mb_strtolower($candidate['Title'])); ?>">
                             <input type="checkbox" name="item_ids[]" value="<?php echo $candidate['id']; ?>">
                             <span><?php echo h($candidate['Title']); ?>
+                                <?php if (!$candidate['is_kept']) { ?><span class="event-not-kept">Not kept</span><?php } ?>
                                 <?php if ($candidate['facts'] !== '') { ?><small class="menu-support"><?php echo h($candidate['facts']); ?></small><?php } ?>
                             </span>
                         </label>
@@ -70,7 +74,7 @@ include(SHARED_PATH . '/header.php');
                 <button type="submit" id="event-add-submit">Add selected games</button>
             </form>
         <?php } else { ?>
-            <p class="menu-support">Every item in your collection is already planned for this event.</p>
+            <p class="menu-support">Every item in Keeplore is already planned for this event.</p>
         <?php } ?>
     </details>
 

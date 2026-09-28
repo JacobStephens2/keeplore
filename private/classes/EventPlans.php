@@ -3,6 +3,7 @@
 require_once dirname(__DIR__) . '/item_tags.php';
 require_once dirname(__DIR__) . '/items_list.php';
 require_once dirname(__DIR__) . '/item_types.php';
+require_once dirname(__DIR__) . '/kept_status.php';
 
 /**
  * The owner's events, such as a beach week, and the items planned for each.
@@ -50,7 +51,7 @@ final class EventPlans
         $event['id'] = (int) $event['id'];
         $event['notes'] = (string) $event['notes'];
         $items = $this->rows(
-            'SELECT g.id, g.Title, g.MnP, g.MxP, g.SS, g.Age, ei.setting, ei.note, ei.is_packed
+            'SELECT g.id, g.Title, g.MnP, g.MxP, g.SS, g.Age, g.is_kept, ei.setting, ei.note, ei.is_packed
              FROM event_items ei JOIN games g ON g.id = ei.artifact_id AND g.user_id = ?
              WHERE ei.event_id = ?
              ORDER BY g.Title ASC, g.id ASC',
@@ -63,25 +64,26 @@ final class EventPlans
             }
             $item['SS'] = (string) $item['SS'];
             $item['is_packed'] = (bool) $item['is_packed'];
+            $item['is_kept'] = artifact_is_kept($item);
         }
         $event['items'] = with_item_tags($this->db, $items, $this->userId);
         return $event;
     }
 
     /**
-     * The owner's collection (kept or secondary) not yet planned for the
-     * event, in title order, each with its play facts line and whether its
-     * type is a game.
+     * Every item the owner has in Keeplore not yet planned for the event, kept
+     * or not, so a game being considered for purchase can be tried in the
+     * plan. In title order, each with its play facts line, whether it is
+     * kept, and whether its type is a game.
      */
     public function itemsToAdd(int $eventId): array
     {
         $items = $this->rows(
-            'SELECT g.id, g.Title, g.MnP, g.MxP, g.SS, g.Age, COALESCE(t.objectType, g.type) AS type_name
+            'SELECT g.id, g.Title, g.MnP, g.MxP, g.SS, g.Age, g.is_kept, COALESCE(t.objectType, g.type) AS type_name
              FROM games g
              LEFT JOIN types t ON t.id = g.type_id
              LEFT JOIN event_items ei ON ei.artifact_id = g.id AND ei.event_id = ?
-             WHERE g.user_id = ? AND (g.is_kept = 1 OR g.is_in_secondary_collection = 1)
-                AND ei.artifact_id IS NULL
+             WHERE g.user_id = ? AND ei.artifact_id IS NULL
              ORDER BY g.Title ASC, g.id ASC',
             'ii', [$eventId, $this->userId]
         );
@@ -89,6 +91,7 @@ final class EventPlans
             'id' => (int) $item['id'],
             'Title' => $item['Title'],
             'facts' => items_list_play_facts($item),
+            'is_kept' => artifact_is_kept($item),
             'is_game' => item_type_is_game($item['type_name']),
         ], $items);
     }

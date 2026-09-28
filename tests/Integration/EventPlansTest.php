@@ -214,17 +214,29 @@ final class EventPlansTest extends TestCase
         $this->assertSame([], $this->plans()->all());
     }
 
-    public function test_items_to_add_are_the_owners_collection_not_yet_planned_in_title_order(): void
+    public function test_items_to_add_are_all_the_owners_items_not_yet_planned_in_title_order(): void
     {
         $id = $this->plans()->save(['name' => 'Beach week']);
         $this->plans()->addItems($id, [11]);
 
         $candidates = $this->plans()->itemsToAdd($id);
 
-        // Arrival is in the secondary collection; Former possession is not kept.
-        $this->assertSame(['Arrival', 'Catan'], array_column($candidates, 'Title'));
+        // A game not kept, such as one being considered for purchase, can be planned too.
+        $this->assertSame(['Arrival', 'Catan', 'Former possession'], array_column($candidates, 'Title'));
+        $this->assertSame([false, true, false], array_column($candidates, 'is_kept'));
         $this->assertSame('3–4 players, best 3, 4 · Age 10+', $candidates[1]['facts']);
         $this->runSql("UPDATE types SET objectType = 'table game' WHERE id = 1");
-        $this->assertSame([false, true], array_column($this->plans()->itemsToAdd($id), 'is_game'));
+        $this->assertSame([false, true, true], array_column($this->plans()->itemsToAdd($id), 'is_game'));
+    }
+
+    public function test_a_planned_item_says_whether_it_is_kept(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+        $this->plans()->addItems($id, [10, 13]);
+
+        $items = $this->plans()->find($id)['items'];
+
+        $this->assertSame(['Catan', 'Former possession'], array_column($items, 'Title'));
+        $this->assertSame([true, false], array_column($items, 'is_kept'));
     }
 }

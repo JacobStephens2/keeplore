@@ -28,7 +28,7 @@ if (is_post_request()) {
 $page_title = 'Edit ' . $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=1'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=2'); ?>">
 <main class="event-page">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/show.php?id=' . $id); ?>"><?php echo h($event['name']); ?></a></p>

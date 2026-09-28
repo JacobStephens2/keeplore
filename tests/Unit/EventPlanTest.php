@@ -220,4 +220,15 @@ class EventPlanTest extends TestCase
         $this->assertSame('Until Jul 10, 2027', event_dates_label(null, '2027-07-10'));
         $this->assertSame('', event_dates_label(null, null));
     }
+
+    public function test_a_game_not_kept_says_so_on_the_checklist(): void
+    {
+        $groups = event_plan_groups([
+            $this->item("That's Not a Hat", ['MnP' => 3, 'MxP' => 8, 'SS' => '5,6', 'Age' => 8,
+                'note' => 'maybe buy', 'is_kept' => false]),
+            $this->item('Ra', ['is_kept' => true]),
+        ], 'none');
+
+        $this->assertSame("- [ ] Ra\n- [ ] That's Not a Hat, 3–8 (5, 6), 8 yrs, maybe buy, not kept\n", event_plan_text($groups));
+    }
 }

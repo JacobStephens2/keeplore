@@ -53,7 +53,7 @@ Formerly **Artifact Manager** — see [docs/keeplore-app-name.md](docs/keeplore-
 
 ### Event Planning
 
-- Create events (a beach week, a game day) and pick the games to bring from your collection
+- Create events (a beach week, a game day) and pick the games to bring from your items, including ones you don't keep yet, which the plan marks "not kept"
 - Group the plan by sweet spot, age, setting or tag, then by a second of those; a game best at 6 and 8 shows under both counts
 - Record a setting and note per game, tick games off as packed, and see the total planned
 - Copy the plan as a plain-text checklist
