@@ -74,7 +74,7 @@ final class EventPlans
             $item['is_kept'] = artifact_is_kept($item);
         }
         $event['items'] = with_item_tags($this->db, $items, $this->userId);
-        $event['players'] = $this->players($id, true);
+        $event['players'] = $this->players($id, true, $this->year($event['starts_on']));
         return $event;
     }
 
@@ -107,7 +107,10 @@ final class EventPlans
     /** The owner's players not yet coming to the event, in name order. */
     public function playersToAdd(int $eventId): array
     {
-        return $this->players($eventId, false);
+        $startsOn = $this->rows(
+            'SELECT starts_on FROM events WHERE id = ? AND user_id = ?', 'ii', [$eventId, $this->userId]
+        )[0]['starts_on'] ?? null;
+        return $this->players($eventId, false, $this->year($startsOn));
     }
 
     /** Creates the event, or renames and redates it with $id. Returns its id. */
@@ -212,18 +215,29 @@ final class EventPlans
 
     /**
      * The owner's players coming to the event, or with $coming false those
-     * not, named "First Last", in name order.
+     * not, named "First Last", in name order. Each age is the one the player
+     * turns in $year, or null without a birth year.
      */
-    private function players(int $eventId, bool $coming): array
+    private function players(int $eventId, bool $coming, int $year): array
     {
         $players = $this->rows(
-            "SELECT p.id, TRIM(CONCAT(COALESCE(p.FirstName, ''), ' ', COALESCE(p.LastName, ''))) AS name
+            "SELECT p.id, TRIM(CONCAT(COALESCE(p.FirstName, ''), ' ', COALESCE(p.LastName, ''))) AS name, p.birth_year
              FROM players p LEFT JOIN event_players ep ON ep.player_id = p.id AND ep.event_id = ?
              WHERE p.user_id = ? AND (ep.player_id IS NOT NULL) = ?
              ORDER BY p.FirstName ASC, p.LastName ASC, p.id ASC",
             'iii', [$eventId, $this->userId, (int) $coming]
         );
-        return array_map(fn($player) => ['id' => (int) $player['id'], 'name' => $player['name']], $players);
+        return array_map(fn($player) => [
+            'id' => (int) $player['id'],
+            'name' => $player['name'],
+            'age' => $player['birth_year'] === null ? null : $year - (int) $player['birth_year'],
+        ], $players);
+    }
+
+    /** The year an event starting on $startsOn is counted in: that year, or this one undated. */
+    private function year(?string $startsOn): int
+    {
+        return (int) ($startsOn === null ? date('Y') : substr($startsOn, 0, 4));
     }
 
     /**

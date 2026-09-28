@@ -44,6 +44,7 @@ include(SHARED_PATH . '/header.php');
 
     <section class="event-players" aria-labelledby="event-players-heading">
         <h2 id="event-players-heading">Players <small class="menu-support"><?php echo count($players); ?></small></h2>
+        <?php if ($players && $event['starts_on']) { ?><p class="menu-support">Ages are as of <?php echo h(substr($event['starts_on'], 0, 4)); ?>, the year the event starts.</p><?php } ?>
         <?php if ($players) { ?>
             <ul class="event-player-list">
                 <?php foreach ($players as $player) { ?>
@@ -52,7 +53,7 @@ include(SHARED_PATH . '/header.php');
                             <?php echo csrf_input(); ?>
                             <input type="hidden" name="event_id" value="<?php echo $id; ?>">
                             <input type="hidden" name="player_id" value="<?php echo $player['id']; ?>">
-                            <span><?php echo h($player['name']); ?></span>
+                            <span><?php echo h($player['name']); ?><?php if ($player['age'] !== null) { ?> <small class="menu-support">age <?php echo $player['age']; ?></small><?php } ?></span>
                             <button type="submit" name="action" value="remove" class="event-remove" aria-label="Remove <?php echo h($player['name']); ?> from this event">Remove</button>
                         </form>
                     </li>
@@ -74,7 +75,7 @@ include(SHARED_PATH . '/header.php');
                         <?php foreach ($players_to_add as $candidate) { ?>
                             <label class="event-choice" data-title="<?php echo h(mb_strtolower($candidate['name'])); ?>">
                                 <input type="checkbox" name="player_ids[]" value="<?php echo $candidate['id']; ?>">
-                                <span><?php echo h($candidate['name']); ?></span>
+                                <span><?php echo h($candidate['name']); ?><?php if ($candidate['age'] !== null) { ?> <small class="menu-support">age <?php echo $candidate['age']; ?></small><?php } ?></span>
                             </label>
                         <?php } ?>
                     </div>

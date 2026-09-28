@@ -35,6 +35,7 @@ final class EventPlansTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-events.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-event-players.sql'));
+        $this->runSql('ALTER TABLE players ADD COLUMN birth_year INT NULL');
         $this->runSql("UPDATE games SET mnp = 3, mxp = 4, ss = '3,4', Age = 10, mnt = 60, mxt = 120 WHERE id = 10");
         require_once PRIVATE_PATH . '/item_tags.php';
         require_once PRIVATE_PATH . '/classes/EventPlans.php';
@@ -250,7 +251,7 @@ final class EventPlansTest extends TestCase
         $this->assertSame(2, $this->plans()->addPlayers($id, [100, '101']));
 
         $this->assertSame(
-            [['id' => 101, 'name' => 'Jo Smith'], ['id' => 100, 'name' => 'Sam Lee']],
+            [['id' => 101, 'name' => 'Jo Smith', 'age' => null], ['id' => 100, 'name' => 'Sam Lee', 'age' => null]],
             $this->plans()->find($id)['players']
         );
     }
@@ -277,7 +278,7 @@ final class EventPlansTest extends TestCase
         $id = $this->plans()->save(['name' => 'Beach week']);
         $this->plans()->addPlayers($id, [101]);
 
-        $this->assertSame([['id' => 100, 'name' => 'Sam Lee']], $this->plans()->playersToAdd($id));
+        $this->assertSame([['id' => 100, 'name' => 'Sam Lee', 'age' => null]], $this->plans()->playersToAdd($id));
     }
 
     public function test_owner_can_remove_a_player_from_an_event(): void
@@ -340,5 +341,17 @@ final class EventPlansTest extends TestCase
         $this->plans()->delete($id);
 
         $this->assertSame('0', $this->db->query('SELECT COUNT(*) FROM event_players')->fetch_row()[0]);
+    }
+
+    public function test_a_players_age_is_their_age_in_the_year_the_event_starts(): void
+    {
+        $this->runSql('UPDATE players SET birth_year = 2015 WHERE id = 100');
+        $dated = $this->plans()->save(['name' => 'Beach week', 'starts_on' => '2027-07-03']);
+        $undated = $this->plans()->save(['name' => 'Someday']);
+        $this->plans()->addPlayers($dated, [100, 101]);
+
+        $this->assertSame([null, 12], array_column($this->plans()->find($dated)['players'], 'age'));
+        // An undated event counts from this year.
+        $this->assertSame((int) date('Y') - 2015, $this->plans()->playersToAdd($undated)[1]['age']);
     }
 }
