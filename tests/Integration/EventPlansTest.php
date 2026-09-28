@@ -34,7 +34,7 @@ final class EventPlansTest extends TestCase
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-events.sql'));
-        $this->runSql("UPDATE games SET mnp = 3, mxp = 4, ss = '3,4', Age = 10 WHERE id = 10");
+        $this->runSql("UPDATE games SET mnp = 3, mxp = 4, ss = '3,4', Age = 10, mnt = 60, mxt = 120 WHERE id = 10");
         require_once PRIVATE_PATH . '/item_tags.php';
         require_once PRIVATE_PATH . '/classes/EventPlans.php';
     }
@@ -120,6 +120,8 @@ final class EventPlansTest extends TestCase
         $this->assertSame(3, $catan['MnP']);
         $this->assertSame(4, $catan['MxP']);
         $this->assertSame(10, $catan['Age']);
+        $this->assertSame(60, $catan['MnT']);
+        $this->assertSame(120, $catan['MxT']);
         $this->assertSame(['strategy'], $catan['tags']);
         $this->assertSame('', $catan['setting']);
         $this->assertFalse($catan['is_packed']);

@@ -13,11 +13,9 @@ if ($event === null) {
 
 // The grouping chosen last for this event stays until changed.
 $dimensions = event_plan_dimensions();
-$saved = ($_SESSION['event_grouping'][$id] ?? []) + ['by' => 'players', 'then' => 'none', 'tags' => ''];
-$by = is_string($_GET['by'] ?? null) && isset($dimensions[$_GET['by']]) ? $_GET['by'] : $saved['by'];
-$then = is_string($_GET['then'] ?? null) && isset($dimensions[$_GET['then']]) ? $_GET['then'] : $saved['then'];
-$tags = is_string($_GET['tags'] ?? null) ? implode(', ', event_plan_chosen_tags($_GET['tags'])) : $saved['tags'];
-$_SESSION['event_grouping'][$id] = ['by' => $by, 'then' => $then, 'tags' => $tags];
+$grouping = event_plan_grouping($_GET, $_SESSION['event_grouping'][$id] ?? []);
+$_SESSION['event_grouping'][$id] = $grouping;
+['by' => $by, 'then' => $then, 'tags' => $tags] = $grouping;
 $by_tag = $by === 'tag' || $then === 'tag';
 
 $items = $event['items'];
@@ -102,7 +100,7 @@ include(SHARED_PATH . '/header.php');
         </form>
         <p id="event-tags-help" class="menu-support">
             A game best at several player counts, or with several tags, shows in each of those groups.
-            To split each player count into casual and main, tag games casual or main on Edit Item, group by Sweet spot then by Tag, and enter “casual, main” so other tags are left out.
+            To split each player count into casual and main, tag games casual or main on Edit Item, group by Sweet spot, and enter “casual, main” here. Then by switches to Tag on its own, and other tags are left out.
         </p>
 
         <section class="event-plan" aria-label="Planned games">
