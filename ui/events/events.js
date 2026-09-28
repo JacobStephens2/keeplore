@@ -1,10 +1,11 @@
 // Event page: filter the games and players to add, save packed marks as
-// they are ticked, copy the plain-text list, and come back to the same
-// place after removing a game inline.
+// they are ticked, copy the plain-text and shopping lists, and come back to
+// the same place after removing a game inline.
 
 bindAddFilter();
 bindPackedMarks();
 bindCopy();
+bindShoppingLink();
 keepScroll();
 
 function bindAddFilter() {
@@ -102,22 +103,38 @@ function bindPackedMarks() {
   });
 }
 
+// Each Copy button copies the textarea its data-copy names and reports in
+// the status beside it.
 function bindCopy() {
-  const text = document.getElementById('event-text');
-  const button = document.getElementById('event-text-copy');
-  const status = document.getElementById('event-text-status');
-  if (!text || !button) {
+  document.querySelectorAll('.event-copy').forEach((button) => {
+    const text = document.getElementById(button.dataset.copy);
+    const status = button.nextElementSibling;
+    if (!text || !status) {
+      return;
+    }
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(text.value);
+        status.textContent = 'Copied.';
+      } catch (error) {
+        text.focus();
+        text.select();
+        status.textContent = 'Press Ctrl+C (or Cmd+C) to copy.';
+      }
+    });
+  });
+}
+
+// The "not kept" count jumps to the shopping list; open it on the way.
+function bindShoppingLink() {
+  const list = document.getElementById('event-shopping');
+  if (!list) {
     return;
   }
-  button.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(text.value);
-      status.textContent = 'Copied.';
-    } catch (error) {
-      text.focus();
-      text.select();
-      status.textContent = 'Press Ctrl+C (or Cmd+C) to copy.';
-    }
+  document.querySelectorAll('.event-shopping-link').forEach((link) => {
+    link.addEventListener('click', () => {
+      list.open = true;
+    });
   });
 }
 

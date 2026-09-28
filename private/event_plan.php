@@ -43,9 +43,7 @@ function event_plan_dimensions() {
 function event_plan_groups(array $items, $by, $then = 'none', array $tags = [], array $player_ages = []) {
     $by = isset(event_plan_dimensions()[$by]) ? $by : 'none';
     $then = isset(event_plan_dimensions()[$then]) && $then !== $by ? $then : 'none';
-    usort($items, function ($a, $b) {
-        return strcasecmp((string) $a['Title'], (string) $b['Title']) ?: ((int) ($a['id'] ?? 0) <=> (int) ($b['id'] ?? 0));
-    });
+    $items = event_plan_sorted_by_title($items);
 
     $groups = [];
     $tags = event_plan_chosen_tags($tags);
@@ -157,6 +155,32 @@ function event_plan_age_groups(array $player_ages) {
     $groups = array_values(array_unique($groups));
     sort($groups);
     return $groups;
+}
+
+/**
+ * The planned items not kept, such as games to buy before the event, in
+ * title order: 'items' with the event's setting and packed mark left out
+ * (a note such as "requested by mom" stays), and 'text' as an unticked checklist, "- [ ] Wavelength, 2–12".
+ */
+function event_plan_shopping_list(array $items) {
+    $to_buy = event_plan_sorted_by_title(array_filter($items, function ($item) {
+        return array_key_exists('is_kept', $item) && !$item['is_kept'];
+    }));
+    $to_buy = array_map(function ($item) {
+        return array_diff_key($item, array_flip(['is_kept', 'setting', 'is_packed']));
+    }, $to_buy);
+    $text = implode('', array_map(function ($item) {
+        return '- [ ] ' . event_plan_line($item) . "\n";
+    }, $to_buy));
+    return ['items' => $to_buy, 'text' => $text];
+}
+
+/** The items in title order, ties by id. */
+function event_plan_sorted_by_title(array $items) {
+    usort($items, function ($a, $b) {
+        return strcasecmp((string) $a['Title'], (string) $b['Title']) ?: ((int) ($a['id'] ?? 0) <=> (int) ($b['id'] ?? 0));
+    });
+    return $items;
 }
 
 /** The items as a checklist: "# group", "## sub-group", "- [ ] line". */

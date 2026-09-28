@@ -53,3 +53,5 @@
 .event-player-ages small { display: block; }
 .event-line-remove { margin: 0; }
 .event-line-remove button { padding: .05rem .5rem; font-size: .75rem; }
+.event-shopping-list { margin: .5rem 0 .75rem; padding-left: 1.25rem; }
+.event-shopping-list li { margin: .25rem 0; }

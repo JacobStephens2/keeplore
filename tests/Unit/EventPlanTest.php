@@ -16,6 +16,7 @@ require_once PROJECT_PATH . '/private/event_plan.php';
  * - event_player_ages(): how many players are adults, and children at each age
  * - event_plan_groups() by 'player_age': games under the youngest player
  *   old enough for them
+ * - event_plan_shopping_list(): the planned games not kept, as a list to buy
  */
 class EventPlanTest extends TestCase
 {
@@ -362,5 +363,25 @@ class EventPlanTest extends TestCase
         $this->assertSame(['casual', 'main'], $this->labels($groups));
         $this->assertSame(['Age 6'], $this->labels($groups[0]['groups']));
         $this->assertSame(['Adults'], $this->labels($groups[1]['groups']));
+    }
+
+    public function test_the_shopping_list_is_the_games_not_kept_in_title_order(): void
+    {
+        $list = event_plan_shopping_list([
+            $this->item('Wavelength', ['is_kept' => false, 'MnP' => 2, 'MxP' => 12, 'setting' => 'beach', 'note' => 'ask Sam']),
+            $this->item('Catan', ['is_kept' => true]),
+            $this->item('Blood on the Clocktower', ['is_kept' => false]),
+        ]);
+
+        $this->assertSame(['Blood on the Clocktower', 'Wavelength'], array_column($list['items'], 'Title'));
+        // Every line is to buy, so "not kept" would only repeat the heading.
+        $this->assertSame("- [ ] Blood on the Clocktower\n- [ ] Wavelength, 2–12, ask Sam\n", $list['text']);
+    }
+
+    public function test_the_shopping_list_is_empty_when_every_game_is_kept(): void
+    {
+        $list = event_plan_shopping_list([$this->item('Catan', ['is_kept' => true])]);
+
+        $this->assertSame(['items' => [], 'text' => ''], $list);
     }
 }

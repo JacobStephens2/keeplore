@@ -22,7 +22,8 @@ $items = $event['items'];
 $players = $event['players'];
 $groups = event_plan_groups($items, $by, $then, event_plan_chosen_tags($tags), array_column($players, 'age'));
 $packed = count(array_filter(array_column($items, 'is_packed')));
-$not_kept = count(array_filter($items, fn($item) => !$item['is_kept']));
+$shopping = event_plan_shopping_list($items);
+$not_kept = count($shopping['items']);
 $to_add = $plans->itemsToAdd($id);
 $players_to_add = $plans->playersToAdd($id);
 $player_ages_label = event_player_ages($players);
@@ -33,7 +34,7 @@ $dates = event_dates_label($event['starts_on'], $event['ends_on']);
 $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=6'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=7'); ?>">
 <main class="event-page" data-event-id="<?php echo $id; ?>" data-item-url="<?php echo h(url_for('/events/item.php')); ?>">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
@@ -96,8 +97,23 @@ include(SHARED_PATH . '/header.php');
     <p class="event-total" aria-live="polite">
         <strong><?php echo count($items); ?></strong> <?php echo count($items) === 1 ? 'game' : 'games'; ?> planned<?php if ($items) { ?>,
         <strong id="event-packed-count"><?php echo $packed; ?></strong> packed<?php } ?><?php if ($not_kept > 0) { ?>,
-        <strong><?php echo $not_kept; ?></strong> not kept<?php } ?>
+        <a href="#event-shopping" class="event-shopping-link"><strong><?php echo $not_kept; ?></strong> not kept</a><?php } ?>
     </p>
+
+    <?php if ($shopping['items']) { ?>
+        <details class="event-text" id="event-shopping">
+            <summary>Shopping list <small class="menu-support"><?php echo $not_kept; ?> not kept</small></summary>
+            <p class="menu-support">The planned games you don't keep yet, to buy or borrow before the event.</p>
+            <ul class="event-shopping-list">
+                <?php foreach ($shopping['items'] as $item) { ?>
+                    <li><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?></li>
+                <?php } ?>
+            </ul>
+            <textarea id="event-shopping-text" rows="<?php echo min(12, $not_kept + 1); ?>" readonly><?php echo h($shopping['text']); ?></textarea>
+            <button type="button" class="event-copy" data-copy="event-shopping-text">Copy shopping list</button>
+            <span class="menu-support" aria-live="polite"></span>
+        </details>
+    <?php } ?>
 
     <details class="event-add" <?php echo $items ? '' : 'open'; ?>>
         <summary>Add games from Keeplore</summary>
@@ -191,8 +207,8 @@ include(SHARED_PATH . '/header.php');
         <details class="event-text">
             <summary>Plain-text list</summary>
             <textarea id="event-text" rows="12" readonly><?php echo h(event_plan_text($groups)); ?></textarea>
-            <button type="button" id="event-text-copy">Copy list</button>
-            <span id="event-text-status" class="menu-support" aria-live="polite"></span>
+            <button type="button" class="event-copy" data-copy="event-text">Copy list</button>
+            <span class="menu-support" aria-live="polite"></span>
         </details>
 
         <section class="event-manage" aria-labelledby="event-manage-heading">
@@ -221,5 +237,5 @@ include(SHARED_PATH . '/header.php');
     <?php } ?>
 </main>
 <form id="event-pack-form" hidden><?php echo csrf_input(); ?></form>
-<script type="module" src="<?php echo url_for('/events/events.js?v=4'); ?>"></script>
+<script type="module" src="<?php echo url_for('/events/events.js?v=5'); ?>"></script>
 <?php include(SHARED_PATH . '/footer.php'); ?>
