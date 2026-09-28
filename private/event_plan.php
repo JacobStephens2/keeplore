@@ -95,18 +95,28 @@ function event_plan_text(array $groups) {
  * and "not kept" for a game planned before it is bought.
  */
 function event_plan_line(array $item) {
-    $parts = [items_list_copy_text($item)];
+    return (string) ($item['Title'] ?? '') . event_plan_details($item);
+}
+
+/**
+ * The checklist line after the title, as in ", 2–5 (4), 10 yrs, beach", or
+ * '' with nothing recorded, so a page can link the title on its own.
+ */
+function event_plan_details(array $item) {
+    $title = (string) ($item['Title'] ?? '');
+    // items_list_copy_text() leads with the title; keep what follows it.
+    $parts = [substr(items_list_copy_text($item), strlen($title))];
     foreach (['setting', 'note'] as $field) {
         $value = trim((string) ($item[$field] ?? ''));
         if ($value !== '') {
-            $parts[] = $value;
+            $parts[] = ', ' . $value;
         }
     }
     // Only a row that says it is not kept is marked; rows without the field are left alone.
     if (array_key_exists('is_kept', $item) && !$item['is_kept']) {
-        $parts[] = 'not kept';
+        $parts[] = ', not kept';
     }
-    return implode(', ', $parts);
+    return implode('', $parts);
 }
 
 function event_plan_checklist(array $items) {

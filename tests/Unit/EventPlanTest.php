@@ -231,4 +231,13 @@ class EventPlanTest extends TestCase
 
         $this->assertSame("- [ ] Ra\n- [ ] That's Not a Hat, 3–8 (5, 6), 8 yrs, maybe buy, not kept\n", event_plan_text($groups));
     }
+
+    public function test_the_details_are_the_checklist_line_after_the_title(): void
+    {
+        $hanabi = $this->item('Hanabi', ['MnP' => 2, 'MxP' => 5, 'SS' => '4', 'Age' => 10,
+            'setting' => 'beach', 'note' => 'requested by mom', 'is_kept' => false]);
+
+        $this->assertSame(', 2–5 (4), 10 yrs, beach, requested by mom, not kept', event_plan_details($hanabi));
+        $this->assertSame('', event_plan_details($this->item('Hive Pocket')));
+    }
 }

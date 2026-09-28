@@ -29,7 +29,7 @@
 .event-group h3 { margin: .75rem 0 .25rem; font-size: 1rem; text-transform: capitalize; }
 .event-checklist { list-style: none; padding: 0; margin: 0; }
 .event-checklist li { margin: .3rem 0; }
-.event-checklist label { display: inline-flex; align-items: flex-start; gap: .6rem; }
+.event-line { display: inline-flex; align-items: flex-start; gap: .6rem; }
 .event-checklist small { margin-left: 1.9rem; display: block; }
 .event-checklist input:checked + span { text-decoration: line-through; opacity: .65; }
 

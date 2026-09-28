@@ -23,7 +23,7 @@ $events = $plans->all();
 $page_title = 'Events';
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=2'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=3'); ?>">
 <main class="event-page">
     <header class="page-header">
         <h1>Events</h1>

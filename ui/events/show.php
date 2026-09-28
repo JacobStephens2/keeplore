@@ -32,7 +32,7 @@ $dates = event_dates_label($event['starts_on'], $event['ends_on']);
 $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=2'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=3'); ?>">
 <main class="event-page" data-event-id="<?php echo $id; ?>" data-item-url="<?php echo h(url_for('/events/item.php')); ?>">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
@@ -117,10 +117,10 @@ include(SHARED_PATH . '/header.php');
                         <ul class="event-checklist">
                             <?php foreach ($sub['items'] as $item) { ?>
                                 <li>
-                                    <label>
-                                        <input type="checkbox" class="event-packed" data-item-id="<?php echo $item['id']; ?>" <?php echo $item['is_packed'] ? 'checked' : ''; ?>>
-                                        <span><?php echo h(event_plan_line($item)); ?></span>
-                                    </label>
+                                    <div class="event-line">
+                                        <input type="checkbox" class="event-packed" data-item-id="<?php echo $item['id']; ?>" aria-label="Packed: <?php echo h($item['Title']); ?>" <?php echo $item['is_packed'] ? 'checked' : ''; ?>>
+                                        <span><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?></span>
+                                    </div>
                                     <?php if ($item['tags'] && !$by_tag) { ?><small class="menu-support"><?php echo h(implode(', ', $item['tags'])); ?></small><?php } ?>
                                 </li>
                             <?php } ?>
@@ -148,7 +148,7 @@ include(SHARED_PATH . '/header.php');
                     <?php echo csrf_input(); ?>
                     <input type="hidden" name="event_id" value="<?php echo $id; ?>">
                     <input type="hidden" name="item_id" value="<?php echo $item['id']; ?>">
-                    <a class="event-item-title" href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>"><?php echo h($item['Title']); ?></a>
+                    <a class="event-item-title" href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a>
                     <label><span class="sr-only">Setting for <?php echo h($item['Title']); ?></span>
                         <input type="text" name="setting" maxlength="64" list="event-settings" placeholder="Setting" value="<?php echo h($item['setting']); ?>">
                     </label>
