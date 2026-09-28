@@ -1,9 +1,11 @@
 // Event page: filter the games and players to add, save packed marks as
-// they are ticked, and copy the plain-text list.
+// they are ticked, copy the plain-text list, and come back to the same
+// place after removing a game inline.
 
 bindAddFilter();
 bindPackedMarks();
 bindCopy();
+keepScroll();
 
 function bindAddFilter() {
   document.querySelectorAll('.event-add-form').forEach(bindAddForm);
@@ -116,5 +118,33 @@ function bindCopy() {
       text.select();
       status.textContent = 'Press Ctrl+C (or Cmd+C) to copy.';
     }
+  });
+}
+
+// A game removed from the grouped list reloads the page; return to where
+// it was, so the next game to remove is still in view.
+function keepScroll() {
+  const page = document.querySelector('.event-page');
+  if (!page) {
+    return;
+  }
+  const key = 'keeplore-event-scroll';
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+    sessionStorage.removeItem(key);
+    if (saved && saved.eventId === page.dataset.eventId) {
+      window.scrollTo(0, saved.y);
+    }
+  } catch (error) {
+    // Without storage the page simply opens at the top.
+  }
+  document.querySelectorAll('.event-keep-scroll').forEach((form) => {
+    form.addEventListener('submit', () => {
+      try {
+        sessionStorage.setItem(key, JSON.stringify({ eventId: page.dataset.eventId, y: window.scrollY }));
+      } catch (error) {
+        // Nothing to keep without storage.
+      }
+    });
   });
 }

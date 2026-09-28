@@ -51,3 +51,5 @@
 .event-player-list button { padding: .15rem .6rem; font-size: .8rem; }
 .event-player-ages { margin: 0 0 .6rem; }
 .event-player-ages small { display: block; }
+.event-line-remove { margin: 0; }
+.event-line-remove button { padding: .05rem .5rem; font-size: .75rem; }

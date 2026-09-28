@@ -33,7 +33,7 @@ $dates = event_dates_label($event['starts_on'], $event['ends_on']);
 $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=5'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=6'); ?>">
 <main class="event-page" data-event-id="<?php echo $id; ?>" data-item-url="<?php echo h(url_for('/events/item.php')); ?>">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
@@ -172,6 +172,12 @@ include(SHARED_PATH . '/header.php');
                                     <div class="event-line">
                                         <input type="checkbox" class="event-packed" data-item-id="<?php echo $item['id']; ?>" aria-label="Packed: <?php echo h($item['Title']); ?>" <?php echo $item['is_packed'] ? 'checked' : ''; ?>>
                                         <span><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?></span>
+                                        <form class="event-line-remove event-keep-scroll" method="post" action="<?php echo url_for('/events/item.php'); ?>">
+                                            <?php echo csrf_input(); ?>
+                                            <input type="hidden" name="event_id" value="<?php echo $id; ?>">
+                                            <input type="hidden" name="item_id" value="<?php echo $item['id']; ?>">
+                                            <button type="submit" name="action" value="remove" class="event-remove" aria-label="Remove <?php echo h($item['Title']); ?> from this event">Remove</button>
+                                        </form>
                                     </div>
                                     <?php if ($item['tags'] && !$by_tag) { ?><small class="menu-support"><?php echo h(implode(', ', $item['tags'])); ?></small><?php } ?>
                                 </li>
@@ -208,12 +214,12 @@ include(SHARED_PATH . '/header.php');
                         <input type="text" name="note" maxlength="255" placeholder="Note" value="<?php echo h($item['note']); ?>">
                     </label>
                     <button type="submit" name="action" value="update">Save</button>
-                    <button type="submit" name="action" value="remove" class="event-remove">Remove</button>
+                    <button type="submit" name="action" value="remove" class="event-remove" aria-label="Remove <?php echo h($item['Title']); ?> from this event">Remove</button>
                 </form>
             <?php } ?>
         </section>
     <?php } ?>
 </main>
 <form id="event-pack-form" hidden><?php echo csrf_input(); ?></form>
-<script type="module" src="<?php echo url_for('/events/events.js?v=3'); ?>"></script>
+<script type="module" src="<?php echo url_for('/events/events.js?v=4'); ?>"></script>
 <?php include(SHARED_PATH . '/footer.php'); ?>
