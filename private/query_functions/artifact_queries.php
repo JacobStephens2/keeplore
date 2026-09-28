@@ -532,6 +532,13 @@ require_once dirname(__DIR__) . '/item_tags.php';
     $user_id = isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
     delete_item_tags_for_artifact($db, (int) $id, $user_id);
 
+    // A deleted item is no longer planned for any event.
+    $artifact_id = (int) $id;
+    $stmt = mysqli_prepare($db, "DELETE FROM event_items WHERE artifact_id = ?");
+    mysqli_stmt_bind_param($stmt, 'i', $artifact_id);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
+
     $sql = "DELETE FROM games WHERE id=? LIMIT 1";
     $stmt = mysqli_prepare($db, $sql);
     mysqli_stmt_bind_param($stmt, "s", $id);
