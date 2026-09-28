@@ -34,7 +34,7 @@ $dates = event_dates_label($event['starts_on'], $event['ends_on']);
 $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=7'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=8'); ?>">
 <main class="event-page" data-event-id="<?php echo $id; ?>" data-item-url="<?php echo h(url_for('/events/item.php')); ?>">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
@@ -44,8 +44,8 @@ include(SHARED_PATH . '/header.php');
         <p><a href="<?php echo url_for('/events/edit.php?id=' . $id); ?>">Edit event</a></p>
     </header>
 
-    <section class="event-players" aria-labelledby="event-players-heading">
-        <h2 id="event-players-heading">Players <small class="menu-support"><?php echo count($players); ?></small></h2>
+    <details class="event-section event-players" data-fold="players" open>
+        <summary><h2>Players <small class="menu-support"><?php echo count($players); ?></small></h2></summary>
         <?php if ($player_ages_label !== '') { ?>
             <p class="event-player-ages"><?php echo h($player_ages_label); ?><?php if ($event['starts_on']) { ?>
                 <small class="menu-support">Ages as of <?php echo h(substr($event['starts_on'], 0, 4)); ?>, the year the event starts.</small><?php } ?></p>
@@ -67,7 +67,7 @@ include(SHARED_PATH . '/header.php');
         <?php } else { ?>
             <p class="menu-support">No players yet.</p>
         <?php } ?>
-        <details class="event-add">
+        <details class="event-add" data-fold="add-players">
             <summary>Add players</summary>
             <?php if ($players_to_add) { ?>
                 <form class="event-add-form" data-noun="player" method="post" action="<?php echo url_for('/events/player.php'); ?>">
@@ -92,7 +92,7 @@ include(SHARED_PATH . '/header.php');
                     <a href="<?php echo url_for('/users/new'); ?>">Create a user</a> to add someone new.</p>
             <?php } ?>
         </details>
-    </section>
+    </details>
 
     <p class="event-total" aria-live="polite">
         <strong><?php echo count($items); ?></strong> <?php echo count($items) === 1 ? 'game' : 'games'; ?> planned<?php if ($items) { ?>,
@@ -101,7 +101,7 @@ include(SHARED_PATH . '/header.php');
     </p>
 
     <?php if ($shopping['items']) { ?>
-        <details class="event-text" id="event-shopping">
+        <details class="event-text" id="event-shopping" data-fold="shopping">
             <summary>Shopping list <small class="menu-support"><?php echo $not_kept; ?> not kept</small></summary>
             <p class="menu-support">The planned games you don't keep yet, to buy or borrow before the event.</p>
             <ul class="event-shopping-list">
@@ -115,7 +115,7 @@ include(SHARED_PATH . '/header.php');
         </details>
     <?php } ?>
 
-    <details class="event-add" <?php echo $items ? '' : 'open'; ?>>
+    <details class="event-add" data-fold="add-games" <?php echo $items ? '' : 'open data-fold-keep-open'; ?>>
         <summary>Add games from Keeplore</summary>
         <p class="menu-support">Games you don't keep are listed too, so a game you are thinking of buying can be tried in the plan. Add it on the Items page first if Keeplore doesn't have it yet.</p>
         <?php if ($to_add) { ?>
@@ -146,73 +146,76 @@ include(SHARED_PATH . '/header.php');
     </details>
 
     <?php if ($items) { ?>
-        <form class="event-grouping" method="get" action="<?php echo url_for('/events/show.php'); ?>">
-            <input type="hidden" name="id" value="<?php echo $id; ?>">
-            <label>Group by
-                <select name="by">
-                    <?php foreach ($dimensions as $key => $label) { ?>
-                        <option value="<?php echo h($key); ?>" <?php echo $by === $key ? 'selected' : ''; ?>><?php echo h($label); ?></option>
-                    <?php } ?>
-                </select>
-            </label>
-            <label>Then by
-                <select name="then">
-                    <?php foreach ($dimensions as $key => $label) { ?>
-                        <option value="<?php echo h($key); ?>" <?php echo $then === $key ? 'selected' : ''; ?>><?php echo h($label); ?></option>
-                    <?php } ?>
-                </select>
-            </label>
-            <label>Only these tags
-                <input type="text" name="tags" placeholder="casual, main" value="<?php echo h($tags); ?>" aria-describedby="event-tags-help">
-            </label>
-            <button type="submit">Group</button>
-        </form>
-        <p id="event-tags-help" class="menu-support">
-            A game best at several player counts, or with several tags, shows in each of those groups.
-            Players' ages makes a group for each child's age coming and one for adults, and puts each game under the youngest of them old enough for it.
-            To split each player count into casual and main, tag games casual or main on Edit Item, group by Sweet spot, and enter “casual, main” here. Then by switches to Tag on its own, and other tags are left out.
-        </p>
+        <details class="event-section" data-fold="plan" open>
+            <summary><h2>Planned games</h2></summary>
+            <form class="event-grouping" method="get" action="<?php echo url_for('/events/show.php'); ?>">
+                <input type="hidden" name="id" value="<?php echo $id; ?>">
+                <label>Group by
+                    <select name="by">
+                        <?php foreach ($dimensions as $key => $label) { ?>
+                            <option value="<?php echo h($key); ?>" <?php echo $by === $key ? 'selected' : ''; ?>><?php echo h($label); ?></option>
+                        <?php } ?>
+                    </select>
+                </label>
+                <label>Then by
+                    <select name="then">
+                        <?php foreach ($dimensions as $key => $label) { ?>
+                            <option value="<?php echo h($key); ?>" <?php echo $then === $key ? 'selected' : ''; ?>><?php echo h($label); ?></option>
+                        <?php } ?>
+                    </select>
+                </label>
+                <label>Only these tags
+                    <input type="text" name="tags" placeholder="casual, main" value="<?php echo h($tags); ?>" aria-describedby="event-tags-help">
+                </label>
+                <button type="submit">Group</button>
+            </form>
+            <p id="event-tags-help" class="menu-support">
+                A game best at several player counts, or with several tags, shows in each of those groups.
+                Players' ages makes a group for each child's age coming and one for adults, and puts each game under the youngest of them old enough for it.
+                To split each player count into casual and main, tag games casual or main on Edit Item, group by Sweet spot, and enter “casual, main” here. Then by switches to Tag on its own, and other tags are left out.
+            </p>
 
-        <section class="event-plan" aria-label="Planned games">
-            <?php foreach ($groups as $group) { ?>
-                <div class="event-group">
-                    <?php if ($group['label'] !== '') { ?>
-                        <h2><?php echo h($group['label']); ?> <small class="menu-support"><?php echo count($group['items']); ?></small></h2>
-                    <?php } ?>
-                    <?php $subs = $group['groups'] ?: [['label' => '', 'items' => $group['items']]]; ?>
-                    <?php foreach ($subs as $sub) { ?>
-                        <?php if ($sub['label'] !== '') { ?><h3><?php echo h($sub['label']); ?></h3><?php } ?>
-                        <ul class="event-checklist">
-                            <?php foreach ($sub['items'] as $item) { ?>
-                                <li>
-                                    <div class="event-line">
-                                        <input type="checkbox" class="event-packed" data-item-id="<?php echo $item['id']; ?>" aria-label="Packed: <?php echo h($item['Title']); ?>" <?php echo $item['is_packed'] ? 'checked' : ''; ?>>
-                                        <span><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?></span>
-                                        <form class="event-line-remove event-keep-scroll" method="post" action="<?php echo url_for('/events/item.php'); ?>">
-                                            <?php echo csrf_input(); ?>
-                                            <input type="hidden" name="event_id" value="<?php echo $id; ?>">
-                                            <input type="hidden" name="item_id" value="<?php echo $item['id']; ?>">
-                                            <button type="submit" name="action" value="remove" class="event-remove" aria-label="Remove <?php echo h($item['Title']); ?> from this event">Remove</button>
-                                        </form>
-                                    </div>
-                                    <?php if ($item['tags'] && !$by_tag) { ?><small class="menu-support"><?php echo h(implode(', ', $item['tags'])); ?></small><?php } ?>
-                                </li>
-                            <?php } ?>
-                        </ul>
-                    <?php } ?>
-                </div>
-            <?php } ?>
-        </section>
+            <section class="event-plan">
+                <?php foreach ($groups as $group) { ?>
+                    <div class="event-group">
+                        <?php if ($group['label'] !== '') { ?>
+                            <h3><?php echo h($group['label']); ?> <small class="menu-support"><?php echo count($group['items']); ?></small></h3>
+                        <?php } ?>
+                        <?php $subs = $group['groups'] ?: [['label' => '', 'items' => $group['items']]]; ?>
+                        <?php foreach ($subs as $sub) { ?>
+                            <?php if ($sub['label'] !== '') { ?><h4><?php echo h($sub['label']); ?></h4><?php } ?>
+                            <ul class="event-checklist">
+                                <?php foreach ($sub['items'] as $item) { ?>
+                                    <li>
+                                        <div class="event-line">
+                                            <input type="checkbox" class="event-packed" data-item-id="<?php echo $item['id']; ?>" aria-label="Packed: <?php echo h($item['Title']); ?>" <?php echo $item['is_packed'] ? 'checked' : ''; ?>>
+                                            <span><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?></span>
+                                            <form class="event-line-remove event-keep-scroll" method="post" action="<?php echo url_for('/events/item.php'); ?>">
+                                                <?php echo csrf_input(); ?>
+                                                <input type="hidden" name="event_id" value="<?php echo $id; ?>">
+                                                <input type="hidden" name="item_id" value="<?php echo $item['id']; ?>">
+                                                <button type="submit" name="action" value="remove" class="event-remove" aria-label="Remove <?php echo h($item['Title']); ?> from this event">Remove</button>
+                                            </form>
+                                        </div>
+                                        <?php if ($item['tags'] && !$by_tag) { ?><small class="menu-support"><?php echo h(implode(', ', $item['tags'])); ?></small><?php } ?>
+                                    </li>
+                                <?php } ?>
+                            </ul>
+                        <?php } ?>
+                    </div>
+                <?php } ?>
+            </section>
+        </details>
 
-        <details class="event-text">
+        <details class="event-text" data-fold="plain-text">
             <summary>Plain-text list</summary>
             <textarea id="event-text" rows="12" readonly><?php echo h(event_plan_text($groups)); ?></textarea>
             <button type="button" class="event-copy" data-copy="event-text">Copy list</button>
             <span class="menu-support" aria-live="polite"></span>
         </details>
 
-        <section class="event-manage" aria-labelledby="event-manage-heading">
-            <h2 id="event-manage-heading">Setting and notes</h2>
+        <details class="event-section event-manage" data-fold="manage" open>
+            <summary><h2>Setting and notes</h2></summary>
             <p class="menu-support">A setting, such as beach, groups games by where they will be played. A note, such as “requested by mom”, rides along on the list.</p>
             <datalist id="event-settings">
                 <?php foreach ($settings as $setting) { ?><option value="<?php echo h($setting); ?>"><?php } ?>
@@ -233,9 +236,9 @@ include(SHARED_PATH . '/header.php');
                     <button type="submit" name="action" value="remove" class="event-remove" aria-label="Remove <?php echo h($item['Title']); ?> from this event">Remove</button>
                 </form>
             <?php } ?>
-        </section>
+        </details>
     <?php } ?>
 </main>
 <form id="event-pack-form" hidden><?php echo csrf_input(); ?></form>
-<script type="module" src="<?php echo url_for('/events/events.js?v=5'); ?>"></script>
+<script type="module" src="<?php echo url_for('/events/events.js?v=6'); ?>"></script>
 <?php include(SHARED_PATH . '/footer.php'); ?>

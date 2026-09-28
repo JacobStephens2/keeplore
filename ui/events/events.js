@@ -1,11 +1,13 @@
 // Event page: filter the games and players to add, save packed marks as
-// they are ticked, copy the plain-text and shopping lists, and come back to
-// the same place after removing a game inline.
+// they are ticked, copy the plain-text and shopping lists, remember which
+// sections are folded, and come back to the same place after removing a
+// game inline.
 
 bindAddFilter();
 bindPackedMarks();
 bindCopy();
 bindShoppingLink();
+rememberFolds();
 keepScroll();
 
 function bindAddFilter() {
@@ -134,6 +136,37 @@ function bindShoppingLink() {
   document.querySelectorAll('.event-shopping-link').forEach((link) => {
     link.addEventListener('click', () => {
       list.open = true;
+    });
+  });
+}
+
+// Each section folds open and closed. Every save reloads the page, so this
+// event's folds are remembered in the browser and put back on load.
+function rememberFolds() {
+  const page = document.querySelector('.event-page');
+  const sections = [...document.querySelectorAll('details[data-fold]')];
+  if (!page || !page.dataset.eventId) {
+    return;
+  }
+  const key = `keeplore-event-folds-${page.dataset.eventId}`;
+  let folds = {};
+  try {
+    folds = JSON.parse(localStorage.getItem(key) || '{}') || {};
+  } catch (error) {
+    // Without storage every section opens as the page sets it.
+  }
+  sections.forEach((section) => {
+    // A section the page insists on, such as Add games on an empty event, stays open.
+    if (typeof folds[section.dataset.fold] === 'boolean' && !('foldKeepOpen' in section.dataset)) {
+      section.open = folds[section.dataset.fold];
+    }
+    section.addEventListener('toggle', () => {
+      folds[section.dataset.fold] = section.open;
+      try {
+        localStorage.setItem(key, JSON.stringify(folds));
+      } catch (error) {
+        // Nothing to remember without storage.
+      }
     });
   });
 }

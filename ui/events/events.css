@@ -25,8 +25,8 @@
 .event-grouping { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; margin: 1.5rem 0 .5rem; }
 .event-grouping select { display: block; margin-top: .35rem; }
 .event-group { margin: 1.5rem 0; }
-.event-group h2 { margin-bottom: .25rem; }
-.event-group h3 { margin: .75rem 0 .25rem; font-size: 1rem; text-transform: capitalize; }
+.event-group h3 { margin-bottom: .25rem; font-size: 1.25rem; }
+.event-group h4 { margin: .75rem 0 .25rem; font-size: 1rem; text-transform: capitalize; }
 .event-checklist { list-style: none; padding: 0; margin: 0; }
 .event-checklist li { margin: .3rem 0; }
 .event-line { display: inline-flex; align-items: flex-start; gap: .6rem; }
@@ -35,7 +35,6 @@
 
 .event-text textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin: .6rem 0; }
 
-.event-manage { margin-top: 2.5rem; }
 .event-item-row { display: grid; grid-template-columns: minmax(140px, 1.4fr) minmax(90px, 1fr) minmax(120px, 1.6fr) auto auto; gap: .5rem; align-items: center; padding: .4rem 0; border-bottom: 1px solid rgba(148, 163, 184, 0.3); }
 .event-item-row input { width: 100%; box-sizing: border-box; }
 @media (max-width: 640px) {
@@ -44,8 +43,6 @@
 }
 .event-not-kept { display: inline-block; margin-left: .4rem; padding: 0 .45rem; border: 1px solid rgba(148, 163, 184, 0.6); border-radius: 999px; font-size: .75rem; font-weight: 600; vertical-align: middle; }
 
-.event-players { margin: 1.25rem 0; }
-.event-players h2 { margin-bottom: .35rem; }
 .event-player-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .5rem; }
 .event-player-list form { display: inline-flex; align-items: center; gap: .5rem; padding: .2rem .3rem .2rem .75rem; border: 1px solid rgba(148, 163, 184, 0.6); border-radius: 999px; }
 .event-player-list button { padding: .15rem .6rem; font-size: .8rem; }
@@ -55,3 +52,8 @@
 .event-line-remove button { padding: .05rem .5rem; font-size: .75rem; }
 .event-shopping-list { margin: .5rem 0 .75rem; padding-left: 1.25rem; }
 .event-shopping-list li { margin: .25rem 0; }
+
+.event-section { margin: 1.5rem 0; }
+.event-section.event-manage { margin-top: 2.5rem; }
+.event-section > summary { cursor: pointer; }
+.event-section > summary h2 { display: inline; margin: 0; }
