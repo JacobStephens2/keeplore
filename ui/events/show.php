@@ -53,7 +53,7 @@ include(SHARED_PATH . '/header.php');
                             <?php echo csrf_input(); ?>
                             <input type="hidden" name="event_id" value="<?php echo $id; ?>">
                             <input type="hidden" name="player_id" value="<?php echo $player['id']; ?>">
-                            <span><?php echo h($player['name']); ?><?php if ($player['age'] !== null) { ?> <small class="menu-support">age <?php echo $player['age']; ?></small><?php } ?></span>
+                            <span><a href="<?php echo url_for('/users/edit.php?id=' . $player['id']); ?>" target="_blank" rel="noopener"><?php echo h($player['name']); ?></a><?php if ($player['age'] !== null) { ?> <small class="menu-support">age <?php echo $player['age']; ?></small><?php } ?></span>
                             <button type="submit" name="action" value="remove" class="event-remove" aria-label="Remove <?php echo h($player['name']); ?> from this event">Remove</button>
                         </form>
                     </li>
