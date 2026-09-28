@@ -51,7 +51,7 @@ final class EventPlans
         $event['id'] = (int) $event['id'];
         $event['notes'] = (string) $event['notes'];
         $items = $this->rows(
-            'SELECT g.id, g.Title, g.MnP, g.MxP, g.SS, g.Age, g.is_kept, ei.setting, ei.note, ei.is_packed
+            'SELECT g.id, g.Title, g.MnP, g.MxP, g.SS, g.Age, g.MnT, g.MxT, g.is_kept, ei.setting, ei.note, ei.is_packed
              FROM event_items ei JOIN games g ON g.id = ei.artifact_id AND g.user_id = ?
              WHERE ei.event_id = ?
              ORDER BY g.Title ASC, g.id ASC',
@@ -59,7 +59,7 @@ final class EventPlans
         );
         foreach ($items as &$item) {
             $item['id'] = (int) $item['id'];
-            foreach (['MnP', 'MxP', 'Age'] as $field) {
+            foreach (['MnP', 'MxP', 'Age', 'MnT', 'MxT'] as $field) {
                 $item[$field] = $item[$field] === null ? null : (int) $item[$field];
             }
             $item['SS'] = (string) $item['SS'];

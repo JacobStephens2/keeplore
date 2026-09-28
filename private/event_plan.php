@@ -6,7 +6,7 @@
  * checklist. A game belongs to every group its values name, so one best at
  * 6 and 8 shows under both "8 players" and "6 players".
  *
- * Items are rows with Title, MnP, MxP, SS, Age, tags, is_kept, and the
+ * Items are rows with Title, MnP, MxP, SS, Age, MnT, MxT, tags, is_kept, and the
  * event's own setting, note and is_packed.
  */
 
@@ -116,8 +116,9 @@ function event_plan_text(array $groups) {
 }
 
 /**
- * One game as the checklist names it: "Hanabi, 2–5 (4), 10 yrs, beach,
- * requested by mom", the Items copy line plus the event's setting and note,
+ * One game as the checklist names it: "Hanabi, 2–5 (4), 10 yrs, 25 min,
+ * beach, requested by mom", the Items copy line plus the play time, the
+ * event's setting and note,
  * and "not kept" for a game planned before it is bought.
  */
 function event_plan_line(array $item) {
@@ -132,6 +133,11 @@ function event_plan_details(array $item) {
     $title = (string) ($item['Title'] ?? '');
     // items_list_copy_text() leads with the title; keep what follows it.
     $parts = [substr(items_list_copy_text($item), strlen($title))];
+    // A time range reads like a player range: "30–60", or "45" with one end.
+    $time = items_list_player_range($item['MnT'] ?? $item['mnt'] ?? null, $item['MxT'] ?? $item['mxt'] ?? null);
+    if ($time !== '') {
+        $parts[] = ', ' . $time . ' min';
+    }
     foreach (['setting', 'note'] as $field) {
         $value = trim((string) ($item[$field] ?? ''));
         if ($value !== '') {

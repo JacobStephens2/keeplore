@@ -272,4 +272,14 @@ class EventPlanTest extends TestCase
             event_plan_grouping(['by' => 'players', 'then' => 'none', 'tags' => ''], ['by' => 'players', 'then' => 'tag', 'tags' => 'casual'])
         );
     }
+
+    public function test_the_line_gives_the_play_time_after_the_age(): void
+    {
+        $this->assertSame(', 2–5 (4), 10 yrs, 25 min',
+            event_plan_details($this->item('Hanabi', ['MnP' => 2, 'MxP' => 5, 'SS' => '4', 'Age' => 10, 'MnT' => 25, 'MxT' => 25])));
+        $this->assertSame(', 30–60 min, beach',
+            event_plan_details($this->item('Ra', ['MnT' => 30, 'MxT' => 60, 'setting' => 'beach'])));
+        $this->assertSame(', 45 min', event_plan_details($this->item('Senji', ['MxT' => 45])));
+        $this->assertSame('', event_plan_details($this->item('Hive Pocket', ['MnT' => 0, 'MxT' => null])));
+    }
 }
