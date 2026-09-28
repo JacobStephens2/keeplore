@@ -355,7 +355,7 @@ final class EventPlansTest extends TestCase
         $this->assertSame((int) date('Y') - 2015, $this->plans()->playersToAdd($undated)[1]['age']);
     }
 
-    public function test_an_events_players_come_back_oldest_first_and_unknown_ages_last(): void
+    public function test_an_events_players_come_back_youngest_first_and_unknown_ages_last(): void
     {
         $this->runSql("INSERT INTO players (id, user_id, FirstName, LastName) VALUES (102, 1, 'Al', 'Young'), (103, 1, 'Bo', 'Twin');
             UPDATE players SET birth_year = 2015 WHERE id IN (100, 103);
@@ -364,7 +364,7 @@ final class EventPlansTest extends TestCase
         $this->plans()->addPlayers($id, [100, 101, 102, 103]);
 
         $this->assertSame(
-            ['Bo Twin', 'Sam Lee', 'Al Young', 'Jo Smith'],
+            ['Al Young', 'Bo Twin', 'Sam Lee', 'Jo Smith'],
             array_column($this->plans()->find($id)['players'], 'name')
         );
     }

@@ -43,7 +43,7 @@ final class EventPlans
     }
 
     /**
-     * The event with its items in title order and its players oldest first,
+     * The event with its items in title order and its players youngest first,
      * those without a birth year last, or null when it is not the owner's.
      */
     public function find(int $id): ?array
@@ -75,9 +75,9 @@ final class EventPlans
         }
         $event['items'] = with_item_tags($this->db, $items, $this->userId);
         $players = $this->players($id, true, $this->year($event['starts_on']));
-        // Unknown ages last, then oldest first; usort is stable (PHP 8), so
+        // Unknown ages last, then youngest first; usort is stable (PHP 8), so
         // players of one age stay in name order.
-        $key = fn($player) => [$player['age'] === null, -($player['age'] ?? 0)];
+        $key = fn($player) => [$player['age'] === null, $player['age']];
         usort($players, fn($a, $b) => $key($a) <=> $key($b));
         $event['players'] = $players;
         return $event;
