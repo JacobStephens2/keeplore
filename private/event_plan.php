@@ -133,10 +133,9 @@ function event_plan_details(array $item) {
     $title = (string) ($item['Title'] ?? '');
     // items_list_copy_text() leads with the title; keep what follows it.
     $parts = [substr(items_list_copy_text($item), strlen($title))];
-    // A time range reads like a player range: "30–60", or "45" with one end.
-    $time = items_list_player_range($item['MnT'] ?? $item['mnt'] ?? null, $item['MxT'] ?? $item['mxt'] ?? null);
+    $time = items_list_play_time($item['MnT'] ?? $item['mnt'] ?? null, $item['MxT'] ?? $item['mxt'] ?? null);
     if ($time !== '') {
-        $parts[] = ', ' . $time . ' min';
+        $parts[] = ', ' . $time;
     }
     foreach (['setting', 'note'] as $field) {
         $value = trim((string) ($item[$field] ?? ''));
