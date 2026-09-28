@@ -57,7 +57,13 @@ _Avoid_: Minimum age (that is the item's own recommended floor).
 An item with a digital form. Independent of whether it is kept. An item can be both physical and digital.
 
 **Event**:
-An occasion the user plans which items to bring to, such as a beach week. Each planned item can carry the event's own setting (where it will be played), a note, and a packed mark.
+An occasion the user plans which items to bring to, such as a beach week. Each planned item can carry the event's own setting (where it will be played), a note, and a packed mark. The players coming to it are chosen from the user's people list.
+
+**Adult**:
+A player 18 or older in the year an event starts, counted from their birth year alone. An event's players are summarized as adults, then children by age.
+
+**Players' ages grouping**:
+An event's games grouped by who is coming: a group for each child's age and one for adults, each game under the youngest of them its minimum age allows. Distinct from Youngest age, which filters the Items page rather than grouping.
 
 **Event setting**:
 Where a planned item will be used at an event, such as the beach. Belongs to the event, not the item, and is distinct from a use's Setting.

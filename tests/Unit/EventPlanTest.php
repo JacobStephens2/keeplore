@@ -13,6 +13,10 @@ require_once PROJECT_PATH . '/private/event_plan.php';
  *   optionally by another
  * - event_plan_text(): those groups as a plain-text packing checklist
  * - event_plan_grouping(): the grouping a request asks for, over the saved one
+ * - event_player_ages(): how many players are adults, and children at each age
+ * - event_plan_groups() by 'player_age': games under the youngest player
+ *   old enough for them
+ * - event_plan_shopping_list(): the planned games not kept, as a list to buy
  */
 class EventPlanTest extends TestCase
 {
@@ -281,5 +285,103 @@ class EventPlanTest extends TestCase
             event_plan_details($this->item('Ra', ['MnT' => 30, 'MxT' => 60, 'setting' => 'beach'])));
         $this->assertSame(', 45 min', event_plan_details($this->item('Senji', ['MxT' => 45])));
         $this->assertSame('', event_plan_details($this->item('Hive Pocket', ['MnT' => 0, 'MxT' => null])));
+    }
+
+    private function players(array $ages): array
+    {
+        return array_map(fn($age) => ['id' => 1, 'name' => 'Someone', 'age' => $age], $ages);
+    }
+
+    public function test_player_ages_count_adults_then_children_oldest_first(): void
+    {
+        $this->assertSame(
+            '2 adults (18+) · 4 children: 1 age 17, 1 age 12, 2 age 8 · 1 age unknown',
+            event_player_ages($this->players([40, 8, 18, 12, 8, null, 17]))
+        );
+    }
+
+    public function test_player_ages_leave_out_what_is_not_there(): void
+    {
+        $this->assertSame('1 adult (18+)', event_player_ages($this->players([30])));
+        $this->assertSame('1 child: 1 age 5', event_player_ages($this->players([5])));
+        $this->assertSame('', event_player_ages([]));
+    }
+
+    public function test_by_players_ages_each_game_shows_under_the_youngest_player_old_enough(): void
+    {
+        $groups = event_plan_groups([
+            $this->item('Catan', ['Age' => 10]),
+            $this->item('Hungry Hippos', ['Age' => 2]),
+            $this->item('Outfoxed', ['Age' => 5]),
+            $this->item('Sushi Go', ['Age' => 6]),
+            $this->item('Hive Pocket'),
+        ], 'player_age', 'none', [], [40, 2, 6, 38, 6, null]);
+
+        $this->assertSame(['Age 2', 'Age 6', 'Adults', 'No age recorded'], $this->labels($groups));
+        $this->assertSame(['Hungry Hippos'], $this->titles($groups[0]));
+        $this->assertSame(['Outfoxed', 'Sushi Go'], $this->titles($groups[1]));
+        $this->assertSame(['Catan'], $this->titles($groups[2]));
+        $this->assertSame(['Hive Pocket'], $this->titles($groups[3]));
+    }
+
+    public function test_by_players_ages_a_game_too_old_for_everyone_coming_collects_last(): void
+    {
+        $groups = event_plan_groups([
+            $this->item('Catan', ['Age' => 10]),
+            $this->item('Hungry Hippos', ['Age' => 2]),
+        ], 'player_age', 'none', [], [2, 6]);
+
+        $this->assertSame(['Age 2', "Older than the players' known ages"], $this->labels($groups));
+        $this->assertSame(['Catan'], $this->titles($groups[1]));
+    }
+
+    public function test_by_players_ages_adults_take_every_game_too_old_for_the_children(): void
+    {
+        $groups = event_plan_groups([
+            $this->item('Blood on the Clocktower', ['Age' => 12]),
+            $this->item('Cards Against Humanity', ['Age' => 21]),
+        ], 'player_age', 'none', [], [18, 6]);
+
+        $this->assertSame(['Adults'], $this->labels($groups));
+        $this->assertSame(['Blood on the Clocktower', 'Cards Against Humanity'], $this->titles($groups[0]));
+    }
+
+    public function test_by_players_ages_without_any_known_ages_nothing_is_grouped(): void
+    {
+        $groups = event_plan_groups([$this->item('Catan', ['Age' => 10])], 'player_age', 'none', [], [null]);
+
+        $this->assertSame(['No player ages recorded'], $this->labels($groups));
+    }
+
+    public function test_players_ages_can_be_the_second_grouping(): void
+    {
+        $groups = event_plan_groups([
+            $this->item('Catan', ['Age' => 10, 'tags' => ['main']]),
+            $this->item('Outfoxed', ['Age' => 5, 'tags' => ['casual']]),
+        ], 'tag', 'player_age', [], [6, 30]);
+
+        $this->assertSame(['casual', 'main'], $this->labels($groups));
+        $this->assertSame(['Age 6'], $this->labels($groups[0]['groups']));
+        $this->assertSame(['Adults'], $this->labels($groups[1]['groups']));
+    }
+
+    public function test_the_shopping_list_is_the_games_not_kept_in_title_order(): void
+    {
+        $list = event_plan_shopping_list([
+            $this->item('Wavelength', ['is_kept' => false, 'MnP' => 2, 'MxP' => 12, 'setting' => 'beach', 'note' => 'ask Sam']),
+            $this->item('Catan', ['is_kept' => true]),
+            $this->item('Blood on the Clocktower', ['is_kept' => false]),
+        ]);
+
+        $this->assertSame(['Blood on the Clocktower', 'Wavelength'], array_column($list['items'], 'Title'));
+        // Every line is to buy, so "not kept" would only repeat the heading.
+        $this->assertSame("- [ ] Blood on the Clocktower\n- [ ] Wavelength, 2–12, ask Sam\n", $list['text']);
+    }
+
+    public function test_the_shopping_list_is_empty_when_every_game_is_kept(): void
+    {
+        $list = event_plan_shopping_list([$this->item('Catan', ['is_kept' => true])]);
+
+        $this->assertSame(['items' => [], 'text' => ''], $list);
     }
 }

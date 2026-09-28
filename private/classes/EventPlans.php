@@ -6,9 +6,10 @@ require_once dirname(__DIR__) . '/item_types.php';
 require_once dirname(__DIR__) . '/kept_status.php';
 
 /**
- * The owner's events, such as a beach week, and the items planned for each.
- * An event item carries the event's own setting, note and packed mark; the
- * item's facts (players, sweet spot, age, tags) come from the item.
+ * The owner's events, such as a beach week, the items planned for each, and
+ * the owner's players coming to each. An event item carries the event's own
+ * setting, note and packed mark; the item's facts (players, sweet spot, age,
+ * tags) come from the item.
  * Another user's event reads as absent and throws OutOfBoundsException on
  * change; bad input throws InvalidArgumentException.
  */
@@ -18,12 +19,14 @@ final class EventPlans
     {
     }
 
-    /** Every event, latest start first and undated last, with item and packed counts. */
+    /** Every event, latest start first and undated last, with item, packed and player counts. */
     public function all(): array
     {
         $events = $this->rows(
             'SELECT e.id, e.name, e.starts_on, e.ends_on,
-                COUNT(ei.artifact_id) AS item_count, COALESCE(SUM(ei.is_packed), 0) AS packed_count
+                COUNT(ei.artifact_id) AS item_count, COALESCE(SUM(ei.is_packed), 0) AS packed_count,
+                (SELECT COUNT(*) FROM event_players ep JOIN players p ON p.id = ep.player_id AND p.user_id = e.user_id
+                 WHERE ep.event_id = e.id) AS player_count
              FROM events e LEFT JOIN event_items ei ON ei.event_id = e.id
              WHERE e.user_id = ?
              GROUP BY e.id, e.name, e.starts_on, e.ends_on
@@ -34,11 +37,15 @@ final class EventPlans
             $event['id'] = (int) $event['id'];
             $event['item_count'] = (int) $event['item_count'];
             $event['packed_count'] = (int) $event['packed_count'];
+            $event['player_count'] = (int) $event['player_count'];
         }
         return $events;
     }
 
-    /** The event with its items in title order, or null when it is not the owner's. */
+    /**
+     * The event with its items in title order and its players youngest first,
+     * those without a birth year last, or null when it is not the owner's.
+     */
     public function find(int $id): ?array
     {
         $event = $this->rows(
@@ -67,6 +74,12 @@ final class EventPlans
             $item['is_kept'] = artifact_is_kept($item);
         }
         $event['items'] = with_item_tags($this->db, $items, $this->userId);
+        $players = $this->players($id, true, $this->year($event['starts_on']));
+        // Unknown ages last, then youngest first; usort is stable (PHP 8), so
+        // players of one age stay in name order.
+        $key = fn($player) => [$player['age'] === null, $player['age']];
+        usort($players, fn($a, $b) => $key($a) <=> $key($b));
+        $event['players'] = $players;
         return $event;
     }
 
@@ -94,6 +107,15 @@ final class EventPlans
             'is_kept' => artifact_is_kept($item),
             'is_game' => item_type_is_game($item['type_name']),
         ], $items);
+    }
+
+    /** The owner's players not yet coming to the event, in name order. */
+    public function playersToAdd(int $eventId): array
+    {
+        $startsOn = $this->rows(
+            'SELECT starts_on FROM events WHERE id = ? AND user_id = ?', 'ii', [$eventId, $this->userId]
+        )[0]['starts_on'] ?? null;
+        return $this->players($eventId, false, $this->year($startsOn));
     }
 
     /** Creates the event, or renames and redates it with $id. Returns its id. */
@@ -137,28 +159,25 @@ final class EventPlans
     public function addItems(int $eventId, array $itemIds): int
     {
         $this->requireEvent($eventId);
-        $itemIds = array_values(array_unique(array_filter(array_map('intval', $itemIds), fn($id) => $id > 0)));
-        if ($itemIds === []) {
-            return 0;
-        }
-        $placeholders = implode(',', array_fill(0, count($itemIds), '?'));
-        $mine = $this->rows(
-            "SELECT id FROM games WHERE user_id = ? AND id IN ($placeholders)",
-            str_repeat('i', count($itemIds) + 1), array_merge([$this->userId], $itemIds)
-        );
-        if (count($mine) !== count($itemIds)) {
-            throw new InvalidArgumentException('Choose items from your own items in Keeplore.');
-        }
-        $added = 0;
-        foreach ($itemIds as $itemId) {
-            $stmt = $this->statement(
-                'INSERT IGNORE INTO event_items (event_id, artifact_id) VALUES (?, ?)',
-                'ii', [$eventId, $itemId]
-            );
-            $added += $stmt->affected_rows;
-            $stmt->close();
-        }
-        return $added;
+        $itemIds = $this->ownIds('games', $itemIds, 'Choose items from your own items in Keeplore.');
+        return $this->linkToEvent('event_items', 'artifact_id', $eventId, $itemIds);
+    }
+
+    /** Adds the owner's players to the event. Returns how many were new. */
+    public function addPlayers(int $eventId, array $playerIds): int
+    {
+        $this->requireEvent($eventId);
+        $playerIds = $this->ownIds('players', $playerIds, 'Choose players from your own people list.');
+        return $this->linkToEvent('event_players', 'player_id', $eventId, $playerIds);
+    }
+
+    public function removePlayer(int $eventId, int $playerId): void
+    {
+        $this->requireEvent($eventId);
+        $this->statement(
+            'DELETE FROM event_players WHERE event_id = ? AND player_id = ?',
+            'ii', [$eventId, $playerId]
+        )->close();
     }
 
     /** Sets whichever of setting, note and is_packed $input names. */
@@ -197,6 +216,73 @@ final class EventPlans
             "UPDATE event_items SET {$field} = ? WHERE event_id = ? AND artifact_id = ?",
             $type . 'ii', [$value, $eventId, $itemId]
         )->close();
+    }
+
+    /**
+     * The owner's players coming to the event, or with $coming false those
+     * not, named "First Last", in name order (find() reorders by age). Each age is the one the player
+     * turns in $year, or null without a birth year.
+     */
+    private function players(int $eventId, bool $coming, int $year): array
+    {
+        $players = $this->rows(
+            "SELECT p.id, TRIM(CONCAT(COALESCE(p.FirstName, ''), ' ', COALESCE(p.LastName, ''))) AS name, p.birth_year
+             FROM players p LEFT JOIN event_players ep ON ep.player_id = p.id AND ep.event_id = ?
+             WHERE p.user_id = ? AND (ep.player_id IS NOT NULL) = ?
+             ORDER BY p.FirstName ASC, p.LastName ASC, p.id ASC",
+            'iii', [$eventId, $this->userId, (int) $coming]
+        );
+        return array_map(fn($player) => [
+            'id' => (int) $player['id'],
+            'name' => $player['name'],
+            'age' => $player['birth_year'] === null ? null : $year - (int) $player['birth_year'],
+        ], $players);
+    }
+
+    /** The year an event starting on $startsOn is counted in: that year, or this one undated. */
+    private function year(?string $startsOn): int
+    {
+        return (int) ($startsOn === null ? date('Y') : substr($startsOn, 0, 4));
+    }
+
+    /**
+     * The distinct positive ids, each checked to belong to the owner in
+     * $table (games or players, never input).
+     */
+    private function ownIds(string $table, array $ids, string $message): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($id) => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $mine = $this->rows(
+            "SELECT id FROM {$table} WHERE user_id = ? AND id IN ($placeholders)",
+            str_repeat('i', count($ids) + 1), array_merge([$this->userId], $ids)
+        );
+        if (count($mine) !== count($ids)) {
+            throw new InvalidArgumentException($message);
+        }
+        return $ids;
+    }
+
+    /**
+     * Links each id to the event in $table's $column (this class's own
+     * names, never input), leaving existing links alone. Returns how many
+     * were new.
+     */
+    private function linkToEvent(string $table, string $column, int $eventId, array $ids): int
+    {
+        $added = 0;
+        foreach ($ids as $id) {
+            $stmt = $this->statement(
+                "INSERT IGNORE INTO {$table} (event_id, {$column}) VALUES (?, ?)",
+                'ii', [$eventId, $id]
+            );
+            $added += $stmt->affected_rows;
+            $stmt->close();
+        }
+        return $added;
     }
 
     private function requireEvent(int $id): void

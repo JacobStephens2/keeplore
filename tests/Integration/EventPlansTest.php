@@ -34,6 +34,8 @@ final class EventPlansTest extends TestCase
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-events.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-event-players.sql'));
+        $this->runSql('ALTER TABLE players ADD COLUMN birth_year INT NULL');
         $this->runSql("UPDATE games SET mnp = 3, mxp = 4, ss = '3,4', Age = 10, mnt = 60, mxt = 120 WHERE id = 10");
         require_once PRIVATE_PATH . '/item_tags.php';
         require_once PRIVATE_PATH . '/classes/EventPlans.php';
@@ -240,5 +242,130 @@ final class EventPlansTest extends TestCase
 
         $this->assertSame(['Catan', 'Former possession'], array_column($items, 'Title'));
         $this->assertSame([true, false], array_column($items, 'is_kept'));
+    }
+
+    public function test_owner_can_add_players_and_those_without_ages_come_back_in_name_order(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+
+        $this->assertSame(2, $this->plans()->addPlayers($id, [100, '101']));
+
+        $this->assertSame(
+            [['id' => 101, 'name' => 'Jo Smith', 'age' => null], ['id' => 100, 'name' => 'Sam Lee', 'age' => null]],
+            $this->plans()->find($id)['players']
+        );
+    }
+
+    public function test_adding_a_player_already_coming_adds_nothing(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+        $this->plans()->addPlayers($id, [100]);
+
+        $this->assertSame(0, $this->plans()->addPlayers($id, [100]));
+        $this->assertCount(1, $this->plans()->find($id)['players']);
+    }
+
+    public function test_another_users_players_cannot_be_added(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->plans()->addPlayers($id, [100, 200]);
+    }
+
+    public function test_players_to_add_are_the_owners_players_not_yet_coming(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+        $this->plans()->addPlayers($id, [101]);
+
+        $this->assertSame([['id' => 100, 'name' => 'Sam Lee', 'age' => null]], $this->plans()->playersToAdd($id));
+    }
+
+    public function test_owner_can_remove_a_player_from_an_event(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+        $this->plans()->addPlayers($id, [100, 101]);
+
+        $this->plans()->removePlayer($id, 100);
+
+        $this->assertSame(['Jo Smith'], array_column($this->plans()->find($id)['players'], 'name'));
+    }
+
+    public function test_the_list_counts_each_events_players(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+        $this->plans()->addItems($id, [10, 11]);
+        $this->plans()->addPlayers($id, [100, 101]);
+
+        $event = $this->plans()->all()[0];
+
+        $this->assertSame(2, $event['item_count']);
+        $this->assertSame(2, $event['player_count']);
+    }
+
+    public function test_a_deleted_player_no_longer_counts_as_coming(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+        $this->plans()->addPlayers($id, [100, 101]);
+
+        $this->runSql('DELETE FROM players WHERE id = 100');
+
+        $this->assertSame(['Jo Smith'], array_column($this->plans()->find($id)['players'], 'name'));
+        $this->assertSame(1, $this->plans()->all()[0]['player_count']);
+    }
+
+    public function test_another_users_event_takes_no_players(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+        $this->plans()->addPlayers($id, [100]);
+
+        foreach ([
+            fn() => $this->plans(2)->addPlayers($id, [200]),
+            fn() => $this->plans(2)->removePlayer($id, 100),
+        ] as $attempt) {
+            try {
+                $attempt();
+                $this->fail('Changed another user\'s event players.');
+            } catch (\OutOfBoundsException $error) {
+                $this->addToAssertionCount(1);
+            }
+        }
+        $this->assertCount(1, $this->plans()->find($id)['players']);
+    }
+
+    public function test_deleting_an_event_deletes_its_players(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+        $this->plans()->addPlayers($id, [100]);
+
+        $this->plans()->delete($id);
+
+        $this->assertSame('0', $this->db->query('SELECT COUNT(*) FROM event_players')->fetch_row()[0]);
+    }
+
+    public function test_a_players_age_is_their_age_in_the_year_the_event_starts(): void
+    {
+        $this->runSql('UPDATE players SET birth_year = 2015 WHERE id = 100');
+        $dated = $this->plans()->save(['name' => 'Beach week', 'starts_on' => '2027-07-03']);
+        $undated = $this->plans()->save(['name' => 'Someday']);
+        $this->plans()->addPlayers($dated, [100, 101]);
+
+        $this->assertSame([12, null], array_column($this->plans()->find($dated)['players'], 'age'));
+        // An undated event counts from this year.
+        $this->assertSame((int) date('Y') - 2015, $this->plans()->playersToAdd($undated)[1]['age']);
+    }
+
+    public function test_an_events_players_come_back_youngest_first_and_unknown_ages_last(): void
+    {
+        $this->runSql("INSERT INTO players (id, user_id, FirstName, LastName) VALUES (102, 1, 'Al', 'Young'), (103, 1, 'Bo', 'Twin');
+            UPDATE players SET birth_year = 2015 WHERE id IN (100, 103);
+            UPDATE players SET birth_year = 2020 WHERE id = 102");
+        $id = $this->plans()->save(['name' => 'Beach week', 'starts_on' => '2027-07-03']);
+        $this->plans()->addPlayers($id, [100, 101, 102, 103]);
+
+        $this->assertSame(
+            ['Al Young', 'Bo Twin', 'Sam Lee', 'Jo Smith'],
+            array_column($this->plans()->find($id)['players'], 'name')
+        );
     }
 }

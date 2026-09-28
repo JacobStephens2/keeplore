@@ -1,36 +1,48 @@
-// Event page: filter the games to add, save packed marks as they are
-// ticked, and copy the plain-text list.
+// Event page: filter the games and players to add, save packed marks as
+// they are ticked, copy the plain-text and shopping lists, remember which
+// sections are folded, and come back to the same place after removing a
+// game inline.
 
 bindAddFilter();
 bindPackedMarks();
 bindCopy();
+bindShoppingLink();
+rememberFolds();
+keepScroll();
 
 function bindAddFilter() {
-  const filter = document.getElementById('event-add-filter');
-  const gamesOnly = document.getElementById('event-add-games-only');
-  const list = document.getElementById('event-add-list');
-  const empty = document.getElementById('event-add-empty');
-  const submit = document.getElementById('event-add-submit');
+  document.querySelectorAll('.event-add-form').forEach(bindAddForm);
+}
+
+// One add list, games or players: type to filter, and the submit button
+// counts what is ticked. data-noun names what the list holds.
+function bindAddForm(form) {
+  const filter = form.querySelector('.event-add-filter');
+  const gamesOnly = form.querySelector('.event-add-games-only');
+  const list = form.querySelector('.event-add-list');
+  const empty = form.querySelector('.event-add-empty');
+  const submit = form.querySelector('.event-add-submit');
   if (!filter || !list) {
     return;
   }
+  const noun = form.dataset.noun;
   const choices = [...list.querySelectorAll('.event-choice')];
 
   function updateSubmit() {
     const selected = list.querySelectorAll('input:checked').length;
     submit.disabled = selected === 0;
-    submit.textContent = selected === 0 ? 'Add selected games'
-      : `Add ${selected} ${selected === 1 ? 'game' : 'games'}`;
+    submit.textContent = selected === 0 ? `Add selected ${noun}s`
+      : `Add ${selected} ${selected === 1 ? noun : `${noun}s`}`;
   }
 
   function applyFilter() {
     const needle = filter.value.trim().toLowerCase();
     let shown = 0;
     choices.forEach((choice) => {
-      // A ticked game stays in view so the choice is not lost from sight.
+      // A ticked choice stays in view so it is not lost from sight.
       const match = choice.querySelector('input').checked
         || ((needle === '' || choice.dataset.title.includes(needle))
-          && (!gamesOnly.checked || choice.dataset.game === '1'));
+          && (!gamesOnly || !gamesOnly.checked || choice.dataset.game === '1'));
       choice.hidden = !match;
       shown += match ? 1 : 0;
     });
@@ -38,7 +50,9 @@ function bindAddFilter() {
   }
 
   filter.addEventListener('input', applyFilter);
-  gamesOnly.addEventListener('change', applyFilter);
+  if (gamesOnly) {
+    gamesOnly.addEventListener('change', applyFilter);
+  }
   applyFilter();
   // Enter in the search box would otherwise submit whatever is ticked.
   filter.addEventListener('keydown', (event) => {
@@ -91,21 +105,96 @@ function bindPackedMarks() {
   });
 }
 
+// Each Copy button copies the textarea its data-copy names and reports in
+// the status beside it.
 function bindCopy() {
-  const text = document.getElementById('event-text');
-  const button = document.getElementById('event-text-copy');
-  const status = document.getElementById('event-text-status');
-  if (!text || !button) {
+  document.querySelectorAll('.event-copy').forEach((button) => {
+    const text = document.getElementById(button.dataset.copy);
+    const status = button.nextElementSibling;
+    if (!text || !status) {
+      return;
+    }
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(text.value);
+        status.textContent = 'Copied.';
+      } catch (error) {
+        text.focus();
+        text.select();
+        status.textContent = 'Press Ctrl+C (or Cmd+C) to copy.';
+      }
+    });
+  });
+}
+
+// The "not kept" count jumps to the shopping list; open it on the way.
+function bindShoppingLink() {
+  const list = document.getElementById('event-shopping');
+  if (!list) {
     return;
   }
-  button.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(text.value);
-      status.textContent = 'Copied.';
-    } catch (error) {
-      text.focus();
-      text.select();
-      status.textContent = 'Press Ctrl+C (or Cmd+C) to copy.';
+  document.querySelectorAll('.event-shopping-link').forEach((link) => {
+    link.addEventListener('click', () => {
+      list.open = true;
+    });
+  });
+}
+
+// Each section folds open and closed. Every save reloads the page, so this
+// event's folds are remembered in the browser and put back on load.
+function rememberFolds() {
+  const page = document.querySelector('.event-page');
+  const sections = [...document.querySelectorAll('details[data-fold]')];
+  if (!page || !page.dataset.eventId) {
+    return;
+  }
+  const key = `keeplore-event-folds-${page.dataset.eventId}`;
+  let folds = {};
+  try {
+    folds = JSON.parse(localStorage.getItem(key) || '{}') || {};
+  } catch (error) {
+    // Without storage every section opens as the page sets it.
+  }
+  sections.forEach((section) => {
+    // A section the page insists on, such as Add games on an empty event, stays open.
+    if (typeof folds[section.dataset.fold] === 'boolean' && !('foldKeepOpen' in section.dataset)) {
+      section.open = folds[section.dataset.fold];
     }
+    section.addEventListener('toggle', () => {
+      folds[section.dataset.fold] = section.open;
+      try {
+        localStorage.setItem(key, JSON.stringify(folds));
+      } catch (error) {
+        // Nothing to remember without storage.
+      }
+    });
+  });
+}
+
+// A game removed from the grouped list reloads the page; return to where
+// it was, so the next game to remove is still in view.
+function keepScroll() {
+  const page = document.querySelector('.event-page');
+  if (!page) {
+    return;
+  }
+  const key = 'keeplore-event-scroll';
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+    sessionStorage.removeItem(key);
+    if (saved && saved.eventId === page.dataset.eventId) {
+      window.scrollTo(0, saved.y);
+    }
+  } catch (error) {
+    // Without storage the page simply opens at the top.
+  }
+  document.querySelectorAll('.event-keep-scroll').forEach((form) => {
+    form.addEventListener('submit', () => {
+      try {
+        sessionStorage.setItem(key, JSON.stringify({ eventId: page.dataset.eventId, y: window.scrollY }));
+      } catch (error) {
+        // Nothing to keep without storage.
+      }
+    });
   });
 }

@@ -66,6 +66,8 @@ final class IssueNineTest extends TestCase
                 user_id INT NOT NULL
             ) ENGINE=InnoDB'
         );
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-events.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-event-players.sql'));
         require_once PRIVATE_PATH . '/database.php';
         require_once PRIVATE_PATH . '/use_participants.php';
         require_once PRIVATE_PATH . '/query_functions/player_queries.php';
@@ -128,6 +130,18 @@ final class IssueNineTest extends TestCase
         $this->assertSame(0, (int) $this->db->query(
             "SELECT COUNT(*) AS c FROM players WHERE id = 101"
         )->fetch_assoc()['c']);
+    }
+
+    // Merging keeps the survivor on every event the loser was coming to.
+    public function test_merge_players_moves_the_losers_events_to_the_survivor(): void
+    {
+        $this->runSql("INSERT INTO events (id, user_id, name) VALUES (1, 1, 'Beach week'), (2, 1, 'Game night');
+            INSERT INTO event_players (event_id, player_id) VALUES (1, 100), (1, 101), (2, 101)");
+
+        $this->assertTrue(merge_players(100, 101, 1));
+
+        $rows = $this->db->query('SELECT event_id, player_id FROM event_players ORDER BY event_id')->fetch_all();
+        $this->assertSame([['1', '100'], ['2', '100']], $rows);
     }
 
     // Brief 3: cross-account merges are refused.
