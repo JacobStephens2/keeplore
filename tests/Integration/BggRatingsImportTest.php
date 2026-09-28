@@ -399,7 +399,6 @@ final class BggRatingsImportTest extends TestCase
 
     public function test_overall_rating_import_stores_the_average_and_keeps_it_through_an_outage(): void
     {
-        $this->db->query('ALTER TABLE games ADD COLUMN BGG_Rat VARCHAR(10) NULL');
         $this->db->query("UPDATE games SET BGG_Rat = '5.50' WHERE id = 11");
         $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/147154/blue-moon-legends' WHERE id = 13");
         $this->db->query("UPDATE games SET BGG_Rat = '9.00' WHERE id = 20");

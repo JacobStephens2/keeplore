@@ -176,6 +176,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
         types.objectType AS type,
         games.user_id,
         games.type_id,
+        games.BGG_Rat,
         DATE((SELECT MAX(responses.PlayDate) FROM responses WHERE responses.Title = games.id)) AS MaxPlay,
         DATE((SELECT MAX(uses.use_date) FROM uses WHERE uses.artifact_id = games.id)) AS MaxUse,
         games.Acq

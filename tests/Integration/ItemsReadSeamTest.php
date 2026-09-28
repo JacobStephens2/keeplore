@@ -75,6 +75,20 @@ final class ItemsReadSeamTest extends TestCase
         $this->assertSame([12], $this->fetchIds(find_artifacts_by_user_id('secondary_only', [], 90)));
     }
 
+    public function test_items_list_query_returns_the_overall_bgg_rating(): void
+    {
+        $this->db->query("UPDATE games SET BGG_Rat = '7.09' WHERE id = 10");
+        $result = find_artifacts_by_user_id('yes', [], 90);
+        $found = null;
+        while ($row = mysqli_fetch_assoc($result)) {
+            if ((int) $row['id'] === 10) {
+                $found = $row;
+            }
+        }
+        $this->assertNotNull($found);
+        $this->assertSame('7.09', $found['BGG_Rat']);
+    }
+
     public function test_to_get_rid_of_list_includes_is_kept_under_strict_group_by(): void
     {
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
