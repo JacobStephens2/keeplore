@@ -58,13 +58,15 @@ function event_plan_groups(array $items, $by, $then = 'none', array $tags = [], 
 }
 
 /**
- * The grouping a request asks for (by, then, tags), each part falling back to
- * the saved one and then to "Sweet spot, nothing, no tags". Naming tags with
- * no second grouping sub-groups by tag, since the tags would otherwise do
- * nothing.
+ * The grouping a request asks for (by, then, tags, at_least, count_tags),
+ * each part falling back to the saved one and then to "Sweet spot, nothing,
+ * no tags, no count". Naming tags with no second grouping sub-groups by tag,
+ * since the tags would otherwise do nothing. at_least is the number of games
+ * each group should keep and count_tags the tags it holds for (see
+ * event_plan_spare()); a blank at_least clears it to 0, meaning none.
  */
 function event_plan_grouping(array $request, array $saved) {
-    $saved += ['by' => 'players', 'then' => 'none', 'tags' => ''];
+    $saved += ['by' => 'players', 'then' => 'none', 'tags' => '', 'at_least' => 0, 'count_tags' => ''];
     $dimensions = event_plan_dimensions();
     $pick = function ($key) use ($request, $saved, $dimensions) {
         $value = $request[$key] ?? null;
@@ -80,7 +82,146 @@ function event_plan_grouping(array $request, array $saved) {
     if ($tags !== '' && $by !== 'tag' && $then === 'none') {
         $then = 'tag';
     }
-    return ['by' => $by, 'then' => $then, 'tags' => $tags];
+    $at_least = $request['at_least'] ?? null;
+    if (is_string($at_least) && trim($at_least) === '') {
+        $at_least = 0;
+    } elseif (is_string($at_least) && preg_match('/^\s*\d{1,2}\s*$/', $at_least)) {
+        $at_least = (int) $at_least;
+    } else {
+        $at_least = max(0, min(99, (int) $saved['at_least']));
+    }
+    $count_tags = is_string($request['count_tags'] ?? null) ? $request['count_tags'] : (string) $saved['count_tags'];
+    $count_tags = implode(', ', event_plan_chosen_tags($count_tags));
+    return ['by' => $by, 'then' => $then, 'tags' => $tags, 'at_least' => $at_least, 'count_tags' => $count_tags];
+}
+
+/**
+ * Which planned games a smaller plan can leave home and still have
+ * $at_least games in every group the grouping makes: each labelled
+ * sub-group, such as "6 players · casual", or each group without a second
+ * grouping. A game outside every group, such as one with none of the chosen
+ * tags, counts toward nothing and is always spare. With $count_tags, only
+ * the groups for those tags need the count, so "casual, main" can leave
+ * "kids" groups out. Items are told apart by id, which an event never
+ * repeats.
+ *
+ * A group with fewer games than $at_least is 'short', and needs every game
+ * it has. The 'needed' games are picked greedily, most uncovered groups
+ * first and kept games ahead of ones to buy, then pruned until dropping any
+ * one of them would leave a group short: a small set, though not always the
+ * smallest possible.
+ *
+ * Returns ['needed' => items, 'spare' => items, 'short' => [['label' =>
+ * '8 players · casual', 'count' => 1], ...]], items in title order and short
+ * groups in the plan's order.
+ */
+function event_plan_spare(array $items, $by, $then, array $tags = [], array $player_ages = [], $at_least = 0, array $count_tags = []) {
+    $at_least = (int) $at_least;
+    $items = event_plan_sorted_by_title($items);
+    if ($at_least <= 0) {
+        return ['needed' => $items, 'spare' => [], 'short' => []];
+    }
+    $by = isset(event_plan_dimensions()[$by]) ? $by : 'none';
+    $then = isset(event_plan_dimensions()[$then]) && $then !== $by ? $then : 'none';
+    $tags = event_plan_chosen_tags($tags);
+    $count_tags = event_plan_chosen_tags($count_tags);
+    $ages = event_plan_age_groups($player_ages);
+
+    // Reading the groups off event_plan_groups() keeps them, and their
+    // order, the same as the page shows.
+    $position = [];
+    foreach ($items as $i => $item) {
+        $position[$item['id']] = $i;
+    }
+    $cells = [];
+    foreach (event_plan_groups($items, $by, $then, $tags, $player_ages) as $group) {
+        // The last group, such as "No sweet spot", gathers games without a value.
+        if ($by !== 'none' && event_plan_keys($group['items'][0], $by, $tags, $ages) === []) {
+            continue;
+        }
+        foreach ($group['groups'] ?: [['label' => '', 'items' => $group['items']]] as $sub) {
+            // Unlabelled sub-groups gather games without the second value.
+            if ($then !== 'none' && $sub['label'] === '') {
+                continue;
+            }
+            $tag = $by === 'tag' ? $group['label'] : ($then === 'tag' ? $sub['label'] : null);
+            if ($count_tags !== [] && $tag !== null && !in_array(mb_strtolower($tag), $count_tags, true)) {
+                continue;
+            }
+            $label = implode(' · ', array_filter([$group['label'], $sub['label']], 'strlen'));
+            $members = [];
+            foreach ($sub['items'] as $item) {
+                $members[] = $position[$item['id']];
+            }
+            $cells[] = ['label' => $label, 'members' => $members, 'need' => min($at_least, count($members))];
+        }
+    }
+
+    $in = [];
+    foreach ($cells as $c => $cell) {
+        foreach ($cell['members'] as $i) {
+            $in[$i][] = $c;
+        }
+    }
+    $have = array_fill(0, count($cells), 0);
+    $chosen = [];
+    // Greedy: the game filling the most still-open groups, kept games first.
+    while (true) {
+        $best = null;
+        $best_rank = null;
+        foreach ($in as $i => $cs) {
+            if (isset($chosen[$i])) {
+                continue;
+            }
+            $gain = 0;
+            foreach ($cs as $c) {
+                $gain += $have[$c] < $cells[$c]['need'] ? 1 : 0;
+            }
+            if ($gain === 0) {
+                continue;
+            }
+            $rank = [$gain, event_plan_is_to_buy($items[$i]) ? 0 : 1, count($cs)];
+            if ($best_rank === null || $rank > $best_rank) {
+                [$best, $best_rank] = [$i, $rank];
+            }
+        }
+        if ($best === null) {
+            break;
+        }
+        $chosen[$best] = true;
+        foreach ($in[$best] as $c) {
+            $have[$c]++;
+        }
+    }
+    // Prune: drop any game every one of whose groups has enough without it,
+    // games to buy and those in the fewest groups first.
+    $order = array_keys($chosen);
+    usort($order, function ($a, $b) use ($items, $in) {
+        return [event_plan_is_to_buy($items[$b]), count($in[$a]), $b] <=> [event_plan_is_to_buy($items[$a]), count($in[$b]), $a];
+    });
+    foreach ($order as $i) {
+        $droppable = true;
+        foreach ($in[$i] as $c) {
+            $droppable = $droppable && $have[$c] > $cells[$c]['need'];
+        }
+        if ($droppable) {
+            unset($chosen[$i]);
+            foreach ($in[$i] as $c) {
+                $have[$c]--;
+            }
+        }
+    }
+
+    $result = ['needed' => [], 'spare' => [], 'short' => []];
+    foreach ($items as $i => $item) {
+        $result[isset($chosen[$i]) ? 'needed' : 'spare'][] = $item;
+    }
+    foreach ($cells as $cell) {
+        if (count($cell['members']) < $at_least) {
+            $result['short'][] = ['label' => $cell['label'], 'count' => count($cell['members'])];
+        }
+    }
+    return $result;
 }
 
 /** An event's dates as "Jul 3 – Jul 10, 2027", or '' with neither. */
@@ -163,9 +304,7 @@ function event_plan_age_groups(array $player_ages) {
  * (a note such as "requested by mom" stays), and 'text' as an unticked checklist, "- [ ] Wavelength, 2–12".
  */
 function event_plan_shopping_list(array $items) {
-    $to_buy = event_plan_sorted_by_title(array_filter($items, function ($item) {
-        return array_key_exists('is_kept', $item) && !$item['is_kept'];
-    }));
+    $to_buy = event_plan_sorted_by_title(array_filter($items, 'event_plan_is_to_buy'));
     $to_buy = array_map(function ($item) {
         return array_diff_key($item, array_flip(['is_kept', 'setting', 'is_packed']));
     }, $to_buy);
@@ -173,6 +312,11 @@ function event_plan_shopping_list(array $items) {
         return '- [ ] ' . event_plan_line($item) . "\n";
     }, $to_buy));
     return ['items' => $to_buy, 'text' => $text];
+}
+
+/** Whether a row says its item is not kept, so it would have to be bought. */
+function event_plan_is_to_buy(array $item) {
+    return array_key_exists('is_kept', $item) && !$item['is_kept'];
 }
 
 /** The items in title order, ties by id. */
@@ -234,7 +378,7 @@ function event_plan_details(array $item) {
         }
     }
     // Only a row that says it is not kept is marked; rows without the field are left alone.
-    if (array_key_exists('is_kept', $item) && !$item['is_kept']) {
+    if (event_plan_is_to_buy($item)) {
         $parts[] = ', not kept';
     }
     return implode('', $parts);
