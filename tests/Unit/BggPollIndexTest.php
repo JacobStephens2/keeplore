@@ -38,7 +38,8 @@ class BggPollIndexTest extends TestCase
             ],
             bgg_poll_listing_from_json($json)
         );
-        $this->assertSame([], bgg_poll_listing_from_json('not json'));
+        $this->assertSame([], bgg_poll_listing_from_json('{"items":[]}'));
+        $this->assertFalse(bgg_poll_listing_from_json('not json'));
     }
 
     public function test_polls_give_best_counts_player_votes_and_community_age(): void
@@ -70,7 +71,7 @@ class BggPollIndexTest extends TestCase
         $this->assertSame([6, 7], bgg_poll_results_from_dynamic_json($range)['best']);
         $this->assertSame('6-7', bgg_poll_results_from_dynamic_json($range)['best_text']);
         $this->assertSame(
-            ['best' => [9], 'best_text' => '9+', 'player_votes' => 12, 'community_age' => null],
+            ['best' => range(9, 20), 'best_text' => '9+', 'player_votes' => 12, 'community_age' => null],
             bgg_poll_results_from_dynamic_json($open)
         );
     }

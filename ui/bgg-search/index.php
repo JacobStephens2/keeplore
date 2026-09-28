@@ -5,8 +5,10 @@ require_once(PRIVATE_PATH . '/bgg_poll_index.php');
 
 $filters = bgg_poll_search_filters($_GET);
 $searched = $filters['best'] !== null || $filters['age'] !== null;
-$games = $searched ? bgg_poll_search($db, $filters) : [];
-$owned = $searched ? bgg_poll_owned_things($db, (int) $_SESSION['user_id']) : [];
+$games = $searched ? bgg_poll_search($db, $filters, BGG_POLL_SEARCH_LIMIT + 1) : [];
+$more = count($games) > BGG_POLL_SEARCH_LIMIT;
+$games = array_slice($games, 0, BGG_POLL_SEARCH_LIMIT);
+$kept = $searched ? bgg_poll_kept_things($db, (int) $_SESSION['user_id']) : [];
 $summary = bgg_poll_index_summary($db);
 
 $page_title = 'Search BGG';
@@ -51,7 +53,7 @@ include(SHARED_PATH . '/header.php');
   <?php } elseif ($games === []) { ?>
     <div class="empty-state"><p>No indexed game matches.</p></div>
   <?php } else { ?>
-    <p><?php echo count($games); ?> <?php echo count($games) === 1 ? 'game' : 'games'; ?>, best BGG rank first<?php echo count($games) >= 200 ? ' (first 200 shown)' : ''; ?>.</p>
+    <p><?php echo $more ? 'More than ' . BGG_POLL_SEARCH_LIMIT : count($games); ?> <?php echo count($games) === 1 ? 'game' : 'games'; ?>, best BGG rank first<?php echo $more ? ' (first ' . BGG_POLL_SEARCH_LIMIT . ' shown)' : ''; ?>.</p>
     <div class="surface-panel">
     <div class="table-scroll">
     <table class="list bgg-search-results">
@@ -63,7 +65,7 @@ include(SHARED_PATH . '/header.php');
           <th>Community age</th>
           <th>BGG rank</th>
           <th>Average</th>
-          <th>Yours</th>
+          <th>Kept</th>
         </tr>
       </thead>
       <tbody>
@@ -80,8 +82,8 @@ include(SHARED_PATH . '/header.php');
             <td><?php echo $game['bgg_rank'] === null ? '' : number_format($game['bgg_rank']); ?></td>
             <td><?php echo $game['average'] === null ? '' : h(number_format($game['average'], 2)); ?></td>
             <td>
-              <?php if (isset($owned[$game['thing_id']])) { ?>
-                <a href="<?php echo url_for('/artifacts/edit.php?id=' . $owned[$game['thing_id']]); ?>">In Keeplore</a>
+              <?php if (isset($kept[$game['thing_id']])) { ?>
+                <a href="<?php echo url_for('/artifacts/edit.php?id=' . $kept[$game['thing_id']]); ?>">Kept</a>
               <?php } ?>
             </td>
           </tr>

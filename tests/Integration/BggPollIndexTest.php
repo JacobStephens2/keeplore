@@ -114,7 +114,7 @@ final class BggPollIndexTest extends TestCase
     {
         $result = $this->refreshSample();
 
-        $this->assertSame(['ok' => true, 'listed' => 4, 'fetched' => 4, 'skipped' => 0, 'failed' => 0], $result);
+        $this->assertSame(['ok' => true, 'listed' => 4, 'fetched' => 4, 'skipped' => 0, 'failed' => 0, 'lists_failed' => 0], $result);
         $row = $this->db->query('SELECT * FROM bgg_poll_games WHERE thing_id = 254640')->fetch_assoc();
         $this->assertSame('Just One', $row['name']);
         $this->assertSame('Party, Family', $row['subdomains']);
@@ -173,7 +173,7 @@ final class BggPollIndexTest extends TestCase
 
         $result = $this->refreshSample();
 
-        $this->assertSame(['ok' => true, 'listed' => 4, 'fetched' => 1, 'skipped' => 3, 'failed' => 0], $result);
+        $this->assertSame(['ok' => true, 'listed' => 4, 'fetched' => 1, 'skipped' => 3, 'failed' => 0, 'lists_failed' => 0], $result);
         $this->assertCount(1, array_filter($this->requested, fn ($url) => str_contains($url, '/dynamicinfo?')));
     }
 
@@ -188,8 +188,8 @@ final class BggPollIndexTest extends TestCase
             $this->fakeBgg([5499 => [[13, 'Catan', 627]]], [])
         );
 
-        $this->assertSame(['ok' => true, 'listed' => 1, 'fetched' => 0, 'skipped' => 0, 'failed' => 1], $result);
-        $this->assertSame(['Catan', 'UNO'], array_column(bgg_poll_search($this->db, ['best' => 4, 'age' => null, 'min_votes' => 0]), 'name'));
+        $this->assertSame(['ok' => true, 'listed' => 1, 'fetched' => 0, 'skipped' => 0, 'failed' => 1, 'lists_failed' => 0], $result);
+        $this->assertSame(['Catan'], array_column(bgg_poll_search($this->db, ['best' => 4, 'age' => null, 'min_votes' => 0]), 'name'));
     }
 
     public function test_a_list_limit_reads_only_the_top_ranked_pages(): void
@@ -220,12 +220,58 @@ final class BggPollIndexTest extends TestCase
         $this->assertNotNull($summary['last_fetched']);
     }
 
-    public function test_owned_things_map_an_owners_linked_items_by_bgg_id(): void
+    public function test_kept_things_map_the_owners_kept_linked_items_by_bgg_id(): void
     {
         // Fixture items 10-13 belong to user 1, item 20 to user 2.
         $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/2223/uno' WHERE id = 10");
+        $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/13', is_kept = 0 WHERE id = 11");
         $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/13' WHERE id = 20");
 
-        $this->assertSame([2223 => 10], bgg_poll_owned_things($this->db, 1));
+        $this->assertSame([2223 => 10], bgg_poll_kept_things($this->db, 1));
+    }
+
+    public function test_a_game_off_every_list_leaves_the_index(): void
+    {
+        $this->refreshSample();
+
+        bgg_poll_index_refresh(
+            $this->db,
+            ['perSubdomain' => 50, 'subdomains' => [5499 => 'Family'], 'pause_ms' => 0],
+            $this->fakeBgg([5499 => [[13, 'Catan', 627]]], [])
+        );
+
+        $this->assertSame(['13'], array_map('strval', array_column($this->db->query('SELECT thing_id FROM bgg_poll_games')->fetch_all(MYSQLI_ASSOC), 'thing_id')));
+        $this->assertSame('0', (string) $this->db->query('SELECT COUNT(*) c FROM bgg_poll_best_players WHERE thing_id <> 13')->fetch_assoc()['c']);
+    }
+
+    public function test_a_failed_list_page_keeps_every_game_and_counts_as_failed(): void
+    {
+        $this->refreshSample();
+        $bgg = $this->fakeBgg([5499 => [[13, 'Catan', 627]]], []);
+
+        $result = bgg_poll_index_refresh(
+            $this->db,
+            ['perSubdomain' => 50, 'subdomains' => [5498 => 'Party', 5499 => 'Family'], 'pause_ms' => 0],
+            function (string $url) use ($bgg) {
+                return str_contains($url, 'objectid=5498') ? '' : $bgg($url);
+            }
+        );
+
+        $this->assertSame(1, $result['lists_failed']);
+        $this->assertSame('4', (string) $this->db->query('SELECT COUNT(*) c FROM bgg_poll_games')->fetch_assoc()['c']);
+    }
+
+    public function test_an_open_ended_best_matches_larger_groups(): void
+    {
+        bgg_poll_index_refresh(
+            $this->db,
+            ['perSubdomain' => 50, 'subdomains' => [5498 => 'Party'], 'pause_ms' => 0],
+            $this->fakeBgg([5498 => [[1, 'Big Party', 10]]], [1 => [[['min' => 9, 'max' => null]], 40, '10+']])
+        );
+
+        $found = bgg_poll_search($this->db, ['best' => 12, 'age' => null, 'min_votes' => 0]);
+
+        $this->assertSame(['Big Party'], array_column($found, 'name'));
+        $this->assertSame('9+', $found[0]['best_players']);
     }
 }

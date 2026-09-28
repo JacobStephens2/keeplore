@@ -100,7 +100,7 @@ Another BoardGameGeek user's rating and comment on an owner's item, matched thro
 
 ### `bgg_poll_games` and `bgg_poll_best_players`
 
-BoardGameGeek's ranked games with their community poll results, for `/bgg-search`. BGG has no search on its polls, so `bin/refresh-bgg-poll-index [per-subdomain]` lists the top 500 games (by default) of each BGG subdomain from the geekdo JSON API and copies each game's polls from `dynamicinfo`. Rerunning refreshes the lists and refetches polls older than 30 days. The index describes BGG, not an owner's collection, so it has no `user_id`. Apply [`add-bgg-poll-index.sql`](../database/migrations/add-bgg-poll-index.sql); it is safe to rerun.
+BoardGameGeek's ranked games with their community poll results, for `/bgg-search`. BGG has no search on its polls, so `bin/refresh-bgg-poll-index [per-subdomain]` lists the top 500 games (by default) of each BGG subdomain from the geekdo JSON API and copies each game's polls from `dynamicinfo`. Rerunning refreshes the lists, refetches polls older than 30 days, and, when every list page answered, drops games no longer on any list. The index describes BGG, not an owner's collection, so it has no `user_id`. Apply [`add-bgg-poll-index.sql`](../database/migrations/add-bgg-poll-index.sql); it is safe to rerun.
 
 `bgg_poll_games`:
 
@@ -119,7 +119,7 @@ BoardGameGeek's ranked games with their community poll results, for `/bgg-search
 | `community_age` | TINYINT UNSIGNED | YES | Community poll age, `6` for "6+"; NULL when nobody voted. BGG's JSON gives no vote count for it |
 | `polls_fetched_at` | DATETIME | YES | When the polls were last fetched; NULL until they are |
 
-`bgg_poll_best_players`: one row `(thing_id, players)` per player count voted Best, cascading from `bgg_poll_games`. An open-ended Best such as 9+ is stored as 9.
+`bgg_poll_best_players`: one row `(thing_id, players)` per player count voted Best, cascading from `bgg_poll_games`. An open-ended Best such as 9+ is stored as every count from 9 to 20.
 
 ---
 

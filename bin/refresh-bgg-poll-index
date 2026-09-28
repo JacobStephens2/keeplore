@@ -19,10 +19,11 @@ ob_end_flush();
 $options = $argc === 2 ? ['perSubdomain' => (int) $argv[1]] : [];
 $result = bgg_poll_index_refresh($db, $options);
 printf(
-  "Listed %d games, fetched %d polls, kept %d recent, failed %d.\n",
+  "Listed %d games, fetched %d polls, kept %d recent, failed %d; %d list pages failed.\n",
   $result['listed'],
   $result['fetched'],
   $result['skipped'],
-  $result['failed']
+  $result['failed'],
+  $result['lists_failed']
 );
-exit($result['failed'] > 0 ? 1 : 0);
+exit($result['failed'] + $result['lists_failed'] > 0 ? 1 : 0);

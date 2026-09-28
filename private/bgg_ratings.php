@@ -127,6 +127,28 @@ function bgg_ratings_delete_item($conn, $user_id, $artifact_id, $bgg_username, $
   mysqli_stmt_close($stmt);
 }
 
+// [artifact_id => BGG thing id] for the owner's items whose link names a
+// thing, by item id. With $kept_only, only the items they keep.
+function item_bgg_thing_ids($conn, $user_id, $kept_only = false) {
+  $stmt = mysqli_prepare(
+    $conn,
+    "SELECT id, bgg_url FROM games WHERE user_id = ? AND bgg_url IS NOT NULL AND bgg_url <> ''"
+      . ($kept_only ? ' AND is_kept = 1' : '') . ' ORDER BY id'
+  );
+  $user_id = (int) $user_id;
+  mysqli_stmt_bind_param($stmt, 'i', $user_id);
+  mysqli_stmt_execute($stmt);
+  $linked = [];
+  foreach (mysqli_stmt_get_result($stmt) as $row) {
+    $thing_id = bgg_thing_id_from_url($row['bgg_url']);
+    if ($thing_id > 0) {
+      $linked[(int) $row['id']] = $thing_id;
+    }
+  }
+  mysqli_stmt_close($stmt);
+  return $linked;
+}
+
 // ['ok' => true, 'bgg_url'] for an owner's item, or ['ok' => false, 'error'].
 function bgg_ratings_owned_item($conn, $user_id, $artifact_id) {
   $stmt = mysqli_prepare($conn, 'SELECT bgg_url FROM games WHERE id = ? AND user_id = ?');
@@ -196,17 +218,7 @@ function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause
   }
   $bgg_user = $found['user'];
 
-  $stmt = mysqli_prepare($conn, "SELECT id, bgg_url FROM games WHERE user_id = ? AND bgg_url IS NOT NULL AND bgg_url <> '' ORDER BY id");
-  mysqli_stmt_bind_param($stmt, 'i', $user_id);
-  mysqli_stmt_execute($stmt);
-  $linked = [];
-  foreach (mysqli_stmt_get_result($stmt) as $row) {
-    $thing_id = bgg_thing_id_from_url($row['bgg_url']);
-    if ($thing_id > 0) {
-      $linked[(int) $row['id']] = $thing_id;
-    }
-  }
-  mysqli_stmt_close($stmt);
+  $linked = item_bgg_thing_ids($conn, $user_id);
 
   $had_rating = find_item_bgg_ratings($conn, array_keys($linked), $user_id);
   $result = ['ok' => true, 'username' => $bgg_user['username'], 'checked' => 0, 'imported' => 0, 'removed' => 0, 'failed' => 0];
@@ -267,17 +279,10 @@ function bgg_overall_rating_store($conn, $user_id, $artifact_id, $rating) {
  */
 function bgg_overall_ratings_import($conn, $user_id, $get_json = null, $pause_ms = 250) {
   $user_id = (int) $user_id;
-  $stmt = mysqli_prepare($conn, "SELECT id, bgg_url FROM games WHERE user_id = ? AND bgg_url IS NOT NULL AND bgg_url <> '' ORDER BY id");
-  mysqli_stmt_bind_param($stmt, 'i', $user_id);
-  mysqli_stmt_execute($stmt);
   $by_thing = [];
-  foreach (mysqli_stmt_get_result($stmt) as $row) {
-    $thing_id = bgg_thing_id_from_url($row['bgg_url']);
-    if ($thing_id > 0) {
-      $by_thing[$thing_id][] = (int) $row['id'];
-    }
+  foreach (item_bgg_thing_ids($conn, $user_id) as $artifact_id => $thing_id) {
+    $by_thing[$thing_id][] = $artifact_id;
   }
-  mysqli_stmt_close($stmt);
 
   $result = ['ok' => true, 'checked' => 0, 'imported' => 0, 'cleared' => 0, 'failed' => 0];
   foreach ($by_thing as $thing_id => $artifact_ids) {
@@ -285,7 +290,7 @@ function bgg_overall_ratings_import($conn, $user_id, $get_json = null, $pause_ms
       usleep((int) $pause_ms * 1000);
     }
     $result['checked'] += count($artifact_ids);
-    $url = bgg_api_root() . '/dynamicinfo?objectid=' . (int) $thing_id . '&objecttype=thing';
+    $url = bgg_dynamic_info_url($thing_id);
     try {
       $json = bgg_fetch($url, $get_json);
     } catch (Throwable $e) {

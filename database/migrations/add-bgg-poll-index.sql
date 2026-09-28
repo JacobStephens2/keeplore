@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS bgg_poll_games (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- One row per player count the community voted Best. An open-ended "Best
--- with 9+" is stored as 9.
+-- with 9+" is stored as every count from 9 to 20.
 CREATE TABLE IF NOT EXISTS bgg_poll_best_players (
   thing_id INT UNSIGNED NOT NULL,
   players TINYINT UNSIGNED NOT NULL,

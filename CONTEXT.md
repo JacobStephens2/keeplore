@@ -53,6 +53,12 @@ An item with a physical form. Independent of whether it is kept.
 The age of the youngest person expected to use an item, as chosen on the Items page. It keeps items whose recorded minimum recommended age is at or below it; an item with no recorded minimum age is left out.
 _Avoid_: Minimum age (that is the item's own recommended floor).
 
+**Community age**:
+The age BoardGameGeek's player-age poll recommends for a game, such as 6 for "6+". Search BGG's "good for ages 6+" keeps games whose community age is 6 or under. Distinct from an item's own recommended minimum age.
+
+**Best player count**:
+A player count BoardGameGeek's community voted Best for a game. An open-ended vote such as "Best with 9+" counts for every larger group.
+
 **Digital item**:
 An item with a digital form. Independent of whether it is kept. An item can be both physical and digital.
 
