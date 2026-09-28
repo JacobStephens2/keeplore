@@ -1,0 +1,35 @@
+#!/usr/bin/env php
+<?php
+// Copy BoardGameGeek's average rating onto one owner's linked items.
+// Rerun to refresh. Usage: bin/import-bgg-overall-ratings <keeplore-email>
+
+if (PHP_SAPI !== 'cli') {
+  exit(1);
+}
+if ($argc !== 2) {
+  fwrite(STDERR, "Usage: bin/import-bgg-overall-ratings <keeplore-email>\n");
+  exit(2);
+}
+
+require_once dirname(__DIR__) . '/private/initialize.php';
+require_once PRIVATE_PATH . '/bgg_ratings.php';
+ob_end_flush();
+
+$stmt = mysqli_prepare($db, 'SELECT id FROM users WHERE email = ?');
+mysqli_stmt_bind_param($stmt, 's', $argv[1]);
+mysqli_stmt_execute($stmt);
+$owner = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+if (!$owner) {
+  fwrite(STDERR, "No Keeplore user with email {$argv[1]}.\n");
+  exit(1);
+}
+
+$result = bgg_overall_ratings_import($db, (int) $owner['id']);
+printf(
+  "Checked %d linked items, stored %d averages, cleared %d, failed %d.\n",
+  $result['checked'],
+  $result['imported'],
+  $result['cleared'],
+  $result['failed']
+);
+exit($result['failed'] > 0 ? 1 : 0);

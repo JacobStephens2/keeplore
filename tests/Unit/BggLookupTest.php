@@ -181,6 +181,18 @@ class BggLookupTest extends TestCase
         $this->assertSame('0', $fields['bgg_player_votes']);
     }
 
+    public function test_dynamic_info_average_is_the_overall_rating(): void
+    {
+        $itemJson = json_encode(['item' => ['objectid' => 13, 'name' => 'Catan']]);
+        $dynamicJson = json_encode(['item' => ['stats' => ['average' => '7.09024', 'baverage' => '6.90146']]]);
+
+        $this->assertSame('7.09', bgg_form_fields_from_json($itemJson, $dynamicJson)['fields']['BGG_Rat']);
+        $this->assertSame('7.09', bgg_overall_rating_from_dynamic_json($dynamicJson));
+        $this->assertNull(bgg_overall_rating_from_dynamic_json(json_encode(['item' => ['stats' => ['average' => '0']]])));
+        $this->assertFalse(bgg_overall_rating_from_dynamic_json('{"queued":true}'));
+        $this->assertFalse(bgg_overall_rating_from_dynamic_json('not json'));
+    }
+
     public function test_link_is_omitted_when_not_a_geek_site(): void
     {
         $itemJson = json_encode([

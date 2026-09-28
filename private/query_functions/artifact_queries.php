@@ -317,11 +317,11 @@ require_once dirname(__DIR__) . '/item_tags.php';
         MnT=?, MxT=?, Age=?, Yr=?, is_in_secondary_collection=?, MnP=?, MxP=?,
         interaction_frequency_days=?, to_get_rid_of=?,
         is_digital=?, is_physical=?, bgg_url=?,
-        bgg_player_votes=?, bgg_age_basis=?
+        bgg_player_votes=?, bgg_age_basis=?, BGG_Rat=?
       WHERE id=?
       LIMIT 1"
     );
-    mysqli_stmt_bind_param($stmt, "sisssissssssssisssisssisi",
+    mysqli_stmt_bind_param($stmt, "sisssissssssssisssisssissi",
       $artifact['Title'], $kept, $artifact['Acq'],
       $artifact['Candidate'], $artifact['UsedRecUserCt'],
       $type_id, $type_name, $artifact['SS'], $artifact['Notes'],
@@ -334,6 +334,7 @@ require_once dirname(__DIR__) . '/item_tags.php';
       $bgg['bgg_url'],
       $bgg['bgg_player_votes'],
       $bgg['bgg_age_basis'],
+      $bgg['BGG_Rat'],
       $artifact['id']
     );
     $result = mysqli_stmt_execute($stmt);
@@ -481,11 +482,12 @@ require_once dirname(__DIR__) . '/item_tags.php';
         image_url,
         bgg_url,
         bgg_player_votes,
-        bgg_age_basis
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        bgg_age_basis,
+        BGG_Rat
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ";
     $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'sssssssssssssssssssssssis',
+    mysqli_stmt_bind_param($stmt, 'sssssssssssssssssssssssiss',
       $artifact['Title'],
       $artifact['Notes'],
       $artifact['Acq'],
@@ -510,7 +512,8 @@ require_once dirname(__DIR__) . '/item_tags.php';
       $image_url,
       $bgg['bgg_url'],
       $bgg['bgg_player_votes'],
-      $bgg['bgg_age_basis']
+      $bgg['bgg_age_basis'],
+      $bgg['BGG_Rat']
     );
     $result = mysqli_stmt_execute($stmt);
     mysqli_stmt_close($stmt);

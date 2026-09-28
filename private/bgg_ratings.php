@@ -245,6 +245,70 @@ function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause
   return $result;
 }
 
+function bgg_overall_rating_store($conn, $user_id, $artifact_id, $rating) {
+  $user_id = (int) $user_id;
+  $artifact_id = (int) $artifact_id;
+  if ($rating === null) {
+    $stmt = mysqli_prepare($conn, 'UPDATE games SET BGG_Rat = NULL WHERE id = ? AND user_id = ?');
+    mysqli_stmt_bind_param($stmt, 'ii', $artifact_id, $user_id);
+  } else {
+    $stmt = mysqli_prepare($conn, 'UPDATE games SET BGG_Rat = ? WHERE id = ? AND user_id = ?');
+    mysqli_stmt_bind_param($stmt, 'sii', $rating, $artifact_id, $user_id);
+  }
+  $ok = mysqli_stmt_execute($stmt);
+  mysqli_stmt_close($stmt);
+  return $ok;
+}
+
+/**
+ * Copy BGG's average rating onto each of this owner's items that link to a
+ * thing. Items that share a thing are fetched once. A failed or queued reply
+ * leaves the stored average alone; a real answer with no average clears it.
+ */
+function bgg_overall_ratings_import($conn, $user_id, $get_json = null, $pause_ms = 250) {
+  $user_id = (int) $user_id;
+  $stmt = mysqli_prepare($conn, "SELECT id, bgg_url FROM games WHERE user_id = ? AND bgg_url IS NOT NULL AND bgg_url <> '' ORDER BY id");
+  mysqli_stmt_bind_param($stmt, 'i', $user_id);
+  mysqli_stmt_execute($stmt);
+  $by_thing = [];
+  foreach (mysqli_stmt_get_result($stmt) as $row) {
+    $thing_id = bgg_thing_id_from_url($row['bgg_url']);
+    if ($thing_id > 0) {
+      $by_thing[$thing_id][] = (int) $row['id'];
+    }
+  }
+  mysqli_stmt_close($stmt);
+
+  $result = ['ok' => true, 'checked' => 0, 'imported' => 0, 'cleared' => 0, 'failed' => 0];
+  foreach ($by_thing as $thing_id => $artifact_ids) {
+    if ($result['checked'] > 0 && $pause_ms > 0) {
+      usleep((int) $pause_ms * 1000);
+    }
+    $result['checked'] += count($artifact_ids);
+    $url = bgg_api_root() . '/dynamicinfo?objectid=' . (int) $thing_id . '&objecttype=thing';
+    try {
+      $json = bgg_fetch($url, $get_json);
+    } catch (Throwable $e) {
+      $result['failed'] += count($artifact_ids);
+      continue;
+    }
+    $rating = bgg_overall_rating_from_dynamic_json($json);
+    if ($rating === false) {
+      $result['failed'] += count($artifact_ids);
+      continue;
+    }
+    foreach ($artifact_ids as $artifact_id) {
+      bgg_overall_rating_store($conn, $user_id, $artifact_id, $rating);
+      if ($rating === null) {
+        $result['cleared']++;
+      } else {
+        $result['imported']++;
+      }
+    }
+  }
+  return $result;
+}
+
 /**
  * Edit Item's "Request <user> data": one item's entry, fetched now. The item
  * must belong to the owner and link to a BGG thing. On success 'message' says

@@ -157,6 +157,11 @@ function items_list_columns(array $filters, array $bgg_reviewers) {
     if ($filters['players'] !== null || $filters['age'] !== null || $attributes) {
         $columns[] = ['key' => 'players', 'label' => 'Players', 'tooltip' => 'Player range, with the best count in brackets'];
     }
+    $columns[] = [
+        'key' => 'bgg_average',
+        'label' => 'BGG',
+        'tooltip' => 'BoardGameGeek average rating',
+    ];
     foreach ($bgg_reviewers as $reviewer) {
         $columns[] = [
             'key' => 'bgg_rating:' . $reviewer,
@@ -271,6 +276,7 @@ function items_list_present_row(array $artifact, $interval, $today = null) {
         'copy_text' => items_list_copy_text($artifact),
         'avg_time' => (int) ceil(($mnt + $mxt) / 2),
         'candidate' => ($candidate_raw != '' && $candidate_raw != 0),
+        'bgg_average' => bgg_overall_rating_text($artifact['BGG_Rat'] ?? $artifact['bgg_rat'] ?? null) ?? '',
         // Keyed by BGG username; an object even when empty so the JSON is {}.
         'bgg_ratings' => empty($artifact['bgg_ratings']) ? new stdClass() : $artifact['bgg_ratings'],
     ];

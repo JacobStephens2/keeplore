@@ -48,6 +48,7 @@
     $artifact['bgg_url'] = $_POST['bgg_url'] ?? '';
     $artifact['bgg_player_votes'] = $_POST['bgg_player_votes'] ?? '';
     $artifact['bgg_age_basis'] = $_POST['bgg_age_basis'] ?? '';
+    $artifact['BGG_Rat'] = $_POST['BGG_Rat'] ?? '';
 
     if ($artifact['Acq'] == '') {
       $artifact['Acq'] = date('Y-m-d');
@@ -302,6 +303,7 @@
         <?php $bgg_keep_title = true; include(SHARED_PATH . '/bgg_lookup_panel.php'); ?>
         <input type="hidden" name="bgg_player_votes" id="bgg_player_votes" value="<?php echo h((string) ($artifact['bgg_player_votes'] ?? '')); ?>">
         <input type="hidden" name="bgg_age_basis" id="bgg_age_basis" value="<?php echo h((string) ($artifact['bgg_age_basis'] ?? '')); ?>">
+        <input type="hidden" name="BGG_Rat" id="BGG_Rat" value="<?php echo h((string) (bgg_overall_rating_text($artifact['BGG_Rat'] ?? $artifact['bgg_rat'] ?? null) ?? '')); ?>">
         <label for="bgg_url">BoardGameGeek Link</label>
         <input type="url" name="bgg_url" id="bgg_url" maxlength="1024"
           placeholder="https://boardgamegeek.com/boardgame/..."

@@ -396,4 +396,50 @@ final class BggRatingsImportTest extends TestCase
         $this->assertSame('No BoardGameGeek user named nosuchuser.', $result['error']);
         $this->assertSame([], item_bgg_reviewers($this->db, 1));
     }
+
+    public function test_overall_rating_import_stores_the_average_and_keeps_it_through_an_outage(): void
+    {
+        $this->db->query('ALTER TABLE games ADD COLUMN BGG_Rat VARCHAR(10) NULL');
+        $this->db->query("UPDATE games SET BGG_Rat = '5.50' WHERE id = 11");
+        $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/147154/blue-moon-legends' WHERE id = 13");
+        $this->db->query("UPDATE games SET BGG_Rat = '9.00' WHERE id = 20");
+
+        $calls = 0;
+        $result = bgg_overall_ratings_import($this->db, 1, function (string $url) use (&$calls) {
+            $calls++;
+            if (str_contains($url, 'objectid=147154')) {
+                return json_encode(['item' => ['stats' => ['average' => '7.654', 'baverage' => '6.1']]]);
+            }
+            if (str_contains($url, 'objectid=29107')) {
+                throw new \RuntimeException('down');
+            }
+            throw new \RuntimeException('unexpected ' . $url);
+        }, 0);
+
+        $this->assertSame(2, $calls);
+        $this->assertSame(['ok' => true, 'checked' => 3, 'imported' => 2, 'cleared' => 0, 'failed' => 1], $result);
+        $this->assertSame('7.65', $this->rating(10));
+        $this->assertSame('7.65', $this->rating(13));
+        $this->assertSame('5.50', $this->rating(11));
+        $this->assertNull($this->rating(12));
+        $this->assertSame('9.00', $this->rating(20));
+
+        $cleared = bgg_overall_ratings_import($this->db, 1, function (string $url) {
+            if (str_contains($url, 'objectid=147154')) {
+                return json_encode(['item' => ['stats' => ['average' => '']]]);
+            }
+            return '{"queued":true}';
+        }, 0);
+        $this->assertSame(2, $cleared['cleared']);
+        $this->assertSame(1, $cleared['failed']);
+        $this->assertNull($this->rating(10));
+        $this->assertNull($this->rating(13));
+        $this->assertSame('5.50', $this->rating(11));
+    }
+
+    private function rating(int $id): ?string
+    {
+        $value = $this->db->query('SELECT BGG_Rat FROM games WHERE id = ' . $id)->fetch_row()[0];
+        return $value === null ? null : (string) $value;
+    }
 }

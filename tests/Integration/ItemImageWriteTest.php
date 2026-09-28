@@ -57,7 +57,8 @@ final class ItemImageWriteTest extends TestCase
             interaction_frequency_days DECIMAL(8,2) DEFAULT NULL,
             to_get_rid_of TINYINT DEFAULT 0,
             is_digital TINYINT DEFAULT NULL,
-            is_physical TINYINT DEFAULT NULL
+            is_physical TINYINT DEFAULT NULL,
+            BGG_Rat VARCHAR(10) DEFAULT NULL
         ) ENGINE=InnoDB");
         $this->db->query("INSERT INTO types VALUES (44, 'other')");
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-image-url.sql'));

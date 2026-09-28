@@ -47,6 +47,7 @@ if(is_post_request()) {
   $artifact['bgg_url'] = $_POST['bgg_url'] ?? '';
   $artifact['bgg_player_votes'] = $_POST['bgg_player_votes'] ?? '';
   $artifact['bgg_age_basis'] = $_POST['bgg_age_basis'] ?? '';
+  $artifact['BGG_Rat'] = $_POST['BGG_Rat'] ?? '';
 
   $artifact['tags'] = $_POST['tags'] ?? '';
   $result = insert_artifact($artifact);
@@ -97,6 +98,7 @@ if(is_post_request()) {
   $artifact['bgg_url'] = '';
   $artifact['bgg_player_votes'] = '';
   $artifact['bgg_age_basis'] = '';
+  $artifact['BGG_Rat'] = '';
   $artifact['tags'] = '';
 }
 
@@ -156,6 +158,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
         <input type="hidden" name="bgg_url" id="bgg_url" value="<?php echo h(normalize_item_bgg_url($artifact['bgg_url'] ?? '')); ?>">
         <input type="hidden" name="bgg_player_votes" id="bgg_player_votes" value="<?php echo h((string) ($artifact['bgg_player_votes'] ?? '')); ?>">
         <input type="hidden" name="bgg_age_basis" id="bgg_age_basis" value="<?php echo h((string) ($artifact['bgg_age_basis'] ?? '')); ?>">
+        <input type="hidden" name="BGG_Rat" id="BGG_Rat" value="<?php echo h((string) ($artifact['BGG_Rat'] ?? '')); ?>">
         <img id="itemPicturePreview" class="item-picture-preview"
           alt="<?php echo $preview_url !== '' ? h($artifact['Title']) . ' cover' : ''; ?>"
           <?php if ($preview_url !== '') { ?>src="<?php echo h($preview_url); ?>"<?php } else { ?>hidden<?php } ?>
