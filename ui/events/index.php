@@ -23,7 +23,7 @@ $events = $plans->all();
 $page_title = 'Events';
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=3'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=4'); ?>">
 <main class="event-page">
     <header class="page-header">
         <h1>Events</h1>
@@ -37,7 +37,7 @@ include(SHARED_PATH . '/header.php');
                     <a href="<?php echo url_for('/events/show.php?id=' . $event['id']); ?>"><?php echo h($event['name']); ?></a>
                     <span class="menu-support">
                         <?php $dates = event_dates_label($event['starts_on'], $event['ends_on']); echo $dates === '' ? '' : h($dates) . ' · '; ?>
-                        <?php echo $event['item_count']; ?> <?php echo $event['item_count'] === 1 ? 'game' : 'games'; ?><?php if ($event['packed_count'] > 0) { ?>, <?php echo $event['packed_count']; ?> packed<?php } ?>
+                        <?php echo $event['item_count']; ?> <?php echo $event['item_count'] === 1 ? 'game' : 'games'; ?><?php if ($event['packed_count'] > 0) { ?>, <?php echo $event['packed_count']; ?> packed<?php } ?><?php if ($event['player_count'] > 0) { ?>, <?php echo $event['player_count']; ?> <?php echo $event['player_count'] === 1 ? 'player' : 'players'; ?><?php } ?>
                     </span>
                 </li>
             <?php } ?>

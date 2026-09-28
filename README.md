@@ -57,10 +57,14 @@ Formerly **Artifact Manager** — see [docs/keeplore-app-name.md](docs/keeplore-
 - Group the plan by sweet spot, age, setting or tag, then by a second of those; a game best at 6 and 8 shows under both counts
 - Record a setting and note per game, tick games off as packed, and see the total planned
 - Copy the plan as a plain-text checklist
+- Add the players coming to an event from your people list, and remove them
 
 Before deploying events, apply
 [`database/migrations/add-events.sql`](database/migrations/add-events.sql). It only creates the
 `events` and `event_items` tables and can be rerun.
+
+Players on events need [`database/migrations/add-event-players.sql`](database/migrations/add-event-players.sql)
+as well, applied after `add-events.sql`. It only creates the `event_players` table and can be rerun.
 
 ### Player & Playgroup Management
 

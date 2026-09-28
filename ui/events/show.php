@@ -23,6 +23,8 @@ $groups = event_plan_groups($items, $by, $then, event_plan_chosen_tags($tags));
 $packed = count(array_filter(array_column($items, 'is_packed')));
 $not_kept = count(array_filter($items, fn($item) => !$item['is_kept']));
 $to_add = $plans->itemsToAdd($id);
+$players = $event['players'];
+$players_to_add = $plans->playersToAdd($id);
 $settings = array_values(array_unique(array_filter(array_map('trim', array_column($items, 'setting')))));
 sort($settings, SORT_NATURAL | SORT_FLAG_CASE);
 $dates = event_dates_label($event['starts_on'], $event['ends_on']);
@@ -30,7 +32,7 @@ $dates = event_dates_label($event['starts_on'], $event['ends_on']);
 $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=3'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/events/events.css?v=4'); ?>">
 <main class="event-page" data-event-id="<?php echo $id; ?>" data-item-url="<?php echo h(url_for('/events/item.php')); ?>">
     <header class="page-header">
         <p class="section-label"><a href="<?php echo url_for('/events/index.php'); ?>">Events</a></p>
@@ -39,6 +41,49 @@ include(SHARED_PATH . '/header.php');
         <?php if ($event['notes'] !== '') { ?><p class="event-notes"><?php echo h($event['notes']); ?></p><?php } ?>
         <p><a href="<?php echo url_for('/events/edit.php?id=' . $id); ?>">Edit event</a></p>
     </header>
+
+    <section class="event-players" aria-labelledby="event-players-heading">
+        <h2 id="event-players-heading">Players <small class="menu-support"><?php echo count($players); ?></small></h2>
+        <?php if ($players) { ?>
+            <ul class="event-player-list">
+                <?php foreach ($players as $player) { ?>
+                    <li>
+                        <form method="post" action="<?php echo url_for('/events/player.php'); ?>">
+                            <?php echo csrf_input(); ?>
+                            <input type="hidden" name="event_id" value="<?php echo $id; ?>">
+                            <input type="hidden" name="player_id" value="<?php echo $player['id']; ?>">
+                            <span><?php echo h($player['name']); ?></span>
+                            <button type="submit" name="action" value="remove" class="event-remove" aria-label="Remove <?php echo h($player['name']); ?> from this event">Remove</button>
+                        </form>
+                    </li>
+                <?php } ?>
+            </ul>
+        <?php } else { ?>
+            <p class="menu-support">No players yet.</p>
+        <?php } ?>
+        <details class="event-add">
+            <summary>Add players</summary>
+            <?php if ($players_to_add) { ?>
+                <form method="post" action="<?php echo url_for('/events/player.php'); ?>">
+                    <?php echo csrf_input(); ?>
+                    <input type="hidden" name="event_id" value="<?php echo $id; ?>">
+                    <input type="hidden" name="action" value="add">
+                    <div class="event-add-list">
+                        <?php foreach ($players_to_add as $candidate) { ?>
+                            <label class="event-choice">
+                                <input type="checkbox" name="player_ids[]" value="<?php echo $candidate['id']; ?>">
+                                <span><?php echo h($candidate['name']); ?></span>
+                            </label>
+                        <?php } ?>
+                    </div>
+                    <button type="submit">Add selected players</button>
+                </form>
+            <?php } else { ?>
+                <p class="menu-support"><?php echo $players ? 'Everyone in your people list is coming.' : 'Your people list is empty.'; ?>
+                    <a href="<?php echo url_for('/users/new'); ?>">Create a user</a> to add someone new.</p>
+            <?php } ?>
+        </details>
+    </section>
 
     <p class="event-total" aria-live="polite">
         <strong><?php echo count($items); ?></strong> <?php echo count($items) === 1 ? 'game' : 'games'; ?> planned<?php if ($items) { ?>,

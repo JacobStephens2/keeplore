@@ -139,8 +139,9 @@
    * Merge the losing player into the surviving player (issue #9, brief 3).
    *
    * Re-points every participation row (plays, proposal outcomes,
-   * playgroup slots) from loser to survivor, then deletes the loser.
-   * Where the survivor is already linked (plays, proposal outcomes),
+   * playgroup slots, events) from loser to survivor, then deletes the
+   * loser. Where the survivor is already linked (plays, proposal outcomes,
+   * events),
    * the loser's redundant link is dropped so no play gains or loses
    * participants overall. Returns true on success, or an array of
    * error strings when the guardrails refuse.
@@ -224,6 +225,31 @@
       "UPDATE playgroup SET FullName = ? WHERE FullName = ? AND user_id = ?"
     );
     mysqli_stmt_bind_param($stmt, "iii", $survivor_id, $loser_id, $user_id);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
+
+    // Events: same drop-conflicts-then-repoint pattern, scoped to the
+    // acting user's events through the parent table.
+    $stmt = mysqli_prepare($db,
+      "DELETE ep_loser FROM event_players AS ep_loser
+       JOIN event_players AS ep_survivor
+         ON ep_survivor.event_id = ep_loser.event_id
+         AND ep_survivor.player_id = ?
+       JOIN events AS e
+         ON e.id = ep_loser.event_id AND e.user_id = ?
+       WHERE ep_loser.player_id = ?"
+    );
+    mysqli_stmt_bind_param($stmt, "iii", $survivor_id, $user_id, $loser_id);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_close($stmt);
+
+    $stmt = mysqli_prepare($db,
+      "UPDATE event_players AS ep
+       JOIN events AS e
+         ON e.id = ep.event_id AND e.user_id = ?
+       SET ep.player_id = ? WHERE ep.player_id = ?"
+    );
+    mysqli_stmt_bind_param($stmt, "iii", $user_id, $survivor_id, $loser_id);
     mysqli_stmt_execute($stmt);
     mysqli_stmt_close($stmt);
 
