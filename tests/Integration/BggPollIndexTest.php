@@ -34,6 +34,8 @@ final class BggPollIndexTest extends TestCase
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-url.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings-manual.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-bgg-poll-index.sql'));
         // Rerunning the migration must be harmless.
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-bgg-poll-index.sql'));
@@ -129,7 +131,7 @@ final class BggPollIndexTest extends TestCase
     {
         $this->refreshSample();
 
-        $found = bgg_poll_search($this->db, ['best' => 7, 'age' => 6, 'min_votes' => 0]);
+        $found = bgg_poll_search($this->db, ['best' => 7, 'age' => 6, 'min_votes' => 0, 'skip_open' => false]);
 
         $this->assertSame(['UNO'], array_column($found, 'name'));
         $this->assertSame(335, $found[0]['player_votes']);
@@ -142,7 +144,7 @@ final class BggPollIndexTest extends TestCase
     {
         $this->refreshSample();
 
-        $found = bgg_poll_search($this->db, ['best' => 7, 'age' => null, 'min_votes' => 0]);
+        $found = bgg_poll_search($this->db, ['best' => 7, 'age' => null, 'min_votes' => 0, 'skip_open' => false]);
 
         $this->assertSame(['Just One', 'UNO'], array_column($found, 'name'));
     }
@@ -151,7 +153,7 @@ final class BggPollIndexTest extends TestCase
     {
         $this->refreshSample();
 
-        $found = bgg_poll_search($this->db, ['best' => null, 'age' => 6, 'min_votes' => 0]);
+        $found = bgg_poll_search($this->db, ['best' => null, 'age' => 6, 'min_votes' => 0, 'skip_open' => false]);
 
         $this->assertSame(['Catan', 'UNO'], array_column($found, 'name'));
     }
@@ -189,7 +191,7 @@ final class BggPollIndexTest extends TestCase
         );
 
         $this->assertSame(['ok' => true, 'listed' => 1, 'fetched' => 0, 'skipped' => 0, 'failed' => 1, 'lists_failed' => 0], $result);
-        $this->assertSame(['Catan'], array_column(bgg_poll_search($this->db, ['best' => 4, 'age' => null, 'min_votes' => 0]), 'name'));
+        $this->assertSame(['Catan'], array_column(bgg_poll_search($this->db, ['best' => 4, 'age' => null, 'min_votes' => 0, 'skip_open' => false]), 'name'));
     }
 
     public function test_a_list_limit_reads_only_the_top_ranked_pages(): void
@@ -228,6 +230,26 @@ final class BggPollIndexTest extends TestCase
         $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/13' WHERE id = 20");
 
         $this->assertSame([2223 => 10], bgg_poll_kept_things($this->db, 1));
+    }
+
+    public function test_reviewer_ratings_map_the_owners_linked_items_by_bgg_id(): void
+    {
+        // Fixture items 10-13 belong to user 1, item 20 to user 2. Item 11 is
+        // not kept, and still shows what Gyges said about it.
+        $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/2223/uno' WHERE id = 10");
+        $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/13', is_kept = 0 WHERE id = 11");
+        $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/13' WHERE id = 20");
+        bgg_ratings_store_item($this->db, 1, 10, 'Gyges', ['rating' => 6.5, 'comment' => null, 'rated_at' => null]);
+        bgg_ratings_store_item($this->db, 1, 11, 'Gyges', ['rating' => null, 'comment' => 'Too long.', 'rated_at' => null]);
+        bgg_ratings_store_item($this->db, 2, 20, 'Gyges', ['rating' => 9.0, 'comment' => 'Not user 1s.', 'rated_at' => null]);
+
+        $ratings = bgg_reviews_by_thing($this->db, 1);
+
+        $this->assertSame([2223, 13], array_keys($ratings));
+        $this->assertSame(6.5, $ratings[2223]['Gyges']['rating']);
+        $this->assertSame(10, $ratings[2223]['Gyges']['artifact_id']);
+        $this->assertNull($ratings[13]['Gyges']['rating']);
+        $this->assertSame('Too long.', $ratings[13]['Gyges']['comment']);
     }
 
     public function test_a_game_off_every_list_leaves_the_index(): void
@@ -269,9 +291,31 @@ final class BggPollIndexTest extends TestCase
             $this->fakeBgg([5498 => [[1, 'Big Party', 10]]], [1 => [[['min' => 9, 'max' => null]], 40, '10+']])
         );
 
-        $found = bgg_poll_search($this->db, ['best' => 12, 'age' => null, 'min_votes' => 0]);
+        $found = bgg_poll_search($this->db, ['best' => 12, 'age' => null, 'min_votes' => 0, 'skip_open' => false]);
 
         $this->assertSame(['Big Party'], array_column($found, 'name'));
         $this->assertSame('9+', $found[0]['best_players']);
+    }
+
+    public function test_leaving_out_open_ended_best_keeps_only_counts_the_votes_name(): void
+    {
+        bgg_poll_index_refresh(
+            $this->db,
+            ['perSubdomain' => 50, 'subdomains' => [5498 => 'Party'], 'pause_ms' => 0],
+            $this->fakeBgg([5498 => [[1, 'Four Plus', 10], [2, 'Nine Plus', 20], [3, 'Up To Nine', 30], [4, 'Three And Four Plus', 40]]], [
+                1 => [[['min' => 4, 'max' => null]], 40, '10+'],
+                2 => [[['min' => 9, 'max' => null]], 40, '10+'],
+                3 => [[['min' => 6, 'max' => 9]], 40, '10+'],
+                4 => [[['min' => 3, 'max' => 3], ['min' => 4, 'max' => null]], 40, '10+'],
+            ])
+        );
+
+        $all = bgg_poll_search($this->db, ['best' => 9, 'age' => null, 'min_votes' => 0, 'skip_open' => false]);
+        $stated = bgg_poll_search($this->db, ['best' => 9, 'age' => null, 'min_votes' => 0, 'skip_open' => true]);
+        $atFour = bgg_poll_search($this->db, ['best' => 4, 'age' => null, 'min_votes' => 0, 'skip_open' => true]);
+
+        $this->assertSame(['Four Plus', 'Nine Plus', 'Up To Nine', 'Three And Four Plus'], array_column($all, 'name'));
+        $this->assertSame(['Nine Plus', 'Up To Nine'], array_column($stated, 'name'));
+        $this->assertSame(['Four Plus', 'Three And Four Plus'], array_column($atFour, 'name'));
     }
 }

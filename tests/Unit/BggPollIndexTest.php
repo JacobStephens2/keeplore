@@ -76,6 +76,15 @@ class BggPollIndexTest extends TestCase
         );
     }
 
+    public function test_best_text_lists_ranges_smallest_first_so_an_open_end_comes_last(): void
+    {
+        $json = json_encode(['item' => ['polls' => ['userplayers' => [
+            'best' => [['min' => 4, 'max' => null], ['min' => 2, 'max' => 2]], 'totalvotes' => '30',
+        ]]]]);
+
+        $this->assertSame('2, 4+', bgg_poll_results_from_dynamic_json($json)['best_text']);
+    }
+
     public function test_a_game_nobody_voted_on_has_no_best_counts_or_age(): void
     {
         $json = json_encode(['item' => ['polls' => ['userplayers' => ['best' => [], 'totalvotes' => '0'], 'playerage' => '(no votes)']]]);
@@ -95,24 +104,31 @@ class BggPollIndexTest extends TestCase
     public function test_search_form_reads_best_count_age_and_minimum_votes(): void
     {
         $this->assertSame(
-            ['best' => 7, 'age' => 6, 'min_votes' => 20],
+            ['best' => 7, 'age' => 6, 'min_votes' => 20, 'skip_open' => false],
             bgg_poll_search_filters(['best' => '7', 'age' => '6', 'min_votes' => '20'])
         );
     }
 
     public function test_search_form_uses_either_filter_alone(): void
     {
-        $this->assertSame(['best' => 7, 'age' => null, 'min_votes' => 0], bgg_poll_search_filters(['best' => '7', 'age' => '']));
-        $this->assertSame(['best' => null, 'age' => 6, 'min_votes' => 0], bgg_poll_search_filters(['age' => '6']));
-        $this->assertSame(['best' => null, 'age' => null, 'min_votes' => 0], bgg_poll_search_filters([]));
+        $this->assertSame(['best' => 7, 'age' => null, 'min_votes' => 0, 'skip_open' => false], bgg_poll_search_filters(['best' => '7', 'age' => '']));
+        $this->assertSame(['best' => null, 'age' => 6, 'min_votes' => 0, 'skip_open' => false], bgg_poll_search_filters(['age' => '6']));
+        $this->assertSame(['best' => null, 'age' => null, 'min_votes' => 0, 'skip_open' => false], bgg_poll_search_filters([]));
     }
 
     public function test_search_form_ignores_values_out_of_range(): void
     {
         $this->assertSame(
-            ['best' => null, 'age' => null, 'min_votes' => 0],
+            ['best' => null, 'age' => null, 'min_votes' => 0, 'skip_open' => false],
             bgg_poll_search_filters(['best' => '0', 'age' => 'six', 'min_votes' => '-3'])
         );
-        $this->assertSame(['best' => null, 'age' => null, 'min_votes' => 0], bgg_poll_search_filters(['best' => ['7']]));
+        $this->assertSame(['best' => null, 'age' => null, 'min_votes' => 0, 'skip_open' => false], bgg_poll_search_filters(['best' => ['7']]));
+    }
+
+    public function test_search_form_reads_leaving_out_open_ended_best(): void
+    {
+        $this->assertTrue(bgg_poll_search_filters(['best' => '9', 'skip_open' => '1'])['skip_open']);
+        $this->assertFalse(bgg_poll_search_filters(['best' => '9', 'skip_open' => ''])['skip_open']);
+        $this->assertFalse(bgg_poll_search_filters(['best' => '9', 'skip_open' => ['1']])['skip_open']);
     }
 }

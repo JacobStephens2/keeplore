@@ -476,3 +476,22 @@ function with_item_bgg_ratings($conn, array $items, $user_id) {
   unset($item);
   return $items;
 }
+
+// [thing_id => [bgg_username => ['rating', 'comment', 'artifact_id']]] for
+// the owner's items that link to a BGG thing, kept or not, so Search BGG can
+// show what imported reviewers such as Gyges said. When two items share a
+// thing, the lower item id speaks for it.
+function bgg_reviews_by_thing($conn, $user_id) {
+  $linked = item_bgg_thing_ids($conn, $user_id);
+  $by_thing = [];
+  foreach (find_item_bgg_ratings($conn, array_keys($linked), $user_id) as $artifact_id => $ratings) {
+    foreach ($ratings as $reviewer => $rating) {
+      $by_thing[$linked[$artifact_id]][$reviewer] = $by_thing[$linked[$artifact_id]][$reviewer] ?? [
+        'rating' => $rating['rating'],
+        'comment' => $rating['comment'],
+        'artifact_id' => $artifact_id,
+      ];
+    }
+  }
+  return $by_thing;
+}
