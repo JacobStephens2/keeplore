@@ -1,9 +1,10 @@
 <?php
 
 /**
- * Another BoardGameGeek user's ratings and comments on the owner's items.
- * bin/import-bgg-ratings fills item_bgg_ratings from BGG, Edit Item can enter
- * one by hand, and the Items list reads it back as one column per BGG user.
+ * A BoardGameGeek reviewer's ratings and comments on the owner's items.
+ * Settings names the owner's own reviewer, bin/import-bgg-ratings fills
+ * item_bgg_ratings from BGG, Edit Item can enter one by hand, and the Items
+ * list reads it back as one column per BGG user.
  * The import never touches a hand entry; Request data on Edit Item replaces
  * one only when BGG has something for that item.
  */
@@ -350,9 +351,9 @@ function bgg_ratings_import_item($conn, $user_id, $artifact_id, $username, $get_
 }
 
 /**
- * Edit Item's rating editor: the owner's own rating and comment for an
- * imported BGG user on one item, with or without a BGG link or an earlier
- * rating. $username must be a reviewer the owner already imported. A blank
+ * Edit Item's rating editor: the owner's own rating and comment for a
+ * BGG reviewer on one item, with or without a BGG link or an earlier
+ * rating. $username must be a reviewer from item_bgg_reviewers(). A blank
  * rating or comment stores none; both blank removes the row. The import
  * leaves the entry alone; "Request <user> data" replaces it only when BGG has
  * an entry for the item.
@@ -371,7 +372,7 @@ function bgg_ratings_save_item($conn, $user_id, $artifact_id, $username, $rating
     }
   }
   if ($reviewer === null) {
-    return ['ok' => false, 'error' => 'No imported BoardGameGeek ratings from ' . trim((string) $username) . '.'];
+    return ['ok' => false, 'error' => trim((string) $username) . ' is not one of your BoardGameGeek reviewers.'];
   }
 
   $rating = bgg_rating_from_input($rating);
@@ -423,7 +424,56 @@ function find_item_bgg_ratings($conn, array $artifact_ids, $user_id) {
   return $ratings;
 }
 
-/** The BGG users whose ratings the owner has imported, alphabetically. */
+// The BGG user the owner set as their reviewer on Settings, or null.
+function user_bgg_username($conn, $user_id) {
+  $stmt = mysqli_prepare($conn, 'SELECT bgg_username FROM users WHERE id = ?');
+  $user_id = (int) $user_id;
+  mysqli_stmt_bind_param($stmt, 'i', $user_id);
+  mysqli_stmt_execute($stmt);
+  $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+  mysqli_stmt_close($stmt);
+  $username = trim((string) ($row['bgg_username'] ?? ''));
+  return $username === '' ? null : $username;
+}
+
+/**
+ * Settings' BoardGameGeek reviewer: blank clears it, anything else must be a
+ * BGG user and is stored as BGG spells it. Their ratings already imported
+ * stay either way. ['ok' => true, 'username', 'message'], with a null
+ * message when nothing changed, or ['ok' => false, 'error'].
+ */
+function user_bgg_username_set($conn, $user_id, $raw, $get_json = null) {
+  $user_id = (int) $user_id;
+  $raw = trim((string) $raw);
+  $current = user_bgg_username($conn, $user_id);
+  if (mb_strlen($raw) > 64) {
+    return ['ok' => false, 'error' => 'A BoardGameGeek username is at most 64 characters.'];
+  }
+  if (strcasecmp($raw, (string) $current) === 0) {
+    return ['ok' => true, 'username' => $current, 'message' => null];
+  }
+  if ($raw === '') {
+    $username = null;
+    $message = 'You no longer have a BoardGameGeek reviewer.';
+  } else {
+    $found = bgg_ratings_find_user($raw, $get_json);
+    if (!$found['ok']) {
+      return $found;
+    }
+    $username = $found['user']['username'];
+    $message = 'Your BoardGameGeek reviewer is now ' . $username . '.';
+  }
+  $stmt = mysqli_prepare($conn, 'UPDATE users SET bgg_username = ? WHERE id = ?');
+  mysqli_stmt_bind_param($stmt, 'si', $username, $user_id);
+  mysqli_stmt_execute($stmt);
+  mysqli_stmt_close($stmt);
+  return ['ok' => true, 'username' => $username, 'message' => $message];
+}
+
+/**
+ * The BGG users whose ratings the owner has imported, plus the reviewer set
+ * on Settings before any import, alphabetically.
+ */
 function item_bgg_reviewers($conn, $user_id) {
   // Through games, so a deleted item's rating does not keep an empty column.
   $stmt = mysqli_prepare(
@@ -442,6 +492,11 @@ function item_bgg_reviewers($conn, $user_id) {
     $reviewers[] = $row['bgg_username'];
   }
   mysqli_stmt_close($stmt);
+  $own = user_bgg_username($conn, $user_id);
+  if ($own !== null && !in_array(strtolower($own), array_map('strtolower', $reviewers), true)) {
+    $reviewers[] = $own;
+    usort($reviewers, 'strcasecmp');
+  }
   return $reviewers;
 }
 

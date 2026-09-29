@@ -1,6 +1,7 @@
 <?php 
 
 require_once('../../private/initialize.php');
+require_once(PRIVATE_PATH . '/bgg_ratings.php');
 global $db;
 
 require_login();
@@ -52,11 +53,15 @@ if(is_post_request()) {
   );
   $update_result = mysqli_stmt_execute($stmt);
   mysqli_stmt_close($stmt);
+
+  // Checked against BGG apart from the rest, so a typo or a BGG outage costs
+  // only this field.
+  $bgg_result = user_bgg_username_set($db, $user_id, (string) ($_POST['bgg_username'] ?? ''));
 }
 
 $user_id = (int) $_SESSION['user_id'];
 $stmt = mysqli_prepare($db, "SELECT
-  first_name, last_name, email, username,
+  first_name, last_name, email, username, bgg_username,
   default_use_interval, default_snooze_days, default_setting, daily_email, daily_email_hour,
   native_notify_enabled, native_notify_hour, native_notify_lead_days, native_notify_past_due
   FROM users WHERE id = ?");
@@ -82,6 +87,11 @@ mysqli_stmt_close($stmt);
         echo '<p class="errors">Update failed, please contact support</p>';
       } elseif (isset($update_result) && $update_result === true) {
         echo '<p id="message">Update successful</p>';
+      }
+      if (isset($bgg_result) && !$bgg_result['ok']) {
+        echo '<p class="errors">' . h($bgg_result['error']) . ' Your BoardGameGeek reviewer did not change.</p>';
+      } elseif (isset($bgg_result) && $bgg_result['message'] !== null) {
+        echo '<p id="bgg_message">' . h($bgg_result['message']) . '</p>';
       }
   ?>
 
@@ -192,6 +202,22 @@ mysqli_stmt_close($stmt);
           }
         ?>
       </select>
+    </div>
+
+    <h2 class="form-field-span">BoardGameGeek</h2>
+    <p class="form-field-span" id="bgg_username_help">The BoardGameGeek user whose ratings and comments you follow on your items: your own account or someone else's. Items and Search BGG show a column for them, and Edit Item can request or enter their rating. Leave blank for none.</p>
+
+    <div class="form-field">
+      <label for="bgg_username">BoardGameGeek reviewer</label>
+      <input
+        type="text"
+        name="bgg_username"
+        id="bgg_username"
+        value="<?php echo h(isset($bgg_result) && !$bgg_result['ok'] ? (string) ($_POST['bgg_username'] ?? '') : (string) $userArray['bgg_username']); ?>"
+        maxlength="64"
+        autocomplete="off"
+        aria-describedby="bgg_username_help"
+      >
     </div>
 
     <h2 class="form-field-span">App notifications</h2>

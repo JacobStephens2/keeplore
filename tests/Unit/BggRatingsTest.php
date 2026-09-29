@@ -174,6 +174,16 @@ class BggRatingsTest extends TestCase
         $this->assertStringContainsString('require_login()', $save);
     }
 
+    public function test_settings_names_the_owners_bgg_reviewer(): void
+    {
+        $settings = (string) file_get_contents(PROJECT_PATH . '/ui/settings/edit.php');
+        $cli = (string) file_get_contents(PROJECT_PATH . '/bin/import-bgg-ratings');
+
+        $this->assertMatchesRegularExpression('/name="bgg_username"/', $settings);
+        $this->assertStringContainsString('user_bgg_username_set(', $settings);
+        $this->assertStringContainsString('user_bgg_username(', $cli);
+    }
+
     public function test_item_page_marks_a_hand_entry_as_not_from_bgg(): void
     {
         $rated = item_bgg_ratings_html(['Gyges' => ['rating' => 7.0, 'comment' => 'Mine.', 'url' => '', 'manual' => true]]);

@@ -79,7 +79,7 @@ Owner-managed free-form tags on items (issue #28). Distinct from BGG rating meta
 
 ### `item_bgg_ratings`
 
-Another BoardGameGeek user's rating and comment on an owner's item, matched through the item's `games.bgg_url`. `bin/import-bgg-ratings <keeplore-email> <bgg-username>` fills it; rerunning refreshes it. Items shows one column per imported BGG user. Edit Item can also enter a user's rating and comment by hand, with or without a BGG link, and the import then leaves it alone. Apply [`add-item-bgg-ratings.sql`](../database/migrations/add-item-bgg-ratings.sql), then [`add-item-bgg-ratings-manual.sql`](../database/migrations/add-item-bgg-ratings-manual.sql); both are safe to rerun.
+A BoardGameGeek reviewer's rating and comment on an owner's item, matched through the item's `games.bgg_url`. `bin/import-bgg-ratings <keeplore-email> [<bgg-username>]` fills it, for the owner's `users.bgg_username` when no BGG user is named; rerunning refreshes it. Items shows one column per imported BGG user, plus one for `users.bgg_username` before any import. Edit Item can also enter a user's rating and comment by hand, with or without a BGG link, and the import then leaves it alone. Apply [`add-item-bgg-ratings.sql`](../database/migrations/add-item-bgg-ratings.sql), then [`add-item-bgg-ratings-manual.sql`](../database/migrations/add-item-bgg-ratings-manual.sql); both are safe to rerun.
 
 | Column | Type | Nullable | Description |
 |---|---|---|---|
@@ -168,6 +168,7 @@ Authentication and account records for application users.
 | `default_setting` | VARCHAR(255) | YES | Default UI setting preference |
 | `daily_email` | TINYINT(1) | NO | Whether user receives the daily use-by email (1 = yes, 0 = no, default 1) |
 | `player_id` | INT | YES | FK to `players.id` -- links this user account to their player record |
+| `bgg_username` | VARCHAR(64) | YES | BoardGameGeek reviewer set on Settings, the owner's own BGG account or someone else's, as BGG spells it. Apply [`add-user-bgg-username.sql`](../database/migrations/add-user-bgg-username.sql); safe to rerun |
 
 **Primary key:** `id`
 **Foreign keys:**
