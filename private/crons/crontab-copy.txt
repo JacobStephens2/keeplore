@@ -1,1 +1,2 @@
 00 * * * * /usr/bin/php /opt/keeplore/current/private/crons/email_notification_of_todays_use_bys.php >> /opt/keeplore/shared/logs/email_notification_of_todays_use_bys.php.log 2>&1
+* * * * * /usr/bin/php /opt/keeplore/current/private/crons/run_bgg_import_jobs.php >> /opt/keeplore/shared/logs/run_bgg_import_jobs.php.log 2>&1

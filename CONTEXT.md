@@ -60,7 +60,7 @@ The age BoardGameGeek's player-age poll recommends for a game, such as 6 for "6+
 A player count BoardGameGeek's community voted Best for a game. An open-ended vote such as "Best with 9+" counts for every larger group, unless Search BGG is told to leave open-ended Best out; then it counts only at 9.
 
 **BGG reviewer**:
-A BoardGameGeek user, such as Gyges, whose ratings and comments on the owner's items are imported or entered by hand. The owner names their own reviewer on Settings, whether their own BGG account or someone else's, and may have older ones from earlier imports. Items and Search BGG show one column per reviewer; Search BGG fills it from the owner's items that link to the game, kept or not.
+A BoardGameGeek user, such as Gyges, whose ratings and comments on the owner's items are imported or entered by hand. The owner names their own reviewer on Settings, whether their own BGG account or someone else's, and may have older ones from earlier imports. Settings imports all of their ratings in the background. Items and Search BGG show one column per reviewer; Search BGG fills it from the owner's items that link to the game, kept or not.
 
 **Digital item**:
 An item with a digital form. Independent of whether it is kept. An item can be both physical and digital.

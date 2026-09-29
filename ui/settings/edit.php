@@ -1,7 +1,7 @@
 <?php 
 
 require_once('../../private/initialize.php');
-require_once(PRIVATE_PATH . '/bgg_ratings.php');
+require_once(PRIVATE_PATH . '/bgg_import_jobs.php');
 global $db;
 
 require_login();
@@ -280,6 +280,23 @@ mysqli_stmt_close($stmt);
       <input type="submit" value="Update Settings">
     </div>
   </form>
+
+  <?php $bgg_import = bgg_import_job_view($db, $user_id); ?>
+  <section class="surface-panel" id="bgg_import" aria-labelledby="bgg_import_heading">
+    <h2 id="bgg_import_heading">BoardGameGeek import</h2>
+    <p>Import every rating and comment your reviewer left on items that link to BoardGameGeek. It runs in the background, a few minutes for a large collection, and you can leave this page. Your hand entries stay.</p>
+    <p id="bgg_import_status" role="status" aria-live="polite"
+      data-status-url="<?php echo url_for('/settings/bgg-import-status.php'); ?>"
+      data-active="<?php echo $bgg_import['active'] ? '1' : '0'; ?>"><?php echo h($bgg_import['text']); ?></p>
+    <form method="post" action="<?php echo url_for('/settings/bgg-import.php'); ?>">
+      <?php echo csrf_input(); ?>
+      <?php $bgg_reviewer = user_bgg_username($db, $user_id); ?>
+      <button type="submit" id="bgg_import_start"<?php if (!$bgg_import['can_queue']) echo ' disabled'; ?>>
+        <?php echo $bgg_reviewer === null ? 'Name a reviewer above to import' : 'Import all ' . h($bgg_reviewer) . ' ratings'; ?>
+      </button>
+    </form>
+  </section>
+  <script src="<?php echo url_for('/settings/bgg-import.js'); ?>?v=2"></script>
 
   <a href="<?php echo url_for('/reset-password/index.php'); ?>">
     <p>Reset password</p>
