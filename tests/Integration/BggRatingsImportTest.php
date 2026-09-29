@@ -39,6 +39,8 @@ final class BggRatingsImportTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings-manual.sql'));
         // Rerunning the migration must be harmless.
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings-manual.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-user-bgg-username.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-user-bgg-username.sql'));
         require_once PRIVATE_PATH . '/bgg_ratings.php';
 
         // Fixture items 10-13 belong to user 1, item 20 to user 2.
@@ -380,9 +382,9 @@ final class BggRatingsImportTest extends TestCase
         $not_owned = bgg_ratings_save_item($this->db, 1, 20, 'Gyges', '7', '');
         $other_owner = bgg_ratings_save_item($this->db, 2, 20, 'Gyges', '7', '');
 
-        $this->assertSame('No imported BoardGameGeek ratings from Someone.', $stranger['error']);
+        $this->assertSame('Someone is not one of your BoardGameGeek reviewers.', $stranger['error']);
         $this->assertSame('Item not found.', $not_owned['error']);
-        $this->assertSame('No imported BoardGameGeek ratings from Gyges.', $other_owner['error']);
+        $this->assertSame('Gyges is not one of your BoardGameGeek reviewers.', $other_owner['error']);
         $this->assertSame([], find_item_bgg_ratings($this->db, [20], 2));
     }
 
@@ -434,6 +436,82 @@ final class BggRatingsImportTest extends TestCase
         $this->assertNull($this->rating(10));
         $this->assertNull($this->rating(13));
         $this->assertSame('5.50', $this->rating(11));
+    }
+
+    public function test_profile_reviewer_is_stored_as_bgg_spells_it(): void
+    {
+        $this->assertNull(user_bgg_username($this->db, 1));
+
+        $result = user_bgg_username_set($this->db, 1, '  gyges ', $this->fakeBgg([]));
+
+        $this->assertSame(['ok' => true, 'username' => 'Gyges', 'message' => 'Your BoardGameGeek reviewer is now Gyges.'], $result);
+        $this->assertSame('Gyges', user_bgg_username($this->db, 1));
+        $this->assertNull(user_bgg_username($this->db, 2));
+    }
+
+    public function test_profile_reviewer_left_as_is_does_not_ask_bgg(): void
+    {
+        user_bgg_username_set($this->db, 1, 'Gyges', $this->fakeBgg([]));
+
+        $result = user_bgg_username_set($this->db, 1, 'GYGES', function () {
+            throw new \RuntimeException('BGG must not be asked again');
+        });
+
+        $this->assertSame(['ok' => true, 'username' => 'Gyges', 'message' => null], $result);
+    }
+
+    public function test_profile_reviewer_left_blank_says_nothing(): void
+    {
+        $result = user_bgg_username_set($this->db, 1, '', function () {
+            throw new \RuntimeException('BGG must not be asked');
+        });
+
+        $this->assertSame(['ok' => true, 'username' => null, 'message' => null], $result);
+    }
+
+    public function test_profile_reviewer_clears_when_blank_and_keeps_the_ratings(): void
+    {
+        user_bgg_username_set($this->db, 1, 'Gyges', $this->fakeBgg([]));
+        $this->importGygesOnBlueMoon();
+
+        $result = user_bgg_username_set($this->db, 1, ' ', $this->fakeBgg([]));
+
+        $this->assertSame(['ok' => true, 'username' => null, 'message' => 'You no longer have a BoardGameGeek reviewer.'], $result);
+        $this->assertNull(user_bgg_username($this->db, 1));
+        $this->assertSame(['Gyges'], item_bgg_reviewers($this->db, 1));
+    }
+
+    public function test_profile_reviewer_must_be_a_bgg_user(): void
+    {
+        user_bgg_username_set($this->db, 1, 'Gyges', $this->fakeBgg([]));
+
+        $unknown = user_bgg_username_set($this->db, 1, 'nosuchuser', function () {
+            return '[]';
+        });
+        $offline = user_bgg_username_set($this->db, 1, 'Someone', function () {
+            throw new \RuntimeException('offline');
+        });
+        $too_long = user_bgg_username_set($this->db, 1, str_repeat('x', 65), $this->fakeBgg([]));
+
+        $this->assertSame('No BoardGameGeek user named nosuchuser.', $unknown['error']);
+        $this->assertSame('Could not reach BoardGameGeek.', $offline['error']);
+        $this->assertSame('A BoardGameGeek username is at most 64 characters.', $too_long['error']);
+        $this->assertSame('Gyges', user_bgg_username($this->db, 1));
+    }
+
+    public function test_profile_reviewer_gets_a_column_and_hand_entry_before_any_import(): void
+    {
+        user_bgg_username_set($this->db, 1, 'Gyges', $this->fakeBgg([]));
+        bgg_ratings_store_item($this->db, 1, 11, 'Other', ['rating' => 7.0, 'comment' => null, 'rated_at' => null]);
+
+        $this->assertSame(['Gyges', 'Other'], item_bgg_reviewers($this->db, 1));
+        $this->assertSame([], item_bgg_reviewers($this->db, 2));
+
+        $saved = bgg_ratings_save_item($this->db, 1, 12, 'gyges', '8', '');
+
+        $this->assertTrue($saved['ok']);
+        $this->assertSame(8.0, find_item_bgg_ratings($this->db, [12], 1)[12]['Gyges']['rating']);
+        $this->assertSame(['Gyges', 'Other'], item_bgg_reviewers($this->db, 1));
     }
 
     private function rating(int $id): ?string

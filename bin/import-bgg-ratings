@@ -2,13 +2,14 @@
 <?php
 // Import a BoardGameGeek user's ratings and comments onto a Keeplore owner's
 // items that link to BGG. They show as a column on Items. Rerun to refresh.
-// Usage: bin/import-bgg-ratings <keeplore-email> <bgg-username>
+// Without a BGG username, imports the reviewer the owner set on Settings.
+// Usage: bin/import-bgg-ratings <keeplore-email> [<bgg-username>]
 
 if (PHP_SAPI !== 'cli') {
   exit(1);
 }
-if ($argc !== 3) {
-  fwrite(STDERR, "Usage: bin/import-bgg-ratings <keeplore-email> <bgg-username>\n");
+if ($argc !== 2 && $argc !== 3) {
+  fwrite(STDERR, "Usage: bin/import-bgg-ratings <keeplore-email> [<bgg-username>]\n");
   exit(2);
 }
 
@@ -25,7 +26,16 @@ if (!$owner) {
   exit(1);
 }
 
-$result = bgg_ratings_import($db, (int) $owner['id'], $argv[2]);
+$bgg_username = trim($argv[2] ?? '');
+if ($bgg_username === '') {
+  $bgg_username = user_bgg_username($db, (int) $owner['id']);
+}
+if ($bgg_username === null) {
+  fwrite(STDERR, "{$argv[1]} has no BoardGameGeek reviewer on Settings. Name one: bin/import-bgg-ratings <keeplore-email> <bgg-username>\n");
+  exit(2);
+}
+
+$result = bgg_ratings_import($db, (int) $owner['id'], $bgg_username);
 if (!$result['ok']) {
   fwrite(STDERR, $result['error'] . "\n");
   exit(1);
