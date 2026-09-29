@@ -9,12 +9,14 @@ $games = $searched ? bgg_poll_search($db, $filters, BGG_POLL_SEARCH_LIMIT + 1) :
 $more = count($games) > BGG_POLL_SEARCH_LIMIT;
 $games = array_slice($games, 0, BGG_POLL_SEARCH_LIMIT);
 $kept = $searched ? bgg_poll_kept_things($db, (int) $_SESSION['user_id']) : [];
+$reviewers = $searched ? item_bgg_reviewers($db, (int) $_SESSION['user_id']) : [];
+$reviews = $reviewers !== [] ? bgg_reviews_by_thing($db, (int) $_SESSION['user_id']) : [];
 $summary = bgg_poll_index_summary($db);
 
 $page_title = 'Search BGG';
 include(SHARED_PATH . '/header.php');
 ?>
-<link rel="stylesheet" href="<?php echo url_for('/bgg-search/bgg-search.css?v=1'); ?>">
+<link rel="stylesheet" href="<?php echo url_for('/bgg-search/bgg-search.css?v=2'); ?>">
 <main class="bgg-search-page">
   <header class="page-header">
     <p class="section-label">BoardGameGeek</p>
@@ -31,6 +33,10 @@ include(SHARED_PATH . '/header.php');
         <?php } ?>
       </select>
     </label>
+    <label class="bgg-search-check">
+      <input type="checkbox" name="skip_open" value="1"<?php if ($filters['skip_open']) { echo ' checked'; } ?>>
+      Leave out open-ended Best (N+)
+    </label>
     <label>Good for ages
       <select name="age">
         <option value="">Any age</option>
@@ -43,7 +49,7 @@ include(SHARED_PATH . '/header.php');
       <input type="number" name="min_votes" min="0" step="1" inputmode="numeric" value="<?php echo $filters['min_votes'] > 0 ? $filters['min_votes'] : ''; ?>" placeholder="0">
     </label>
     <button type="submit">Search</button>
-    <p class="menu-support bgg-search-help">Good for ages 6+ finds games the community rates for 6-year-olds or younger (6+, 5+, 4+...).</p>
+    <p class="menu-support bgg-search-help">Good for ages 6+ finds games the community rates for 6-year-olds or younger (6+, 5+, 4+...). A Best vote such as 4+ counts for every larger group unless you leave open-ended Best out; 9+ still counts at 9.</p>
   </form>
 
   <?php if ($summary['polled'] === 0) { ?>
@@ -68,6 +74,9 @@ include(SHARED_PATH . '/header.php');
           <th data-sort="rank">BGG rank</th>
           <th data-sort="average">Average</th>
           <th data-sort="kept">Kept</th>
+          <?php foreach ($reviewers as $reviewer) { ?>
+            <th data-sort="bgg_rating:<?php echo h($reviewer); ?>"><?php echo h($reviewer); ?></th>
+          <?php } ?>
         </tr>
       </thead>
       <tbody>
@@ -80,6 +89,7 @@ include(SHARED_PATH . '/header.php');
             data-rank="<?php echo h((string) $game['bgg_rank']); ?>"
             data-average="<?php echo h((string) $game['average']); ?>"
             data-kept="<?php echo isset($kept[$game['thing_id']]) ? '1' : '0'; ?>"
+            data-ratings="<?php echo h(json_encode(array_map(fn ($review) => $review['rating'], $reviews[$game['thing_id']] ?? []), JSON_FORCE_OBJECT)); ?>"
           >
             <td class="name">
               <a href="<?php echo h($game['url']); ?>" target="_blank" rel="noopener"><?php echo h($game['name']); ?></a>
@@ -96,6 +106,19 @@ include(SHARED_PATH . '/header.php');
                 <a href="<?php echo url_for('/artifacts/edit.php?id=' . $kept[$game['thing_id']]); ?>">Kept</a>
               <?php } ?>
             </td>
+            <?php foreach ($reviewers as $reviewer) {
+              $review = $reviews[$game['thing_id']][$reviewer] ?? null; ?>
+              <td class="bgg-search-review">
+                <?php if ($review !== null) { ?>
+                  <?php if ($review['rating'] !== null) { ?>
+                    <a href="<?php echo url_for('/artifacts/edit.php?id=' . $review['artifact_id']); ?>"><?php echo h(bgg_score_text($review['rating'])); ?></a>
+                  <?php } ?>
+                  <?php if ((string) $review['comment'] !== '') { ?>
+                    <details><summary>Comment</summary><p><?php echo h($review['comment']); ?></p></details>
+                  <?php } ?>
+                <?php } ?>
+              </td>
+            <?php } ?>
           </tr>
         <?php } ?>
       </tbody>
@@ -103,12 +126,12 @@ include(SHARED_PATH . '/header.php');
     </div>
     </div>
     <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=3"></script>
-    <script src="<?php echo url_for('/bgg-search/bgg-search.js'); ?>?v=1"></script>
+    <script src="<?php echo url_for('/bgg-search/bgg-search.js'); ?>?v=2"></script>
   <?php } ?>
 
   <p class="menu-support bgg-search-source">
     Covers the top-ranked games of each BGG subdomain: <?php echo number_format($summary['polled']); ?> games with polls<?php if ($summary['last_fetched'] !== null) { ?>, last fetched <?php echo h(substr($summary['last_fetched'], 0, 10)); ?><?php } ?>.
-    Player-poll votes count everyone who voted on the game's player-count poll. BGG's data does not give a vote count for the age poll.
+    Player-poll votes count everyone who voted on the game's player-count poll.<?php if ($reviewers !== []) { ?> The <?php echo h(implode(' and ', $reviewers)); ?> <?php echo count($reviewers) === 1 ? 'column shows' : 'columns show'; ?> the ratings and comments on your Keeplore items that link to the game.<?php } ?> BGG's data does not give a vote count for the age poll.
     Data from <a href="https://boardgamegeek.com" target="_blank" rel="noopener">BoardGameGeek</a>.
   </p>
 </main>

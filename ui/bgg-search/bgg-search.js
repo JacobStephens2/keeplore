@@ -56,6 +56,12 @@
       game[key] = numberOrNull(tr.getAttribute('data-' + key));
     });
     game.kept = tr.getAttribute('data-kept') === '1';
+    // data-ratings maps each imported reviewer, such as Gyges, to a score or
+    // null for a comment alone; each sorts under its own column's key.
+    var ratings = JSON.parse(tr.getAttribute('data-ratings') || '{}');
+    Object.keys(ratings).forEach(function (reviewer) {
+      game['bgg_rating:' + reviewer] = numberOrNull(ratings[reviewer]);
+    });
     game.row = tr;
     return game;
   }
@@ -81,7 +87,7 @@
       row: function (game) {
         return game.row;
       },
-      columnCount: 7,
+      columnCount: table.querySelectorAll('thead th').length,
       pageLength: rows.length || 1,
     });
   }

@@ -87,7 +87,11 @@ function bgg_poll_results_from_dynamic_json($json) {
   $best = [];
   $parts = [];
   $ranges = $polls['userplayers']['best'] ?? [];
-  foreach (is_array($ranges) ? $ranges : [] as $range) {
+  $ranges = is_array($ranges) ? array_filter($ranges, 'is_array') : [];
+  // Smallest first, so an open-ended range is always the last part of
+  // best_text; the search's open-ended filter reads it from there.
+  usort($ranges, fn ($a, $b) => (int) ($a['min'] ?? 0) <=> (int) ($b['min'] ?? 0));
+  foreach ($ranges as $range) {
     $min = (int) ($range['min'] ?? 0);
     if ($min <= 0) {
       continue;
@@ -108,8 +112,9 @@ function bgg_poll_results_from_dynamic_json($json) {
   ];
 }
 
-// The search form: a Best player count, a youngest age, and the fewest
-// player-poll votes worth trusting. Anything else reads as not set.
+// The search form: a Best player count, a youngest age, the fewest
+// player-poll votes worth trusting, and whether to leave out games Best at
+// the count only through an open-ended vote. Anything else reads as not set.
 function bgg_poll_search_filters(array $input) {
   $number = function ($key, $min, $max) use ($input) {
     $value = $input[$key] ?? '';
@@ -123,6 +128,7 @@ function bgg_poll_search_filters(array $input) {
     'best' => $number('best', 1, 99),
     'age' => $number('age', 1, 99),
     'min_votes' => $number('min_votes', 0, 99999) ?? 0,
+    'skip_open' => ($input['skip_open'] ?? '') === '1',
   ];
 }
 
@@ -130,6 +136,8 @@ function bgg_poll_search_filters(array $input) {
  * Indexed games matching bgg_poll_search_filters(), best BGG rank first:
  * Best with 'best' players, rated by the community for 'age' or younger,
  * with at least 'min_votes' player-poll votes. Either filter works alone.
+ * With 'skip_open', a game Best at 'best' only because an open-ended vote
+ * such as "4+" runs past its count is left out; "9+" still counts at 9.
  */
 function bgg_poll_search($conn, array $filters, $limit = BGG_POLL_SEARCH_LIMIT) {
   $sql = 'SELECT g.thing_id, g.name, g.year_published, g.bgg_rank, g.average, g.users_rated, g.image_url,
@@ -142,6 +150,10 @@ function bgg_poll_search($conn, array $filters, $limit = BGG_POLL_SEARCH_LIMIT) 
     $sql .= ' JOIN bgg_poll_best_players b ON b.thing_id = g.thing_id AND b.players = ?';
     $types = 'i' . $types;
     array_unshift($params, (int) $filters['best']);
+    if (!empty($filters['skip_open'])) {
+      // An open-ended vote can only be the last part of best_players ("3, 4+").
+      $where[] = "NOT (g.best_players LIKE '%+' AND b.players > CAST(REPLACE(SUBSTRING_INDEX(g.best_players, ' ', -1), '+', '') AS UNSIGNED))";
+    }
   }
   if (($filters['age'] ?? null) !== null) {
     $where[] = 'g.community_age <= ?';
@@ -360,3 +372,4 @@ function bgg_poll_kept_things($conn, $user_id) {
   }
   return $kept;
 }
+

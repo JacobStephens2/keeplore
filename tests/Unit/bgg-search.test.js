@@ -40,3 +40,22 @@ test('a row reads its numbers from data attributes, blanks as missing', () => {
     { id: 3, name: 'UNO', best: 4, votes: 335, age: null, rank: 9000, average: 5.48, kept: true, row }
   );
 });
+
+test('a row reads each reviewer score as a sort key, a comment alone as missing', () => {
+  const attrs = { 'data-name': 'UNO', 'data-kept': '0', 'data-ratings': '{"Gyges":6.5,"Tom":null}' };
+  const row = { getAttribute: (name) => (name in attrs ? attrs[name] : null) };
+  const game = bggSearch.gameFromRow(row, 0);
+  assert.equal(game['bgg_rating:Gyges'], 6.5);
+  assert.equal(game['bgg_rating:Tom'], null);
+});
+
+test('reviewer scores sort by value, unrated last', () => {
+  const games = [
+    { ...JUST_ONE, 'bgg_rating:Gyges': 7 },
+    { ...UNO, 'bgg_rating:Gyges': 8.5 },
+    { ...NEW_GAME },
+  ];
+  const names = (dir) => bggSearch.sortGames(games, [{ key: 'bgg_rating:Gyges', dir }]).map((game) => game.name);
+  assert.deepEqual(names('desc'), ['UNO', 'Just One', 'another game']);
+  assert.deepEqual(names('asc'), ['Just One', 'UNO', 'another game']);
+});
