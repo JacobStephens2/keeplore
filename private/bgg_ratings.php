@@ -2,8 +2,8 @@
 
 /**
  * A BoardGameGeek reviewer's ratings and comments on the owner's items.
- * Settings names the owner's own reviewer, bin/import-bgg-ratings fills
- * item_bgg_ratings from BGG, Edit Item can enter one by hand, and the Items
+ * Settings names the owner's own reviewer, bin/import-bgg-ratings or
+ * Settings' background import fills item_bgg_ratings from BGG, Edit Item can enter one by hand, and the Items
  * list reads it back as one column per BGG user.
  * The import never touches a hand entry; Request data on Edit Item replaces
  * one only when BGG has something for that item.
@@ -209,9 +209,10 @@ function bgg_ratings_refresh_item($conn, $user_id, $artifact_id, $thing_id, arra
  * Looks up $username's entry for every owner item with a BGG link and stores
  * what they rated or commented on. An item BGG answered with no entry loses
  * its old row; an item whose lookup failed keeps it. $pause_ms spaces the
- * requests out so a full collection does not hammer BGG.
+ * requests out so a full collection does not hammer BGG. $on_progress, when
+ * given, hears ($result, $total) before the first lookup and after each one.
  */
-function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause_ms = 250) {
+function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause_ms = 250, $on_progress = null) {
   $user_id = (int) $user_id;
   $found = bgg_ratings_find_user($username, $get_json);
   if (!$found['ok']) {
@@ -222,12 +223,15 @@ function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause
   $linked = item_bgg_thing_ids($conn, $user_id);
 
   $had_rating = find_item_bgg_ratings($conn, array_keys($linked), $user_id);
+  // The owner's own entry wins over whatever BGG has.
+  $to_check = array_filter($linked, function ($artifact_id) use ($had_rating, $bgg_user) {
+    return empty($had_rating[$artifact_id][$bgg_user['username']]['manual']);
+  }, ARRAY_FILTER_USE_KEY);
   $result = ['ok' => true, 'username' => $bgg_user['username'], 'checked' => 0, 'imported' => 0, 'removed' => 0, 'failed' => 0];
-  foreach ($linked as $artifact_id => $thing_id) {
-    // The owner's own entry wins over whatever BGG has.
-    if (!empty($had_rating[$artifact_id][$bgg_user['username']]['manual'])) {
-      continue;
-    }
+  if ($on_progress !== null) {
+    $on_progress($result, count($to_check));
+  }
+  foreach ($to_check as $artifact_id => $thing_id) {
     if ($result['checked'] > 0 && $pause_ms > 0) {
       usleep($pause_ms * 1000);
     }
@@ -239,6 +243,9 @@ function bgg_ratings_import($conn, $user_id, $username, $get_json = null, $pause
       $result['imported']++;
     } elseif (isset($had_rating[$artifact_id][$bgg_user['username']])) {
       $result['removed']++;
+    }
+    if ($on_progress !== null) {
+      $on_progress($result, count($to_check));
     }
   }
 

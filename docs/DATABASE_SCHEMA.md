@@ -98,6 +98,26 @@ A BoardGameGeek reviewer's rating and comment on an owner's item, matched throug
 
 ---
 
+### `bgg_import_jobs`
+
+A full import of an owner's `users.bgg_username` into `item_bgg_ratings`, queued from Settings and run by `private/crons/run_bgg_import_jobs.php`, which cron starts every minute (see `private/crons/crontab-copy.txt`). Settings polls the owner's latest row for progress. An owner has at most one queued or running import; a running row untouched for 10 minutes is marked failed, and so is a queued row after 10 minutes when no import is running or finished in that time, which means the cron worker is not running. Apply [`add-bgg-import-jobs.sql`](../database/migrations/add-bgg-import-jobs.sql); safe to rerun.
+
+| Column | Type | Nullable | Description |
+|---|---|---|---|
+| `id` | INT UNSIGNED, AUTO_INCREMENT | NO | Primary key |
+| `user_id` | INT | NO | Owner who queued it |
+| `bgg_username` | VARCHAR(64) | NO | BGG reviewer imported, as Settings named them when queued |
+| `status` | VARCHAR(16) | NO | `queued`, `running`, `done` or `failed` |
+| `total` | INT UNSIGNED | YES | Items the import will check; NULL until it starts checking |
+| `checked`, `imported`, `removed`, `failed` | INT UNSIGNED | NO | Running counts, as `bgg_ratings_import()` reports them |
+| `error` | VARCHAR(255) | YES | Why a failed import stopped |
+| `created_at`, `started_at`, `finished_at` | DATETIME | `started_at`, `finished_at` YES | When it was queued, claimed by the worker, and ended |
+| `updated_at` | DATETIME | NO | Last progress; how an abandoned import is spotted |
+
+**Primary key:** `id`
+
+---
+
 ### `bgg_poll_games` and `bgg_poll_best_players`
 
 BoardGameGeek's ranked games with their community poll results, for `/bgg-search`. BGG has no search on its polls, so `bin/refresh-bgg-poll-index [per-subdomain]` lists the top 500 games (by default) of each BGG subdomain from the geekdo JSON API and copies each game's polls from `dynamicinfo`. Rerunning refreshes the lists, refetches polls older than 30 days, and, when every list page answered, drops games no longer on any list. The index describes BGG, not an owner's collection, so it has no `user_id`. Apply [`add-bgg-poll-index.sql`](../database/migrations/add-bgg-poll-index.sql); it is safe to rerun.
