@@ -57,10 +57,9 @@
     $message = record_use_success_message($_POST);
 
     if ($is_ajax) {
-      $status = compute_artifact_use_by_status((int) $_POST['artifact']['id'], (int) $_SESSION['user_id']);
-      $artifact_row = find_artifact_by_id((int) $_POST['artifact']['id']);
+      $entry = (new UseByQueue($db, (int) $_SESSION['user_id']))->entry((int) $_POST['artifact']['id']);
       header('Content-Type: application/json');
-      echo json_encode(record_use_ajax_payload($_POST, end($ids), $status, $artifact_row));
+      echo json_encode(record_use_ajax_payload($_POST, end($ids), $entry));
       exit;
     }
 

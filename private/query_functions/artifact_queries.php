@@ -5,54 +5,7 @@ use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
 require_once dirname(__DIR__) . '/item_tags.php';
-require_once dirname(__DIR__) . '/use_by_date.php';
-
-  function compute_artifact_use_by_status($artifact_id, $user_id) {
-    global $db;
-    $stmt = mysqli_prepare(
-      $db,
-      "SELECT
-        games.Acq,
-        games.interaction_frequency_days,
-        (SELECT MAX(uses.use_date) FROM uses WHERE uses.artifact_id = games.id) AS most_recent_use,
-        (SELECT MAX(responses.PlayDate) FROM responses WHERE responses.Title = games.id) AS most_recent_response
-      FROM games
-      WHERE games.id = ? AND games.user_id = ?
-      LIMIT 1"
-    );
-    mysqli_stmt_bind_param($stmt, "ii", $artifact_id, $user_id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    $row = mysqli_fetch_assoc($result);
-    mysqli_stmt_close($stmt);
-
-    if (!$row) {
-      return ['use_by_date' => null, 'most_recent_use_date' => null, 'is_overdue' => false];
-    }
-
-    $most_recent_raw = null;
-    if ($row['most_recent_use'] !== null && $row['most_recent_response'] !== null) {
-      $most_recent_raw = strtotime($row['most_recent_use']) >= strtotime($row['most_recent_response'])
-        ? $row['most_recent_use'] : $row['most_recent_response'];
-    } else {
-      $most_recent_raw = $row['most_recent_use'] ?? $row['most_recent_response'];
-    }
-    $most_recent_date = $most_recent_raw !== null ? substr($most_recent_raw, 0, 10) : null;
-
-    $use_by_date = use_by_date(
-      $row['Acq'],
-      $most_recent_date,
-      $row['interaction_frequency_days'],
-      default_use_interval($db, $user_id)
-    );
-
-    date_default_timezone_set('America/New_York');
-    return [
-      'use_by_date' => $use_by_date,
-      'most_recent_use_date' => $most_recent_date,
-      'is_overdue' => $use_by_date !== null && $use_by_date < date('Y-m-d'),
-    ];
-  }
+require_once dirname(__DIR__) . '/classes/UseByQueue.php';
 
   function set_artifact_to_get_rid_of($artifact_id, $value) {
     global $db;
@@ -575,135 +528,6 @@ require_once dirname(__DIR__) . '/use_by_date.php';
     return $result;
   }
 
-  function use_by($type, $interval, $sweetSpot, $minimumAge, $shelfSort, $user = null, $hideSnoozed = false) {
-
-    if ($user === null && isset($_SESSION['user_id'])) {
-      $user = $_SESSION['user_id'];
-    }
-
-    global $db;
-
-    $params = [];
-    $param_types = '';
-
-    // Pre-aggregate the most recent use per artifact in a derived table so
-    // the main query stays at one row per game (no GROUP BY blowup from
-    // joining many uses rows). The `responses` table is no longer joined
-    // — the responses→uses migration moved every PlayDate row into uses
-    // with use_date >= PlayDate, so MAX(uses.use_date) equals what the
-    // old CASE expression returned.
-    $sql =
-      "SELECT
-        games.Title,
-        games.mnp,
-        games.mxp,
-        games.mnt,
-        games.mxt,
-        games.Candidate,
-        games.UsedRecUserCt,
-        games.ss,
-        games.id,
-        types.objectType AS type,
-        games.user_id,
-        games.age,
-        games.type_id,
-        games.is_in_secondary_collection,
-        recent.MostRecentUse AS MostRecentUseOrResponse,
-        games.Acq,
-        games.is_kept,
-        games.interaction_frequency_days,
-        games.to_get_rid_of,
-        games.snoozed_until
-      FROM games
-        LEFT JOIN (
-          SELECT artifact_id, MAX(use_date) AS MostRecentUse
-          FROM uses
-          GROUP BY artifact_id
-        ) recent ON recent.artifact_id = games.id
-        LEFT JOIN types ON games.type_id = types.id
-      WHERE games.user_id = ?
-      ";
-
-      $params[] = $user;
-      $param_types .= 's';
-
-      $sql .= " AND (games.to_get_rid_of = 0 OR games.to_get_rid_of IS NULL) ";
-
-      if ($hideSnoozed) {
-        $sql .= " AND (games.snoozed_until IS NULL OR games.snoozed_until <= CURDATE()) ";
-      }
-
-      if ($shelfSort == 'yes') {
-        $sql .= " AND (games.is_kept = 1 OR games.is_in_secondary_collection = 1) ";
-      } else {
-        $sql .= " AND games.is_kept = 1 ";
-      }
-
-      if ($sweetSpot !== '') {
-        $sql .= "AND
-          (
-            games.ss LIKE ?
-            OR games.ss LIKE ?
-            OR games.ss LIKE ?
-            OR games.ss LIKE ?
-            OR games.ss LIKE ?
-            OR games.ss LIKE ?
-            OR games.ss LIKE ?
-          )
-        ";
-        $params[] = $sweetSpot;
-        $param_types .= 's';
-        $params[] = $sweetSpot . ' %';
-        $param_types .= 's';
-        $params[] = '%0' . $sweetSpot . '%';
-        $param_types .= 's';
-        $params[] = '%,' . $sweetSpot;
-        $param_types .= 's';
-        $params[] = '%,' . $sweetSpot . ',%';
-        $param_types .= 's';
-        $params[] = '%, ' . $sweetSpot;
-        $param_types .= 's';
-        $params[] = '%, ' . $sweetSpot . ',%';
-        $param_types .= 's';
-      }
-
-      if ($minimumAge !== '' && $minimumAge !== 0 && $minimumAge !== '0') {
-        $sql .= " AND games.age >= ? ";
-        $params[] = $minimumAge;
-        $param_types .= 's';
-      }
-
-      if (gettype($type) === 'array') {
-        if (count($type) > 0) {
-          $placeholders = implode(',', array_fill(0, count($type), '?'));
-          $sql .= "AND games.type_id IN (" . $placeholders . ") ";
-          foreach($type as $typeIndividual) {
-            $params[] = $typeIndividual;
-            $param_types .= 's';
-          }
-        } else {
-          // User unchecked every type filter — return no rows.
-          $sql .= " AND 1 = 0 ";
-        }
-      } elseif ($type === '') {
-        // add no type clause
-      } else {
-        $sql .= "AND types.objectType = ? ";
-        $params[] = $type;
-        $param_types .= 's';
-      }
-
-      $sql .= "
-        ORDER BY MostRecentUseOrResponse ASC
-      ";
-      $stmt = mysqli_prepare($db, $sql);
-      mysqli_stmt_bind_param($stmt, $param_types, ...$params);
-      mysqli_stmt_execute($stmt);
-      $result = mysqli_stmt_get_result($stmt);
-      confirm_result_set($result);
-      return $result;
-  }
-
   function first_play_by() {
     global $db;
 
@@ -788,60 +612,31 @@ require_once dirname(__DIR__) . '/use_by_date.php';
 
 function email_artifact_use_notice($user_id) {
 
-  $sweetSpot = '';
-  $minimumAge = 0;
-  $shelfSort = 'no';
-  $type = '';
-
   global $db;
   $interval = default_use_interval($db, $user_id);
-
-  $artifact_set = use_by($type, $interval, $sweetSpot, $minimumAge, $shelfSort, $user_id);
 
   $due_today_array = array();
   $overdue_array = array();
   $due_in_coming_week = array();
 
-  $i = 0;
-  while($artifact = mysqli_fetch_assoc($artifact_set)) {
-
-      if ($artifact['interaction_frequency_days'] !== null) {
-        $this_interval = $artifact['interaction_frequency_days'];
-      } else {
-        $this_interval = $interval;
+  // Each section lists items by last use, never used first.
+  $entries = (new UseByQueue($db, (int) $user_id))->entries();
+  usort($entries, fn ($a, $b) => $a['last_use'] <=> $b['last_use']);
+  foreach ($entries as $entry) {
+      $notice = [
+          'artifact' => h($entry['Title']),
+          'artifact_id' => h($entry['id']),
+          'use_by_date' => $entry['use_by_date'],
+          'most_recent_use' => $entry['last_use'] ?? 'No interactions',
+          'interval' => $entry['interaction_frequency_days'] ?? $interval,
+      ];
+      if ($entry['status'] === 'due_today') {
+          $due_today_array[] = $notice;
+      } elseif ($entry['status'] === 'upcoming' && $entry['days_until'] <= 7) {
+          $due_in_coming_week[] = $notice;
+      } elseif ($entry['status'] === 'overdue') {
+          $overdue_array[] = $notice;
       }
-
-      $use_by_date = use_by_date($artifact['Acq'], $artifact['MostRecentUseOrResponse'], $artifact['interaction_frequency_days'], $interval);
-      if ($use_by_date === null) {
-          continue;
-      }
-      $date_of_most_recent_use = ($artifact['MostRecentUseOrResponse'] === NULL)
-          ? 'No interactions'
-          : substr($artifact['MostRecentUseOrResponse'], 0, 10);
-
-      date_default_timezone_set('America/New_York');
-      $today = date('Y-m-d');
-      $diff_days = (new DateTime($today))->diff(new DateTime($use_by_date))->days;
-
-      if ($use_by_date === $today) { // due today
-          $due_today_array[$i]['artifact'] = h($artifact['Title']);
-          $due_today_array[$i]['artifact_id'] = h($artifact['id']);
-          $due_today_array[$i]['most_recent_use'] = $date_of_most_recent_use;
-          $due_today_array[$i]['interval'] = $this_interval;
-      } elseif ($diff_days > 0 && $diff_days < 8 && $use_by_date > $today) { // due in coming week
-          $due_in_coming_week[$i]['artifact'] = h($artifact['Title']);
-          $due_in_coming_week[$i]['artifact_id'] = h($artifact['id']);
-          $due_in_coming_week[$i]['use_by_date'] = $use_by_date;
-          $due_in_coming_week[$i]['most_recent_use'] = $date_of_most_recent_use;
-          $due_in_coming_week[$i]['interval'] = $this_interval;
-      } elseif ($use_by_date < $today) { // due in past
-          $overdue_array[$i]['artifact'] = h($artifact['Title']);
-          $overdue_array[$i]['artifact_id'] = h($artifact['id']);
-          $overdue_array[$i]['use_by_date'] = $use_by_date;
-          $overdue_array[$i]['most_recent_use'] = $date_of_most_recent_use;
-          $overdue_array[$i]['interval'] = $this_interval;
-      }
-      $i++;
   }
 
   $count_to_notify_about =

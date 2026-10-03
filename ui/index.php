@@ -22,72 +22,25 @@ if ($default_snooze_days < 1) {
   $default_snooze_days = 7;
 }
 
-// Fetch tracked artifacts with most recent use dates (same query as use_by())
-$stmt = mysqli_prepare($db, "SELECT
-    games.id,
-    games.Title,
-    games.Acq,
-    games.interaction_frequency_days,
-    types.objectType AS type,
-    CASE
-      WHEN MAX(uses.use_date) IS NULL THEN MAX(responses.PlayDate)
-      WHEN MAX(uses.use_date) < MAX(responses.PlayDate) THEN MAX(responses.PlayDate)
-      ELSE MAX(uses.use_date)
-    END AS MostRecentUseOrResponse
-  FROM games
-    LEFT JOIN responses ON games.id = responses.Title
-    LEFT JOIN uses ON games.id = uses.artifact_id
-    LEFT JOIN types ON games.type_id = types.id
-  GROUP BY games.id, games.Title, games.Acq, games.interaction_frequency_days, types.objectType, games.is_kept, games.user_id, games.to_get_rid_of, games.snoozed_until
-  HAVING games.user_id = ? AND games.is_kept = 1 AND (games.to_get_rid_of = 0 OR games.to_get_rid_of IS NULL)
-    AND (games.snoozed_until IS NULL OR games.snoozed_until <= CURDATE())
-  ORDER BY MostRecentUseOrResponse ASC");
-mysqli_stmt_bind_param($stmt, "i", $user_id);
-mysqli_stmt_execute($stmt);
-$artifact_result = mysqli_stmt_get_result($stmt);
+// The Use-by queue without snoozed items, most overdue first. Undated
+// items count as tracked but have nothing to be due.
+$entries = (new UseByQueue($db, $user_id))->entries(['default_interval' => $default_interval, 'hide_snoozed' => true]);
+$tracked_count = count($entries);
+$dated_items = array_values(array_filter($entries, fn ($item) => $item['use_by_date'] !== null));
 
-// Calculate use-by dates and find top 5 most overdue
-date_default_timezone_set('America/New_York');
-$now = new DateTime(date('Y-m-d'));
-$overdue_items = [];
-$tracked_count = 0;
-
-while ($artifact = mysqli_fetch_assoc($artifact_result)) {
-  $tracked_count++;
-  $use_by_date = use_by_date($artifact['Acq'], $artifact['MostRecentUseOrResponse'], $artifact['interaction_frequency_days'], $default_interval);
-  if ($use_by_date === null) {
-    continue; // no acquisition date and no use: nothing to be due
-  }
-  $diff = (int) $now->diff(new DateTime($use_by_date))->format('%r%a'); // negative = overdue
-
-  $overdue_items[] = [
-    'id' => $artifact['id'],
-    'title' => $artifact['Title'],
-    'type' => $artifact['type'],
-    'use_by' => $use_by_date,
-    'days_diff' => $diff,
-    'most_recent' => $artifact['MostRecentUseOrResponse'] !== null
-      ? substr($artifact['MostRecentUseOrResponse'], 0, 10)
-      : null,
-  ];
-}
-mysqli_stmt_close($stmt);
-
-// Sort by use-by date ascending (most overdue first)
-usort($overdue_items, fn($a, $b) => $a['days_diff'] <=> $b['days_diff']);
 // Render up to 8 cards; CSS hides cards 6-8 on viewports that don't have
 // room for a 4-column grid so they only show when there's space.
-$top_overdue = array_slice($overdue_items, 0, 8);
+$top_overdue = array_slice($dated_items, 0, 8);
 $overdue_count = 0;
 $due_soon_count = 0;
 $type_names = [];
 
-foreach ($overdue_items as $item) {
-  if ($item['days_diff'] < 0) {
+foreach ($dated_items as $item) {
+  if ($item['status'] === 'overdue') {
     $overdue_count++;
   }
 
-  if ($item['days_diff'] >= 0 && $item['days_diff'] <= 14) {
+  if ($item['days_until'] >= 0 && $item['days_until'] <= 14) {
     $due_soon_count++;
   }
 
@@ -155,12 +108,12 @@ include(SHARED_PATH . '/header.php');
         <h2 class="menu-card-title">Most past due</h2>
         <ul class="overdue-list">
           <?php foreach ($top_overdue as $item) {
-            $overdue = $item['days_diff'] < 0;
+            $overdue = $item['status'] === 'overdue';
           ?>
             <li class="overdue-item-card">
               <div class="overdue-item-head">
                 <a class="overdue-item-title" href="<?php echo url_for('/artifacts/' . (is_guest() ? 'show' : 'edit') . '.php?id=' . h(u($item['id']))); ?>">
-                  <?php echo h($item['title']); ?>
+                  <?php echo h($item['Title']); ?>
                 </a>
                 <?php if (!empty($item['type'])) { ?>
                   <span class="status-chip"><?php echo h($item['type']); ?></span>
@@ -168,11 +121,11 @@ include(SHARED_PATH . '/header.php');
               </div>
               <p class="overdue-item-date<?php if ($overdue) echo ' overdue-past'; ?>">
                 <span class="overdue-item-date-label">Interact by</span>
-                <?php echo h($item['use_by']); ?>
+                <?php echo h($item['use_by_date']); ?>
               </p>
               <p class="overdue-item-date overdue-item-date-last">
                 <span class="overdue-item-date-label">Last interacted</span>
-                <?php echo $item['most_recent'] !== null ? h($item['most_recent']) : '—'; ?>
+                <?php echo $item['last_use'] !== null ? h($item['last_use']) : '—'; ?>
               </p>
               <?php if (!is_guest()) { ?>
               <div class="overdue-item-actions">
@@ -180,14 +133,14 @@ include(SHARED_PATH . '/header.php');
                 <form method="post" action="<?php echo url_for('/artifacts/snooze.php'); ?>" class="overdue-item-snooze">
                   <?php echo csrf_input(); ?>
                   <input type="hidden" name="artifact_id" value="<?php echo h($item['id']); ?>">
-                  <input type="hidden" name="artifact_name" value="<?php echo h($item['title']); ?>">
+                  <input type="hidden" name="artifact_name" value="<?php echo h($item['Title']); ?>">
                   <input type="hidden" name="return_to" value="dashboard">
                   <button type="submit" class="snooze-btn" title="Hide for <?php echo h((string) $default_snooze_days); ?> day<?php echo $default_snooze_days === 1 ? '' : 's'; ?>">Snooze</button>
                 </form>
                 <form method="post" action="<?php echo url_for('/artifacts/mark-get-rid-of.php'); ?>" class="overdue-item-getridof">
                   <?php echo csrf_input(); ?>
                   <input type="hidden" name="artifact_id" value="<?php echo h($item['id']); ?>">
-                  <input type="hidden" name="artifact_name" value="<?php echo h($item['title']); ?>">
+                  <input type="hidden" name="artifact_name" value="<?php echo h($item['Title']); ?>">
                   <input type="hidden" name="return_to" value="dashboard">
                   <button type="submit" class="get-rid-of-btn">Get Rid Of</button>
                 </form>

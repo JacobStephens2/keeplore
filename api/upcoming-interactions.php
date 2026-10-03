@@ -4,7 +4,7 @@
   require_once('../private/rate_limiter.php');
   require_once('../private/app_logger.php');
   require_once('../private/query_functions.php');
-  require_once('../private/use_by_date.php');
+  require_once('../private/classes/UseByQueue.php');
   header('Content-Type: application/json');
 
   $logger = new AppLogger();
@@ -42,8 +42,6 @@
     exit;
   }
 
-  date_default_timezone_set('America/New_York');
-
   $default_interval = default_use_interval($database, $user_id);
   $user_stmt = mysqli_prepare($database, "SELECT native_notify_enabled, native_notify_hour, native_notify_lead_days, native_notify_past_due FROM users WHERE id = ?");
   mysqli_stmt_bind_param($user_stmt, "i", $user_id);
@@ -58,55 +56,33 @@
     'past_due' => (int) ($user_row['native_notify_past_due'] ?? 1) === 1,
   ];
 
-  $artifact_set = use_by('', $default_interval, '', 0, 'no', $user_id);
-
-  $today = new DateTime(date('Y-m-d'));
-  $horizon = (new DateTime(date('Y-m-d')))->modify('+60 days');
+  $queue = new UseByQueue($database, $user_id);
 
   $items = [];
-  while ($artifact = mysqli_fetch_assoc($artifact_set)) {
-    $this_interval = ($artifact['interaction_frequency_days'] !== null)
-      ? (float) $artifact['interaction_frequency_days']
-      : $default_interval;
-
-    $most_recent_use_or_response = $artifact['MostRecentUseOrResponse'];
-    $use_by_date = use_by_date($artifact['Acq'], $most_recent_use_or_response, $artifact['interaction_frequency_days'], $default_interval);
-    if ($use_by_date === null) {
+  foreach ($queue->entries(['default_interval' => $default_interval]) as $entry) {
+    if ($entry['use_by_date'] === null || $entry['days_until'] > 60) {
       continue;
-    }
-    $use_by_dt = new DateTime($use_by_date);
-
-    if ($use_by_dt > $horizon) {
-      continue;
-    }
-
-    if ($use_by_dt < $today) {
-      $status = 'past_due';
-    } elseif ($use_by_dt->format('Y-m-d') === $today->format('Y-m-d')) {
-      $status = 'due_today';
-    } else {
-      $diff = $today->diff($use_by_dt)->days;
-      $status = ($diff <= 7) ? 'due_soon' : 'upcoming';
     }
 
     $items[] = [
-      'id' => (int) $artifact['id'],
-      'title' => $artifact['Title'],
-      'use_by_date' => $use_by_date,
-      'most_recent_interaction' => ($most_recent_use_or_response !== null)
-        ? substr($most_recent_use_or_response, 0, 10)
-        : null,
-      'interval_days' => $this_interval,
-      'status' => $status,
+      'id' => (int) $entry['id'],
+      'title' => $entry['Title'],
+      'use_by_date' => $entry['use_by_date'],
+      'most_recent_interaction' => $entry['last_use'],
+      'interval_days' => ($entry['interaction_frequency_days'] !== null)
+        ? (float) $entry['interaction_frequency_days']
+        : $default_interval,
+      'status' => match (true) {
+        $entry['status'] === 'overdue' => 'past_due',
+        $entry['status'] === 'due_today' => 'due_today',
+        $entry['days_until'] <= 7 => 'due_soon',
+        default => 'upcoming',
+      },
     ];
   }
 
-  usort($items, function ($a, $b) {
-    return strcmp($a['use_by_date'], $b['use_by_date']);
-  });
-
   $response->authenticated = true;
-  $response->today = $today->format('Y-m-d');
+  $response->today = $queue->today();
   $response->timezone = 'America/New_York';
   $response->horizon_days = 60;
   $response->default_interval_days = $default_interval;

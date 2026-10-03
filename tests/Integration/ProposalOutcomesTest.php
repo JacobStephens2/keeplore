@@ -226,19 +226,20 @@ final class ProposalOutcomesTest extends TestCase
 
     public function test_proposals_do_not_change_either_items_use_history_or_due_date(): void
     {
-        require_once PRIVATE_PATH . '/query_functions/artifact_queries.php';
         require_once PRIVATE_PATH . '/query_functions/response_queries.php';
         require_once PRIVATE_PATH . '/database.php';
+        require_once PRIVATE_PATH . '/classes/UseByQueue.php';
         $GLOBALS['db'] = $this->db;
         $_SESSION['user_id'] = 1;
-        $before = [compute_artifact_use_by_status(10, 1), compute_artifact_use_by_status(11, 1)];
+        $queue = new \UseByQueue($this->db, 1, '2026-06-01');
+        $before = [$queue->entry(10), $queue->entry(11)];
         $usesBefore = find_uses_by_user_id([1, 2], '')->fetch_all(MYSQLI_ASSOC);
         $id = $this->proposals->save($this->proposal(['chosen_item_id' => 11]));
         $this->proposals->save($this->proposal(['chosen_item_id' => 11, 'outcome' => 'chose_something_else']), $id);
-        $this->assertSame($before, [compute_artifact_use_by_status(10, 1), compute_artifact_use_by_status(11, 1)]);
+        $this->assertSame($before, [$queue->entry(10), $queue->entry(11)]);
         $this->assertSame($usesBefore, find_uses_by_user_id([1, 2], '')->fetch_all(MYSQLI_ASSOC));
         $this->proposals->delete($id);
-        $this->assertSame($before, [compute_artifact_use_by_status(10, 1), compute_artifact_use_by_status(11, 1)]);
+        $this->assertSame($before, [$queue->entry(10), $queue->entry(11)]);
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('invalidReports')]
