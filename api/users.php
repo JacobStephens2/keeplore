@@ -1,6 +1,7 @@
 <?php
 
   require_once('private/initialize.php');
+  require_once('../private/people_api.php');
   header('Content-Type: application/json');
 
   $response = new stdClass;
@@ -10,22 +11,15 @@
     echo json_encode($authentication_response);
     exit;
   }
-  // User enumeration is outside the agent read scope (collection, uses,
-  // proposals, plus the kept toggle).
-  deny_agent_key_writes($authentication_response);
   $response->authentication_response = $authentication_response;
 
-  $requestBody = json_decode(
-    file_get_contents('php://input')
+  [$status, $fields] = search_people_over_api(
+    $database, $authentication_response, json_decode(file_get_contents('php://input'))
   );
-    
-  if (isset($requestBody->query) && $requestBody->query != '') {
-    $result = User::list_users_by_query($requestBody->query, $requestBody->userid);
-  } else {
-    $result = User::list_users();
-    
+  http_response_code($status);
+  foreach ($fields as $field => $value) {
+    $response->$field = $value;
   }
-  $response->users = $result;
 
   echo json_encode($response);
 

@@ -57,6 +57,7 @@
   require_once('use_by_date.php');
   require_once('classes/UseByQueue.php');
   require_once('classes/Items.php');
+  require_once('classes/People.php');
   require_once('database.php');
   require_once('kept_status.php');
   require_once('item_tags.php');
@@ -75,7 +76,6 @@
   require_once('classes/DatabaseObject.class.php');
   DatabaseObject::set_database($db);
   require_once('classes/Artifact.class.php');
-  require_once('classes/User.class.php');
 
   $logger = new AppLogger();
   $cache = new Cache();

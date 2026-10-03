@@ -1,7 +1,8 @@
 <?php
 require_once dirname(__DIR__, 2) . '/private/initialize.php';
 require_login();
-$player_set = find_players_by_user_id();
+$people = (new People($db, (int) $_SESSION['user_id']))->all();
+usort($people, fn ($a, $b) => $b['id'] <=> $a['id']);
 $page_title = 'Users';
 include(SHARED_PATH . '/header.php');
 ?>
@@ -24,7 +25,7 @@ include(SHARED_PATH . '/header.php');
       <input type="search" id="users-search" class="list-search" data-shortcut="search" placeholder="Search by name" autocomplete="off" spellcheck="false" autofocus>
     </label>
 
-    <?php if ($player_set->num_rows === 0) { ?>
+    <?php if (!$people) { ?>
       <div class="empty-state">
         <p class="section-label">Empty</p>
         <h2>No users yet</h2>
@@ -46,26 +47,25 @@ include(SHARED_PATH . '/header.php');
       </thead>
 
       <tbody id="users-list-body">
-        <?php while($player = mysqli_fetch_assoc($player_set)) { ?>
+        <?php foreach ($people as $person) { ?>
           <?php
-            $user_name = trim($player['FirstName'] . ' ' . $player['LastName']);
-            $user_age = $player['birth_year'] ? (date('Y') - (int) $player['birth_year']) : '';
+            $user_age = $person['birth_year'] ? (date('Y') - $person['birth_year']) : '';
           ?>
           <tr
-            data-name="<?php echo h($user_name); ?>"
-            data-gender="<?php echo h($player['G']); ?>"
+            data-name="<?php echo h($person['name']); ?>"
+            data-gender="<?php echo h($person['gender']); ?>"
             data-age="<?php echo h((string) $user_age); ?>"
-            data-id="<?php echo h($player['id']); ?>"
+            data-id="<?php echo h($person['id']); ?>"
           >
             <td>
-              <a class="table-action" href="<?php echo url_for('/users/edit.php?id=' . h(u($player['id']))); ?>">
-                <?php echo h($user_name); ?>
+              <a class="table-action" href="<?php echo url_for('/users/edit.php?id=' . h(u($person['id']))); ?>">
+                <?php echo h($person['name']); ?>
               </a>
             </td>
-            <td><?php echo h($player['G']); ?></td>
+            <td><?php echo h($person['gender']); ?></td>
             <td><?php echo h((string) $user_age); ?></td>
-            <td><a class="table-action" href="<?php echo url_for('/users/delete.php?id=' . h(u($player['id']))); ?>">Delete</a></td>
-            <td><?php echo h($player['id']); ?></td>
+            <td><a class="table-action" href="<?php echo url_for('/users/delete.php?id=' . h(u($person['id']))); ?>">Delete</a></td>
+            <td><?php echo h($person['id']); ?></td>
           </tr>
         <?php } ?>
       </tbody>
@@ -77,7 +77,6 @@ include(SHARED_PATH . '/header.php');
 
     <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=3"></script>
     <script src="<?php echo url_for('/shared/js/users-list.js'); ?>?v=2"></script>
-    <?php mysqli_free_result($player_set); ?>
   </div>
 
 </main>

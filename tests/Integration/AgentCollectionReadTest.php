@@ -35,7 +35,7 @@ final class AgentCollectionReadTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->runSql(
             "ALTER TABLE games ADD COLUMN Wt VARCHAR(50) DEFAULT NULL, ADD COLUMN Yr DOUBLE DEFAULT NULL;
-             ALTER TABLE players ADD COLUMN FullName VARCHAR(255) DEFAULT NULL,
+             ALTER TABLE players ADD COLUMN FullName VARCHAR(255) DEFAULT NULL, ADD COLUMN G VARCHAR(10) DEFAULT NULL,
                ADD COLUMN birth_year INT DEFAULT NULL, ADD COLUMN represents_user_id INT DEFAULT NULL;
              CREATE TABLE uses_players (
                id INT AUTO_INCREMENT PRIMARY KEY,
@@ -55,7 +55,7 @@ final class AgentCollectionReadTest extends TestCase
         require_once PRIVATE_PATH . '/kept_status.php';
         require_once PRIVATE_PATH . '/collection_list.php';
         require_once PRIVATE_PATH . '/use_participants.php';
-        require_once PRIVATE_PATH . '/players_list.php';
+        require_once PRIVATE_PATH . '/people_api.php';
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
     }
 
@@ -209,15 +209,28 @@ final class AgentCollectionReadTest extends TestCase
         $this->assertSame([], find_uses_with_participants($this->db, 1, null, 200));
     }
 
-    public function test_players_list_is_scoped_to_the_user(): void
+    private function agentKey(int $userId): object
     {
-        $players = list_players_for_user($this->db, 1);
-        $this->assertSame([101, 100], array_column($players, 'id'));
-        $sam = $players[1];
-        $this->assertSame('Sam Lee', $sam['name']);
-        $this->assertSame(1990, $sam['birth_year']);
-        $this->assertSame(1, $sam['represents_user_id']);
-        $this->assertNull($players[0]['birth_year']);
-        $this->assertSame([200], array_column(list_players_for_user($this->db, 2), 'id'));
+        return (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => $userId];
+    }
+
+    public function test_players_list_is_scoped_to_the_user_with_the_published_fields(): void
+    {
+        [$status, $fields] = list_people_over_api($this->db, $this->agentKey(1));
+
+        $this->assertSame(200, $status);
+        $this->assertSame([
+            ['id' => 101, 'name' => 'Jo Smith', 'FirstName' => 'Jo', 'LastName' => 'Smith', 'birth_year' => null, 'represents_user_id' => null],
+            ['id' => 100, 'name' => 'Sam Lee', 'FirstName' => 'Sam', 'LastName' => 'Lee', 'birth_year' => 1990, 'represents_user_id' => 1],
+        ], $fields['players']);
+        $this->assertSame([200], array_column(list_people_over_api($this->db, $this->agentKey(2))[1]['players'], 'id'));
+    }
+
+    public function test_players_list_refuses_the_master_key(): void
+    {
+        [$status, $fields] = list_people_over_api($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']);
+
+        $this->assertSame(400, $status);
+        $this->assertSame(['message' => 'players.php requires a user-scoped key.'], $fields);
     }
 }

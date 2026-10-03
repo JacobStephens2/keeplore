@@ -7,7 +7,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Seams:
  * - ui/users/index.php source: search is in the first HTML with autofocus,
- *   independent of DataTables; the list is the items-style table
+ *   independent of DataTables; the list is the items-style table, newest first
  * - ui/shared/js/users-list.js: filter/sort/page of the users table
  */
 class UsersListTest extends TestCase
@@ -42,12 +42,11 @@ class UsersListTest extends TestCase
         );
         $this->assertStringContainsString('/shared/js/list-table.js', $source);
         $this->assertStringContainsString('/shared/js/users-list.js', $source);
-        $queries = file_get_contents(PROJECT_PATH . '/private/query_functions/player_queries.php');
-        $this->assertNotFalse($queries);
+        $this->assertStringContainsString('->all()', $source);
         $this->assertMatchesRegularExpression(
-            '/function find_players_by_user_id\(\) \{[\s\S]*?ORDER BY id DESC/',
-            $queries,
-            'The users list query must return newest id first so first paint matches the old DataTables order.'
+            '/usort\(\$people, fn \(\$a, \$b\) => \$b\[\'id\'\] <=> \$a\[\'id\'\]\)/',
+            $source,
+            'The users page must order people newest id first so first paint matches the old DataTables order.'
         );
     }
 

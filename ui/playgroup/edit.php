@@ -47,15 +47,13 @@ if(is_post_request()) {
           <select name="FullName">
             <option value='Invalid'>Choose a player</option>
           <?php
-            $player_set = list_players();
-            while($player = mysqli_fetch_assoc($player_set)) {
-              echo "<option value=\"" . h($player['id']) . "\"";
-              if($playgroupplayer['FullName'] == $player['id']) {
+            foreach ((new People($db, (int) $_SESSION['user_id']))->all() as $person) {
+              echo "<option value=\"" . h($person['id']) . "\"";
+              if($playgroupplayer['FullName'] == $person['id']) {
                 echo " selected";
               }
-              echo ">" . h($player['FirstName']) . ' ' . h($player['LastName']) . "</option>";
+              echo ">" . h($person['name']) . "</option>";
             }
-            mysqli_free_result($player_set);
           ?>
           </select>
         </dd>

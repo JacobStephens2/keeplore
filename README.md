@@ -114,7 +114,7 @@ api/                        REST API endpoints
 ├── uses.php                Interaction recording
 ├── types.php               Item types
 ├── players.php             Household players (read-only)
-├── users.php               User management
+├── users.php               Person search (signed-in owner's people)
 └── private/                API-specific initialization
 
 private/                    Backend logic (not web-accessible)
@@ -130,7 +130,7 @@ private/                    Backend logic (not web-accessible)
 ├── classes/                OOP data access layer
 │   ├── DatabaseObject.class.php
 │   ├── Artifact.class.php
-│   └── User.class.php
+│   └── …                   Owner-scoped modules (Items, People, Uses, …)
 ├── query_functions/        Domain-specific query modules
 ├── crons/                  Scheduled tasks
 └── oneTimeScripts/         Migration scripts

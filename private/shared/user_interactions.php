@@ -2,7 +2,7 @@
   require_once PRIVATE_PATH . '/player_item_uses.php';
   $player_id = (int) $id;
   $user_id_int = (int) $user_id;
-  $player_full_name = trim(($player['FirstName'] ?? '') . ' ' . ($player['LastName'] ?? ''));
+  $player_full_name = $person['name'];
   $participants = record_use_participants(
     $player_id,
     $player_full_name,
