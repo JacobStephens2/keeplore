@@ -8,6 +8,10 @@ Keeplore helps people understand which possessions earn their place through use.
 A tracked entity or object for which an interaction or use can be recorded, including games and other item types. Any such item can also have proposal outcomes recorded.
 _Avoid_: Game (when referring to all supported item types).
 
+**Type**:
+One of the owner's own categories for items, such as table game, book or film. Each item has at most one. Deleting a type moves its items to another of the owner's types or leaves them without one.
+_Avoid_: Artifact type, ObjectType.
+
 **Use**:
 A recorded occasion when an item was used, on a date, optionally with people, a Setting (where it was used) and notes. One Record Use submit can record several identical uses at once through its Number of uses. Distinct from an item proposal, which is never a use.
 

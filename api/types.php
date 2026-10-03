@@ -3,6 +3,7 @@
   require_once('private/initialize.php');
   require_once('../private/rate_limiter.php');
   require_once('../private/app_logger.php');
+  require_once('../private/types_api.php');
   header('Content-Type: application/json');
 
   $logger = new AppLogger();
@@ -32,29 +33,12 @@
   switch ($method) {
 
     case 'GET':
-      // List all artifact types, optionally filtered by user_id
-      $user_id = isset($authentication_response->user_id) ? (int) $authentication_response->user_id : null;
-
-      if ($user_id) {
-        $stmt = $database->prepare(
-          "SELECT id, ObjectType AS type FROM types WHERE user_id = ? ORDER BY ObjectType ASC"
-        );
-        $stmt->bind_param("i", $user_id);
-      } else {
-        $stmt = $database->prepare(
-          "SELECT id, ObjectType AS type FROM types ORDER BY ObjectType ASC"
-        );
+      // Read-only item types, scoped to the authenticated user
+      [$status, $fields] = list_types_over_api($database, $authentication_response);
+      http_response_code($status);
+      foreach ($fields as $field => $value) {
+        $response->$field = $value;
       }
-
-      $stmt->execute();
-      $result = $stmt->get_result();
-      $types = [];
-      while ($record = $result->fetch_assoc()) {
-        $types[] = $record;
-      }
-      $stmt->close();
-
-      $response->types = $types;
       echo json_encode($response);
       break;
 

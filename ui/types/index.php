@@ -41,56 +41,27 @@
       </thead>
 
       <tbody>
-        <?php 
-          $user_id = $_SESSION['user_id'];
-          $types = query("SELECT id, ObjectType FROM types WHERE user_id = '$user_id'");
-
-          foreach($types as $type) { 
-            
-            $type_name = $type['ObjectType'];
-            $type_id = $type['id'];
-
-            $query = 
-              "SELECT COUNT(id) AS artifacts_kept_of_this_type
-              FROM games
-              WHERE type_id = '$type_id'
-              AND user_id = '$user_id'
-              AND is_kept = '1'
-            ";
-            $artifacts_kept_of_this_type = singleValueQuery($query);
-
-            $artifacts_unkept_of_this_type = singleValueQuery(
-              "SELECT COUNT(id) AS artifacts_kept_of_this_type
-              FROM games
-              WHERE type_id = '$type_id'
-              AND user_id = '$user_id'
-              AND is_kept = '0'
-            ");
-            ?>
-            
+        <?php foreach ((new Types($db, (int) $_SESSION['user_id']))->all() as $type) { ?>
             <tr>
               <td>
                 <?php if (!is_guest()) { ?>
                 <a href="/types/edit?id=<?php echo $type['id']; ?>">
-                  <?php echo h($type_name); ?>
+                  <?php echo h($type['name']); ?>
                 </a>
-                <?php } else { echo h($type_name); } ?>
+                <?php } else { echo h($type['name']); } ?>
               </td>
               <td>
                 <a href="/artifacts/?type=<?php echo $type['id']; ?>&kept=yes">
-                  <?php echo h($artifacts_kept_of_this_type); ?>
+                  <?php echo h($type['kept_count']); ?>
                 </a>
               </td>
               <td>
                 <a href="/artifacts/?type=<?php echo $type['id']; ?>&kept=no">
-                  <?php echo h($artifacts_unkept_of_this_type); ?>
+                  <?php echo h($type['not_kept_count']); ?>
                 </a>
               </td>
             </tr>
-            
-            <?php 
-          } 
-        ?>
+        <?php } ?>
       </tbody>
   	</table>
     </div>
