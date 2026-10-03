@@ -2,12 +2,13 @@
   // Request BGG Data lookup shared by Create Item and Edit Item. Set
   // $bgg_keep_title = true before including to leave the Name field alone
   // when a match is used. Set $bgg_default_type (from user_bgg_default_type)
-  // to give a used match that Type. Needs ui/artifacts/new-bgg.js on the page.
+  // to give a used match that Type while Type is still Create Item's
+  // DEFAULT_TYPE or blank. Needs ui/artifacts/new-bgg.js on the page.
   $bgg_keep_title = $bgg_keep_title ?? false;
   $bgg_default_type = $bgg_default_type ?? null;
 ?>
         <div class="bgg-lookup">
-          <button type="button" id="requestBggData"<?php if ($bgg_keep_title) { ?> data-keep-title<?php } ?><?php if ($bgg_default_type !== null) { ?> data-default-type-id="<?php echo (int) $bgg_default_type['id']; ?>" data-default-type-name="<?php echo h($bgg_default_type['name']); ?>"<?php } ?>>Request BGG Data</button>
+          <button type="button" id="requestBggData"<?php if ($bgg_keep_title) { ?> data-keep-title<?php } ?><?php if ($bgg_default_type !== null) { ?> data-default-type-id="<?php echo (int) $bgg_default_type['id']; ?>" data-default-type-name="<?php echo h($bgg_default_type['name']); ?>" data-form-default-type-id="<?php echo h((string) DEFAULT_TYPE); ?>"<?php } ?>>Request BGG Data</button>
           <p class="bgg-lookup-status" id="bggLookupStatus" hidden></p>
           <div class="bgg-confirm" id="bggConfirm" hidden>
             <img id="bggMatchImage" class="bgg-match-image" alt="" hidden referrerpolicy="no-referrer">
