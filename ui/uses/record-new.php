@@ -108,7 +108,7 @@
 <script type="module" src="modules/getUsers.js"></script>
 <script type="module" src="modules/addNewUser.js"></script>
 <script type="module" src="modules/addNewEntity.js"></script>
-<script defer src="record-new.js"></script>
+<script defer src="record-new.js?v=2"></script>
 
 <main>
 
@@ -230,15 +230,6 @@
     <input type="submit" value="Submit">
 
   </form>
-
-  <script>
-    document.addEventListener('keypress', function(event) {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        document.querySelector('form').submit();
-      }
-    })
-  </script>
 
 </main>
 
