@@ -46,8 +46,11 @@ final class Items
     /** Fields an update gives their create default when blank. */
     private const BLANK_TAKES_DEFAULT = ['MnT', 'MxT', 'MnP', 'MxP', 'SS', 'Age', 'Acq'];
 
+    private Types $types;
+
     public function __construct(private mysqli $db, private int $userId)
     {
+        $this->types = new Types($db, $userId);
     }
 
     /** Create the Item with its tags and return its id. */
@@ -249,7 +252,7 @@ final class Items
     private function ownerType($typeId): ?array
     {
         $typeId = trim((string) $typeId);
-        return preg_match('/^[1-9][0-9]*$/', $typeId) ? user_type($this->db, $this->userId, (int) $typeId) : null;
+        return preg_match('/^[1-9][0-9]*$/', $typeId) ? $this->types->find((int) $typeId) : null;
     }
 
     /**

@@ -71,7 +71,7 @@ $userResult = mysqli_stmt_get_result($stmt);
 $userArray = mysqli_fetch_assoc($userResult);
 mysqli_stmt_close($stmt);
 $bgg_default_type = user_bgg_default_type($db, $user_id);
-$types = user_types($db, $user_id);
+$types = (new Types($db, $user_id))->all();
 
 ?>
 
@@ -231,8 +231,8 @@ $types = user_types($db, $user_id);
       <label for="bgg_default_type_id">Type for BoardGameGeek items</label>
       <select name="bgg_default_type_id" id="bgg_default_type_id" aria-describedby="bgg_default_type_help">
         <option value="">Keep Create Item's type</option>
-        <?php foreach ($types as $type_name => $type_id) { ?>
-          <option value="<?php echo $type_id; ?>"<?php if ($bgg_default_type !== null && $bgg_default_type['id'] === $type_id) echo ' selected'; ?>><?php echo h($type_name); ?></option>
+        <?php foreach ($types as $type) { ?>
+          <option value="<?php echo $type['id']; ?>"<?php if ($bgg_default_type !== null && $bgg_default_type['id'] === $type['id']) echo ' selected'; ?>><?php echo h($type['name']); ?></option>
         <?php } ?>
       </select>
     </div>
