@@ -1,4 +1,4 @@
-import { API_ORIGIN } from "./publicEnvironmentVariables.js";
+import { API_BASE } from "./publicEnvironmentVariables.js";
 
 // Person rows on Record Use and Edit Use. The server renders the rows a
 // form opens with; + adds more with addUserRow. Every row, either way, is
@@ -111,7 +111,7 @@ export function rowParts(row) {
 // The signed-in user's people matching query, or [] after sending a
 // signed-out visitor to log in.
 export async function searchPeople(query, userid) {
-  const response = await fetch("https://" + API_ORIGIN + "/users.php", {
+  const response = await fetch(API_BASE + "/users.php", {
     method: "POST",
     credentials: "include",
     body: JSON.stringify({ query, userid }),

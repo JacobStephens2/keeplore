@@ -707,7 +707,7 @@
       var newMsg = document.getElementById('record-modal-new-msg');
       if (!usersWrap || !search) return;
 
-      var API_BASE = 'https://api.' + window.location.host.replace(/^www\./, '');
+      var API_BASE = 'https://' + <?php echo json_encode(API_ORIGIN); ?>;
       var currentUserId = '<?php echo h($_SESSION['user_id'] ?? ''); ?>';
       var csrfToken = (document.querySelector('#record-modal-form input[name="csrf_token"]') || {}).value || '';
       var searchWrap = search.closest('.modal-user-search-wrap');
