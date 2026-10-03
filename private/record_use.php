@@ -8,7 +8,7 @@
  * listed as a participant, and the default Setting value.
  */
 
-const RECORD_USE_MAX_COUNT = 20;
+require_once __DIR__ . '/classes/Uses.php';
 
 /**
  * How many identical uses one Record Use submit writes. Pages without the
@@ -17,20 +17,20 @@ const RECORD_USE_MAX_COUNT = 20;
 function record_use_count(array $post): int
 {
     $count = (int) ($post['useCount'] ?? 1);
-    return max(1, min(RECORD_USE_MAX_COUNT, $count));
+    return max(1, min(Uses::MAX_COUNT, $count));
 }
 
-/**
- * Write record_use_count($post) identical uses through $insert_use and
- * return how many were written. Callers own the transaction.
- */
-function record_uses(array $post, callable $insert_use): int
+/** The Record Use form's POST in the Uses module's input names. */
+function record_use_input(array $post): array
 {
-    $count = record_use_count($post);
-    for ($i = 0; $i < $count; $i++) {
-        $insert_use($post);
-    }
-    return $count;
+    return [
+        'item_id' => $post['artifact']['id'] ?? '',
+        'use_date' => $post['useDate'] ?? '',
+        'setting' => $post['Note'] ?? '',
+        'notes' => $post['NotesTwo'] ?? '',
+        'player_ids' => array_column($post['user'] ?? [], 'id'),
+        'count' => record_use_count($post),
+    ];
 }
 
 function record_use_success_message(array $post): string

@@ -155,7 +155,7 @@ class RecordUseTest extends TestCase
     {
         $this->assertSame(1, record_use_count(['useCount' => '0']));
         $this->assertSame(1, record_use_count(['useCount' => '-3']));
-        $this->assertSame(RECORD_USE_MAX_COUNT, record_use_count(['useCount' => '500']));
+        $this->assertSame(\Uses::MAX_COUNT, record_use_count(['useCount' => '500']));
     }
 
     public function test_success_message_names_how_many_uses_when_more_than_one(): void
@@ -170,32 +170,39 @@ class RecordUseTest extends TestCase
         );
     }
 
-    public function test_record_uses_writes_one_identical_use_per_count(): void
+    public function test_input_maps_the_record_use_post_onto_the_uses_module(): void
     {
-        $post = [
+        $this->assertSame([
+            'item_id' => '12',
+            'use_date' => '2026-10-02',
+            'setting' => 'Cabin',
+            'notes' => 'Close game',
+            'player_ids' => ['1', '', '2'],
+            'count' => 2,
+        ], record_use_input([
             'artifact' => ['id' => '12', 'name' => 'Old Maid'],
+            'user' => [
+                ['id' => '1', 'name' => 'Local Dev'],
+                ['id' => '', 'name' => 'Typed but not picked'],
+                ['id' => '2', 'name' => 'Sam Lee'],
+            ],
             'useDate' => '2026-10-02',
+            'Note' => 'Cabin',
+            'NotesTwo' => 'Close game',
             'useCount' => '2',
-        ];
-        $written = [];
-
-        $count = record_uses($post, function (array $p) use (&$written) {
-            $written[] = $p;
-        });
-
-        $this->assertSame(2, $count);
-        $this->assertSame([$post, $post], $written);
+        ]));
     }
 
-    public function test_record_uses_writes_one_use_without_a_count(): void
+    public function test_input_from_a_quick_record_is_one_use_with_blank_notes(): void
     {
-        $written = 0;
-
-        record_uses([], function () use (&$written) {
-            $written++;
-        });
-
-        $this->assertSame(1, $written);
+        $this->assertSame([
+            'item_id' => '',
+            'use_date' => '',
+            'setting' => '',
+            'notes' => '',
+            'player_ids' => [],
+            'count' => 1,
+        ], record_use_input([]));
     }
 
     public function test_group_keeps_the_people_date_and_setting_of_a_recorded_use(): void

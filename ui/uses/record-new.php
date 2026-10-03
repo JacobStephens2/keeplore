@@ -41,68 +41,53 @@
     $is_ajax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
     $after_record = record_use_return_path($_POST, url_for('/uses/' . $formProcessingFile));
 
-    if ($_POST['artifact']['name'] == '') {
-
+    try {
+      $ids = (new Uses($db, (int) $_SESSION['user_id']))->record(record_use_input($_POST));
+    } catch (InvalidArgumentException | OutOfBoundsException $error) {
       if ($is_ajax) {
         header('Content-Type: application/json');
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'message' => 'Please choose an item.']);
+        http_response_code($error instanceof OutOfBoundsException ? 404 : 400);
+        echo json_encode(['ok' => false, 'message' => $error->getMessage()]);
         exit;
       }
-
-      $_SESSION['message'] = "Please choose an item.";
-
+      $_SESSION['message'] = $error->getMessage();
       redirect_to($after_record);
-
-    } else {
-
-      // insert_use exits on a DB error, so an unfinished batch is rolled
-      // back when the connection closes instead of half-saving.
-      mysqli_begin_transaction($db);
-      record_uses($_POST, 'insert_use');
-      $new_id = mysqli_insert_id($db);
-      $insertResult = mysqli_commit($db);
-
-      if($insertResult === true) {
-        $message = record_use_success_message($_POST);
-
-        if ($is_ajax) {
-          $status = compute_artifact_use_by_status((int) $_POST['artifact']['id'], (int) $_SESSION['user_id']);
-          $artifact_row = find_artifact_by_id((int) $_POST['artifact']['id']);
-          header('Content-Type: application/json');
-          echo json_encode(record_use_ajax_payload($_POST, (int) $new_id, $status, $artifact_row));
-          exit;
-        }
-
-        // Only this page's own form offers its group again; quick records
-        // from the dashboard, Use By, and Edit User post here by AJAX.
-        if (($_POST['return_to'] ?? '') !== 'user-edit') {
-          $_SESSION['record_use_group'] = record_use_group($_POST, record_use_today());
-        }
-        $_SESSION['message'] = $message;
-        redirect_to($after_record);
-      } else {
-        if ($is_ajax) {
-          header('Content-Type: application/json');
-          http_response_code(500);
-          echo json_encode(['ok' => false, 'message' => 'Failed to record interaction.']);
-          exit;
-        }
-        $errors = $insertResult;
-      }
     }
 
+    $message = record_use_success_message($_POST);
+
+    if ($is_ajax) {
+      $status = compute_artifact_use_by_status((int) $_POST['artifact']['id'], (int) $_SESSION['user_id']);
+      $artifact_row = find_artifact_by_id((int) $_POST['artifact']['id']);
+      header('Content-Type: application/json');
+      echo json_encode(record_use_ajax_payload($_POST, end($ids), $status, $artifact_row));
+      exit;
+    }
+
+    // Only this page's own form offers its group again; quick records
+    // from the dashboard, Use By, and Edit User post here by AJAX.
+    if (($_POST['return_to'] ?? '') !== 'user-edit') {
+      $_SESSION['record_use_group'] = record_use_group($_POST, record_use_today());
+    }
+    $_SESSION['message'] = $message;
+    redirect_to($after_record);
 
   }
 
+  $artifact_id = null;
+  $artifact_name = null;
   if (isset($_GET['artifact_id'])) {
-    $artifact_id = $_GET['artifact_id'];
-    $artifact_name = singleValueQuery(
-      "SELECT Title FROM games WHERE id = '$artifact_id' "
-    );
-  } else {
-    $artifact_id = null;
-    $artifact_name = null;
+    $stmt = mysqli_prepare($db, "SELECT id, Title FROM games WHERE id = ? AND user_id = ?");
+    $requested_id = (int) $_GET['artifact_id'];
+    $owner_id = (int) $_SESSION['user_id'];
+    mysqli_stmt_bind_param($stmt, 'ii', $requested_id, $owner_id);
+    mysqli_stmt_execute($stmt);
+    $prefill = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+    mysqli_stmt_close($stmt);
+    if ($prefill !== null) {
+      $artifact_id = $prefill['id'];
+      $artifact_name = $prefill['Title'];
+    }
   }
 
   $form = record_use_form($_SESSION['record_use_group'] ?? null, isset($_GET['again']), [
@@ -149,11 +134,11 @@
     <input type="search" 
       id="SearchTitles" 
       name="artifact[name]" 
-      value="<?php echo $artifact_name; ?>"
+      value="<?php echo h($artifact_name ?? ''); ?>"
       data-userid="<?php echo $_SESSION['user_id']; ?>"
     >
     <input type="hidden" id="SearchTitleSubmission" name="artifact[id]" 
-      value="<?php echo $artifact_id; ?>"
+      value="<?php echo h($artifact_id ?? ''); ?>"
     >
     <div class="searchResults" style="display: none;">
       <ul class="searchResults" style="margin-top: 0;">
@@ -223,7 +208,7 @@
       <div>
         <label for="useCount">Number of uses</label>
         <input type="number" name="useCount" id="useCount"
-          value="1" min="1" max="<?php echo RECORD_USE_MAX_COUNT; ?>" step="1"
+          value="1" min="1" max="<?php echo Uses::MAX_COUNT; ?>" step="1"
         >
       </div>
     </div>

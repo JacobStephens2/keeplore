@@ -2,32 +2,33 @@
 require_once('../../private/initialize.php');
 require_login();
 
-if(!isset($_GET['id'])) {
+$uses = new Uses($db, (int) $_SESSION['user_id']);
+$id = (int) ($_GET['id'] ?? 0);
+$use = $uses->find($id);
+if ($use === null) {
+  $_SESSION['message'] = 'That use was not found.';
   redirect_to(url_for('/uses/interactions.php'));
 }
-$id = $_GET['id'];
 
 if(is_post_request()) {
-  // handle post requests sent by this page
-  $response = [];
-  $response['use_id'] = $id ?? '';
-  $response['artifact_id'] = $_POST['artifact_id'] ?? '';
-  $response['use_date'] = $_POST['use_date'] ?? '';
-  $response['user'] = $_POST['user'] ?? '';
-  $response['note'] = $_POST['note'] ?? '';
-  $response['notesTwo'] = $_POST['notesTwo'] ?? '';
-
-  $result = update_use($response);
-  if($result === true) {
+  // A person row whose name was cleared is no longer on the use.
+  $people = array_filter($_POST['user'] ?? [], fn ($person) => ($person['name'] ?? '') !== '');
+  try {
+    $uses->update($id, [
+      'item_id' => $_POST['artifact_id'] ?? '',
+      'use_date' => $_POST['use_date'] ?? '',
+      'setting' => $_POST['note'] ?? '',
+      'notes' => $_POST['notesTwo'] ?? '',
+      'player_ids' => array_column($people, 'id'),
+    ]);
     $_SESSION['message'] = 'The use was updated successfully.';
-  } else {
-    $errors = $result;
+    $use = $uses->find($id);
+  } catch (InvalidArgumentException $error) {
+    $errors = [$error->getMessage()];
+  } catch (OutOfBoundsException $error) {
+    $_SESSION['message'] = 'That use was not found.';
+    redirect_to(url_for('/uses/interactions.php'));
   }
-
-  $response = find_use_details_by_id($id);
-
-} else {
-  $response = find_use_details_by_id($id);
 }
 
 $page_title = 'Edit Interaction';
@@ -46,7 +47,7 @@ include(SHARED_PATH . '/header.php');
     <?php echo display_errors($errors); ?>
 
     <form
-      action="<?php echo url_for('/uses/record-edit.php?id=' . h(u($id))); ?>"
+      action="<?php echo url_for('/uses/record-edit.php?id=' . h(u($use['id']))); ?>"
       method="post"
       >
       <?php echo csrf_input(); ?>
@@ -56,15 +57,15 @@ include(SHARED_PATH . '/header.php');
         type="date" 
         id="UseDate" 
         name="use_date" 
-        value="<?php echo h(substr($response['use_date'],0,10)); ?>" 
+        value="<?php echo h($use['use_date']); ?>" 
       />
 
       <label for="Title">Item</label>      <select id="Title" name="artifact_id">
         <?php
-          $artifact_set = list_artifacts();
+          $artifact_set = list_artifacts((int) $_SESSION['user_id']);
           while($artifact = mysqli_fetch_assoc($artifact_set)) {
             echo "<option value=\"" . h($artifact['id']) . "\"";
-            if($response["game_id"] == $artifact['id']) {
+            if($use['item_id'] == $artifact['id']) {
               echo " selected";
             }
             echo ">" . h($artifact['Title']) . "</option>";
@@ -73,15 +74,11 @@ include(SHARED_PATH . '/header.php');
         ?>
       </select>
 
-      <?php
-        $usersResultObject = find_users_by_use_id($response['id']);
-      ?>
-
       <label for="users">People List</label>
       <section id="users">
         <?php
         $i = 0;
-        foreach ($usersResultObject as $user) {
+        foreach ($use['people'] as $user) {
           ?>
           <div class="person-row" id="personRow<?php echo $i; ?>">
             <input 
@@ -89,7 +86,7 @@ include(SHARED_PATH . '/header.php');
               class="user" 
               id="user<?php echo $i; ?>name" 
               name="user[<?php echo $i; ?>][name]" 
-              value="<?php echo h($user['FirstName'] . ' ' . $user['LastName']); ?>"
+              value="<?php echo h($user['name']); ?>"
               data-userid="<?php echo $_SESSION['user_id']; ?>"
               autocomplete="off"
             >
@@ -97,7 +94,7 @@ include(SHARED_PATH . '/header.php');
               type="hidden" 
               id="user<?php echo $i; ?>id" 
               name="user[<?php echo $i; ?>][id]" 
-              value="<?php echo $user['id']; ?>"
+              value="<?php echo (int) $user['id']; ?>"
             >
             <div class="userResults" id="userResultsDiv<?php echo $i; ?>" style="display: none;">
               <ul class="userResults" id="userResults<?php echo $i; ?>"></ul>
@@ -126,7 +123,7 @@ include(SHARED_PATH . '/header.php');
       <input type="text"
         name="note" 
         id="Note" 
-        value="<?php echo h($response['note']); ?>" 
+        value="<?php echo h($use['setting']); ?>" 
       >
 
       <label for="notesTwo">Notes</label>
@@ -135,10 +132,9 @@ include(SHARED_PATH . '/header.php');
         id="notesTwo" 
         cols="30" 
         rows="10"
-        ><?php echo h($response['notesTwo']); ?></textarea>
+        ><?php echo h($use['notes']); ?></textarea>
 
       
-      <input type="hidden" name="use_id" value="<?php echo h($response['id']); ?>" /></dd>
 
       <input type="submit" value="Save use" />
 
@@ -148,7 +144,7 @@ include(SHARED_PATH . '/header.php');
 
   <a 
     class="action" 
-    href="<?php echo url_for('/uses/record-delete.php?id=' . h(u($response['id']))); ?>"
+    href="<?php echo url_for('/uses/record-delete.php?id=' . h(u($use['id']))); ?>"
   >
     <button>
       Delete Interaction
