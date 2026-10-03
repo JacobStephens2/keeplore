@@ -1,9 +1,9 @@
 <?php
 
-  require_once 'artifact_type_array.php';
   require_once dirname(__DIR__) . '/item_types.php';
-  global $typesArray;
+  global $db;
   global $type;
+  $type_ids_by_name = array_column((new Types($db, (int) $_SESSION['user_id']))->all(), 'id', 'name');
   // Pages that tidy their filter panel (Items, #15) set
   // $type_filter_shortcuts = 'trimmed' before including this partial to
   // keep only Select All / Deselect All plus one game-type shortcut. Every
@@ -45,7 +45,7 @@
 <div id="selectButtons">
   <button id="selectAll">Select All</button>
   <button id="deselectAll">Deselect All</button>
-  <button id="selectGames" data-type-ids="<?php echo h(json_encode(item_game_type_ids($typesArray ?? []))); ?>">Select Games</button>
+  <button id="selectGames" data-type-ids="<?php echo h(json_encode(item_game_type_ids($type_ids_by_name))); ?>">Select Games</button>
   <?php if (!$trimmed_shortcuts) { ?>
   <button id="selectAnalogGames">Select Analog Games</button>
   <button id="selectOnlineGames">Select Online Games</button>
@@ -55,16 +55,16 @@
 
 <span id="typeCheckboxes" style="display: flex; flex-wrap: wrap">
   <?php
-    foreach ($typesArray as $artifactType => $id) {
+    foreach ($type_ids_by_name as $type_name => $id) {
       ?>
       <span>
         <input
           type="checkbox"
           id="<?php 
-            if ($artifactType == '') {
+            if ($type_name == '') {
               echo 'no-type';
             } else {
-              echo str_replace(' ', '-', $artifactType);
+              echo str_replace(' ', '-', $type_name);
             }
           ?>" 
           value="<?php echo $id; ?>" 
@@ -79,10 +79,10 @@
         >
         <label>
           <?php 
-            if ($artifactType === '') {
+            if ($type_name === '') {
               echo 'no type';
             } else {
-              echo str_replace('-', ' ', $artifactType); 
+              echo str_replace('-', ' ', $type_name); 
             }
           ?>
         </label>

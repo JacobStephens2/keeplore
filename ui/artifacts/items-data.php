@@ -6,14 +6,14 @@
   header('Content-Type: application/json');
   header('Cache-Control: no-store');
 
-  list($default_use_interval, $typesArray) = items_list_load_filter_defaults($_SESSION['user_id']);
+  list($default_use_interval, $type_ids_by_name) = items_list_load_filter_defaults($_SESSION['user_id']);
 
   $filters = items_list_filters_from_request(
     $_GET,
     [],
     'GET',
     $default_use_interval,
-    $typesArray
+    $type_ids_by_name
   );
   $items = items_list_payload($db, $filters, $_SESSION['user_id']);
 

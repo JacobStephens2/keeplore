@@ -1,13 +1,13 @@
 <?php
-  require_once SHARED_PATH . '/artifact_type_array.php';
-  global $typesArray;
+  global $db;
+  $type_ids_by_name = array_column((new Types($db, (int) $_SESSION['user_id']))->all(), 'id', 'name');
 
   // Only one of the user's types is preselected: an id they don't own (such
   // as a configured default type from another account) posts no type.
   $wanted_type_id = isset($type_id) ? (string) $type_id : '';
   $current_type_id = '';
   $current_type_name = '';
-  foreach ($typesArray as $type_name => $tid) {
+  foreach ($type_ids_by_name as $type_name => $tid) {
     if ((string) $tid === $wanted_type_id) {
       $current_type_id = $wanted_type_id;
       $current_type_name = $type_name;
@@ -23,7 +23,7 @@
 />
 <input type="hidden" name="type" id="type" value="<?php echo h($current_type_id); ?>" />
 <datalist id="type_list">
-  <?php foreach ($typesArray as $type_name => $tid) { ?>
+  <?php foreach ($type_ids_by_name as $type_name => $tid) { ?>
     <option value="<?php echo h($type_name); ?>" data-id="<?php echo h($tid); ?>"></option>
   <?php } ?>
 </datalist>

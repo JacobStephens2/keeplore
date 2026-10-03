@@ -4,14 +4,14 @@
   global $db;
   require_login_or_guest();
 
-  list($default_use_interval, $typesArray) = items_list_load_filter_defaults($_SESSION['user_id']);
+  list($default_use_interval, $type_ids_by_name) = items_list_load_filter_defaults($_SESSION['user_id']);
 
   $filters = items_list_filters_from_request(
     $_GET,
     $_POST,
     $_SERVER['REQUEST_METHOD'],
     $default_use_interval,
-    $typesArray
+    $type_ids_by_name
   );
   $kept = $filters['kept'];
   $type = $filters['type'];
@@ -139,7 +139,7 @@
     <?php
       // One click to games only, or to Other (items still waiting for a real
       // type). Each link keeps every other filter.
-      $type_switch = items_list_type_switch($typesArray ?? [], $switch_type_ids);
+      $type_switch = items_list_type_switch($type_ids_by_name, $switch_type_ids);
       $type_switch_base = $switch_base;
       unset($type_switch_base['type']);
       if ($kept_switch_active !== null) {
@@ -291,7 +291,7 @@
       >
 
       <?php
-        $all_type_ids = array_map('strval', array_values($typesArray ?? []));
+        $all_type_ids = array_map('strval', array_values($type_ids_by_name));
         $current_type_ids = [];
         if (isset($type) && is_array($type)) {
           foreach (array_values($type) as $type_id) {
@@ -365,7 +365,7 @@
     <script src="<?php echo url_for('/artifacts/items-table-sort.js'); ?>?v=1"></script>
     <script type="application/json" id="items-list-config"><?php
       echo json_encode([
-        'dataUrl' => url_for('/artifacts/items-data.php') . '?' . http_build_query(items_list_query_params($filters, $typesArray ?? [])),
+        'dataUrl' => url_for('/artifacts/items-data.php') . '?' . http_build_query(items_list_query_params($filters, $type_ids_by_name)),
         'itemUrlPrefix' => url_for('/artifacts/' . (is_guest() ? 'show' : 'edit') . '.php?id='),
         'keptToggleUrl' => url_for('/artifacts/set-tracked.php'),
         'csrfToken' => generate_csrf_token(),

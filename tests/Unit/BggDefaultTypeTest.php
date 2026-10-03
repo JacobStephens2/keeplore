@@ -77,7 +77,7 @@ class BggDefaultTypeTest extends TestCase
         $this->assertStringContainsString('name="bgg_default_type_id"', $source);
         $this->assertStringContainsString('user_bgg_default_type_set($db, $user_id,', $source);
         $this->assertStringContainsString('user_bgg_default_type($db, $user_id)', $source);
-        $this->assertStringContainsString('$types = user_types($db, $user_id);', $source);
+        $this->assertStringContainsString('$types = (new Types($db, $user_id))->all();', $source);
         $this->assertStringNotContainsString('artifact_type_array.php', $source);
         $this->assertSame(1, substr_count($source, '$user_id = '), 'Settings sets $user_id once');
     }

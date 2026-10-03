@@ -16,9 +16,7 @@
     if (isset($_SESSION['type']) && count($_SESSION['type']) > 0) {
       $type = $_SESSION['type'];
     } else {
-      include(SHARED_PATH . '/artifact_type_array.php'); 
-      global $typesArray;
-      $type = $typesArray;
+      $type = array_column((new Types($db, (int) $_SESSION['user_id']))->all(), 'id', 'name');
     }
   }
 
