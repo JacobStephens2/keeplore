@@ -210,7 +210,7 @@ class RecordUseTest extends TestCase
             'Note' => 'Grandma\'s',
             'NotesTwo' => 'Close game',
             'useCount' => '2',
-        ]);
+        ], '2026-10-03');
 
         $this->assertSame([
             'people' => [
@@ -219,6 +219,7 @@ class RecordUseTest extends TestCase
             ],
             'useDate' => '2026-10-02',
             'Note' => 'Grandma\'s',
+            'savedOn' => '2026-10-03',
         ], $group);
     }
 
@@ -230,31 +231,69 @@ class RecordUseTest extends TestCase
                 ['id' => '2', 'name' => 'Sam Lee'],
                 ['id' => '2', 'name' => 'Sam Lee'],
             ],
-        ]);
+        ], '2026-10-03');
 
         $this->assertSame([['id' => 2, 'name' => 'Sam Lee']], $group['people']);
         $this->assertSame('', $group['useDate']);
         $this->assertSame('', $group['Note']);
     }
 
-    public function test_form_defaults_use_the_group_when_recording_again(): void
+    public function test_form_opens_with_the_group_when_recording_again(): void
     {
-        $group = [
+        $form = record_use_form($this->group(), true, $this->fallback());
+
+        $this->assertSame($this->group()['people'], $form['people']);
+        $this->assertSame('2026-10-02', $form['useDate']);
+        $this->assertSame('Cabin', $form['Note']);
+        $this->assertNull($form['offerGroup']);
+    }
+
+    public function test_form_offers_the_group_but_opens_fresh_otherwise(): void
+    {
+        $form = record_use_form($this->group(), false, $this->fallback());
+
+        $this->assertSame($this->fallback()['people'], $form['people']);
+        $this->assertSame('2026-10-03', $form['useDate']);
+        $this->assertSame('Home', $form['Note']);
+        $this->assertSame($this->group(), $form['offerGroup']);
+    }
+
+    public function test_form_opens_fresh_without_a_group_even_when_asked_again(): void
+    {
+        foreach ([null, ['people' => [], 'useDate' => '', 'Note' => '']] as $group) {
+            $form = record_use_form($group, true, $this->fallback());
+
+            $this->assertSame($this->fallback()['people'], $form['people']);
+            $this->assertNull($form['offerGroup']);
+        }
+    }
+
+    public function test_form_uses_today_when_the_group_was_saved_on_an_earlier_day(): void
+    {
+        $group = ['savedOn' => '2026-09-28'] + $this->group();
+
+        $form = record_use_form($group, true, $this->fallback());
+
+        $this->assertSame('2026-10-03', $form['useDate']);
+        $this->assertSame($group['people'], $form['people']);
+    }
+
+    public function test_form_keeps_todays_date_when_the_group_has_none(): void
+    {
+        $group = ['useDate' => ''] + $this->group();
+
+        $this->assertSame('2026-10-03', record_use_form($group, true, $this->fallback())['useDate']);
+    }
+
+    /** @return array{people: list<array{id: int, name: string}>, useDate: string, Note: string} */
+    private function group(): array
+    {
+        return [
             'people' => [['id' => 2, 'name' => 'Sam Lee']],
             'useDate' => '2026-10-02',
             'Note' => 'Cabin',
+            'savedOn' => '2026-10-03',
         ];
-
-        $this->assertSame($group, record_use_form_defaults($group, $this->fallback()));
-    }
-
-    public function test_form_defaults_fall_back_without_a_group(): void
-    {
-        $this->assertSame($this->fallback(), record_use_form_defaults(null, $this->fallback()));
-        $this->assertSame(
-            $this->fallback(),
-            record_use_form_defaults(['people' => [], 'useDate' => '', 'Note' => ''], $this->fallback())
-        );
     }
 
     /** @return array{people: list<array{id: int, name: string}>, useDate: string, Note: string} */

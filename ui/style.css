@@ -1384,18 +1384,6 @@ input.sweetSpot {
   margin-right: 0.5rem;
 }
 
-#interactorControls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-  margin-top: 0.6rem;
-}
-
-#interactorControls button.user {
-  margin-top: 0;
-}
-
 .new-interactor-toggle {
   min-height: 2.8rem;
   padding: 0.7rem 1rem;

@@ -1,9 +1,14 @@
 import { API_ORIGIN } from "./publicEnvironmentVariables.js";
 
-// Index for the next interactor row, based on how many interactor search
-// inputs are currently present (each row contributes exactly one input.user).
-function nextUserIndex() {
-  return document.querySelectorAll("input.user").length;
+// Index for the next interactor row: one past the highest user<i>name on
+// the page, so a removed row's index is never handed out twice.
+export function nextUserIndex() {
+  let highest = -1;
+  document.querySelectorAll("input.user").forEach((input) => {
+    const match = /^user(\d+)name$/.exec(input.id);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  });
+  return highest + 1;
 }
 
 // Build an interactor row (search input + hidden id + remove button + results

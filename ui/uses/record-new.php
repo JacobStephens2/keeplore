@@ -64,7 +64,6 @@
       $insertResult = mysqli_commit($db);
 
       if($insertResult === true) {
-        $_SESSION['record_use_group'] = record_use_group($_POST);
         $message = record_use_success_message($_POST);
 
         if ($is_ajax) {
@@ -75,6 +74,11 @@
           exit;
         }
 
+        // Only this page's own form offers its group again; quick records
+        // from the dashboard, Use By, and Edit User post here by AJAX.
+        if (($_POST['return_to'] ?? '') !== 'user-edit') {
+          $_SESSION['record_use_group'] = record_use_group($_POST, record_use_today());
+        }
         $_SESSION['message'] = $message;
         redirect_to($after_record);
       } else {
@@ -101,12 +105,9 @@
     $artifact_name = null;
   }
 
-  $last_group = $_SESSION['record_use_group'] ?? null;
-  $recording_again = isset($_GET['again']) && !empty($last_group['people']);
-  $today = (new DateTime('now', new DateTimeZone('America/New_York')))->format('Y-m-d');
-  $form = record_use_form_defaults($recording_again ? $last_group : null, [
+  $form = record_use_form($_SESSION['record_use_group'] ?? null, isset($_GET['again']), [
     'people' => [['id' => (int) $_SESSION['player_id'], 'name' => (string) $_SESSION['FullName']]],
-    'useDate' => $today,
+    'useDate' => record_use_today(),
     'Note' => most_recent_use_setting((int) $_SESSION['user_id']),
   ]);
   $first_person = $form['people'][0];
@@ -133,11 +134,11 @@
     <div class="record-use-top">
       <input type="submit" value="Submit">
 
-      <?php if (!$recording_again && !empty($last_group['people'])) { ?>
+      <?php if ($form['offerGroup'] !== null) { ?>
         <a class="secondary-link record-again" href="<?php echo $formProcessingFile; ?>?again=1">
           Record another use with this group
         </a>
-        <span class="record-again-names"><?php echo h(implode(', ', array_column($last_group['people'], 'name'))); ?></span>
+        <span class="record-again-names"><?php echo h(implode(', ', array_column($form['offerGroup']['people'], 'name'))); ?></span>
       <?php } ?>
     </div>
 

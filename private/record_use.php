@@ -106,7 +106,7 @@ function most_recent_use_setting(int $user_id, callable $query = null): string
  * Use keeps it after a save so "Record another use with this group" can
  * reopen the form with only the item left to pick.
  */
-function record_use_group(array $post): array
+function record_use_group(array $post, string $today): array
 {
     $people = [];
     foreach ($post['user'] ?? [] as $person) {
@@ -120,21 +120,36 @@ function record_use_group(array $post): array
         'people' => array_values($people),
         'useDate' => (string) ($post['useDate'] ?? ''),
         'Note' => (string) ($post['Note'] ?? ''),
+        'savedOn' => $today,
     ];
 }
 
 /**
- * People, date, and setting the Record Use form opens with: the remembered
- * group when recording again, otherwise $fallback.
+ * What the Record Use form opens with. Asked to record again ($again) with
+ * a remembered group, it opens with that group's people, date, and setting
+ * (the date only on the day the group was saved, so a later visit gets
+ * $fallback's date); otherwise it opens with $fallback and offers the remembered group, if any,
+ * as "Record another use with this group".
  */
-function record_use_form_defaults(?array $group, array $fallback): array
+function record_use_form(?array $last_group, bool $again, array $fallback): array
 {
-    if (empty($group['people'])) {
-        return $fallback;
+    $has_group = !empty($last_group['people']);
+    if ($again && $has_group) {
+        return [
+            'people' => $last_group['people'],
+            'useDate' => ($last_group['useDate'] ?? '') !== ''
+                && ($last_group['savedOn'] ?? '') === $fallback['useDate']
+                ? $last_group['useDate']
+                : $fallback['useDate'],
+            'Note' => (string) ($last_group['Note'] ?? ''),
+            'offerGroup' => null,
+        ];
     }
-    return [
-        'people' => $group['people'],
-        'useDate' => ($group['useDate'] ?? '') !== '' ? $group['useDate'] : $fallback['useDate'],
-        'Note' => (string) ($group['Note'] ?? ''),
-    ];
+    return $fallback + ['offerGroup' => $has_group ? $last_group : null];
+}
+
+/** Today's date (Y-m-d) in the app's America/New_York day. */
+function record_use_today(): string
+{
+    return (new DateTime('now', new DateTimeZone('America/New_York')))->format('Y-m-d');
 }

@@ -77,6 +77,13 @@ An event's games grouped by who is coming: a group for each child's age and one 
 **Event setting**:
 Where a planned item will be used at an event, such as the beach. Belongs to the event, not the item, and is distinct from a use's Setting.
 
+**Use group**:
+The people, date, and Setting of the use last saved from Record Use. "Record another use with this group" reopens Record Use with them filled in, so only the item is left to pick. Quick records from other pages do not change it.
+_Avoid_: Group (alone; proposals and event groupings also have groups).
+
+**Number of uses**:
+How many identical uses one Record Use submit saves, from 1 to 20, such as two rounds of Old Maid with the same family on the same day.
+
 **Games in each group**:
 The number of planned games an event should keep in every group its grouping makes, such as 2 in each of "6 players · casual" and "6 players · main". It can hold for only some of the chosen tags, such as casual and main but not kids. Games the plan can leave home and still meet it are spare, marked "Can stay home"; a group with fewer games than the number is short and needs all of them.
 _Avoid_: Minimum age (an item's own recommended floor).
