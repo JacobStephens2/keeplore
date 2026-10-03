@@ -57,7 +57,7 @@ if(is_post_request()) {
   // Checked against BGG apart from the rest, so a typo or a BGG outage costs
   // only this field.
   $bgg_result = user_bgg_username_set($db, $user_id, (string) ($_POST['bgg_username'] ?? ''));
-  $bgg_type_result = user_bgg_default_type_set($db, $user_id, $_POST['bgg_default_type_id'] ?? '');
+  $bgg_default_type_result = user_bgg_default_type_set($db, $user_id, $_POST['bgg_default_type_id'] ?? '');
 }
 
 $stmt = mysqli_prepare($db, "SELECT
@@ -95,10 +95,10 @@ $types = user_types($db, $user_id);
       } elseif (isset($bgg_result) && $bgg_result['message'] !== null) {
         echo '<p id="bgg_message">' . h($bgg_result['message']) . '</p>';
       }
-      if (isset($bgg_type_result) && !$bgg_type_result['ok']) {
-        echo '<p class="errors">' . h($bgg_type_result['error']) . ' Your type for BoardGameGeek items did not change.</p>';
-      } elseif (isset($bgg_type_result) && $bgg_type_result['message'] !== null) {
-        echo '<p id="bgg_type_message">' . h($bgg_type_result['message']) . '</p>';
+      if (isset($bgg_default_type_result) && !$bgg_default_type_result['ok']) {
+        echo '<p class="errors">' . h($bgg_default_type_result['error']) . ' Your type for BoardGameGeek items did not change.</p>';
+      } elseif (isset($bgg_default_type_result) && $bgg_default_type_result['message'] !== null) {
+        echo '<p id="bgg_default_type_message">' . h($bgg_default_type_result['message']) . '</p>';
       }
   ?>
 

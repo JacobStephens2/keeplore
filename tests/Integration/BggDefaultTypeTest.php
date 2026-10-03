@@ -59,7 +59,11 @@ final class BggDefaultTypeTest extends TestCase
     public function test_setting_one_of_your_types_makes_it_the_bgg_default(): void
     {
         $this->assertSame(
-            ['ok' => true, 'message' => 'Your type for BoardGameGeek items is now board-game.'],
+            [
+                'ok' => true,
+                'type' => ['id' => 1, 'name' => 'board-game'],
+                'message' => 'Your type for BoardGameGeek items is now board-game.',
+            ],
             user_bgg_default_type_set($this->db, 1, '1')
         );
 
@@ -70,7 +74,10 @@ final class BggDefaultTypeTest extends TestCase
     {
         user_bgg_default_type_set($this->db, 1, '1');
 
-        $this->assertSame(['ok' => true, 'message' => null], user_bgg_default_type_set($this->db, 1, '1'));
+        $this->assertSame(
+            ['ok' => true, 'type' => ['id' => 1, 'name' => 'board-game'], 'message' => null],
+            user_bgg_default_type_set($this->db, 1, '1')
+        );
     }
 
     public function test_another_owners_type_is_refused_and_leaves_the_setting(): void
@@ -82,6 +89,23 @@ final class BggDefaultTypeTest extends TestCase
             user_bgg_default_type_set($this->db, 1, '3')
         );
         $this->assertSame(['id' => 2, 'name' => 'film'], user_bgg_default_type($this->db, 1));
+    }
+
+    public function test_an_id_that_names_no_type_is_refused_as_not_yours(): void
+    {
+        $this->assertSame(
+            ['ok' => false, 'error' => 'That type is not one of yours.'],
+            user_bgg_default_type_set($this->db, 1, '999')
+        );
+        $this->assertNull(user_bgg_default_type($this->db, 1));
+    }
+
+    public function test_one_of_two_same_named_types_can_be_set(): void
+    {
+        $this->db->query("INSERT INTO types (id, objectType, user_id) VALUES (4, 'film', 1)");
+
+        $this->assertTrue(user_bgg_default_type_set($this->db, 1, '4')['ok']);
+        $this->assertSame(['id' => 4, 'name' => 'film'], user_bgg_default_type($this->db, 1));
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('notATypeProvider')]
@@ -125,10 +149,19 @@ final class BggDefaultTypeTest extends TestCase
         user_bgg_default_type_set($this->db, 1, '1');
 
         $this->assertSame(
-            ['ok' => true, 'message' => 'You no longer have a type for BoardGameGeek items.'],
+            ['ok' => true, 'type' => null, 'message' => 'You no longer have a type for BoardGameGeek items.'],
             user_bgg_default_type_set($this->db, 1, ' ')
         );
         $this->assertNull(user_bgg_default_type($this->db, 1));
+    }
+
+    public function test_blank_clears_a_default_whose_type_now_belongs_elsewhere(): void
+    {
+        $this->db->query('UPDATE users SET bgg_default_type_id = 3 WHERE id = 1');
+
+        $this->assertTrue(user_bgg_default_type_set($this->db, 1, '')['ok']);
+        $stored = $this->db->query('SELECT bgg_default_type_id FROM users WHERE id = 1')->fetch_row()[0];
+        $this->assertNull($stored);
     }
 
     public function test_a_default_whose_type_now_belongs_elsewhere_reads_as_none(): void
