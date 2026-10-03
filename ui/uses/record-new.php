@@ -176,7 +176,7 @@
     </div>
     <section id="users">
       <?php foreach ($form['people'] as $i => $person) { ?>
-        <div class="person-row" id="SwSDiv<?php echo $i; ?>">
+        <div class="person-row" id="personRow<?php echo $i; ?>">
           <input
             type="search"
             class="user"

@@ -3619,8 +3619,19 @@ html[data-theme="dark"] .modal-panel {
   font-size: 0.9rem;
 }
 
-/* Person rows on Record Use and Edit Use. */
-.person-row + .person-row {
+/* Person rows on Record Use and Edit Use. Edit Use stacks them; Record
+   Use (.record-use-page below) lays each out as one flex line. */
+.person-row,
+.person-row > .userResults {
+  margin-top: 0.5rem;
+}
+
+.record-use-page .person-row:first-child,
+.record-use-page .person-row > .userResults {
+  margin-top: 0;
+}
+
+.record-use-page .person-row + .person-row {
   margin-top: 0.5rem;
 }
 

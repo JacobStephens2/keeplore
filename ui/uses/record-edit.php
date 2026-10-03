@@ -83,13 +83,13 @@ include(SHARED_PATH . '/header.php');
         $i = 0;
         foreach ($usersResultObject as $user) {
           ?>
-          <div class="person-row" id="SwSDiv<?php echo $i; ?>">
+          <div class="person-row" id="personRow<?php echo $i; ?>">
             <input 
               type="search" 
               class="user" 
               id="user<?php echo $i; ?>name" 
               name="user[<?php echo $i; ?>][name]" 
-              value="<?php echo $user['FirstName'] . ' ' . $user['LastName']; ?>"
+              value="<?php echo h($user['FirstName'] . ' ' . $user['LastName']); ?>"
               data-userid="<?php echo $_SESSION['user_id']; ?>"
               autocomplete="off"
             >

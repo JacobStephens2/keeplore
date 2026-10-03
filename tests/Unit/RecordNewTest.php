@@ -83,16 +83,7 @@ if (listeners.keypress) {
 process.stdout.write(JSON.stringify({ submitted: submitted, prevented: event.prevented }));
 JS;
 
-        $cmd = 'node -e ' . escapeshellarg($script) . ' 2>&1';
-        $output = [];
-        $code = 0;
-        exec($cmd, $output, $code);
-        $raw = implode("\n", $output);
-        $this->assertSame(0, $code, $raw);
-
-        $decoded = json_decode($raw, true);
-        $this->assertIsArray($decoded);
-        return $decoded;
+        return $this->runNode($script);
     }
 
     /** @return array{blurred: bool, prevented: bool} */
@@ -115,6 +106,12 @@ listeners.wheel(event);
 process.stdout.write(JSON.stringify({ blurred, prevented: event.prevented }));
 JS;
 
+        return $this->runNode($script);
+    }
+
+    /** @return array<string, mixed> */
+    private function runNode(string $script): array
+    {
         $cmd = 'node -e ' . escapeshellarg($script) . ' 2>&1';
         $output = [];
         $code = 0;

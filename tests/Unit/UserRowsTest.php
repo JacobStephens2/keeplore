@@ -33,7 +33,7 @@ class UserRowsTest extends TestCase
     {
         $result = $this->run_(<<<'JS'
 const list = el('ul');
-renderUserResults(doc, list, people(12), () => {});
+renderUserResults(doc, list, people(12), { onPick: () => {} });
 return list.children.map((li) => [li.tabIndex, li.textContent]).slice(0, 2).concat([list.children.length]);
 JS);
 
@@ -45,7 +45,7 @@ JS);
         $result = $this->run_(<<<'JS'
 const list = el('ul');
 const picked = [];
-renderUserResults(doc, list, people(3), (person) => picked.push(person.id));
+renderUserResults(doc, list, people(3), { onPick: (person) => picked.push(person.id) });
 const enter = key('Enter');
 list.children[1].fire('keydown', enter);
 list.children[2].fire('keydown', key('a'));
@@ -60,7 +60,7 @@ JS);
         $result = $this->run_(<<<'JS'
 const list = el('ul');
 const picked = [];
-renderUserResults(doc, list, people(3), (person) => picked.push(person.id));
+renderUserResults(doc, list, people(3), { onPick: (person) => picked.push(person.id) });
 list.children[2].fire('click', {});
 return picked;
 JS);
@@ -124,7 +124,7 @@ JS);
         $result = $this->run_(<<<'JS'
 const list = el('ul');
 const picked = [];
-renderUserResults(doc, list, people(2), (person) => picked.push(person.id));
+renderUserResults(doc, list, people(2), { onPick: (person) => picked.push(person.id) });
 const space = key(' ');
 list.children[0].fire('keydown', space);
 return { picked, prevented: space.prevented };
@@ -158,6 +158,39 @@ return { shown: parts.results.style.display, focused: doc.activeElement === part
 JS);
 
         $this->assertSame(['shown' => 'none', 'focused' => true, 'id' => ''], $result);
+    }
+
+    public function test_escape_in_the_search_closes_results_and_keeps_the_text(): void
+    {
+        $result = $this->run_(<<<'JS'
+const row = buildUserRow(doc, 1, '7');
+const parts = rowParts(row);
+await wireUserRow(doc, row, { search: async () => people(2) }).search('Fi');
+parts.name.value = 'Fi';
+const escape = key('Escape');
+parts.name.fire('keydown', escape);
+parts.name.focus();
+return { shown: parts.results.style.display, text: parts.name.value, prevented: escape.prevented };
+JS);
+
+        $this->assertSame(['shown' => 'none', 'text' => 'Fi', 'prevented' => true], $result);
+    }
+
+    public function test_row_parts_are_found_by_the_row_ids(): void
+    {
+        $result = $this->run_(<<<'JS'
+const parts = rowParts(buildUserRow(doc, 3, '7'));
+return [parts.name.id, parts.id.id, parts.results.id, parts.list.id, parts.remove.textContent];
+JS);
+
+        $this->assertSame(['user3name', 'user3id', 'userResultsDiv3', 'userResults3', '-'], $result);
+    }
+
+    public function test_edit_use_escapes_person_names(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/ui/uses/record-edit.php');
+
+        $this->assertStringContainsString("h(\$user['FirstName'] . ' ' . \$user['LastName'])", $source);
     }
 
     public function test_results_close_when_focus_leaves_the_row(): void
@@ -208,7 +241,7 @@ const parts = rowParts(added);
 return [added.id, parts.id.value, parts.name.value, parts.name.dataset.userid, doc.activeElement === parts.name];
 JS);
 
-        $this->assertSame(['SwSDiv1', '12', 'New Person', '7', true], $result);
+        $this->assertSame(['personRow1', '12', 'New Person', '7', true], $result);
     }
 
     public function test_record_pages_use_the_one_row_module(): void
@@ -268,19 +301,7 @@ function people(n) {
   return Array.from({ length: n }, (_, i) => ({ id: i, FirstName: 'First' + i, LastName: 'Last' + i }));
 }
 function key(k) { const e = { key: k, prevented: false, preventDefault() { e.prevented = true; } }; return e; }
-// The row contract the server markup and buildUserRow share: fields by id.
-function rowParts(row) {
-  const i = row.id.replace('SwSDiv', '');
-  const byId = (id) => row.all().find((n) => n.id === id);
-  return {
-    name: byId('user' + i + 'name'),
-    id: byId('user' + i + 'id'),
-    remove: row.all().find((n) => /\bremove-user\b/.test(n.className)),
-    results: byId('userResultsDiv' + i),
-    list: byId('userResults' + i),
-  };
-}
-const { nextUserIndex, renderUserResults, buildUserRow, wireUserRow, addUserRow } = await import({$url});
+const { nextUserIndex, renderUserResults, buildUserRow, wireUserRow, addUserRow, rowParts } = await import({$url});
 const out = await (async () => { {$body} })();
 process.stdout.write(JSON.stringify(out));
 JS;

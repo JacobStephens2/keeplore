@@ -25,7 +25,7 @@ function displayName(user) {
 
 // Fill list with up to 10 people. Each is a tab stop; click, Enter, or
 // Space picks it, and Escape calls onEscape.
-export function renderUserResults(doc, list, users, onPick, onEscape = () => {}) {
+export function renderUserResults(doc, list, users, { onPick, onEscape = () => {} }) {
   list.replaceChildren();
   users.slice(0, MAX_RESULTS).forEach((user) => {
     const li = doc.createElement("li");
@@ -51,7 +51,7 @@ export function renderUserResults(doc, list, users, onPick, onEscape = () => {})
 // Use render.
 export function buildUserRow(doc, index, userid) {
   const row = doc.createElement("div");
-  row.setAttribute("id", "SwSDiv" + index);
+  row.setAttribute("id", "personRow" + index);
   row.classList.add("person-row");
 
   const name = doc.createElement("input");
@@ -92,14 +92,19 @@ function descendants(node) {
   return Array.from(node.children || []).flatMap((child) => [child, ...descendants(child)]);
 }
 
-function rowParts(row) {
+// The row contract Record Use, Edit Use, and buildUserRow share: row
+// personRow<i> holds user<i>name, user<i>id, userResultsDiv<i> around
+// userResults<i>, and optionally a .remove-user button.
+export function rowParts(row) {
+  const i = row.id.replace("personRow", "");
   const all = descendants(row);
+  const byId = (id) => all.find((n) => n.id === id);
   return {
-    name: all.find((n) => n.tagName === "INPUT" && n.type === "search"),
-    id: all.find((n) => n.tagName === "INPUT" && n.type === "hidden"),
-    remove: all.find((n) => n.tagName === "BUTTON" && /\bremove-user\b/.test(n.className)),
-    results: all.find((n) => n.tagName === "DIV"),
-    list: all.find((n) => n.tagName === "UL"),
+    name: byId("user" + i + "name"),
+    id: byId("user" + i + "id"),
+    remove: all.find((n) => /\bremove-user\b/.test(n.className)),
+    results: byId("userResultsDiv" + i),
+    list: byId("userResults" + i),
   };
 }
 
@@ -130,7 +135,7 @@ export function wireUserRow(doc, row, { search = searchPeople } = {}) {
   }
 
   // Clear, not just hide, so refocusing the search doesn't reopen them.
-  function closeResults() {
+  function closeResultsAndReturnToSearch() {
     parts.list.replaceChildren();
     hideResults();
     parts.name.focus();
@@ -139,7 +144,7 @@ export function wireUserRow(doc, row, { search = searchPeople } = {}) {
   function pick(user) {
     parts.id.value = String(user.id);
     parts.name.value = displayName(user);
-    closeResults();
+    closeResultsAndReturnToSearch();
   }
 
   async function runSearch(query) {
@@ -152,7 +157,10 @@ export function wireUserRow(doc, row, { search = searchPeople } = {}) {
     const users = await search(query, parts.name.dataset.userid);
     // A slower earlier search must not replace newer results.
     if (thisSearch !== latestSearch) return;
-    renderUserResults(doc, parts.list, users, pick, closeResults);
+    renderUserResults(doc, parts.list, users, {
+      onPick: pick,
+      onEscape: closeResultsAndReturnToSearch,
+    });
     parts.results.style.display = users.length > 0 ? "block" : "none";
   }
 
@@ -160,6 +168,13 @@ export function wireUserRow(doc, row, { search = searchPeople } = {}) {
   parts.list.replaceChildren();
 
   parts.name.addEventListener("input", () => runSearch(parts.name.value));
+  // Escape closes the results but keeps what was typed (type=search would
+  // otherwise clear the field).
+  parts.name.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || parts.list.children.length === 0) return;
+    event.preventDefault();
+    closeResultsAndReturnToSearch();
+  });
   parts.name.addEventListener("focus", () => {
     if (parts.list.children.length > 0) parts.results.style.display = "block";
   });
