@@ -155,6 +155,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
         <?php
           require_once PRIVATE_PATH . '/item_types.php';
           $bgg_default_type = user_bgg_default_type($db, (int) $_SESSION['user_id']);
+          $bgg_form_default_type_id = DEFAULT_TYPE;
           include(SHARED_PATH . '/bgg_lookup_panel.php');
         ?>
         <?php $preview_url = normalize_item_image_url($artifact['image_url'] ?? ''); ?>

@@ -62,6 +62,7 @@ class BggDefaultTypeTest extends TestCase
         $panel = (string) file_get_contents(PROJECT_PATH . '/private/shared/bgg_lookup_panel.php');
 
         $this->assertStringContainsString('$bgg_default_type = user_bgg_default_type(', $page);
+        $this->assertStringContainsString('$bgg_form_default_type_id = DEFAULT_TYPE;', $page);
         $this->assertStringContainsString('bgg-default-type.js', $page);
         $this->assertStringContainsString('data-default-type-id=', $panel);
         $this->assertStringContainsString('data-form-default-type-id=', $panel);
