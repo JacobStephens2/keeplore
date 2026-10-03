@@ -3,11 +3,11 @@ require_once('../../private/initialize.php');
 
 require_login();
 
-$name = $_POST['type'] ?? '';
+$name = is_string($_POST['type'] ?? null) ? $_POST['type'] : '';
 
 if(is_post_request()) {
   try {
-    (new Types($db, (int) $_SESSION['user_id']))->create(is_string($name) ? $name : '');
+    (new Types($db, (int) $_SESSION['user_id']))->create($name);
     $_SESSION['message'] = 'The type was created successfully.';
     redirect_to(url_for('/types/index.php'));
   } catch (InvalidArgumentException $error) {
@@ -31,7 +31,7 @@ if(is_post_request()) {
       <?php echo csrf_input(); ?>
       <dl>
         <dt>Type</dt>
-        <dd><input type="text" name="type" maxlength="100" value="<?php echo h(is_string($name) ? $name : ''); ?>" /></dd>
+        <dd><input type="text" name="type" value="<?php echo h($name); ?>" /></dd>
       </dl>
       <div>
         <input type="submit" value="Add" />

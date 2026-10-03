@@ -37,9 +37,11 @@ final class Types
     /** Add a type to the owner's list and return its id. */
     public function create(string $name): int
     {
-        $name = $this->validName($name, null);
-        $this->statement('INSERT INTO types (objectType, user_id) VALUES (?, ?)', 'si', [$name, $this->userId])->close();
-        return (int) $this->db->insert_id;
+        return $this->transaction(function () use ($name) {
+            $name = $this->validName($name, null);
+            $this->statement('INSERT INTO types (objectType, user_id) VALUES (?, ?)', 'si', [$name, $this->userId])->close();
+            return (int) $this->db->insert_id;
+        });
     }
 
     /** Rename the type, and every one of the owner's items with it, together. */
@@ -98,7 +100,8 @@ final class Types
     /**
      * The name trimmed, or InvalidArgumentException when it is blank, too
      * long for the column, or another of the owner's type names in any case.
-     * $id is the type being renamed, which may keep its own name.
+     * $id is the type being renamed, which may keep its own name. Locks the
+     * owner's types so a concurrent create or rename can't take the name.
      */
     private function validName(string $name, ?int $id): string
     {
@@ -109,7 +112,7 @@ final class Types
         if (mb_strlen($name) > self::NAME_LENGTH) {
             throw new InvalidArgumentException('A type name can be at most ' . self::NAME_LENGTH . ' characters.');
         }
-        foreach ($this->rows('SELECT id, objectType FROM types WHERE user_id = ?', 'i', [$this->userId]) as $row) {
+        foreach ($this->rows('SELECT id, objectType FROM types WHERE user_id = ? FOR UPDATE', 'i', [$this->userId]) as $row) {
             if ((int) $row['id'] !== $id && mb_strtolower((string) $row['objectType']) === mb_strtolower($name)) {
                 throw new InvalidArgumentException('You already have a type with this name.');
             }
@@ -118,7 +121,7 @@ final class Types
     }
 
     /** The owner's types, narrowed by $where, each with its kept and not-kept counts. */
-    private function select(string $where, string $types, array $params): array
+    private function select(string $where, string $bindTypes, array $params): array
     {
         return array_map([$this, 'type'], $this->rows(
             "SELECT types.id, types.objectType,
@@ -129,7 +132,7 @@ final class Types
              WHERE types.user_id = ? $where
              GROUP BY types.id, types.objectType
              ORDER BY types.objectType, types.id",
-            $types, $params
+            $bindTypes, $params
         ));
     }
 

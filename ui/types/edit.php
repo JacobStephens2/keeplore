@@ -42,7 +42,7 @@ include(SHARED_PATH . '/header.php');
       <?php echo csrf_input(); ?>
       <dl>
         <dt>Type</dt>
-        <dd><input type="text" name="type" maxlength="100" value="<?php echo h($name); ?>" /></dd>
+        <dd><input type="text" name="type" value="<?php echo h($name); ?>" /></dd>
       </dl>
       <div>
         <input type="submit" value="Edit" />
