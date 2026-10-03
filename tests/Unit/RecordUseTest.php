@@ -138,4 +138,43 @@ class RecordUseTest extends TestCase
 
         $this->assertSame('Home', most_recent_use_setting(8, $query));
     }
+
+    public function test_use_count_defaults_to_one(): void
+    {
+        $this->assertSame(1, record_use_count([]));
+        $this->assertSame(1, record_use_count(['useCount' => '']));
+        $this->assertSame(1, record_use_count(['useCount' => 'abc']));
+    }
+
+    public function test_use_count_reads_the_number_of_uses(): void
+    {
+        $this->assertSame(2, record_use_count(['useCount' => '2']));
+    }
+
+    public function test_use_count_is_clamped_to_one_through_the_max(): void
+    {
+        $this->assertSame(1, record_use_count(['useCount' => '0']));
+        $this->assertSame(1, record_use_count(['useCount' => '-3']));
+        $this->assertSame(RECORD_USE_MAX_COUNT, record_use_count(['useCount' => '500']));
+    }
+
+    public function test_success_message_names_how_many_uses_when_more_than_one(): void
+    {
+        $this->assertSame(
+            'The interaction with Old Maid with 1 person was recorded 2 times.',
+            record_use_success_message([
+                'artifact' => ['name' => 'Old Maid'],
+                'user' => [['id' => 2, 'name' => 'Sam Lee']],
+                'useCount' => '2',
+            ])
+        );
+    }
+
+    public function test_record_new_page_posts_and_honors_the_number_of_uses(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/ui/uses/record-new.php');
+
+        $this->assertStringContainsString('name="useCount"', $source);
+        $this->assertStringContainsString('record_use_count($_POST)', $source);
+    }
 }

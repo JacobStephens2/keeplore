@@ -8,12 +8,26 @@
  * listed as a participant, and the default Setting value.
  */
 
+const RECORD_USE_MAX_COUNT = 20;
+
+/**
+ * How many identical uses one Record Use submit writes. Pages without the
+ * Number of uses field post nothing and record one.
+ */
+function record_use_count(array $post): int
+{
+    $count = (int) ($post['useCount'] ?? 1);
+    return max(1, min(RECORD_USE_MAX_COUNT, $count));
+}
+
 function record_use_success_message(array $post): string
 {
     $user_count = count($post['user'] ?? []);
     $user_count_word = $user_count === 1 ? 'person' : 'people';
+    $use_count = record_use_count($post);
+    $times = $use_count > 1 ? " $use_count times" : '';
     return 'The interaction with ' . ($post['artifact']['name'] ?? '')
-        . " with $user_count $user_count_word was recorded.";
+        . " with $user_count $user_count_word was recorded$times.";
 }
 
 function record_use_ajax_payload(array $post, int $use_id, array $status, $artifact_row): array

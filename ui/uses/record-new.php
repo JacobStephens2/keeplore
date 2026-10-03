@@ -56,7 +56,12 @@
 
     } else {
 
-      $insertResult = insert_use($_POST);
+      for ($i = 0; $i < record_use_count($_POST); $i++) {
+        $insertResult = insert_use($_POST);
+        if ($insertResult !== true) {
+          break;
+        }
+      }
 
       if($insertResult === true) {
         $new_id = mysqli_insert_id($db);
@@ -201,6 +206,11 @@
         $dt = new DateTime("now", new DateTimeZone($tz)); //first argument "must" be a string
         $dt->setTimestamp($timestamp); //adjust the object to correct timestamp
         echo $dt->format('Y') . '-' . $dt->format('m') . '-' . $dt->format('d'); ?>"  
+    >
+
+    <label for="useCount">Number of uses</label>
+    <input type="number" name="useCount" id="useCount"
+      value="1" min="1" max="<?php echo RECORD_USE_MAX_COUNT; ?>" step="1"
     >
 
     <label for="Note">Setting</label>
