@@ -38,8 +38,21 @@ function item_type_ids_where(array $types_by_name, callable $matches) {
   return $ids;
 }
 
+// The owner's types as [type name => id], by name.
+function user_types($conn, int $user_id): array {
+  $stmt = mysqli_prepare($conn, "SELECT id, objectType FROM types WHERE user_id = ? ORDER BY objectType ASC");
+  mysqli_stmt_bind_param($stmt, 'i', $user_id);
+  mysqli_stmt_execute($stmt);
+  $types = [];
+  foreach (mysqli_stmt_get_result($stmt) as $row) {
+    $types[(string) $row['objectType']] = (int) $row['id'];
+  }
+  mysqli_stmt_close($stmt);
+  return $types;
+}
+
 /**
- * The owner's type for items filled from BoardGameGeek on Create Item, as
+ * The owner's Type for BoardGameGeek items, used on Create Item, as
  * ['id' => int, 'name' => string], or null when none is set or the stored
  * type is no longer one of the owner's.
  */
@@ -56,25 +69,45 @@ function user_bgg_default_type($conn, int $user_id): ?array {
 }
 
 /**
- * Set the owner's BoardGameGeek type from Settings. Blank clears it; a type
- * that is not the owner's is refused (false) and the setting stays.
+ * Set the owner's Type for BoardGameGeek items from Settings. Blank clears
+ * it. Returns ['ok' => true, 'message' => string|null], the message null
+ * when nothing changed, or ['ok' => false, 'error' => string] when the input
+ * is not a type, the type is not the owner's, or the save failed; then the
+ * setting stays.
  */
-function user_bgg_default_type_set($conn, int $user_id, $raw): bool {
-  $type_id = (int) trim((string) $raw);
-  if ($type_id > 0) {
-    $stmt = mysqli_prepare($conn, "SELECT 1 FROM types WHERE id = ? AND user_id = ? LIMIT 1");
-    mysqli_stmt_bind_param($stmt, 'ii', $type_id, $user_id);
-    mysqli_stmt_execute($stmt);
-    $owned = mysqli_fetch_row(mysqli_stmt_get_result($stmt)) !== null;
-    mysqli_stmt_close($stmt);
-    if (!$owned) {
-      return false;
-    }
+function user_bgg_default_type_set($conn, int $user_id, $raw): array {
+  $raw = trim((string) $raw);
+  if ($raw !== '' && preg_match('/^[1-9][0-9]*$/', $raw) !== 1) {
+    return ['ok' => false, 'error' => 'That is not a type.'];
   }
-  $value = $type_id > 0 ? $type_id : null;
-  $stmt = mysqli_prepare($conn, "UPDATE users SET bgg_default_type_id = ? WHERE id = ? LIMIT 1");
-  mysqli_stmt_bind_param($stmt, 'ii', $value, $user_id);
-  $ok = mysqli_stmt_execute($stmt);
-  mysqli_stmt_close($stmt);
-  return $ok;
+  $type = null;
+  if ($raw !== '') {
+    $type_id = (int) $raw;
+    $name = array_search($type_id, user_types($conn, $user_id), true);
+    if ($name === false) {
+      return ['ok' => false, 'error' => 'That type is not one of yours.'];
+    }
+    $type = ['id' => $type_id, 'name' => (string) $name];
+  }
+  if ($type === user_bgg_default_type($conn, $user_id)) {
+    return ['ok' => true, 'message' => null];
+  }
+  $value = $type['id'] ?? null;
+  try {
+    $stmt = mysqli_prepare($conn, "UPDATE users SET bgg_default_type_id = ? WHERE id = ? LIMIT 1");
+    $saved = $stmt !== false
+      && mysqli_stmt_bind_param($stmt, 'ii', $value, $user_id)
+      && mysqli_stmt_execute($stmt);
+    if ($stmt !== false) {
+      mysqli_stmt_close($stmt);
+    }
+  } catch (mysqli_sql_exception $e) {
+    $saved = false;
+  }
+  if (!$saved) {
+    return ['ok' => false, 'error' => 'Your type for BoardGameGeek items could not be saved. Please try again.'];
+  }
+  return ['ok' => true, 'message' => $type === null
+    ? 'You no longer have a type for BoardGameGeek items.'
+    : 'Your type for BoardGameGeek items is now ' . $type['name'] . '.'];
 }

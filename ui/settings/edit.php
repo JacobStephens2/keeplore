@@ -8,6 +8,7 @@ global $db;
 require_login();
 
 $page_title = 'Edit User Settings';
+$user_id = (int) $_SESSION['user_id'];
 
 if(is_post_request()) {
   $daily_email = isset($_POST['daily_email']) ? 1 : 0;
@@ -29,8 +30,6 @@ if(is_post_request()) {
   if ($default_snooze_days < 1 || $default_snooze_days > 365) {
     $default_snooze_days = 7;
   }
-  $user_id = (int) $_SESSION['user_id'];
-
   $stmt = mysqli_prepare($db, "UPDATE users
     SET first_name = ?, last_name = ?, email = ?, username = ?,
         default_setting = ?, default_use_interval = ?, default_snooze_days = ?, daily_email = ?, daily_email_hour = ?,
@@ -58,10 +57,9 @@ if(is_post_request()) {
   // Checked against BGG apart from the rest, so a typo or a BGG outage costs
   // only this field.
   $bgg_result = user_bgg_username_set($db, $user_id, (string) ($_POST['bgg_username'] ?? ''));
-  $bgg_type_saved = user_bgg_default_type_set($db, $user_id, $_POST['bgg_default_type_id'] ?? '');
+  $bgg_type_result = user_bgg_default_type_set($db, $user_id, $_POST['bgg_default_type_id'] ?? '');
 }
 
-$user_id = (int) $_SESSION['user_id'];
 $stmt = mysqli_prepare($db, "SELECT
   first_name, last_name, email, username, bgg_username,
   default_use_interval, default_snooze_days, default_setting, daily_email, daily_email_hour,
@@ -73,8 +71,7 @@ $userResult = mysqli_stmt_get_result($stmt);
 $userArray = mysqli_fetch_assoc($userResult);
 mysqli_stmt_close($stmt);
 $bgg_default_type = user_bgg_default_type($db, $user_id);
-require SHARED_PATH . '/artifact_type_array.php';
-$user_id = (int) $_SESSION['user_id']; // artifact_type_array.php reassigns it
+$types = user_types($db, $user_id);
 
 ?>
 
@@ -98,8 +95,10 @@ $user_id = (int) $_SESSION['user_id']; // artifact_type_array.php reassigns it
       } elseif (isset($bgg_result) && $bgg_result['message'] !== null) {
         echo '<p id="bgg_message">' . h($bgg_result['message']) . '</p>';
       }
-      if (isset($bgg_type_saved) && !$bgg_type_saved) {
-        echo '<p class="errors">That type is not one of yours. Your type for BoardGameGeek items did not change.</p>';
+      if (isset($bgg_type_result) && !$bgg_type_result['ok']) {
+        echo '<p class="errors">' . h($bgg_type_result['error']) . ' Your type for BoardGameGeek items did not change.</p>';
+      } elseif (isset($bgg_type_result) && $bgg_type_result['message'] !== null) {
+        echo '<p id="bgg_type_message">' . h($bgg_type_result['message']) . '</p>';
       }
   ?>
 
@@ -232,8 +231,8 @@ $user_id = (int) $_SESSION['user_id']; // artifact_type_array.php reassigns it
       <label for="bgg_default_type_id">Type for BoardGameGeek items</label>
       <select name="bgg_default_type_id" id="bgg_default_type_id" aria-describedby="bgg_default_type_help">
         <option value="">Keep Create Item's type</option>
-        <?php foreach ($typesArray ?? [] as $type_name => $type_id) { ?>
-          <option value="<?php echo (int) $type_id; ?>"<?php if ($bgg_default_type !== null && $bgg_default_type['id'] === (int) $type_id) echo ' selected'; ?>><?php echo h($type_name); ?></option>
+        <?php foreach ($types as $type_name => $type_id) { ?>
+          <option value="<?php echo $type_id; ?>"<?php if ($bgg_default_type !== null && $bgg_default_type['id'] === $type_id) echo ' selected'; ?>><?php echo h($type_name); ?></option>
         <?php } ?>
       </select>
     </div>
