@@ -4,11 +4,14 @@
 //   import ApiClient from '/shared/js/api-client.js';
 //   const artifacts = await ApiClient.getArtifacts();
 //
-// The baseUrl defaults to the existing API origin used throughout the app.
-// Override it after import if needed: ApiClient.baseUrl = 'https://other-host';
+// The baseUrl is the API host the server configured (see
+// publicEnvironmentVariables.js). Override it after import if needed:
+// ApiClient.baseUrl = 'https://other-host';
+
+import { API_ORIGIN } from '../../uses/modules/publicEnvironmentVariables.js';
 
 const ApiClient = {
-  baseUrl: 'https://api.keeplore.app',
+  baseUrl: `https://${API_ORIGIN}`,
 
   /**
    * Core request method. All other methods delegate here.

@@ -16,7 +16,7 @@
         navigator.serviceWorker.register('/sw.js');
       }
     </script>
-    <script src="/native-notifications.js?v=2" defer></script>
+    <script type="module" src="/native-notifications.js?v=3"></script>
     <script src="/shared/js/theme.js?v=1" defer></script>
   </body>
 </html>

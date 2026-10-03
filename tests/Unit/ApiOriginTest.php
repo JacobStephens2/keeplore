@@ -9,29 +9,75 @@ use PHPUnit\Framework\TestCase;
  *
  * The UI's JS modules call the API host the server configured (header.php
  * prints API_ORIGIN into a meta tag), so staging.keeplore.app talks to
- * api.staging.keeplore.app instead of production.
+ * api.staging.keeplore.app instead of production. Every script that calls
+ * the API takes its host from this one module.
  */
 class ApiOriginTest extends TestCase
 {
-    /** @return array<string, array{string}> */
-    public static function modules(): array
+    private const MODULE = PROJECT_PATH . '/ui/uses/modules/publicEnvironmentVariables.js';
+
+    public function test_api_origin_reads_the_server_meta_tag(): void
     {
-        return [
-            'uses' => [PROJECT_PATH . '/ui/uses/publicEnvironmentVariables.js'],
-            'uses/modules' => [PROJECT_PATH . '/ui/uses/modules/publicEnvironmentVariables.js'],
-        ];
+        $this->assertSame('api.staging.keeplore.app', $this->apiOrigin('api.staging.keeplore.app'));
     }
 
-    /** @dataProvider modules */
-    public function test_api_origin_reads_the_server_meta_tag(string $module): void
+    public function test_api_origin_falls_back_to_production_without_the_meta_tag(): void
     {
-        $this->assertSame('api.staging.keeplore.app', $this->apiOrigin($module, 'api.staging.keeplore.app'));
+        $this->assertSame('api.keeplore.app', $this->apiOrigin(null));
     }
 
-    /** @dataProvider modules */
-    public function test_api_origin_falls_back_to_production_without_the_meta_tag(string $module): void
+    public function test_native_notifications_fetch_from_the_meta_tag_host(): void
     {
-        $this->assertSame('api.keeplore.app', $this->apiOrigin($module, null));
+        $this->assertSame(
+            'https://api.staging.keeplore.app/upcoming-interactions.php',
+            $this->nativeNotificationsUrl('api.staging.keeplore.app')
+        );
+    }
+
+    public function test_native_notifications_fall_back_to_production_without_the_meta_tag(): void
+    {
+        $this->assertSame(
+            'https://api.keeplore.app/upcoming-interactions.php',
+            $this->nativeNotificationsUrl(null)
+        );
+    }
+
+    public function test_footer_loads_native_notifications_as_a_module(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/private/shared/footer.php');
+
+        $this->assertMatchesRegularExpression('#<script type="module" src="/native-notifications\.js\?v=\d+"></script>#', $source);
+    }
+
+    public function test_api_client_requests_the_meta_tag_host(): void
+    {
+        $this->assertSame('https://api.staging.keeplore.app/types.php', $this->apiClientUrl('api.staging.keeplore.app'));
+    }
+
+    public function test_api_client_falls_back_to_production_without_the_meta_tag(): void
+    {
+        $this->assertSame('https://api.keeplore.app/types.php', $this->apiClientUrl(null));
+    }
+
+    public function test_only_the_module_names_the_production_api_host(): void
+    {
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(PROJECT_PATH . '/ui', \FilesystemIterator::SKIP_DOTS));
+        $naming = [];
+        foreach ($files as $file) {
+            if ($file->getExtension() === 'js' && str_contains((string) file_get_contents($file->getPathname()), 'api.keeplore.app')) {
+                $naming[] = substr($file->getPathname(), strlen(PROJECT_PATH));
+            }
+        }
+
+        $this->assertSame(['/ui/uses/modules/publicEnvironmentVariables.js'], $naming);
+    }
+
+    public function test_use_by_record_modal_calls_the_configured_api_host(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/useby.php');
+
+        $this->assertStringContainsString("var API_BASE = 'https://' + <?php echo json_encode(API_ORIGIN); ?>;", $source);
+        $this->assertStringNotContainsString('window.location.host', $source);
     }
 
     public function test_header_prints_the_api_origin_meta_tag(): void
@@ -53,9 +99,51 @@ class ApiOriginTest extends TestCase
         $this->assertStringContainsString('Header set Access-Control-Allow-Origin "%{KEEPLORE_UI_ORIGIN}e" env=KEEPLORE_UI_ORIGIN', $source);
     }
 
-    private function apiOrigin(string $module, ?string $metaContent): string
+    private function apiOrigin(?string $metaContent): string
     {
-        $url = json_encode('file://' . $module);
+        $url = json_encode('file://' . self::MODULE);
+        return $this->node($metaContent, <<<JS
+const { API_ORIGIN } = await import({$url});
+process.stdout.write(API_ORIGIN);
+JS);
+    }
+
+    /** The URL native-notifications.js fetches inside the native app. */
+    private function nativeNotificationsUrl(?string $metaContent): string
+    {
+        $url = json_encode('file://' . PROJECT_PATH . '/ui/native-notifications.js');
+        return $this->node($metaContent, <<<JS
+let fetched;
+document.readyState = 'complete';
+globalThis.fetch = async (url) => { fetched = url; return { status: 401 }; };
+globalThis.window = {
+  Capacitor: {
+    isNativePlatform: () => true,
+    Plugins: { LocalNotifications: {} },
+  },
+};
+await import({$url});
+await new Promise((resolve) => setTimeout(resolve, 0));
+process.stdout.write(String(fetched));
+JS);
+    }
+
+    /** The URL api-client.js requests for a call. */
+    private function apiClientUrl(?string $metaContent): string
+    {
+        $url = json_encode('file://' . PROJECT_PATH . '/ui/shared/js/api-client.js');
+        return $this->node($metaContent, <<<JS
+let fetched;
+globalThis.fetch = async (url) => { fetched = url; return { status: 200, ok: true, json: async () => ({}) }; };
+const { default: ApiClient } = await import({$url});
+await ApiClient.getTypes();
+process.stdout.write(String(fetched));
+JS);
+    }
+
+    /** Runs $body as an ES module under a fake document holding the meta tag. */
+    private function node(?string $metaContent, string $body): string
+    {
         $meta = json_encode($metaContent);
         $script = <<<JS
 const content = {$meta};
@@ -64,8 +152,7 @@ globalThis.document = {
     ? { content: content }
     : null,
 };
-const { API_ORIGIN } = await import({$url});
-process.stdout.write(API_ORIGIN);
+{$body}
 JS;
 
         $cmd = 'node --input-type=module -e ' . escapeshellarg($script) . ' 2>&1';

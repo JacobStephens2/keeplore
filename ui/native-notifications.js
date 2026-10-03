@@ -1,5 +1,6 @@
+import { API_ORIGIN } from './uses/modules/publicEnvironmentVariables.js';
+
 (function () {
-  'use strict';
 
   if (!window.Capacitor || typeof window.Capacitor.isNativePlatform !== 'function' || !window.Capacitor.isNativePlatform()) {
     return;
@@ -8,7 +9,7 @@
   var LocalNotifications = window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
   if (!LocalNotifications) return;
 
-  var API_URL = 'https://api.keeplore.app/upcoming-interactions.php';
+  var API_URL = 'https://' + API_ORIGIN + '/upcoming-interactions.php';
   var DEFAULTS = { enabled: true, hour: 9, lead_days: 3, past_due: true };
 
   function atHour(dateString, hour, offsetDays) {
