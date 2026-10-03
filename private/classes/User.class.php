@@ -3,9 +3,6 @@
 class User extends DatabaseObject {
 
   static protected $table_name = 'players';
-  static protected $db_columns = [
-     'birth_year', 'FirstName', 'FullName', 'G', 'id', 'LastName', 'MenuPriority', 'Priority', 'user_id'
-  ];
 
   public $id;
 

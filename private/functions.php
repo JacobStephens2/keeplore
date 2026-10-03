@@ -48,6 +48,28 @@ function normalize_item_image_url($value) {
   return $url;
 }
 
+// The Items module's input from a Create Item or Edit Item form post. The
+// forms name the type and age fields differently; the module ignores the
+// rest of the post it doesn't write.
+function item_input_from_form(array $form) {
+  foreach (['type' => 'type_id', 'age' => 'Age'] as $field => $key) {
+    if (array_key_exists($field, $form)) {
+      $form[$key] = $form[$field];
+      unset($form[$field]);
+    }
+  }
+  return $form;
+}
+
+// An item's publication year as stored: blank is null.
+function normalize_item_year($year) {
+  if ($year === null) {
+    return null;
+  }
+  $trimmed = trim((string) $year);
+  return $trimmed === '' ? null : $trimmed;
+}
+
 // BGG-family item pages. A typed "boardgamegeek.com/..." or http:// link
 // is upgraded to https; anything else normalizes to ''.
 function normalize_item_bgg_url($value) {
@@ -196,6 +218,25 @@ function error_404() {
 function error_500() {
   header($_SERVER["SERVER_PROTOCOL"] . " 500 Internal Server Error");
   exit();
+}
+
+// The signed-in owner's Item for the quick item actions (Snooze, Mark to get
+// rid of, Mark kept). Another owner's or a missing Item ends the request as
+// "Item not found.": a JSON 404 for AJAX, otherwise a message on the Items page.
+function find_owned_item_or_exit(int $item_id, bool $is_ajax): array {
+  global $db;
+  $item = (new Items($db, (int) $_SESSION['user_id']))->find($item_id);
+  if ($item) {
+    return $item;
+  }
+  if ($is_ajax) {
+    header('Content-Type: application/json');
+    http_response_code(404);
+    echo json_encode(['ok' => false, 'message' => 'Item not found.']);
+    exit;
+  }
+  $_SESSION['message'] = 'Item not found.';
+  redirect_to(url_for('/artifacts/index.php'));
 }
 
 function redirect_to($location) {

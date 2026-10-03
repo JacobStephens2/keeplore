@@ -18,8 +18,9 @@
     redirect_to(url_for('/artifacts/useby.php'));
   }
 
-  $artifact_record = find_artifact_by_id($artifact_id);
-  $artifact_name = $artifact_record['Title'] ?? ($_REQUEST['artifact_name'] ?? 'Item');
+  $artifact_id = (int) $artifact_id;
+  $artifact_record = find_owned_item_or_exit($artifact_id, $is_ajax);
+  $artifact_name = $artifact_record['Title'];
 
   $result = set_artifact_to_get_rid_of($artifact_id, $value);
 

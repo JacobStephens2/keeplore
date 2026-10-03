@@ -2,12 +2,6 @@
 require_once('../../private/initialize.php');
 require_login();
 
-$defaultMnT = 30;
-$defaultMxT = 60;
-$defaultMnP = 1;
-$defaultMxP = 1;
-$defaultSS = '01';
-
 $user_id = $_SESSION['user_id'];
 $default_interval = singleValueQuery(
   "SELECT default_use_interval
@@ -15,91 +9,42 @@ $default_interval = singleValueQuery(
   WHERE id = '$user_id'
 ");
 
+$artifact = [
+  'Title' => '', 'type_id' => '', 'Age' => '', 'Yr' => '', 'image_url' => '',
+  'bgg_url' => '', 'bgg_player_votes' => '', 'bgg_age_basis' => '', 'BGG_Rat' => '', 'tags' => '',
+] + Items::DEFAULTS;
+
 if(is_post_request()) {
 
   $is_ajax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
+  $input = item_input_from_form($_POST);
 
-  $artifact = [];
-  $artifact['Title'] = $_POST['Title'] ?? '';
-  $artifact['Acq'] = $_POST['Acq'] ?? date('Y-m-d');
-  $artifact['type'] = $_POST['type'] ?? '';
-  if ($artifact['type'] === '') {
-    $artifact['type'] = DEFAULT_TYPE;
-  }
-  // A quick add (e.g. from Record Use) defaults to kept; the full form posts is_kept explicitly.
-  $artifact['is_kept'] = $_POST['is_kept'] ?? ($is_ajax ? '1' : '');
-  $artifact['Candidate'] = $_POST['Candidate'] ?? '';
-  $artifact['interaction_frequency_days'] = $_POST['interaction_frequency_days'] ?? $default_interval;
-  $artifact['CandidateGroupDate'] = date('Y-m-d');
-  $artifact['UsedRecUserCt'] = 0;
-  $artifact['Notes'] = $_POST['Notes'] ?? '';
-  (($_POST['MnT'] ?? '') == '') ? $artifact['MnT'] = $defaultMnT : $artifact['MnT'] = $_POST['MnT'];
-  (($_POST['MxT'] ?? '') == '') ? $artifact['MxT'] = $defaultMxT : $artifact['MxT'] = $_POST['MxT'];
-  (($_POST['MnP'] ?? '') == '') ? $artifact['MnP'] = $defaultMnP : $artifact['MnP'] = $_POST['MnP'];
-  (($_POST['MxP'] ?? '') == '') ? $artifact['MxP'] = $defaultMxP : $artifact['MxP'] = $_POST['MxP'];
-  (($_POST['SS'] ?? '') == '') ? $artifact['SS'] = $defaultSS : $artifact['SS'] = $_POST['SS'];
-  $artifact['age'] = $_POST['age'] ?? 0;
-  if ($artifact['age'] === '') {
-    $artifact['age'] = 0;
-  }
-  $artifact['Yr'] = trim((string) ($_POST['Yr'] ?? ''));
-  $artifact['image_url'] = normalize_item_image_url($_POST['image_url'] ?? '');
-  $artifact['bgg_url'] = $_POST['bgg_url'] ?? '';
-  $artifact['bgg_player_votes'] = $_POST['bgg_player_votes'] ?? '';
-  $artifact['bgg_age_basis'] = $_POST['bgg_age_basis'] ?? '';
-  $artifact['BGG_Rat'] = $_POST['BGG_Rat'] ?? '';
-
-  $artifact['tags'] = $_POST['tags'] ?? '';
-  $result = insert_artifact($artifact);
-
-  if($result === true) {
-    $new_id = mysqli_insert_id($db);
-    replace_item_tags($db, $new_id, (int) $_SESSION['user_id'], $artifact['tags']);
+  try {
+    $new_id = (new Items($db, (int) $_SESSION['user_id']))->create($input);
 
     if ($is_ajax) {
       header('Content-Type: application/json');
       echo json_encode([
         'ok' => true,
         'id' => $new_id,
-        'Title' => $artifact['Title'],
+        'Title' => $input['Title'] ?? '',
       ]);
       exit;
     }
 
     $_SESSION['message'] = 'The item was created successfully.';
     redirect_to(url_for('/artifacts/show.php?id=' . $new_id));
-  } else {
+  } catch (ItemInvalid $invalid) {
     if ($is_ajax) {
       header('Content-Type: application/json');
       http_response_code(422);
-      echo json_encode(['ok' => false, 'message' => implode(' ', $result)]);
+      echo json_encode(['ok' => false, 'message' => $invalid->getMessage()]);
       exit;
     }
-    $errors = $result;
+    $errors = $invalid->errors;
+    $artifact = array_replace($artifact, $input);
   }
 
-} else {
-  // display the blank form
-  $artifact = [];
-  $artifact["Title"] = '';
-  $artifact["type"] = '';
-  $artifact["Acq"] = '';
-  $artifact["is_kept"] = '';
-  $artifact["Candidate"] = '';
-  $artifact["UsedRecUserCt"] = '';
-  $artifact["MnT"] = $defaultMnT;
-  $artifact["MxT"] = $defaultMxT;
-  $artifact["MnP"] = $defaultMnP;
-  $artifact["MxP"] = $defaultMxP;
-  $artifact["SS"] = $defaultSS;
-  $artifact["age"] = '';
-  $artifact["Yr"] = '';
-  $artifact['image_url'] = '';
-  $artifact['bgg_url'] = '';
-  $artifact['bgg_player_votes'] = '';
-  $artifact['bgg_age_basis'] = '';
-  $artifact['BGG_Rat'] = '';
-  $artifact['tags'] = '';
 }
 
 $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
@@ -172,8 +117,8 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 
       <div class="form-field">
         <?php
-          $type_id = ($artifact['type'] !== '' && $artifact['type'] !== null)
-            ? $artifact['type']
+          $type_id = ($artifact['type_id'] !== '' && $artifact['type_id'] !== null)
+            ? $artifact['type_id']
             : DEFAULT_TYPE;
           require SHARED_PATH . '/artifact_type_search.php';
         ?>
@@ -201,7 +146,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
       <div class="form-field">
         <label for="SS">Sweet Spot(s)</label>
         <input type="text" name="SS" id="SS"
-          value="<?php echo $artifact['SS']; ?>"
+          value="<?php echo h($artifact['SS']); ?>"
           aria-describedby="ss-hint"
         >
         <p id="ss-hint" class="form-field-hint">Ideal player counts, comma-separated. Example: 2, 3, 4</p>
@@ -216,28 +161,28 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
       <div class="form-field">
         <label for="MnP">Minimum User Count</label>
         <input type="number" name="MnP" id="MnP"
-          value="<?php echo $artifact['MnP']; ?>"
+          value="<?php echo h($artifact['MnP']); ?>"
         >
       </div>
 
       <div class="form-field">
         <label for="MxP">Maximum User Count</label>
-        <input type="number" name="MxP" id="MxP" value="<?php echo $artifact['MxP']; ?>">
+        <input type="number" name="MxP" id="MxP" value="<?php echo h($artifact['MxP']); ?>">
       </div>
 
       <div class="form-field">
         <label for="MnT">Minimum Time</label>
-        <input type="number" name="MnT" id="MnT" value="<?php echo $artifact['MnT']; ?>">
+        <input type="number" name="MnT" id="MnT" value="<?php echo h($artifact['MnT']); ?>">
       </div>
 
       <div class="form-field">
         <label for="MxT">Maxiumum Time</label>
-        <input type="number" name="MxT" id="MxT" value="<?php echo $artifact['MxT']; ?>">
+        <input type="number" name="MxT" id="MxT" value="<?php echo h($artifact['MxT']); ?>">
       </div>
 
       <div class="form-field">
         <label for="age">Minimum Age</label>
-        <input type="number" name="age" id="age" value="<?php echo h($artifact['age']); ?>">
+        <input type="number" name="age" id="age" value="<?php echo h($artifact['Age']); ?>">
       </div>
 
       <div class="form-field">

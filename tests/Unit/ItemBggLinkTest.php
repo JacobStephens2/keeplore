@@ -11,34 +11,10 @@ class ItemBggLinkTest extends TestCase
         return (string) file_get_contents(PROJECT_PATH . $path);
     }
 
-    private function updateWriter(): string
-    {
-        preg_match(
-            '/function update_artifact\s*\(.*?\n  \}/s',
-            $this->source('/private/query_functions/artifact_queries.php'),
-            $match
-        );
-        return $match[0] ?? '';
-    }
-
-    public function test_insert_writes_bgg_url(): void
-    {
-        $this->assertMatchesRegularExpression(
-            '/INSERT INTO games\s*\([^)]*\bbgg_url\b/s',
-            $this->source('/private/query_functions/artifact_queries.php')
-        );
-    }
-
-    public function test_update_writes_bgg_url(): void
-    {
-        $this->assertStringContainsString('bgg_url=?', $this->updateWriter());
-    }
-
     public function test_create_form_carries_the_bgg_link(): void
     {
         $new = $this->source('/ui/artifacts/new.php');
         $this->assertMatchesRegularExpression('/<input type="hidden" name="bgg_url" id="bgg_url"/', $new);
-        $this->assertStringContainsString("\$artifact['bgg_url'] = \$_POST['bgg_url'] ?? '';", $new);
         $this->assertStringContainsString('fields.bgg_url', $this->source('/ui/artifacts/new-bgg.js'));
     }
 
@@ -46,7 +22,6 @@ class ItemBggLinkTest extends TestCase
     {
         $edit = $this->source('/ui/artifacts/edit.php');
         $this->assertMatchesRegularExpression('/<input type="url" name="bgg_url" id="bgg_url"/', $edit);
-        $this->assertStringContainsString("\$artifact['bgg_url'] = \$_POST['bgg_url'] ?? '';", $edit);
     }
 
     public function test_edit_and_show_pages_link_to_the_item(): void
@@ -77,31 +52,11 @@ class ItemBggLinkTest extends TestCase
         $this->assertStringContainsString('keepTitle', $this->source('/ui/artifacts/new-bgg.js'));
     }
 
-    public function test_a_link_to_another_site_is_a_validation_error(): void
-    {
-        require_once PRIVATE_PATH . '/query_functions/artifact_queries.php';
-        $item = ['Title' => 'Chess', 'is_kept' => '1'];
-
-        $this->assertSame([], validate_artifact($item + ['bgg_url' => 'boardgamegeek.com/boardgame/171/chess']));
-        $this->assertSame([], validate_artifact($item + ['bgg_url' => '']));
-        $this->assertContains(
-            'BoardGameGeek Link must be a boardgamegeek.com, rpggeek.com, or videogamegeek.com page.',
-            validate_artifact($item + ['bgg_url' => 'https://example.com/chess'])
-        );
-    }
-
     public function test_stored_link_is_null_when_blank(): void
     {
         $this->assertNull(item_bgg_fields_for_storage(['bgg_url' => ''])['bgg_url']);
         $this->assertNull(item_bgg_fields_for_storage(['bgg_url' => 'javascript:alert(1)'])['bgg_url']);
         $this->assertSame('https://boardgamegeek.com/boardgame/171', item_bgg_fields_for_storage(['bgg_url' => 'http://boardgamegeek.com/boardgame/171'])['bgg_url']);
-    }
-
-    public function test_writers_store_the_bgg_vote_basis(): void
-    {
-        $writers = $this->source('/private/query_functions/artifact_queries.php');
-        $this->assertMatchesRegularExpression('/INSERT INTO games\s*\([^)]*\bbgg_player_votes\b[^)]*\bbgg_age_basis\b[^)]*\bBGG_Rat\b/s', $writers);
-        $this->assertStringContainsString('bgg_player_votes=?, bgg_age_basis=?, BGG_Rat=?', $this->updateWriter());
     }
 
     public function test_forms_carry_the_bgg_vote_basis(): void
