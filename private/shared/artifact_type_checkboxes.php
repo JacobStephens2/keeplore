@@ -55,16 +55,16 @@
 
 <span id="typeCheckboxes" style="display: flex; flex-wrap: wrap">
   <?php
-    foreach ($type_ids_by_name as $artifactType => $id) {
+    foreach ($type_ids_by_name as $type_name => $id) {
       ?>
       <span>
         <input
           type="checkbox"
           id="<?php 
-            if ($artifactType == '') {
+            if ($type_name == '') {
               echo 'no-type';
             } else {
-              echo str_replace(' ', '-', $artifactType);
+              echo str_replace(' ', '-', $type_name);
             }
           ?>" 
           value="<?php echo $id; ?>" 
@@ -79,10 +79,10 @@
         >
         <label>
           <?php 
-            if ($artifactType === '') {
+            if ($type_name === '') {
               echo 'no type';
             } else {
-              echo str_replace('-', ' ', $artifactType); 
+              echo str_replace('-', ' ', $type_name); 
             }
           ?>
         </label>
