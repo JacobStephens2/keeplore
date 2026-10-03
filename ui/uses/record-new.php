@@ -64,6 +64,7 @@
       $insertResult = mysqli_commit($db);
 
       if($insertResult === true) {
+        $_SESSION['record_use_group'] = record_use_group($_POST);
         $message = record_use_success_message($_POST);
 
         if ($is_ajax) {
@@ -100,6 +101,16 @@
     $artifact_name = null;
   }
 
+  $last_group = $_SESSION['record_use_group'] ?? null;
+  $recording_again = isset($_GET['again']) && !empty($last_group['people']);
+  $today = (new DateTime('now', new DateTimeZone('America/New_York')))->format('Y-m-d');
+  $form = record_use_form_defaults($recording_again ? $last_group : null, [
+    'people' => [['id' => (int) $_SESSION['player_id'], 'name' => (string) $_SESSION['FullName']]],
+    'useDate' => $today,
+    'Note' => most_recent_use_setting((int) $_SESSION['user_id']),
+  ]);
+  $first_person = $form['people'][0];
+
   include(SHARED_PATH . '/header.php'); 
 ?>
 
@@ -120,6 +131,13 @@
     <?php echo csrf_input(); ?>
 
     <input type="submit" value="Submit">
+
+    <?php if (!$recording_again && !empty($last_group['people'])) { ?>
+      <p class="record-again">
+        <a href="<?php echo $formProcessingFile; ?>?again=1">Record another use with this group</a>
+        <span><?php echo h(implode(', ', array_column($last_group['people'], 'name'))); ?></span>
+      </p>
+    <?php } ?>
 
     <label for="SearchTitles">Search Items</label>    <input type="search" 
       id="SearchTitles" 
@@ -150,13 +168,13 @@
     </div>
 
     <label for="users">People</label>
-    <section id="users">
+    <section id="users" data-prefill="<?php echo h(json_encode(array_slice($form['people'], 1))); ?>">
       <input 
         type="search" 
         class="user" 
         id="user0name" 
         name="user[0][name]" 
-        value="<?php echo $_SESSION['FullName']; ?>"
+        value="<?php echo h($first_person['name']); ?>"
         data-userid="<?php echo $_SESSION['user_id']; ?>"
         data-playerid="<?php echo $_SESSION['player_id']; ?>"
         data-listposition="0"
@@ -165,7 +183,7 @@
         type="hidden" 
         id="user0id" 
         name="user[0][id]" 
-        value="<?php echo $_SESSION['player_id']; ?>"
+        value="<?php echo $first_person['id']; ?>"
         data-listposition="0"
       >
       <div id="userResultsDiv0" class="userResults user" style="display: none;">
@@ -199,12 +217,7 @@
 
     <label for="date">Date</label>
     <input type="date" name="useDate" id="date" 
-      value="<?php
-        $tz = 'America/New_York';
-        $timestamp = time();
-        $dt = new DateTime("now", new DateTimeZone($tz)); //first argument "must" be a string
-        $dt->setTimestamp($timestamp); //adjust the object to correct timestamp
-        echo $dt->format('Y') . '-' . $dt->format('m') . '-' . $dt->format('d'); ?>"  
+      value="<?php echo h($form['useDate']); ?>"
     >
 
     <label for="useCount">Number of uses</label>
@@ -216,7 +229,7 @@
     <input type="text" 
       name="Note" 
       id="Note"
-      value="<?php echo h(most_recent_use_setting((int) $_SESSION['user_id'])); ?>"
+      value="<?php echo h($form['Note']); ?>"
     >
 
     <label for="NotesTwo">Notes</label>

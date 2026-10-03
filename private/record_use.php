@@ -100,3 +100,41 @@ function most_recent_use_setting(int $user_id, callable $query = null): string
     }
     return (string) $note;
 }
+
+/**
+ * The group a use was recorded with: who was there, when, and where. Record
+ * Use keeps it after a save so "Record another use with this group" can
+ * reopen the form with only the item left to pick.
+ */
+function record_use_group(array $post): array
+{
+    $people = [];
+    foreach ($post['user'] ?? [] as $person) {
+        $id = (int) ($person['id'] ?? 0);
+        if ($id <= 0 || isset($people[$id])) {
+            continue;
+        }
+        $people[$id] = ['id' => $id, 'name' => trim((string) ($person['name'] ?? ''))];
+    }
+    return [
+        'people' => array_values($people),
+        'useDate' => (string) ($post['useDate'] ?? ''),
+        'Note' => (string) ($post['Note'] ?? ''),
+    ];
+}
+
+/**
+ * People, date, and setting the Record Use form opens with: the remembered
+ * group when recording again, otherwise $fallback.
+ */
+function record_use_form_defaults(?array $group, array $fallback): array
+{
+    if (empty($group['people'])) {
+        return $fallback;
+    }
+    return [
+        'people' => $group['people'],
+        'useDate' => ($group['useDate'] ?? '') !== '' ? $group['useDate'] : $fallback['useDate'],
+        'Note' => (string) ($group['Note'] ?? ''),
+    ];
+}

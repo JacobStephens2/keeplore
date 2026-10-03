@@ -197,4 +197,73 @@ class RecordUseTest extends TestCase
 
         $this->assertSame(1, $written);
     }
+
+    public function test_group_keeps_the_people_date_and_setting_of_a_recorded_use(): void
+    {
+        $group = record_use_group([
+            'artifact' => ['id' => '12', 'name' => 'Old Maid'],
+            'user' => [
+                ['id' => '1', 'name' => 'Local Dev'],
+                ['id' => '2', 'name' => ' Sam Lee '],
+            ],
+            'useDate' => '2026-10-02',
+            'Note' => 'Grandma\'s',
+            'NotesTwo' => 'Close game',
+            'useCount' => '2',
+        ]);
+
+        $this->assertSame([
+            'people' => [
+                ['id' => 1, 'name' => 'Local Dev'],
+                ['id' => 2, 'name' => 'Sam Lee'],
+            ],
+            'useDate' => '2026-10-02',
+            'Note' => 'Grandma\'s',
+        ], $group);
+    }
+
+    public function test_group_drops_blank_and_repeated_people(): void
+    {
+        $group = record_use_group([
+            'user' => [
+                ['id' => '', 'name' => 'Typed but not picked'],
+                ['id' => '2', 'name' => 'Sam Lee'],
+                ['id' => '2', 'name' => 'Sam Lee'],
+            ],
+        ]);
+
+        $this->assertSame([['id' => 2, 'name' => 'Sam Lee']], $group['people']);
+        $this->assertSame('', $group['useDate']);
+        $this->assertSame('', $group['Note']);
+    }
+
+    public function test_form_defaults_use_the_group_when_recording_again(): void
+    {
+        $group = [
+            'people' => [['id' => 2, 'name' => 'Sam Lee']],
+            'useDate' => '2026-10-02',
+            'Note' => 'Cabin',
+        ];
+
+        $this->assertSame($group, record_use_form_defaults($group, $this->fallback()));
+    }
+
+    public function test_form_defaults_fall_back_without_a_group(): void
+    {
+        $this->assertSame($this->fallback(), record_use_form_defaults(null, $this->fallback()));
+        $this->assertSame(
+            $this->fallback(),
+            record_use_form_defaults(['people' => [], 'useDate' => '', 'Note' => ''], $this->fallback())
+        );
+    }
+
+    /** @return array{people: list<array{id: int, name: string}>, useDate: string, Note: string} */
+    private function fallback(): array
+    {
+        return [
+            'people' => [['id' => 1, 'name' => 'Local Dev']],
+            'useDate' => '2026-10-03',
+            'Note' => 'Home',
+        ];
+    }
 }

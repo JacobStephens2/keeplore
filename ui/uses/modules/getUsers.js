@@ -108,3 +108,8 @@ document
     event.preventDefault();
     addUserRow();
   });
+
+// Record another use with this group: the server lists everyone after the
+// first person in data-prefill, and each gets its own row.
+JSON.parse(document.querySelector("section#users")?.dataset.prefill || "[]")
+  .forEach((person) => addUserRow(person));
