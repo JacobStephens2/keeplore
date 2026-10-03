@@ -27,6 +27,7 @@
   --radius-lg: 28px;
   --page-width: 1200px;
   --header-height: 4.5rem;
+  --field-width: 42rem;
 }
 
 html {
@@ -511,7 +512,7 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]),
 select,
 textarea,
 .input-box {
-  width: min(100%, 42rem);
+  width: min(100%, var(--field-width));
   min-height: 3.5rem;
   padding: 0.95rem 1rem;
   border: 1px solid transparent;
@@ -1206,7 +1207,8 @@ ul.userResults {
 
 .searchResults li:hover,
 .user li:hover,
-.userResults li:hover {
+.userResults li:hover,
+.userResults li:focus-visible {
   background: rgba(48, 57, 92, 0.08);
   cursor: pointer;
 }
@@ -1382,18 +1384,6 @@ input.user,
 input.sweetSpot {
   display: inline-block;
   margin-right: 0.5rem;
-}
-
-#interactorControls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-  margin-top: 0.6rem;
-}
-
-#interactorControls button.user {
-  margin-top: 0;
 }
 
 .new-interactor-toggle {
@@ -3546,7 +3536,8 @@ html[data-theme="dark"] .guest-banner {
 
 html[data-theme="dark"] .searchResults li:hover,
 html[data-theme="dark"] .user li:hover,
-html[data-theme="dark"] .userResults li:hover {
+html[data-theme="dark"] .userResults li:hover,
+html[data-theme="dark"] .userResults li:focus-visible {
   background: rgba(157, 177, 217, 0.12);
 }
 
@@ -3604,4 +3595,110 @@ html[data-theme="dark"] .modal-panel {
 }
 .item-merge button {
   justify-self: start;
+}
+
+/* Record Use (/uses/record-new): compact rows. Add/remove buttons sit
+   inline with the search they belong to instead of wrapping below it. */
+.record-use-page label {
+  margin: 0.8rem 0 0.35rem;
+}
+
+.record-use-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.record-use-top .record-again {
+  min-height: 3.2rem;
+}
+
+.record-again-names {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+/* Person rows on Record Use and Edit Use. Edit Use stacks them; Record
+   Use (.record-use-page below) lays each out as one flex line. */
+.person-row,
+.person-row > .userResults {
+  margin-top: 0.5rem;
+}
+
+.record-use-page .person-row:first-child,
+.record-use-page .person-row > .userResults {
+  margin-top: 0;
+}
+
+.record-use-page .person-row + .person-row {
+  margin-top: 0.5rem;
+}
+
+.record-use-page .person-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: var(--field-width);
+}
+
+.record-use-page .person-row input.user {
+  flex: 1 1 12rem;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}
+
+.record-use-page .person-row button {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.record-use-page button.user {
+  min-width: 2.8rem;
+  padding: 0.7rem 0.9rem;
+}
+
+.record-use-page .person-row > .userResults {
+  flex-basis: 100%;
+  order: 1;
+}
+
+.record-use-page #SearchTitles {
+  width: 100%;
+  max-width: var(--field-width);
+}
+
+.record-use-page .field-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 9rem);
+  gap: 0 0.75rem;
+  max-width: var(--field-width);
+}
+
+.record-use-page .field-pair input {
+  width: 100%;
+}
+
+.record-use-page .field-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem;
+  max-width: var(--field-width);
+}
+
+.record-use-page .field-head .new-interactor-toggle {
+  min-height: 2.2rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.record-use-page textarea {
+  display: block;
+  width: 100%;
+  max-width: var(--field-width);
+  min-height: 0;
+  margin-bottom: 0.75rem;
 }

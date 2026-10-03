@@ -37,3 +37,44 @@ function item_type_ids_where(array $types_by_name, callable $matches) {
   }
   return $ids;
 }
+
+/**
+ * The owner's type for items filled from BoardGameGeek on Create Item, as
+ * ['id' => int, 'name' => string], or null when none is set or the stored
+ * type is no longer one of the owner's.
+ */
+function user_bgg_default_type($conn, int $user_id): ?array {
+  $stmt = mysqli_prepare($conn, "SELECT types.id, types.objectType
+    FROM users
+    JOIN types ON types.id = users.bgg_default_type_id AND types.user_id = users.id
+    WHERE users.id = ? LIMIT 1");
+  mysqli_stmt_bind_param($stmt, 'i', $user_id);
+  mysqli_stmt_execute($stmt);
+  $row = mysqli_fetch_row(mysqli_stmt_get_result($stmt));
+  mysqli_stmt_close($stmt);
+  return $row ? ['id' => (int) $row[0], 'name' => (string) $row[1]] : null;
+}
+
+/**
+ * Set the owner's BoardGameGeek type from Settings. Blank clears it; a type
+ * that is not the owner's is refused (false) and the setting stays.
+ */
+function user_bgg_default_type_set($conn, int $user_id, $raw): bool {
+  $type_id = (int) trim((string) $raw);
+  if ($type_id > 0) {
+    $stmt = mysqli_prepare($conn, "SELECT 1 FROM types WHERE id = ? AND user_id = ? LIMIT 1");
+    mysqli_stmt_bind_param($stmt, 'ii', $type_id, $user_id);
+    mysqli_stmt_execute($stmt);
+    $owned = mysqli_fetch_row(mysqli_stmt_get_result($stmt)) !== null;
+    mysqli_stmt_close($stmt);
+    if (!$owned) {
+      return false;
+    }
+  }
+  $value = $type_id > 0 ? $type_id : null;
+  $stmt = mysqli_prepare($conn, "UPDATE users SET bgg_default_type_id = ? WHERE id = ? LIMIT 1");
+  mysqli_stmt_bind_param($stmt, 'ii', $value, $user_id);
+  $ok = mysqli_stmt_execute($stmt);
+  mysqli_stmt_close($stmt);
+  return $ok;
+}

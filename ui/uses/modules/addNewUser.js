@@ -1,4 +1,4 @@
-import { addUserRow } from "./getUsers.js";
+import { addUserRow } from "./userRows.js";
 
 // Lets you create a brand-new interactor (player) without leaving the page.
 // On success the new person is added as a selected interactor row.
@@ -76,7 +76,7 @@ function createInteractor(event) {
     .then(function (result) {
       createBtn.disabled = false;
       if (result.ok && result.data && result.data.ok) {
-        addUserRow({ id: result.data.id, name: result.data.FullName });
+        addUserRow(document, { id: result.data.id, name: result.data.FullName });
         resetForm();
       } else {
         msg.textContent = (result.data && result.data.message) || "Could not create person.";

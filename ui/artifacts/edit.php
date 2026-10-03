@@ -426,6 +426,6 @@
   editFormDisplayButton.addEventListener('click', toggleEditFormDisplay);
 </script>
 <script src="<?php echo url_for('/shared/js/form-save-shortcut.js'); ?>?v=1"></script>
-<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=10"></script>
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=11"></script>
 
 <?php include(SHARED_PATH . '/footer.php'); ?>

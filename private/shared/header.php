@@ -32,6 +32,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#30395c">
     <meta name="description" content="<?php echo h($page_description); ?>">
+    <meta name="keeplore-api-origin" content="<?php echo h(API_ORIGIN); ?>">
     <meta name="application-name" content="Keeplore">
     <meta name="apple-mobile-web-app-title" content="Keeplore">
     <meta name="mobile-web-app-capable" content="yes">
@@ -82,7 +83,7 @@
         if (meta) { meta.setAttribute('content', effective === 'dark' ? '#0c1222' : '#30395c'); }
       })();
     </script>
-    <link rel="stylesheet" media="all" href="../../style.css?v=64" />
+    <link rel="stylesheet" media="all" href="../../style.css?v=68" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">

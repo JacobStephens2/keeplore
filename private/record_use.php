@@ -8,12 +8,39 @@
  * listed as a participant, and the default Setting value.
  */
 
+const RECORD_USE_MAX_COUNT = 20;
+
+/**
+ * How many identical uses one Record Use submit writes. Pages without the
+ * Number of uses field post nothing and record one.
+ */
+function record_use_count(array $post): int
+{
+    $count = (int) ($post['useCount'] ?? 1);
+    return max(1, min(RECORD_USE_MAX_COUNT, $count));
+}
+
+/**
+ * Write record_use_count($post) identical uses through $insert_use and
+ * return how many were written. Callers own the transaction.
+ */
+function record_uses(array $post, callable $insert_use): int
+{
+    $count = record_use_count($post);
+    for ($i = 0; $i < $count; $i++) {
+        $insert_use($post);
+    }
+    return $count;
+}
+
 function record_use_success_message(array $post): string
 {
     $user_count = count($post['user'] ?? []);
     $user_count_word = $user_count === 1 ? 'person' : 'people';
+    $use_count = record_use_count($post);
+    $times = $use_count > 1 ? " $use_count times" : '';
     return 'The interaction with ' . ($post['artifact']['name'] ?? '')
-        . " with $user_count $user_count_word was recorded.";
+        . " with $user_count $user_count_word was recorded$times.";
 }
 
 function record_use_ajax_payload(array $post, int $use_id, array $status, $artifact_row): array
@@ -72,4 +99,57 @@ function most_recent_use_setting(int $user_id, callable $query = null): string
         return '';
     }
     return (string) $note;
+}
+
+/**
+ * The group a use was recorded with: who was there, when, and where. Record
+ * Use keeps it after a save so "Record another use with this group" can
+ * reopen the form with only the item left to pick.
+ */
+function record_use_group(array $post, string $today): array
+{
+    $people = [];
+    foreach ($post['user'] ?? [] as $person) {
+        $id = (int) ($person['id'] ?? 0);
+        if ($id <= 0 || isset($people[$id])) {
+            continue;
+        }
+        $people[$id] = ['id' => $id, 'name' => trim((string) ($person['name'] ?? ''))];
+    }
+    return [
+        'people' => array_values($people),
+        'useDate' => (string) ($post['useDate'] ?? ''),
+        'Note' => (string) ($post['Note'] ?? ''),
+        'savedOn' => $today,
+    ];
+}
+
+/**
+ * What the Record Use form opens with. Asked to record again ($again) with
+ * a remembered group, it opens with that group's people, date, and setting
+ * (the date only on the day the group was saved, so a later visit gets
+ * $fallback's date); otherwise it opens with $fallback and offers the remembered group, if any,
+ * as "Record another use with this group".
+ */
+function record_use_form(?array $last_group, bool $again, array $fallback): array
+{
+    $has_group = !empty($last_group['people']);
+    if ($again && $has_group) {
+        return [
+            'people' => $last_group['people'],
+            'useDate' => ($last_group['useDate'] ?? '') !== ''
+                && ($last_group['savedOn'] ?? '') === $fallback['useDate']
+                ? $last_group['useDate']
+                : $fallback['useDate'],
+            'Note' => (string) ($last_group['Note'] ?? ''),
+            'offerGroup' => null,
+        ];
+    }
+    return $fallback + ['offerGroup' => $has_group ? $last_group : null];
+}
+
+/** Today's date (Y-m-d) in the app's America/New_York day. */
+function record_use_today(): string
+{
+    return (new DateTime('now', new DateTimeZone('America/New_York')))->format('Y-m-d');
 }

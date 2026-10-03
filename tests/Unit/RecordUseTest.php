@@ -138,4 +138,171 @@ class RecordUseTest extends TestCase
 
         $this->assertSame('Home', most_recent_use_setting(8, $query));
     }
+
+    public function test_use_count_defaults_to_one(): void
+    {
+        $this->assertSame(1, record_use_count([]));
+        $this->assertSame(1, record_use_count(['useCount' => '']));
+        $this->assertSame(1, record_use_count(['useCount' => 'abc']));
+    }
+
+    public function test_use_count_reads_the_number_of_uses(): void
+    {
+        $this->assertSame(2, record_use_count(['useCount' => '2']));
+    }
+
+    public function test_use_count_is_clamped_to_one_through_the_max(): void
+    {
+        $this->assertSame(1, record_use_count(['useCount' => '0']));
+        $this->assertSame(1, record_use_count(['useCount' => '-3']));
+        $this->assertSame(RECORD_USE_MAX_COUNT, record_use_count(['useCount' => '500']));
+    }
+
+    public function test_success_message_names_how_many_uses_when_more_than_one(): void
+    {
+        $this->assertSame(
+            'The interaction with Old Maid with 1 person was recorded 2 times.',
+            record_use_success_message([
+                'artifact' => ['name' => 'Old Maid'],
+                'user' => [['id' => 2, 'name' => 'Sam Lee']],
+                'useCount' => '2',
+            ])
+        );
+    }
+
+    public function test_record_uses_writes_one_identical_use_per_count(): void
+    {
+        $post = [
+            'artifact' => ['id' => '12', 'name' => 'Old Maid'],
+            'useDate' => '2026-10-02',
+            'useCount' => '2',
+        ];
+        $written = [];
+
+        $count = record_uses($post, function (array $p) use (&$written) {
+            $written[] = $p;
+        });
+
+        $this->assertSame(2, $count);
+        $this->assertSame([$post, $post], $written);
+    }
+
+    public function test_record_uses_writes_one_use_without_a_count(): void
+    {
+        $written = 0;
+
+        record_uses([], function () use (&$written) {
+            $written++;
+        });
+
+        $this->assertSame(1, $written);
+    }
+
+    public function test_group_keeps_the_people_date_and_setting_of_a_recorded_use(): void
+    {
+        $group = record_use_group([
+            'artifact' => ['id' => '12', 'name' => 'Old Maid'],
+            'user' => [
+                ['id' => '1', 'name' => 'Local Dev'],
+                ['id' => '2', 'name' => ' Sam Lee '],
+            ],
+            'useDate' => '2026-10-02',
+            'Note' => 'Grandma\'s',
+            'NotesTwo' => 'Close game',
+            'useCount' => '2',
+        ], '2026-10-03');
+
+        $this->assertSame([
+            'people' => [
+                ['id' => 1, 'name' => 'Local Dev'],
+                ['id' => 2, 'name' => 'Sam Lee'],
+            ],
+            'useDate' => '2026-10-02',
+            'Note' => 'Grandma\'s',
+            'savedOn' => '2026-10-03',
+        ], $group);
+    }
+
+    public function test_group_drops_blank_and_repeated_people(): void
+    {
+        $group = record_use_group([
+            'user' => [
+                ['id' => '', 'name' => 'Typed but not picked'],
+                ['id' => '2', 'name' => 'Sam Lee'],
+                ['id' => '2', 'name' => 'Sam Lee'],
+            ],
+        ], '2026-10-03');
+
+        $this->assertSame([['id' => 2, 'name' => 'Sam Lee']], $group['people']);
+        $this->assertSame('', $group['useDate']);
+        $this->assertSame('', $group['Note']);
+    }
+
+    public function test_form_opens_with_the_group_when_recording_again(): void
+    {
+        $form = record_use_form($this->group(), true, $this->fallback());
+
+        $this->assertSame($this->group()['people'], $form['people']);
+        $this->assertSame('2026-10-02', $form['useDate']);
+        $this->assertSame('Cabin', $form['Note']);
+        $this->assertNull($form['offerGroup']);
+    }
+
+    public function test_form_offers_the_group_but_opens_fresh_otherwise(): void
+    {
+        $form = record_use_form($this->group(), false, $this->fallback());
+
+        $this->assertSame($this->fallback()['people'], $form['people']);
+        $this->assertSame('2026-10-03', $form['useDate']);
+        $this->assertSame('Home', $form['Note']);
+        $this->assertSame($this->group(), $form['offerGroup']);
+    }
+
+    public function test_form_opens_fresh_without_a_group_even_when_asked_again(): void
+    {
+        foreach ([null, ['people' => [], 'useDate' => '', 'Note' => '']] as $group) {
+            $form = record_use_form($group, true, $this->fallback());
+
+            $this->assertSame($this->fallback()['people'], $form['people']);
+            $this->assertNull($form['offerGroup']);
+        }
+    }
+
+    public function test_form_uses_today_when_the_group_was_saved_on_an_earlier_day(): void
+    {
+        $group = ['savedOn' => '2026-09-28'] + $this->group();
+
+        $form = record_use_form($group, true, $this->fallback());
+
+        $this->assertSame('2026-10-03', $form['useDate']);
+        $this->assertSame($group['people'], $form['people']);
+    }
+
+    public function test_form_keeps_todays_date_when_the_group_has_none(): void
+    {
+        $group = ['useDate' => ''] + $this->group();
+
+        $this->assertSame('2026-10-03', record_use_form($group, true, $this->fallback())['useDate']);
+    }
+
+    /** @return array{people: list<array{id: int, name: string}>, useDate: string, Note: string} */
+    private function group(): array
+    {
+        return [
+            'people' => [['id' => 2, 'name' => 'Sam Lee']],
+            'useDate' => '2026-10-02',
+            'Note' => 'Cabin',
+            'savedOn' => '2026-10-03',
+        ];
+    }
+
+    /** @return array{people: list<array{id: int, name: string}>, useDate: string, Note: string} */
+    private function fallback(): array
+    {
+        return [
+            'people' => [['id' => 1, 'name' => 'Local Dev']],
+            'useDate' => '2026-10-03',
+            'Note' => 'Home',
+        ];
+    }
 }

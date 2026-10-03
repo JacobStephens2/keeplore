@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
   native_notify_past_due TINYINT(1) NOT NULL DEFAULT 1,
   player_id INT DEFAULT NULL,
   bgg_username VARCHAR(64) DEFAULT NULL,
+  bgg_default_type_id INT DEFAULT NULL,
   UNIQUE KEY uq_users_username (username),
   UNIQUE KEY uq_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

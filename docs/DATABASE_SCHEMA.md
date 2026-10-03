@@ -189,6 +189,7 @@ Authentication and account records for application users.
 | `daily_email` | TINYINT(1) | NO | Whether user receives the daily use-by email (1 = yes, 0 = no, default 1) |
 | `player_id` | INT | YES | FK to `players.id` -- links this user account to their player record |
 | `bgg_username` | VARCHAR(64) | YES | BoardGameGeek reviewer set on Settings, the owner's own BGG account or someone else's, as BGG spells it. Apply [`add-user-bgg-username.sql`](../database/migrations/add-user-bgg-username.sql); safe to rerun |
+| `bgg_default_type_id` | INT | YES | One of the owner's `types.id`, such as table game, set on Settings. Create Item gives an item filled from a BoardGameGeek match this type unless the owner already picked one. NULL keeps the form's type. Apply [`add-user-bgg-default-type.sql`](../database/migrations/add-user-bgg-default-type.sql); safe to rerun |
 
 **Primary key:** `id`
 **Foreign keys:**

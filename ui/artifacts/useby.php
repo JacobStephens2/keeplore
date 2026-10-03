@@ -9,7 +9,7 @@
   include(SHARED_PATH . '/dataTable.html'); 
 ?>
 <script defer src="/shared/filter_button.js"></script>
-<script defer src="useby.js?v=7"></script>
+<script defer src="useby.js?v=8"></script>
 
 <?php // process form submission and initialize variables
   if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -54,8 +54,6 @@
 ?>
 
 <main class="useby-page">
-
-  <meta id="apiOrigin" content="<?php echo API_ORIGIN; ?>">
 
   <header class="page-header page-header-row">
     <div>

@@ -21,6 +21,9 @@
 
   // Edit Item links an existing item, so the owner's name stays put.
   const keepTitle = requestBtn.hasAttribute("data-keep-title");
+  // Type as the page opened, so a type the owner picks is left alone.
+  const typeInput = document.querySelector("#type");
+  const initialTypeId = typeInput ? typeInput.value : "";
   let pending = null;
 
   // A hand edit means BGG's votes no longer back that number, so drop the
@@ -71,6 +74,9 @@
       return;
     }
     fillForm(pending.fields);
+    if (window.BggDefaultType) {
+      window.BggDefaultType.apply(document, requestBtn, initialTypeId);
+    }
     showBases(pending.basis);
     showStatus(keepTitle
       ? "Filled from " + pending.match.name + " and linked it. Save to keep the changes."
