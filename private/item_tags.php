@@ -175,17 +175,3 @@ function item_tag_user_filter($tag, $user_id) {
     'params' => [(int) $user_id, $normalized],
   ];
 }
-
-function delete_item_tags_for_artifact($conn, $artifact_id, $user_id = null) {
-  $artifact_id = (int) $artifact_id;
-  if ($user_id === null) {
-    $stmt = mysqli_prepare($conn, "DELETE FROM item_tags WHERE artifact_id = ?");
-    mysqli_stmt_bind_param($stmt, 'i', $artifact_id);
-  } else {
-    $user_id = (int) $user_id;
-    $stmt = mysqli_prepare($conn, "DELETE FROM item_tags WHERE artifact_id = ? AND user_id = ?");
-    mysqli_stmt_bind_param($stmt, 'ii', $artifact_id, $user_id);
-  }
-  mysqli_stmt_execute($stmt);
-  mysqli_stmt_close($stmt);
-}

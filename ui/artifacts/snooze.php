@@ -30,8 +30,9 @@
     $days = $default_snooze_days;
   }
 
-  $artifact_record = find_artifact_by_id($artifact_id);
-  $artifact_name = $artifact_record['Title'] ?? ($_REQUEST['artifact_name'] ?? 'Item');
+  $artifact_id = (int) $artifact_id;
+  $artifact_record = find_owned_item_or_exit($artifact_id, $is_ajax);
+  $artifact_name = $artifact_record['Title'];
 
   $snooze_until = snooze_artifact($artifact_id, $days);
 

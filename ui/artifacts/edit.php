@@ -11,8 +11,9 @@
     error_404();
   }
 
-  $artifact = find_artifact_by_id($id);
-  if (!$artifact || (int) $artifact['user_id'] !== (int) $_SESSION['user_id']) {
+  $items = new Items($db, (int) $_SESSION['user_id']);
+  $artifact = $items->find($id);
+  if (!$artifact) {
     error_404();
   }
 
@@ -77,7 +78,7 @@
     }
   }
 
-  $artifact = find_artifact_by_id($id);
+  $artifact = $items->find($id);
   $item_tags = find_item_tags_for_artifacts($db, [$id], (int) $_SESSION['user_id'])[$id] ?? [];
   if (is_post_request() && isset($_POST['tags'])) {
     $item_tags = parse_item_tags_input($_POST['tags']);

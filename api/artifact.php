@@ -223,41 +223,31 @@
       }
 
       $id = (int) $_GET['id'];
-      $user_id = isset($authentication_response->user_id) ? (int) $authentication_response->user_id : null;
-
-      if ($user_id) {
-        $artifact = Artifact::find_by_id_and_user_id($id, $user_id);
-      } else {
-        $artifact = Artifact::find_by_id($id);
+      // The master key has no user of its own: it names the owner in the query.
+      $user_id = isset($authentication_response->user_id)
+        ? (int) $authentication_response->user_id
+        : filter_var($_GET['user_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+      if (!$user_id) {
+        http_response_code(400);
+        $response->message = 'Missing or invalid required parameter: user_id';
+        echo json_encode($response);
+        exit;
       }
 
-      if (!$artifact) {
+      $items = new Items($database, $user_id);
+      $artifact = $items->find($id);
+      try {
+        $items->delete($id);
+      } catch (OutOfBoundsException $not_found) {
         http_response_code(404);
         $response->message = 'Item not found.';
         echo json_encode($response);
         exit;
       }
 
-      if ($user_id) {
-        $result = $artifact->delete_by_user_id();
-      } else {
-        $result = $artifact->delete();
-      }
-
-      if ($result === true) {
-        delete_item_tags_for_artifact($database, $id, $user_id);
-        $logger->logDataChange('delete', 'artifact', $id, ['title' => $artifact->Title]);
-        $response->message = 'Item deleted successfully.';
-        echo json_encode($response);
-      } elseif (is_string($result)) {
-        http_response_code(404);
-        $response->message = $result;
-        echo json_encode($response);
-      } else {
-        http_response_code(500);
-        $response->message = 'Failed to delete item.';
-        echo json_encode($response);
-      }
+      $logger->logDataChange('delete', 'artifact', $id, ['title' => $artifact['Title']]);
+      $response->message = 'Item deleted successfully.';
+      echo json_encode($response);
       break;
 
     default:

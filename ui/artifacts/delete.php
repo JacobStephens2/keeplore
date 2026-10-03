@@ -6,16 +6,24 @@ require_login();
 if(!isset($_GET['id'])) {
   redirect_to(url_for('/artifacts/index.php'));
 }
-$id = $_GET['id'];
+$id = (int) $_GET['id'];
+$items = new Items($db, (int) $_SESSION['user_id']);
 
 if(is_post_request()) {
 
-  $result = delete_artifact($id);
+  try {
+    $items->delete($id);
+  } catch (OutOfBoundsException $not_found) {
+    error_404();
+  }
   $_SESSION['message'] = 'The item was deleted successfully.';
   redirect_to(url_for('/artifacts/index.php'));
 
-} else {
-  $object = find_artifact_by_id($id);
+}
+
+$object = $items->find($id);
+if (!$object) {
+  error_404();
 }
 
 ?>

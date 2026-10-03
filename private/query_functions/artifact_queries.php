@@ -463,36 +463,6 @@ require_once dirname(__DIR__) . '/classes/UseByQueue.php';
     }
   }
 
-  function delete_artifact($id) {
-    global $db;
-
-    $user_id = isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
-    delete_item_tags_for_artifact($db, (int) $id, $user_id);
-
-    // A deleted item is no longer planned for any event.
-    $artifact_id = (int) $id;
-    $stmt = mysqli_prepare($db, "DELETE FROM event_items WHERE artifact_id = ?");
-    mysqli_stmt_bind_param($stmt, 'i', $artifact_id);
-    mysqli_stmt_execute($stmt);
-    mysqli_stmt_close($stmt);
-
-    $sql = "DELETE FROM games WHERE id=? LIMIT 1";
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, "s", $id);
-    $result = mysqli_stmt_execute($stmt);
-    mysqli_stmt_close($stmt);
-
-    // For DELETE statements, $result is true/false
-    if($result) {
-      return true;
-    } else {
-      // DELETE failed
-      echo mysqli_error($db);
-      db_disconnect($db);
-      exit;
-    }
-  }
-
   function list_artifacts(int $user_id) {
     global $db;
     $sql = "SELECT games.id, games.Title FROM games WHERE games.user_id = ? ORDER BY games.Title ASC";

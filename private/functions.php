@@ -198,6 +198,25 @@ function error_500() {
   exit();
 }
 
+// The signed-in owner's Item for the quick item actions (Snooze, Mark to get
+// rid of, Mark kept). Another owner's or a missing Item ends the request as
+// "Item not found.": a JSON 404 for AJAX, otherwise a message on the Items page.
+function find_owned_item_or_exit(int $artifact_id, bool $is_ajax): array {
+  global $db;
+  $item = (new Items($db, (int) $_SESSION['user_id']))->find($artifact_id);
+  if ($item) {
+    return $item;
+  }
+  if ($is_ajax) {
+    header('Content-Type: application/json');
+    http_response_code(404);
+    echo json_encode(['ok' => false, 'message' => 'Item not found.']);
+    exit;
+  }
+  $_SESSION['message'] = 'Item not found.';
+  redirect_to(url_for('/artifacts/index.php'));
+}
+
 function redirect_to($location) {
   header("Location: " . $location);
   exit;
