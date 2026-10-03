@@ -24,116 +24,15 @@ $response = find_response_by_id($id);
       </dl>
       <!-- GET variable approach to passing player id from new page to show -->
       <dl>
-          <?php 
-            $playerNo = 1;
-            echo '<dt>Player ' . $playerNo . ": ";
-            $id = $_GET['player1'] ?? '';
-            $player = find_player_by_id($id); 
-            echo h($player['FirstName']) . ' ' . h($player['LastName']);
-            $playerNo++;
-            echo "</dt></dl>";
-            $id = $_GET['player2'] ?? '';
-            if($id != '') {
-              $player = find_player_by_id($id); 
+          <?php
+            $people = new People($db, (int) $_SESSION['user_id']);
+            $player_name = fn ($id) => h($people->find((int) $id)['name'] ?? '');
+            echo '<dt>Player 1: ' . $player_name($_GET['player1'] ?? '') . "</dt></dl>";
+            for ($playerNo = 2; $playerNo <= 9 && ($_GET['player' . $playerNo] ?? '') != ''; $playerNo++) {
               echo "
                 <dl>
-                  <dt>Player " . $playerNo . ": "
-                    .
-                      h($player['FirstName']) . ' ' . h($player['LastName']) 
-                    .
-                  "</dt>
+                  <dt>Player " . $playerNo . ": " . $player_name($_GET['player' . $playerNo]) . "</dt>
                 </dl>";
-              $playerNo++;
-              $id = $_GET['player3'] ?? '';
-              if($id != '') {
-                $player = find_player_by_id($id); 
-                echo "
-                  <dl>
-                    <dt>Player " . $playerNo . ": "
-                      .
-                        h($player['FirstName']) . ' ' . h($player['LastName']) 
-                      .
-                    "</dt>
-                  </dl>";
-                $playerNo++;
-                $id = $_GET['player' . $playerNo] ?? '';
-                if($id != '') {
-                  $player = find_player_by_id($id); 
-                  echo "
-                    <dl>
-                      <dt>Player " . $playerNo . ": "
-                        .
-                          h($player['FirstName']) . ' ' . h($player['LastName']) 
-                        .
-                      "</dt>
-                    </dl>";
-                  $playerNo++;
-                  $id = $_GET['player5'] ?? '';
-                  if($id != '') {
-                    $player = find_player_by_id($id); 
-                    echo "
-                      <dl>
-                        <dt>Player " . $playerNo . ": "
-                          .
-                            h($player['FirstName']) . ' ' . h($player['LastName']) 
-                          .
-                        "</dt>
-                      </dl>";
-                    $playerNo++;
-                    $id = $_GET['player6'] ?? '';
-                    if($id != '') {
-                      $player = find_player_by_id($id); 
-                      echo "
-                        <dl>
-                          <dt>Player " . $playerNo . ": "
-                            .
-                              h($player['FirstName']) . ' ' . h($player['LastName']) 
-                            .
-                          "</dt>
-                        </dl>";
-                      $playerNo++;
-                      $id = $_GET['player7'] ?? '';
-                      if($id != '') {
-                        $player = find_player_by_id($id); 
-                        echo "
-                          <dl>
-                            <dt>Player " . $playerNo . ": "
-                              .
-                                h($player['FirstName']) . ' ' . h($player['LastName']) 
-                              .
-                            "</dt>
-                          </dl>";
-                        $playerNo++;
-                        $id = $_GET['player8'] ?? '';
-                        if($id != '') {
-                          $player = find_player_by_id($id); 
-                          echo "
-                            <dl>
-                              <dt>Player " . $playerNo . ": "
-                                .
-                                  h($player['FirstName']) . ' ' . h($player['LastName']) 
-                                .
-                              "</dt>
-                            </dl>";
-                          $playerNo++;
-                          $id = $_GET['player9'] ?? '';
-                          if($id != '') {
-                            $player = find_player_by_id($id); 
-                            echo "
-                              <dl>
-                                <dt>Player " . $playerNo . ": "
-                                  .
-                                    h($player['FirstName']) . ' ' . h($player['LastName']) 
-                                  .
-                                "</dt>
-                              </dl>";  
-                          }
-                        }
-                      }
-                    }      
-                  }    
-                }  
-              }
             }
           ?>
     </div>

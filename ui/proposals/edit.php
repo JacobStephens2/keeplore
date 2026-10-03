@@ -15,7 +15,7 @@ if ($id !== null && $record === null) {
 $items = find_artifacts_by_user()->fetch_all(MYSQLI_ASSOC);
 usort($items, fn($a, $b) => strcasecmp($a['Title'], $b['Title']) ?: $a['id'] <=> $b['id']);
 $itemsById = array_column($items, null, 'id');
-$participants = list_players()->fetch_all(MYSQLI_ASSOC);
+$participants = (new People($db, (int) $_SESSION['user_id']))->all();
 $initialItemId = $record['item_id'] ?? filter_var($_GET['item_id'] ?? '', FILTER_VALIDATE_INT);
 if ($initialItemId && !isset($itemsById[$initialItemId])) {
     error_404();
@@ -124,8 +124,8 @@ include(SHARED_PATH . '/header.php');
                     <div class="proposal-participants" id="proposal-participants">
                         <?php foreach ($participants as $participant) { ?>
                             <label class="proposal-choice">
-                                <input type="checkbox" name="participant_ids[]" value="<?php echo (int) $participant['id']; ?>" <?php echo in_array($participant['id'], $values['participant_ids']) ? 'checked' : ''; ?>>
-                                <?php echo h(trim(($participant['FirstName'] ?? '') . ' ' . ($participant['LastName'] ?? ''))); ?>
+                                <input type="checkbox" name="participant_ids[]" value="<?php echo $participant['id']; ?>" <?php echo in_array($participant['id'], $values['participant_ids']) ? 'checked' : ''; ?>>
+                                <?php echo h($participant['name']); ?>
                             </label>
                         <?php } ?>
                     </div>

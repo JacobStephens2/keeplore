@@ -61,15 +61,13 @@ include(SHARED_PATH . '/header.php');
         <select id="User" name="Player">
           <option value='Invalid'>Choose a User</option>
           <?php
-            $player_set = list_players();
-            while($player = mysqli_fetch_assoc($player_set)) {
-              echo "<option value=\"" . h($player['id']) . "\"";
-              if($response["Player"] == $player['id']) {
+            foreach ((new People($db, (int) $_SESSION['user_id']))->all() as $person) {
+              echo "<option value=\"" . h($person['id']) . "\"";
+              if($response["Player"] == $person['id']) {
                 echo " selected";
               }
-              echo ">" . h($player['FirstName']) . ' ' . h($player['LastName']) . "</option>";
+              echo ">" . h($person['name']) . "</option>";
             }
-            mysqli_free_result($player_set);
           ?>
         </select>
       </div>
