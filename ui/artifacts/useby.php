@@ -44,10 +44,7 @@
   }
   $_SESSION['hideSnoozed'] = $hideSnoozed;
   $typeArray = $_SESSION['type'] ?? [];
-  $default_use_interval = singleValueQuery("SELECT default_use_interval
-    FROM users
-    WHERE id = '$user_id'
-  ");
+  $default_use_interval = default_use_interval($db, $user_id);
   $interval = $_POST['interval'] ?? $default_use_interval;
   $artifact_set = use_by($type, $interval, $sweetSpot, $minimumAge, $shelfSort, null, $hideSnoozed === 'yes');
   $total_overdue = 0;
@@ -293,24 +290,12 @@
           </td>
 
           <?php
+              $use_by_date = use_by_date($artifact['Acq'], $artifact['MostRecentUseOrResponse'], $artifact['interaction_frequency_days'], $interval);
               date_default_timezone_set('America/New_York');
-              $DateTimeNow = new DateTime(date('Y-m-d'));
-              $DateTimeMostRecentUse = new DateTime(substr($artifact['MostRecentUseOrResponse'],0,10));
-              $DateTimeAcquisition = new DateTime(substr($artifact['Acq'],0,10));
-
-              $intervalInHours = $this_interval * 24;
-
-              if ($DateTimeMostRecentUse < $DateTimeAcquisition || $artifact['MostRecentUseOrResponse'] === NULL) {
-                $DateInterval = DateInterval::createFromDateString("$intervalInHours hour");
-                $useByDate = date_add($DateTimeAcquisition, $DateInterval);
-              } else {
-                $doubledInterval = $intervalInHours * 2;
-                $DateInterval = DateInterval::createFromDateString("$doubledInterval hour");
-                $useByDate = date_add($DateTimeMostRecentUse, $DateInterval);
-              }
+              $is_overdue = $use_by_date !== null && $use_by_date < date('Y-m-d');
           ?>
 
-          <td class="useByDate date<?php if ($useByDate < $DateTimeNow) echo ' overdue-past'; ?>" data-label="Interact by"><?php print_r($useByDate->format('Y-m-d')); ?></td>
+          <td class="useByDate date<?php if ($is_overdue) echo ' overdue-past'; ?>" data-label="Interact by"><?php echo h($use_by_date ?? ''); ?></td>
 
             <?php if (!is_guest()) { ?>
             <td class="record" data-label="Record">
@@ -378,13 +363,13 @@
 
           <td class="overdue" data-label="Overdue"
             <?php
-                if ($useByDate < $DateTimeNow) {
+                if ($is_overdue) {
                   echo 'style="color: red;"';
                 }
             ?>
             >
             <?php
-                if ($useByDate < $DateTimeNow) {
+                if ($is_overdue) {
                   $total_overdue++;
                   echo 'Yes';
                 } else {

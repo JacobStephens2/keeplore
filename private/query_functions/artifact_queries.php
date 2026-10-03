@@ -5,6 +5,7 @@ use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
 require_once dirname(__DIR__) . '/item_tags.php';
+require_once dirname(__DIR__) . '/use_by_date.php';
 
   function compute_artifact_use_by_status($artifact_id, $user_id) {
     global $db;
@@ -29,17 +30,6 @@ require_once dirname(__DIR__) . '/item_tags.php';
       return ['use_by_date' => null, 'most_recent_use_date' => null, 'is_overdue' => false];
     }
 
-    $interval_stmt = mysqli_prepare($db, "SELECT default_use_interval FROM users WHERE id = ?");
-    mysqli_stmt_bind_param($interval_stmt, "i", $user_id);
-    mysqli_stmt_execute($interval_stmt);
-    $interval_row = mysqli_fetch_assoc(mysqli_stmt_get_result($interval_stmt));
-    mysqli_stmt_close($interval_stmt);
-    $default_interval = (float) ($interval_row['default_use_interval'] ?? (defined('DEFAULT_USE_INTERVAL') ? DEFAULT_USE_INTERVAL : 90));
-
-    $this_interval = $row['interaction_frequency_days'] !== null
-      ? (float) $row['interaction_frequency_days']
-      : $default_interval;
-
     $most_recent_raw = null;
     if ($row['most_recent_use'] !== null && $row['most_recent_response'] !== null) {
       $most_recent_raw = strtotime($row['most_recent_use']) >= strtotime($row['most_recent_response'])
@@ -49,29 +39,18 @@ require_once dirname(__DIR__) . '/item_tags.php';
     }
     $most_recent_date = $most_recent_raw !== null ? substr($most_recent_raw, 0, 10) : null;
 
+    $use_by = use_by_date(
+      $row['Acq'],
+      $most_recent_date,
+      $row['interaction_frequency_days'],
+      default_use_interval($db, $user_id)
+    );
+
     date_default_timezone_set('America/New_York');
-    $acq = new DateTime(substr($row['Acq'], 0, 10));
-    $now = new DateTime(date('Y-m-d'));
-
-    if ($most_recent_date === null) {
-      $base = clone $acq;
-      $hours = (int) ($this_interval * 24);
-    } else {
-      $recent = new DateTime($most_recent_date);
-      if ($recent < $acq) {
-        $base = clone $acq;
-        $hours = (int) ($this_interval * 24);
-      } else {
-        $base = clone $recent;
-        $hours = (int) ($this_interval * 2 * 24);
-      }
-    }
-    $use_by = $base->add(DateInterval::createFromDateString("$hours hours"));
-
     return [
-      'use_by_date' => $use_by->format('Y-m-d'),
+      'use_by_date' => $use_by,
       'most_recent_use_date' => $most_recent_date,
-      'is_overdue' => $use_by < $now,
+      'is_overdue' => $use_by !== null && $use_by < date('Y-m-d'),
     ];
   }
 
@@ -179,7 +158,8 @@ require_once dirname(__DIR__) . '/item_tags.php';
         games.BGG_Rat,
         DATE((SELECT MAX(responses.PlayDate) FROM responses WHERE responses.Title = games.id)) AS MaxPlay,
         DATE((SELECT MAX(uses.use_date) FROM uses WHERE uses.artifact_id = games.id)) AS MaxUse,
-        games.Acq
+        games.Acq,
+        games.interaction_frequency_days
     FROM
         games
     LEFT JOIN types ON games.type_id = types.id
@@ -815,13 +795,7 @@ function email_artifact_use_notice($user_id) {
   $type = '';
 
   global $db;
-  $stmt = mysqli_prepare($db, "SELECT default_use_interval FROM users WHERE id = ?");
-  mysqli_stmt_bind_param($stmt, "i", $user_id);
-  mysqli_stmt_execute($stmt);
-  $result = mysqli_stmt_get_result($stmt);
-  $row = mysqli_fetch_array($result);
-  mysqli_stmt_close($stmt);
-  $interval = ($row !== null) ? $row[0] : DEFAULT_USE_INTERVAL;
+  $interval = default_use_interval($db, $user_id);
 
   $artifact_set = use_by($type, $interval, $sweetSpot, $minimumAge, $shelfSort, $user_id);
 
@@ -838,45 +812,33 @@ function email_artifact_use_notice($user_id) {
         $this_interval = $interval;
       }
 
+      $use_by_date = use_by_date($artifact['Acq'], $artifact['MostRecentUseOrResponse'], $artifact['interaction_frequency_days'], $interval);
+      if ($use_by_date === null) {
+          continue;
+      }
+      $date_of_most_recent_use = ($artifact['MostRecentUseOrResponse'] === NULL)
+          ? 'No interactions'
+          : substr($artifact['MostRecentUseOrResponse'], 0, 10);
+
       date_default_timezone_set('America/New_York');
-      $DateTimeNow = new DateTime(date('Y-m-d'));
-      $DateTimeMostRecentUse = ($artifact['MostRecentUseOrResponse'] !== NULL)
-          ? new DateTime(substr($artifact['MostRecentUseOrResponse'],0,10))
-          : new DateTime('1970-01-01');
-      if ($artifact['MostRecentUseOrResponse'] === NULL) {
-          $date_of_most_recent_use = 'No interactions';
-      } else {
-          $date_of_most_recent_use = $DateTimeMostRecentUse->format('Y-m-d');
-      }
-      $DateTimeAcquisition = new DateTime(substr($artifact['Acq'],0,10));
-      $intervalInHours = $this_interval * 24;
+      $today = date('Y-m-d');
+      $diff_days = (new DateTime($today))->diff(new DateTime($use_by_date))->days;
 
-      if ($DateTimeMostRecentUse < $DateTimeAcquisition || $artifact['MostRecentUseOrResponse'] === NULL) {
-          $DateInterval = DateInterval::createFromDateString("$intervalInHours hour");
-          $useByDate = date_add($DateTimeAcquisition, $DateInterval);
-      } else {
-          $doubledInterval = $intervalInHours * 2;
-          $DateInterval = DateInterval::createFromDateString("$doubledInterval hour");
-          $useByDate = date_add($DateTimeMostRecentUse, $DateInterval);
-      }
-
-      $diff_days = $useByDate->diff($DateTimeNow)->days;
-
-      if ($useByDate->format('Y-m-d') === $DateTimeNow->format('Y-m-d')) { // due today
+      if ($use_by_date === $today) { // due today
           $due_today_array[$i]['artifact'] = h($artifact['Title']);
           $due_today_array[$i]['artifact_id'] = h($artifact['id']);
           $due_today_array[$i]['most_recent_use'] = $date_of_most_recent_use;
           $due_today_array[$i]['interval'] = $this_interval;
-      } elseif ($diff_days > 0 && $diff_days < 8 && $useByDate->format('Y-m-d') > $DateTimeNow->format('Y-m-d')) { // due in coming week
+      } elseif ($diff_days > 0 && $diff_days < 8 && $use_by_date > $today) { // due in coming week
           $due_in_coming_week[$i]['artifact'] = h($artifact['Title']);
           $due_in_coming_week[$i]['artifact_id'] = h($artifact['id']);
-          $due_in_coming_week[$i]['use_by_date'] = $useByDate->format('Y-m-d');
+          $due_in_coming_week[$i]['use_by_date'] = $use_by_date;
           $due_in_coming_week[$i]['most_recent_use'] = $date_of_most_recent_use;
           $due_in_coming_week[$i]['interval'] = $this_interval;
-      } elseif ($useByDate->format('Y-m-d') < $DateTimeNow->format('Y-m-d')) { // due in past
+      } elseif ($use_by_date < $today) { // due in past
           $overdue_array[$i]['artifact'] = h($artifact['Title']);
           $overdue_array[$i]['artifact_id'] = h($artifact['id']);
-          $overdue_array[$i]['use_by_date'] = $useByDate->format('Y-m-d');
+          $overdue_array[$i]['use_by_date'] = $use_by_date;
           $overdue_array[$i]['most_recent_use'] = $date_of_most_recent_use;
           $overdue_array[$i]['interval'] = $this_interval;
       }

@@ -2,14 +2,6 @@
   require_once('../../private/initialize.php');
   require_login_or_guest();
 
-  $user_id = $_SESSION['user_id'];
-  $stmt = mysqli_prepare($db, "SELECT default_use_interval FROM users WHERE id = ?");
-  mysqli_stmt_bind_param($stmt, "i", $user_id);
-  mysqli_stmt_execute($stmt);
-  $interval_row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-  mysqli_stmt_close($stmt);
-  $default_interval = (float) ($interval_row['default_use_interval'] ?? 90);
-
   $artifact_set = find_artifacts_to_get_rid_of();
 
   $page_title = 'To Get Rid Of';

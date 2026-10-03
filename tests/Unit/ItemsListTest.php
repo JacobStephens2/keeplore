@@ -71,6 +71,33 @@ class ItemsListTest extends TestCase
         $this->assertSame(21, $row['avg_time']);
     }
 
+    public function test_own_interaction_frequency_replaces_the_page_interval(): void
+    {
+        $item = [
+            'id' => 14,
+            'Title' => 'Hanabi',
+            'is_kept' => 1,
+            'Acq' => '2024-01-10',
+            'interaction_frequency_days' => '30.00',
+        ];
+
+        $this->assertSame('2024-02-09', items_list_present_row($item, 90, '2024-06-01')['use_by']);
+        $this->assertSame(
+            '2024-02-09',
+            items_list_present_row($item + ['MaxUse' => '2023-12-25'], 90, '2024-06-01')['use_by'],
+            'A use before acquisition counts from acquisition.'
+        );
+        $this->assertSame(
+            '2024-04-14',
+            items_list_present_row($item + ['MaxUse' => '2024-02-14'], 90, '2024-06-01')['use_by']
+        );
+        $this->assertSame(
+            '2024-01-11',
+            items_list_present_row(['interaction_frequency_days' => '0.5'] + $item + ['MaxUse' => '2024-01-10'], 90, '2024-06-01')['use_by'],
+            'A fractional frequency keeps its fraction.'
+        );
+    }
+
     public function test_unkept_item_is_never_overdue(): void
     {
         $row = items_list_present_row([

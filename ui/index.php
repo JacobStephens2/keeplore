@@ -11,13 +11,13 @@ $page_title = 'Menu';
 
 // Fetch user's default interval and snooze length
 $user_id = (int) $_SESSION['user_id'];
-$stmt = mysqli_prepare($db, "SELECT default_use_interval, default_snooze_days FROM users WHERE id = ?");
+$default_interval = default_use_interval($db, $user_id);
+$stmt = mysqli_prepare($db, "SELECT default_snooze_days FROM users WHERE id = ?");
 mysqli_stmt_bind_param($stmt, "i", $user_id);
 mysqli_stmt_execute($stmt);
-$interval_row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+$snooze_row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
 mysqli_stmt_close($stmt);
-$default_interval = (float) ($interval_row['default_use_interval'] ?? 90);
-$default_snooze_days = (int) ($interval_row['default_snooze_days'] ?? 7);
+$default_snooze_days = (int) ($snooze_row['default_snooze_days'] ?? 7);
 if ($default_snooze_days < 1) {
   $default_snooze_days = 7;
 }
@@ -50,36 +50,21 @@ $artifact_result = mysqli_stmt_get_result($stmt);
 date_default_timezone_set('America/New_York');
 $now = new DateTime(date('Y-m-d'));
 $overdue_items = [];
+$tracked_count = 0;
 
 while ($artifact = mysqli_fetch_assoc($artifact_result)) {
-  $this_interval = $artifact['interaction_frequency_days'] !== null
-    ? (float) $artifact['interaction_frequency_days']
-    : $default_interval;
-
-  $acq = new DateTime(substr($artifact['Acq'], 0, 10));
-
-  if ($artifact['MostRecentUseOrResponse'] === null) {
-    $base = clone $acq;
-    $hours = (int)($this_interval * 24);
-  } else {
-    $recent = new DateTime(substr($artifact['MostRecentUseOrResponse'], 0, 10));
-    if ($recent < $acq) {
-      $base = clone $acq;
-      $hours = (int)($this_interval * 24);
-    } else {
-      $base = clone $recent;
-      $hours = (int)($this_interval * 2 * 24);
-    }
+  $tracked_count++;
+  $use_by = use_by_date($artifact['Acq'], $artifact['MostRecentUseOrResponse'], $artifact['interaction_frequency_days'], $default_interval);
+  if ($use_by === null) {
+    continue; // no acquisition date and no use: nothing to be due
   }
-
-  $use_by = $base->add(DateInterval::createFromDateString("$hours hours"));
-  $diff = (int) $now->diff($use_by)->format('%r%a'); // negative = overdue
+  $diff = (int) $now->diff(new DateTime($use_by))->format('%r%a'); // negative = overdue
 
   $overdue_items[] = [
     'id' => $artifact['id'],
     'title' => $artifact['Title'],
     'type' => $artifact['type'],
-    'use_by' => $use_by->format('Y-m-d'),
+    'use_by' => $use_by,
     'days_diff' => $diff,
     'most_recent' => $artifact['MostRecentUseOrResponse'] !== null
       ? substr($artifact['MostRecentUseOrResponse'], 0, 10)
@@ -93,7 +78,6 @@ usort($overdue_items, fn($a, $b) => $a['days_diff'] <=> $b['days_diff']);
 // Render up to 8 cards; CSS hides cards 6-8 on viewports that don't have
 // room for a 4-column grid so they only show when there's space.
 $top_overdue = array_slice($overdue_items, 0, 8);
-$tracked_count = count($overdue_items);
 $overdue_count = 0;
 $due_soon_count = 0;
 $type_names = [];
