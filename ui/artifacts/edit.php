@@ -27,58 +27,25 @@
   mysqli_stmt_close($stmt);
 
   if(is_post_request()) {
-    // The edit form has no format inputs: carry the row's current format
-    // flags forward so saving edits never clears them.
-    $prior_format = [
-      'is_digital' => $artifact['is_digital'] ?? null,
-      'is_physical' => $artifact['is_physical'] ?? null,
-    ];
-    // Handle form values sent by new.php
-    $artifact = [];
-    $artifact['is_digital'] = $prior_format['is_digital'];
-    $artifact['is_physical'] = $prior_format['is_physical'];
-    $artifact['id'] = $id ?? '';
-    $artifact['Title'] = $_POST['Title'] ?? '';
-    $artifact['is_in_secondary_collection'] = $_POST['is_in_secondary_collection'] ?? 0;
-    $artifact['Acq'] = $_POST['Acq'] ?? date('Y-m-d');
-    $artifact['age'] = $_POST['age'] ?? 0;
-    if ($artifact['age'] == '') {
-      $artifact['age'] = 0;
+    $input = item_input_from_form($_POST);
+    // An unchecked box posts nothing; it means no.
+    foreach (['is_kept', 'to_get_rid_of', 'is_in_secondary_collection'] as $box) {
+      $input[$box] = $_POST[$box] ?? 0;
     }
-    $artifact['Yr'] = trim((string) ($_POST['Yr'] ?? ''));
-    $artifact['bgg_url'] = $_POST['bgg_url'] ?? '';
-    $artifact['bgg_player_votes'] = $_POST['bgg_player_votes'] ?? '';
-    $artifact['bgg_age_basis'] = $_POST['bgg_age_basis'] ?? '';
-    $artifact['BGG_Rat'] = $_POST['BGG_Rat'] ?? '';
-
-    if ($artifact['Acq'] == '') {
-      $artifact['Acq'] = date('Y-m-d');
-    }
-    $artifact['type'] = $_POST['type'] ?? '';
-
-    $artifact['interaction_frequency_days'] = $_POST['interaction_frequency_days'] ?? $default_interval;
-    $artifact['is_kept'] = $_POST['is_kept'] ?? '';
-    $artifact['to_get_rid_of'] = $_POST['to_get_rid_of'] ?? '0';
-    $artifact['Candidate'] = $_POST['Candidate'] ?? '';
-    $artifact['CandidateGroupDate'] = date('Y-m-d');
-    $artifact['UsedRecUserCt'] = '0';
-    $artifact['Notes'] = $_POST['Notes'] ?? '';
-    ($_POST['MnT'] == '') ? $artifact['MnT'] = 5 : $artifact['MnT'] = $_POST['MnT'];
-    ($_POST['MxT'] == '') ? $artifact['MxT'] = 240 : $artifact['MxT'] = $_POST['MxT'];
-    ($_POST['MnP'] == '') ? $artifact['MnP'] = 5 : $artifact['MnP'] = $_POST['MnP'];
-    ($_POST['MxP'] == '') ? $artifact['MxP'] = 240 : $artifact['MxP'] = $_POST['MxP'];
-    ($_POST['SS'] == '') ? $artifact['SS'] = 1 : $artifact['SS'] = $_POST['SS'];
-    $result = update_artifact($artifact);
-    if($result === true) {
-      replace_item_tags($db, $id, (int) $_SESSION['user_id'], $_POST['tags'] ?? '');
+    try {
+      $items->update($id, $input);
       $_SESSION['message'] = 'The item was updated successfully.';
       redirect_to(url_for('/artifacts/edit.php?id=' . $id));
-    } else {
-      $errors = $result;
+    } catch (ItemInvalid $invalid) {
+      $errors = $invalid->errors;
+      $submitted = array_diff_key($input, ['id' => true, 'user_id' => true]);
+    } catch (OutOfBoundsException $not_found) {
+      error_404();
     }
   }
 
-  $artifact = $items->find($id);
+  // After a rejected save the form shows what was typed, to fix in one pass.
+  $artifact = array_replace($items->find($id), $submitted ?? []);
   $item_tags = find_item_tags_for_artifacts($db, [$id], (int) $_SESSION['user_id'])[$id] ?? [];
   if (is_post_request() && isset($_POST['tags'])) {
     $item_tags = parse_item_tags_input($_POST['tags']);

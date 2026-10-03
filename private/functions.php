@@ -48,6 +48,28 @@ function normalize_item_image_url($value) {
   return $url;
 }
 
+// The Items module's input from a Create Item or Edit Item form post. The
+// forms name the type and age fields differently; the module ignores the
+// rest of the post it doesn't write.
+function item_input_from_form(array $form) {
+  foreach (['type' => 'type_id', 'age' => 'Age'] as $field => $key) {
+    if (array_key_exists($field, $form)) {
+      $form[$key] = $form[$field];
+      unset($form[$field]);
+    }
+  }
+  return $form;
+}
+
+// An item's publication year as stored: blank is null.
+function normalize_item_year($year) {
+  if ($year === null) {
+    return null;
+  }
+  $trimmed = trim((string) $year);
+  return $trimmed === '' ? null : $trimmed;
+}
+
 // BGG-family item pages. A typed "boardgamegeek.com/..." or http:// link
 // is upgraded to https; anything else normalizes to ''.
 function normalize_item_bgg_url($value) {
