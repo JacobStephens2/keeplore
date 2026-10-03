@@ -4,6 +4,9 @@ require_once __DIR__ . '/agent_keys.php';
 require_once __DIR__ . '/item_api.php';
 require_once __DIR__ . '/classes/Uses.php';
 
+/** The log action each use write over HTTP records. */
+const USE_API_LOG_ACTIONS = ['POST' => 'create', 'DELETE' => 'delete'];
+
 /**
  * GET /uses.php: the owner's uses, newest first, through the Uses module.
  * The query's artifact_id and player_id keep one item's uses or the uses a
@@ -23,7 +26,15 @@ function list_uses_over_api(mysqli $db, object $authentication, array $query): a
     return [400, ['message' => 'user_id or artifact_id parameter is required for API key authentication.']];
   }
 
-  return [200, ['uses' => array_map(fn (array $use) => [
+  return [200, ['uses' => array_map('use_api_fields', (new Uses($db, $owner))->all($item_id, $person_id))]];
+}
+
+/**
+ * A use as the HTTP interface names its fields: note is the Setting,
+ * notesTwo the notes, players the person ids, participants the people.
+ */
+function use_api_fields(array $use): array {
+  return [
     'id' => $use['id'],
     'artifact_id' => $use['item_id'],
     'artifact_title' => $use['item_title'],
@@ -36,7 +47,7 @@ function list_uses_over_api(mysqli $db, object $authentication, array $query): a
       'FirstName' => $person['first_name'],
       'LastName' => $person['last_name'],
     ], $use['people']),
-  ], (new Uses($db, $owner))->all($item_id, $person_id))]];
+  ];
 }
 
 /**
@@ -73,14 +84,14 @@ function record_use_over_api(mysqli $db, object $authentication, $body): array {
     return [400, ['message' => $invalid->getMessage()]];
   }
 
-  $use = $uses->find($id);
+  $use = use_api_fields($uses->find($id));
   return [201, ['message' => 'Use recorded successfully.', 'use' => [
     'id' => $use['id'],
-    'artifact_id' => $use['item_id'],
+    'artifact_id' => $use['artifact_id'],
     'use_date' => $use['use_date'],
     'user_id' => $owner,
-    'note' => $use['setting'],
-    'notesTwo' => $use['notes'],
+    'note' => $use['note'],
+    'notesTwo' => $use['notesTwo'],
   ]]];
 }
 
@@ -90,7 +101,8 @@ function record_use_over_api(mysqli $db, object $authentication, $body): array {
  * query's user_id. Agent keys are refused (ADR-0002), and a use the owner
  * doesn't have is a 404.
  *
- * Returns [status, response fields].
+ * Returns [status, response fields]; on success the fields' use is the
+ * deleted use.
  */
 function delete_use_over_api(mysqli $db, object $authentication, array $query): array {
   $refusal = agent_key_write_refusal($authentication);
@@ -106,12 +118,14 @@ function delete_use_over_api(mysqli $db, object $authentication, array $query): 
     return [400, ['message' => 'Missing or invalid required parameter: user_id']];
   }
 
+  $uses = new Uses($db, $owner);
+  $use = $uses->find($id);
   try {
-    (new Uses($db, $owner))->delete($id);
+    $uses->delete($id);
   } catch (OutOfBoundsException $not_found) {
     return [404, ['message' => 'Use record not found.']];
   }
-  return [200, ['message' => 'Use record deleted successfully.']];
+  return [200, ['message' => 'Use record deleted successfully.', 'use' => use_api_fields($use)]];
 }
 
 /** The owner of the item $item_id names, or null when there is no such item. */

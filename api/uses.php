@@ -41,13 +41,11 @@
         'DELETE' => delete_use_over_api($database, $authentication_response, $_GET),
       };
       http_response_code($status);
-      if ($method === 'POST' && isset($fields['use'])) {
-        $logger->logDataChange('create', 'use', $fields['use']['id'], [
+      if (isset($fields['use'])) {
+        $logger->logDataChange(USE_API_LOG_ACTIONS[$method], 'use', $fields['use']['id'], [
           'artifact_id' => $fields['use']['artifact_id'],
           'use_date' => $fields['use']['use_date']
         ]);
-      } elseif ($method === 'DELETE' && $status === 200) {
-        $logger->logDataChange('delete', 'use', (int) $_GET['id']);
       }
       foreach ($fields as $field => $value) {
         $response->$field = $value;

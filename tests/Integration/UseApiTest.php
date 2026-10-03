@@ -191,6 +191,7 @@ final class UseApiTest extends TestCase
 
         $this->assertSame(200, $status);
         $this->assertSame('Use record deleted successfully.', $fields['message']);
+        $this->assertSame([100, 101], $fields['use']['players']);
         $this->assertNull((new Uses($this->db, 1))->find($id));
         $this->assertSame(0, $this->peopleLinks($id));
     }
