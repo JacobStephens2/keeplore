@@ -28,7 +28,6 @@ final class UseByQueueTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
-        $this->db->query('ALTER TABLE games ADD COLUMN snoozed_until DATE DEFAULT NULL');
         require_once PRIVATE_PATH . '/classes/UseByQueue.php';
     }
 
@@ -151,6 +150,16 @@ final class UseByQueueTest extends TestCase
         $this->assertNull($entries[2]['use_by_date']);
         $this->assertNull($entries[2]['days_until']);
         $this->assertNull($entries[2]['status']);
+    }
+
+    public function test_items_due_the_same_day_are_ordered_by_last_use(): void
+    {
+        // Catan: last used 2026-02-01, frequency 90, due 2026-07-31.
+        // Never used, acquired 2026-05-02 with frequency 90: also due 2026-07-31.
+        $this->db->query("INSERT INTO games (id, user_id, Title, type_id, Acq) VALUES (16, 1, 'Unplayed', 1, '2026-05-02')");
+        $entries = $this->queue()->entries();
+        $this->assertSame(['2026-07-31', '2026-07-31'], array_column($entries, 'use_by_date'));
+        $this->assertSame([16, 10], $this->ids($entries));
     }
 
     public function test_sweet_spot_and_minimum_age_filters(): void

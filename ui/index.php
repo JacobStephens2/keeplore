@@ -24,9 +24,9 @@ if ($default_snooze_days < 1) {
 
 // The Use-by queue without snoozed items, most overdue first. Undated
 // items count as tracked but have nothing to be due.
-$queue = (new UseByQueue($db, $user_id))->entries(['default_interval' => $default_interval, 'hide_snoozed' => true]);
-$tracked_count = count($queue);
-$dated_items = array_values(array_filter($queue, fn ($item) => $item['use_by_date'] !== null));
+$entries = (new UseByQueue($db, $user_id))->entries(['default_interval' => $default_interval, 'hide_snoozed' => true]);
+$tracked_count = count($entries);
+$dated_items = array_values(array_filter($entries, fn ($item) => $item['use_by_date'] !== null));
 
 // Render up to 8 cards; CSS hides cards 6-8 on viewports that don't have
 // room for a 4-column grid so they only show when there's space.

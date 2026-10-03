@@ -619,19 +619,22 @@ function email_artifact_use_notice($user_id) {
   $overdue_array = array();
   $due_in_coming_week = array();
 
-  foreach ((new UseByQueue($db, (int) $user_id))->entries() as $artifact) {
+  // Each section lists items by last use, never used first.
+  $entries = (new UseByQueue($db, (int) $user_id))->entries();
+  usort($entries, fn ($a, $b) => $a['last_use'] <=> $b['last_use']);
+  foreach ($entries as $entry) {
       $notice = [
-          'artifact' => h($artifact['Title']),
-          'artifact_id' => h($artifact['id']),
-          'use_by_date' => $artifact['use_by_date'],
-          'most_recent_use' => $artifact['last_use'] ?? 'No interactions',
-          'interval' => $artifact['interaction_frequency_days'] ?? $interval,
+          'artifact' => h($entry['Title']),
+          'artifact_id' => h($entry['id']),
+          'use_by_date' => $entry['use_by_date'],
+          'most_recent_use' => $entry['last_use'] ?? 'No interactions',
+          'interval' => $entry['interaction_frequency_days'] ?? $interval,
       ];
-      if ($artifact['status'] === 'due_today') {
+      if ($entry['status'] === 'due_today') {
           $due_today_array[] = $notice;
-      } elseif ($artifact['status'] === 'upcoming' && $artifact['days_until'] <= 7) {
+      } elseif ($entry['status'] === 'upcoming' && $entry['days_until'] <= 7) {
           $due_in_coming_week[] = $notice;
-      } elseif ($artifact['status'] === 'overdue') {
+      } elseif ($entry['status'] === 'overdue') {
           $overdue_array[] = $notice;
       }
   }

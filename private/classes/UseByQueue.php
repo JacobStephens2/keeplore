@@ -31,7 +31,8 @@ final class UseByQueue
     }
 
     /**
-     * The queue, ordered by use-by date with undated items last. Filters:
+     * The queue, ordered by use-by date with undated items last, then by
+     * last use (never used first). Filters:
      * default_interval (the owner's default use interval when absent),
      * type_ids (null for every type; an empty array returns nothing),
      * sweet_spot, minimum_age, include_secondary_collection, hide_snoozed.
@@ -92,7 +93,8 @@ final class UseByQueue
             $this->rows(implode(' AND ', $where), $types, $params)
         );
         usort($entries, fn (array $a, array $b) =>
-            [$a['use_by_date'] === null, $a['use_by_date']] <=> [$b['use_by_date'] === null, $b['use_by_date']]);
+            [$a['use_by_date'] === null, $a['use_by_date'], $a['last_use'], (int) $a['id']]
+            <=> [$b['use_by_date'] === null, $b['use_by_date'], $b['last_use'], (int) $b['id']]);
         return $entries;
     }
 

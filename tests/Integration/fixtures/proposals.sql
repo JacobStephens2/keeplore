@@ -22,6 +22,7 @@ CREATE TABLE games (
     UsedRecUserCt INT DEFAULT NULL,
     type VARCHAR(100) DEFAULT NULL,
     to_get_rid_of TINYINT DEFAULT 0,
+    snoozed_until DATE DEFAULT NULL,
     Acq DATE DEFAULT '2026-01-01',
     interaction_frequency_days INT DEFAULT 90,
     BGG_Rat VARCHAR(10) DEFAULT NULL

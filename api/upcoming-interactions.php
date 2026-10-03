@@ -59,23 +59,23 @@
   $queue = new UseByQueue($database, $user_id);
 
   $items = [];
-  foreach ($queue->entries(['default_interval' => $default_interval]) as $artifact) {
-    if ($artifact['use_by_date'] === null || $artifact['days_until'] > 60) {
+  foreach ($queue->entries(['default_interval' => $default_interval]) as $entry) {
+    if ($entry['use_by_date'] === null || $entry['days_until'] > 60) {
       continue;
     }
 
     $items[] = [
-      'id' => (int) $artifact['id'],
-      'title' => $artifact['Title'],
-      'use_by_date' => $artifact['use_by_date'],
-      'most_recent_interaction' => $artifact['last_use'],
-      'interval_days' => ($artifact['interaction_frequency_days'] !== null)
-        ? (float) $artifact['interaction_frequency_days']
+      'id' => (int) $entry['id'],
+      'title' => $entry['Title'],
+      'use_by_date' => $entry['use_by_date'],
+      'most_recent_interaction' => $entry['last_use'],
+      'interval_days' => ($entry['interaction_frequency_days'] !== null)
+        ? (float) $entry['interaction_frequency_days']
         : $default_interval,
       'status' => match (true) {
-        $artifact['status'] === 'overdue' => 'past_due',
-        $artifact['status'] === 'due_today' => 'due_today',
-        $artifact['days_until'] <= 7 => 'due_soon',
+        $entry['status'] === 'overdue' => 'past_due',
+        $entry['status'] === 'due_today' => 'due_today',
+        $entry['days_until'] <= 7 => 'due_soon',
         default => 'upcoming',
       },
     ];

@@ -231,7 +231,6 @@ final class ProposalOutcomesTest extends TestCase
         require_once PRIVATE_PATH . '/classes/UseByQueue.php';
         $GLOBALS['db'] = $this->db;
         $_SESSION['user_id'] = 1;
-        $this->db->query('ALTER TABLE games ADD COLUMN snoozed_until DATE DEFAULT NULL');
         $queue = new \UseByQueue($this->db, 1, '2026-06-01');
         $before = [$queue->entry(10), $queue->entry(11)];
         $usesBefore = find_uses_by_user_id([1, 2], '')->fetch_all(MYSQLI_ASSOC);
