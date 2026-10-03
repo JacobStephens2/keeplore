@@ -41,7 +41,8 @@ final class AgentCollectionReadTest extends TestCase
                id INT AUTO_INCREMENT PRIMARY KEY,
                use_id INT NOT NULL,
                player_id INT NOT NULL,
-               user_id INT NOT NULL
+               user_id INT NOT NULL,
+               UNIQUE KEY use_player (use_id, player_id)
              ) ENGINE=InnoDB;
              UPDATE games SET mnp = 3, mxp = 4, ss = '4', mnt = 60, mxt = 120, Wt = '2.3', Yr = 1995,
                is_physical = 1 WHERE id = 10;
@@ -49,12 +50,12 @@ final class AgentCollectionReadTest extends TestCase
              INSERT INTO uses (id, artifact_id, user_id, use_date) VALUES
                (2, 10, 1, '2026-03-05'), (3, 11, 1, '2026-01-10'), (4, 20, 2, '2026-04-01');
              INSERT INTO uses_players (use_id, player_id, user_id) VALUES
-               (2, 100, 1), (2, 100, 1), (2, 101, 1), (3, 101, 1), (4, 200, 2);"
+               (2, 101, 1), (2, 100, 1), (3, 101, 1), (4, 200, 2);"
         );
         require_once PRIVATE_PATH . '/item_tags.php';
         require_once PRIVATE_PATH . '/kept_status.php';
         require_once PRIVATE_PATH . '/collection_list.php';
-        require_once PRIVATE_PATH . '/use_participants.php';
+        require_once PRIVATE_PATH . '/use_api.php';
         require_once PRIVATE_PATH . '/people_api.php';
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
     }
@@ -189,24 +190,26 @@ final class AgentCollectionReadTest extends TestCase
         $this->assertSame(1, $rows[0]['plays']);
     }
 
-    public function test_uses_carry_deduplicated_player_ids_and_filter_by_player(): void
+    public function test_uses_carry_player_ids_and_filter_by_player(): void
     {
-        $uses = find_uses_with_participants($this->db, 1);
-        $this->assertSame([2, 1, 3], array_map(fn ($u) => (int) $u['id'], $uses));
+        [$status, $fields] = list_uses_over_api($this->db, $this->agentKey(1), []);
+        $uses = $fields['uses'];
+        $this->assertSame(200, $status);
+        $this->assertSame([2, 1, 3], array_column($uses, 'id'));
         $this->assertSame([101, 100], $uses[0]['players']);
         $this->assertCount(2, $uses[0]['participants']);
         $this->assertSame([], $uses[1]['players']);
 
-        $byPlayer = find_uses_with_participants($this->db, 1, null, 101);
-        $this->assertSame([2, 3], array_map(fn ($u) => (int) $u['id'], $byPlayer));
+        $byPlayer = list_uses_over_api($this->db, $this->agentKey(1), ['player_id' => '101'])[1]['uses'];
+        $this->assertSame([2, 3], array_column($byPlayer, 'id'));
 
-        $byPlayerAndItem = find_uses_with_participants($this->db, 1, 10, 101);
-        $this->assertSame([2], array_map(fn ($u) => (int) $u['id'], $byPlayerAndItem));
+        $byPlayerAndItem = list_uses_over_api($this->db, $this->agentKey(1), ['artifact_id' => '10', 'player_id' => '101'])[1]['uses'];
+        $this->assertSame([2], array_column($byPlayerAndItem, 'id'));
     }
 
     public function test_uses_player_filter_cannot_reach_another_users_plays(): void
     {
-        $this->assertSame([], find_uses_with_participants($this->db, 1, null, 200));
+        $this->assertSame([], list_uses_over_api($this->db, $this->agentKey(1), ['player_id' => '200'])[1]['uses']);
     }
 
     private function agentKey(int $userId): object

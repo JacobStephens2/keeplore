@@ -3,7 +3,7 @@
   require_once('private/initialize.php');
   require_once('../private/rate_limiter.php');
   require_once('../private/app_logger.php');
-  require_once('../private/use_participants.php');
+  require_once('../private/use_api.php');
   header('Content-Type: application/json');
 
   $logger = new AppLogger();
@@ -28,189 +28,29 @@
   }
   $response->authentication_response = $authentication_response;
 
-  $user_id = isset($authentication_response->user_id) ? (int) $authentication_response->user_id : null;
-
   $method = $_SERVER['REQUEST_METHOD'];
 
   switch ($method) {
 
     case 'GET':
-      // List uses for authenticated user, optionally filtered by item and player
-      $artifact_id = (isset($_GET['artifact_id']) && is_numeric($_GET['artifact_id'])) ? (int) $_GET['artifact_id'] : null;
-      $player_id = (isset($_GET['player_id']) && is_numeric($_GET['player_id'])) ? (int) $_GET['player_id'] : null;
-      if (!$user_id && $artifact_id === null) {
-        http_response_code(400);
-        $response->message = 'artifact_id parameter is required for API key authentication.';
-        echo json_encode($response);
-        exit;
-      }
-
-      $response->uses = find_uses_with_participants($database, $user_id, $artifact_id, $player_id);
-      echo json_encode($response);
-      break;
-
     case 'POST':
-      // Agent keys permit reads plus the kept toggle only.
-      deny_agent_key_writes($authentication_response);
-      // Record a new use
-      $requestBody = json_decode(file_get_contents('php://input'));
-
-      if (!$requestBody) {
-        http_response_code(400);
-        $response->message = 'Invalid or missing JSON request body.';
-        echo json_encode($response);
-        exit;
-      }
-
-      // Validate required fields
-      if (!isset($requestBody->artifact_id) || !is_numeric($requestBody->artifact_id)) {
-        http_response_code(400);
-        $response->message = 'artifact_id is required and must be numeric.';
-        echo json_encode($response);
-        exit;
-      }
-
-      if (!isset($requestBody->use_date) || trim($requestBody->use_date) === '') {
-        http_response_code(400);
-        $response->message = 'use_date is required (YYYY-MM-DD format).';
-        echo json_encode($response);
-        exit;
-      }
-
-      // Validate date format
-      $date = DateTime::createFromFormat('Y-m-d', $requestBody->use_date);
-      if (!$date || $date->format('Y-m-d') !== $requestBody->use_date) {
-        http_response_code(400);
-        $response->message = 'use_date must be a valid date in YYYY-MM-DD format.';
-        echo json_encode($response);
-        exit;
-      }
-
-      $artifact_id = (int) $requestBody->artifact_id;
-      $use_date = $requestBody->use_date;
-      $note = isset($requestBody->note) ? $requestBody->note : '';
-      $notesTwo = isset($requestBody->notesTwo) ? $requestBody->notesTwo : '';
-
-      // Determine the user_id for the new record
-      $record_user_id = $user_id ? $user_id : (isset($requestBody->user_id) ? (int) $requestBody->user_id : null);
-
-      if (!$record_user_id) {
-        http_response_code(400);
-        $response->message = 'Could not determine user_id for this use record.';
-        echo json_encode($response);
-        exit;
-      }
-
-      // Verify the artifact exists and belongs to the user
-      if ($user_id) {
-        $artifact = Artifact::find_by_id_and_user_id($artifact_id, $user_id);
-        if (!$artifact) {
-          http_response_code(404);
-          $response->message = 'Item not found or does not belong to you.';
-          echo json_encode($response);
-          exit;
-        }
-      }
-
-      $stmt = $database->prepare(
-        "INSERT INTO uses (artifact_id, use_date, user_id, note, notesTwo) VALUES (?, ?, ?, ?, ?)"
-      );
-      $stmt->bind_param("isiss", $artifact_id, $use_date, $record_user_id, $note, $notesTwo);
-      $result = $stmt->execute();
-
-      if ($result) {
-        $new_id = $database->insert_id;
-        $stmt->close();
-
-        http_response_code(201);
-        $logger->logDataChange('create', 'use', $new_id, [
-          'artifact_id' => $artifact_id,
-          'use_date' => $use_date
-        ]);
-        $response->message = 'Use recorded successfully.';
-        $response->use = [
-          'id' => $new_id,
-          'artifact_id' => $artifact_id,
-          'use_date' => $use_date,
-          'user_id' => $record_user_id,
-          'note' => $note,
-          'notesTwo' => $notesTwo
-        ];
-        echo json_encode($response);
-      } else {
-        $stmt->close();
-        http_response_code(500);
-        $response->message = 'Failed to record use.';
-        echo json_encode($response);
-      }
-      break;
-
     case 'DELETE':
-      // Agent keys permit reads plus the kept toggle only.
-      deny_agent_key_writes($authentication_response);
-      // Delete a use record by ID, scoped to authenticated user
-      if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-        http_response_code(400);
-        $response->message = 'Missing or invalid required parameter: id';
-        echo json_encode($response);
-        exit;
+      [$status, $fields] = match ($method) {
+        'GET' => list_uses_over_api($database, $authentication_response, $_GET),
+        'POST' => record_use_over_api($database, $authentication_response, json_decode(file_get_contents('php://input'))),
+        'DELETE' => delete_use_over_api($database, $authentication_response, $_GET),
+      };
+      http_response_code($status);
+      if (isset($fields['use'])) {
+        $logger->logDataChange(USE_API_LOG_ACTIONS[$method], 'use', $fields['use']['id'], [
+          'artifact_id' => $fields['use']['artifact_id'],
+          'use_date' => $fields['use']['use_date']
+        ]);
       }
-
-      $id = (int) $_GET['id'];
-
-      if ($user_id) {
-        // Verify ownership before deleting
-        $check_stmt = $database->prepare(
-          "SELECT id FROM uses WHERE id = ? AND user_id = ?"
-        );
-        $check_stmt->bind_param("ii", $id, $user_id);
-        $check_stmt->execute();
-        $check_result = $check_stmt->get_result();
-
-        if ($check_result->num_rows === 0) {
-          $check_stmt->close();
-          http_response_code(404);
-          $response->message = 'Use record not found.';
-          echo json_encode($response);
-          exit;
-        }
-        $check_stmt->close();
-
-        // Delete the use record
-        $stmt = $database->prepare("DELETE FROM uses WHERE id = ? AND user_id = ? LIMIT 1");
-        $stmt->bind_param("ii", $id, $user_id);
-      } else {
-        // API key auth: delete by id only
-        $check_stmt = $database->prepare("SELECT id FROM uses WHERE id = ?");
-        $check_stmt->bind_param("i", $id);
-        $check_stmt->execute();
-        $check_result = $check_stmt->get_result();
-
-        if ($check_result->num_rows === 0) {
-          $check_stmt->close();
-          http_response_code(404);
-          $response->message = 'Use record not found.';
-          echo json_encode($response);
-          exit;
-        }
-        $check_stmt->close();
-
-        $stmt = $database->prepare("DELETE FROM uses WHERE id = ? LIMIT 1");
-        $stmt->bind_param("i", $id);
+      foreach ($fields as $field => $value) {
+        $response->$field = $value;
       }
-
-      $result = $stmt->execute();
-      $stmt->close();
-
-      if ($result) {
-        $logger->logDataChange('delete', 'use', $id);
-        $response->message = 'Use record deleted successfully.';
-        echo json_encode($response);
-      } else {
-        http_response_code(500);
-        $response->message = 'Failed to delete use record.';
-        echo json_encode($response);
-      }
+      echo json_encode($response);
       break;
 
     default:
