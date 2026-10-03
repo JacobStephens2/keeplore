@@ -34,7 +34,7 @@
 
     case 'GET':
       // Read-only household players, scoped to the authenticated user
-      [$status, $fields] = list_players_over_api($database, $authentication_response);
+      [$status, $fields] = list_people_over_api($database, $authentication_response);
       http_response_code($status);
       foreach ($fields as $field => $value) {
         $response->$field = $value;

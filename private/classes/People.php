@@ -34,6 +34,7 @@ final class People
             return $this->all();
         }
         $pattern = '%' . strtr($query, ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
+        // The name matched is person()'s name: first and last joined, trimmed.
         return array_map([$this, 'person'], $this->rows(
             'SELECT ' . self::COLUMNS . " FROM players
              WHERE user_id = ?

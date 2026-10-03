@@ -17,12 +17,13 @@ function search_people_over_api(mysqli $db, object $authentication, $body): arra
   if ($refusal !== null) {
     return [403, $refusal];
   }
-  if (!isset($authentication->user_id)) {
+  $owner = people_api_owner($authentication);
+  if ($owner === null) {
     return [400, ['message' => 'users.php requires a user-scoped key.']];
   }
   $query = is_object($body) && isset($body->query) && is_scalar($body->query) ? (string) $body->query : '';
 
-  $people = (new People($db, (int) $authentication->user_id))->search($query);
+  $people = (new People($db, $owner))->search($query);
   return [200, ['users' => array_map(fn (array $person) => [
     'id' => $person['id'],
     'FullName' => $person['name'],
@@ -38,11 +39,11 @@ function search_people_over_api(mysqli $db, object $authentication, $body): arra
  *
  * Returns [status, response fields].
  */
-function list_players_over_api(mysqli $db, object $authentication): array {
-  if (!isset($authentication->user_id)) {
+function list_people_over_api(mysqli $db, object $authentication): array {
+  $owner = people_api_owner($authentication);
+  if ($owner === null) {
     return [400, ['message' => 'players.php requires a user-scoped key.']];
   }
-  $owner = (int) $authentication->user_id;
 
   return [200, ['players' => array_map(fn (array $person) => [
     'id' => $person['id'],
@@ -52,6 +53,14 @@ function list_players_over_api(mysqli $db, object $authentication): array {
     'birth_year' => $person['birth_year'],
     'represents_user_id' => $person['is_me'] ? $owner : null,
   ], (new People($db, $owner))->all())]];
+}
+
+/**
+ * Whose people a request reads: the signed-in user's. Null for the master
+ * key, which has no people of its own.
+ */
+function people_api_owner(object $authentication): ?int {
+  return isset($authentication->user_id) ? (int) $authentication->user_id : null;
 }
 
 ?>

@@ -216,19 +216,19 @@ final class AgentCollectionReadTest extends TestCase
 
     public function test_players_list_is_scoped_to_the_user_with_the_published_fields(): void
     {
-        [$status, $fields] = list_players_over_api($this->db, $this->agentKey(1));
+        [$status, $fields] = list_people_over_api($this->db, $this->agentKey(1));
 
         $this->assertSame(200, $status);
         $this->assertSame([
             ['id' => 101, 'name' => 'Jo Smith', 'FirstName' => 'Jo', 'LastName' => 'Smith', 'birth_year' => null, 'represents_user_id' => null],
             ['id' => 100, 'name' => 'Sam Lee', 'FirstName' => 'Sam', 'LastName' => 'Lee', 'birth_year' => 1990, 'represents_user_id' => 1],
         ], $fields['players']);
-        $this->assertSame([200], array_column(list_players_over_api($this->db, $this->agentKey(2))[1]['players'], 'id'));
+        $this->assertSame([200], array_column(list_people_over_api($this->db, $this->agentKey(2))[1]['players'], 'id'));
     }
 
     public function test_players_list_refuses_the_master_key(): void
     {
-        [$status, $fields] = list_players_over_api($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']);
+        [$status, $fields] = list_people_over_api($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']);
 
         $this->assertSame(400, $status);
         $this->assertSame(['message' => 'players.php requires a user-scoped key.'], $fields);
