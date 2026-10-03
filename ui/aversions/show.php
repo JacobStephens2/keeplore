@@ -26,12 +26,12 @@ $response = find_response_by_id($id);
       <dl>
           <?php
             $people = new People($db, (int) $_SESSION['user_id']);
-            $player_name = fn ($id) => h($people->find((int) $id)['name'] ?? '');
-            echo '<dt>Player 1: ' . $player_name($_GET['player1'] ?? '') . "</dt></dl>";
+            $person_name = fn ($id) => h($people->find((int) $id)['name'] ?? '');
+            echo '<dt>Player 1: ' . $person_name($_GET['player1'] ?? '') . "</dt></dl>";
             for ($playerNo = 2; $playerNo <= 9 && ($_GET['player' . $playerNo] ?? '') != ''; $playerNo++) {
               echo "
                 <dl>
-                  <dt>Player " . $playerNo . ": " . $player_name($_GET['player' . $playerNo]) . "</dt>
+                  <dt>Player " . $playerNo . ": " . $person_name($_GET['player' . $playerNo]) . "</dt>
                 </dl>";
             }
           ?>
