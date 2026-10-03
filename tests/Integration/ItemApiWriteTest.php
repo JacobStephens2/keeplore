@@ -45,6 +45,9 @@ final class ItemApiWriteTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->runSql("INSERT INTO item_tags (user_id, artifact_id, tag) VALUES
             (1, 10, 'family'), (2, 20, 'mine')");
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-events.sql'));
+        $this->runSql("INSERT INTO events (id, user_id, name) VALUES (1, 1, 'Beach week'), (2, 2, 'Game night')");
+        $this->runSql('INSERT INTO event_items (event_id, artifact_id) VALUES (1, 10), (2, 20)');
         require_once PRIVATE_PATH . '/item_api.php';
     }
 
@@ -102,6 +105,14 @@ final class ItemApiWriteTest extends TestCase
     {
         return array_column(
             $this->db->query("SELECT tag FROM item_tags WHERE artifact_id = $itemId ORDER BY tag")->fetch_all(MYSQLI_NUM),
+            0
+        );
+    }
+
+    private function eventsPlanning(int $itemId): array
+    {
+        return array_column(
+            $this->db->query("SELECT event_id FROM event_items WHERE artifact_id = $itemId")->fetch_all(MYSQLI_NUM),
             0
         );
     }
@@ -289,7 +300,7 @@ final class ItemApiWriteTest extends TestCase
         $this->assertSame(['mine'], $response['artifact']['tags']);
     }
 
-    public function test_delete_removes_the_session_users_item_and_its_tags(): void
+    public function test_delete_removes_the_session_users_item_its_tags_and_its_event_plans(): void
     {
         [$status, $response] = delete_item_over_api($this->db, $this->session(), ['id' => '10']);
 
@@ -298,6 +309,7 @@ final class ItemApiWriteTest extends TestCase
         $this->assertSame('Catan', $response['artifact']['Title']);
         $this->assertNull($this->item(10));
         $this->assertSame([], $this->tagsOf(10));
+        $this->assertSame([], $this->eventsPlanning(10));
     }
 
     public function test_delete_of_an_item_the_owner_does_not_have_returns_404_and_leaves_it(): void
@@ -308,6 +320,7 @@ final class ItemApiWriteTest extends TestCase
         $this->assertSame('Item not found.', $response['message']);
         $this->assertSame('Private item', $this->item(20, 2)['Title']);
         $this->assertSame(['mine'], $this->tagsOf(20));
+        $this->assertSame(['2'], $this->eventsPlanning(20));
     }
 
     public function test_delete_without_a_valid_id_returns_400(): void
