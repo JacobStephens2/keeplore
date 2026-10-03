@@ -55,6 +55,7 @@
   require_once('functions.php');
   require_once('record_use.php');
   require_once('use_by_date.php');
+  require_once('classes/UseByQueue.php');
   require_once('database.php');
   require_once('kept_status.php');
   require_once('item_tags.php');

@@ -25,11 +25,12 @@ class RecordUseTest extends TestCase
             ],
             42,
             [
+                'type' => 'board-game',
+                'last_use' => '2026-09-21',
                 'use_by_date' => '2027-03-20',
-                'most_recent_use_date' => '2026-09-21',
-                'is_overdue' => false,
-            ],
-            ['type' => 'board-game']
+                'days_until' => 180,
+                'status' => 'upcoming',
+            ]
         );
 
         $this->assertSame(true, $payload['ok']);
@@ -47,6 +48,18 @@ class RecordUseTest extends TestCase
         );
     }
 
+    public function test_ajax_payload_marks_an_overdue_entry(): void
+    {
+        $payload = record_use_ajax_payload(
+            ['artifact' => ['id' => 1, 'name' => 'Azul'], 'useDate' => '2026-09-20'],
+            7,
+            ['type' => 'board-game', 'last_use' => '2026-01-01', 'use_by_date' => '2026-06-30', 'days_until' => -82, 'status' => 'overdue']
+        );
+
+        $this->assertTrue($payload['is_overdue']);
+        $this->assertSame('2026-01-01', $payload['most_recent_use_date']);
+    }
+
     public function test_ajax_payload_says_people_when_more_than_one_participant(): void
     {
         $payload = record_use_ajax_payload(
@@ -59,11 +72,12 @@ class RecordUseTest extends TestCase
                 'useDate' => '2026-09-20',
             ],
             7,
-            [],
-            false
+            null
         );
 
         $this->assertSame('', $payload['artifact_type']);
+        $this->assertNull($payload['new_use_by_date']);
+        $this->assertFalse($payload['is_overdue']);
         $this->assertSame(
             'The interaction with Azul with 2 people was recorded.',
             $payload['message']

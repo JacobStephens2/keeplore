@@ -46,7 +46,15 @@
   $typeArray = $_SESSION['type'] ?? [];
   $default_use_interval = default_use_interval($db, $user_id);
   $interval = $_POST['interval'] ?? $default_use_interval;
-  $artifact_set = use_by($type, $interval, $sweetSpot, $minimumAge, $shelfSort, null, $hideSnoozed === 'yes');
+  $queue = new UseByQueue($db, (int) $user_id);
+  $artifacts = $queue->entries([
+    'default_interval' => $interval,
+    'type_ids' => is_array($type) ? array_values($type) : [],
+    'sweet_spot' => $sweetSpot,
+    'minimum_age' => $minimumAge,
+    'include_secondary_collection' => $shelfSort === 'yes',
+    'hide_snoozed' => $hideSnoozed === 'yes',
+  ]);
   $total_overdue = 0;
 ?>
 
@@ -213,7 +221,7 @@
   <table id="useBy" class="list" data-page-length='100'>
     <thead>
       <tr id="headerRow">
-        <th>Name (<?php echo $artifact_set->num_rows; ?>)</th>
+        <th>Name (<?php echo count($artifacts); ?>)</th>
         <th>Interact By</th>
         <?php if (!is_guest()) { ?><th>Record</th><?php } ?>
         <th>Type</th>
@@ -242,7 +250,7 @@
     </thead>
 
     <tbody>
-      <?php while($artifact = mysqli_fetch_assoc($artifact_set)) {
+      <?php foreach ($artifacts as $artifact) {
         $id = h(u($artifact['id']));
         if ($artifact['interaction_frequency_days'] !== null) {
           $this_interval = $artifact['interaction_frequency_days'];
@@ -250,7 +258,7 @@
           $this_interval = $interval;
         }
         $snoozed_until = $artifact['snoozed_until'] ?? null;
-        $is_snoozed = $snoozed_until !== null && $snoozed_until > date('Y-m-d');
+        $is_snoozed = $snoozed_until !== null && $snoozed_until > $queue->today();
         ?>
         <tr>
           <td class="name artifact edit" data-label="Name">
@@ -289,13 +297,9 @@
             </div>
           </td>
 
-          <?php
-              $use_by_date = use_by_date($artifact['Acq'], $artifact['MostRecentUseOrResponse'], $artifact['interaction_frequency_days'], $interval);
-              date_default_timezone_set('America/New_York');
-              $is_overdue = $use_by_date !== null && $use_by_date < date('Y-m-d');
-          ?>
+          <?php $is_overdue = $artifact['status'] === 'overdue'; ?>
 
-          <td class="useByDate date<?php if ($is_overdue) echo ' overdue-past'; ?>" data-label="Interact by"><?php echo h($use_by_date ?? ''); ?></td>
+          <td class="useByDate date<?php if ($is_overdue) echo ' overdue-past'; ?>" data-label="Interact by"><?php echo h($artifact['use_by_date'] ?? ''); ?></td>
 
             <?php if (!is_guest()) { ?>
             <td class="record" data-label="Record">
@@ -379,10 +383,7 @@
           </td>
 
           <td class="mostRecentUse date hideOnPrint" data-label="Last interacted">
-            <?php
-              $mostRecent = substr($artifact['MostRecentUseOrResponse'] ?? '', 0, 10);
-              echo $mostRecent !== '' ? h($mostRecent) : '—';
-            ?>
+            <?php echo $artifact['last_use'] !== null ? h($artifact['last_use']) : '—'; ?>
           </td>
 
           <td class="acquisitionDate" data-label="Tracking start"><?php echo h($artifact['Acq']); ?></td>
@@ -395,7 +396,6 @@
   </table>
   </div>
 
-  <?php mysqli_free_result($artifact_set); ?>
   <script src="<?php echo url_for('/shared/js/record-use-submit.js'); ?>"></script>
   <script>
     document.querySelector('span#totalOverdue').innerText = '<?php echo $total_overdue; ?>';

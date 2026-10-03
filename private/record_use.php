@@ -43,19 +43,20 @@ function record_use_success_message(array $post): string
         . " with $user_count $user_count_word was recorded$times.";
 }
 
-function record_use_ajax_payload(array $post, int $use_id, array $status, $artifact_row): array
+/** The quick-record JSON, with the item's use-by status from its Use-by queue entry. */
+function record_use_ajax_payload(array $post, int $use_id, ?array $entry): array
 {
     return [
         'ok' => true,
         'message' => record_use_success_message($post),
         'artifact_id' => (int) ($post['artifact']['id'] ?? 0),
         'artifact_name' => $post['artifact']['name'] ?? '',
-        'artifact_type' => is_array($artifact_row) ? ($artifact_row['type'] ?? '') : '',
+        'artifact_type' => (string) ($entry['type'] ?? ''),
         'use_id' => $use_id,
         'use_date' => $post['useDate'] ?? '',
-        'new_use_by_date' => $status['use_by_date'] ?? null,
-        'most_recent_use_date' => $status['most_recent_use_date'] ?? null,
-        'is_overdue' => $status['is_overdue'] ?? false,
+        'new_use_by_date' => $entry['use_by_date'] ?? null,
+        'most_recent_use_date' => $entry['last_use'] ?? null,
+        'is_overdue' => ($entry['status'] ?? null) === 'overdue',
     ];
 }
 

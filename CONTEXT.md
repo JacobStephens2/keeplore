@@ -39,6 +39,10 @@ The alternative selected by the group, optionally recorded as an existing item o
 The date by which an item should next be used, shown as "Interact by". With no recorded use, or a most recent use before acquisition, it is the acquisition date plus the item's interval; otherwise the most recent use plus twice the interval. An item with neither an acquisition date nor a use has none. A use-by date before today is overdue.
 _Avoid_: Play by.
 
+**Use-by queue**:
+The kept items not flagged to get rid of, plus the secondary collection when asked for, each with its last use, use-by date and whether it is overdue, due today or upcoming. The dashboard, Interact By, the daily email and notifications show it.
+_Avoid_: Interaction queue.
+
 **Interaction frequency**:
 An item's own interval in days, used for its use-by date in place of the default use interval. A page's interval setting changes only the default, never an item's own frequency.
 
