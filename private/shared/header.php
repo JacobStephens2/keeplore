@@ -32,6 +32,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#30395c">
     <meta name="description" content="<?php echo h($page_description); ?>">
+    <meta name="keeplore-api-origin" content="<?php echo h(API_ORIGIN); ?>">
     <meta name="application-name" content="Keeplore">
     <meta name="apple-mobile-web-app-title" content="Keeplore">
     <meta name="mobile-web-app-capable" content="yes">
