@@ -152,7 +152,11 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
       </div>
 
       <div class="form-field form-field-span">
-        <?php include(SHARED_PATH . '/bgg_lookup_panel.php'); ?>
+        <?php
+          require_once PRIVATE_PATH . '/item_types.php';
+          $bgg_default_type = user_bgg_default_type($db, (int) $_SESSION['user_id']);
+          include(SHARED_PATH . '/bgg_lookup_panel.php');
+        ?>
         <?php $preview_url = normalize_item_image_url($artifact['image_url'] ?? ''); ?>
         <input type="hidden" name="image_url" id="image_url" value="<?php echo h($preview_url); ?>">
         <input type="hidden" name="bgg_url" id="bgg_url" value="<?php echo h(normalize_item_bgg_url($artifact['bgg_url'] ?? '')); ?>">
@@ -264,7 +268,8 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 
 </main>
 
-<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=10"></script>
+<script src="<?php echo url_for('/artifacts/bgg-default-type.js'); ?>?v=1"></script>
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=11"></script>
 <script src="<?php echo url_for('/shared/js/form-save-shortcut.js'); ?>?v=1"></script>
 <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=3"></script>
 <script type="application/json" id="create-item-lookup-config"><?php

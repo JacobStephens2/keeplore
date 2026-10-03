@@ -2,6 +2,7 @@
 
 require_once('../../private/initialize.php');
 require_once(PRIVATE_PATH . '/bgg_import_jobs.php');
+require_once(PRIVATE_PATH . '/item_types.php');
 global $db;
 
 require_login();
@@ -57,6 +58,7 @@ if(is_post_request()) {
   // Checked against BGG apart from the rest, so a typo or a BGG outage costs
   // only this field.
   $bgg_result = user_bgg_username_set($db, $user_id, (string) ($_POST['bgg_username'] ?? ''));
+  $bgg_type_saved = user_bgg_default_type_set($db, $user_id, $_POST['bgg_default_type_id'] ?? '');
 }
 
 $user_id = (int) $_SESSION['user_id'];
@@ -70,6 +72,9 @@ mysqli_stmt_execute($stmt);
 $userResult = mysqli_stmt_get_result($stmt);
 $userArray = mysqli_fetch_assoc($userResult);
 mysqli_stmt_close($stmt);
+$bgg_default_type = user_bgg_default_type($db, $user_id);
+require SHARED_PATH . '/artifact_type_array.php';
+$user_id = (int) $_SESSION['user_id']; // artifact_type_array.php reassigns it
 
 ?>
 
@@ -92,6 +97,9 @@ mysqli_stmt_close($stmt);
         echo '<p class="errors">' . h($bgg_result['error']) . ' Your BoardGameGeek reviewer did not change.</p>';
       } elseif (isset($bgg_result) && $bgg_result['message'] !== null) {
         echo '<p id="bgg_message">' . h($bgg_result['message']) . '</p>';
+      }
+      if (isset($bgg_type_saved) && !$bgg_type_saved) {
+        echo '<p class="errors">That type is not one of yours. Your type for BoardGameGeek items did not change.</p>';
       }
   ?>
 
@@ -219,6 +227,17 @@ mysqli_stmt_close($stmt);
         aria-describedby="bgg_username_help"
       >
     </div>
+
+    <div class="form-field">
+      <label for="bgg_default_type_id">Type for BoardGameGeek items</label>
+      <select name="bgg_default_type_id" id="bgg_default_type_id" aria-describedby="bgg_default_type_help">
+        <option value="">Keep Create Item's type</option>
+        <?php foreach ($typesArray ?? [] as $type_name => $type_id) { ?>
+          <option value="<?php echo (int) $type_id; ?>"<?php if ($bgg_default_type !== null && $bgg_default_type['id'] === (int) $type_id) echo ' selected'; ?>><?php echo h($type_name); ?></option>
+        <?php } ?>
+      </select>
+    </div>
+    <p class="form-field-span" id="bgg_default_type_help">When you use a BoardGameGeek match on Create Item, the item gets this type unless you already picked one, such as table game.</p>
 
     <h2 class="form-field-span">App notifications</h2>
     <p class="form-field-span">These settings control notifications from the Keeplore Android app.</p>
