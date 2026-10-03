@@ -127,19 +127,27 @@
     <?php echo $page_title; ?>
   </h1>
 
-  <form action="<?php echo $formProcessingFile; ?>" method="post">
+  <form action="<?php echo $formProcessingFile; ?>" method="post" class="record-use-page">
     <?php echo csrf_input(); ?>
 
-    <input type="submit" value="Submit">
+    <div class="record-use-top">
+      <input type="submit" value="Submit">
 
-    <?php if (!$recording_again && !empty($last_group['people'])) { ?>
-      <p class="record-again">
-        <a href="<?php echo $formProcessingFile; ?>?again=1">Record another use with this group</a>
-        <span><?php echo h(implode(', ', array_column($last_group['people'], 'name'))); ?></span>
-      </p>
-    <?php } ?>
+      <?php if (!$recording_again && !empty($last_group['people'])) { ?>
+        <a class="secondary-link record-again" href="<?php echo $formProcessingFile; ?>?again=1">
+          Record another use with this group
+        </a>
+        <span class="record-again-names"><?php echo h(implode(', ', array_column($last_group['people'], 'name'))); ?></span>
+      <?php } ?>
+    </div>
 
-    <label for="SearchTitles">Search Items</label>    <input type="search" 
+    <div class="field-head">
+      <label for="SearchTitles">Search Items</label>
+      <button type="button" id="showNewEntity" class="new-interactor-toggle">
+        + New item
+      </button>
+    </div>
+    <input type="search" 
       id="SearchTitles" 
       name="artifact[name]" 
       value="<?php echo $artifact_name; ?>"
@@ -154,12 +162,6 @@
       </ul>
     </div>
 
-    <div id="entityControls">
-      <button type="button" id="showNewEntity" class="new-interactor-toggle">
-        + New item
-      </button>
-    </div>
-
     <div id="newEntityForm" class="new-interactor-form" style="display: none;">
       <input type="text" id="newEntityTitle" placeholder="Item name" autocomplete="off">
       <button type="button" id="createEntity" class="new-interactor-create">Create &amp; select</button>
@@ -167,45 +169,39 @@
       <span id="newEntityMsg" class="new-interactor-msg" role="status" aria-live="polite"></span>
     </div>
 
-    <label for="users">People</label>
-    <section id="users" data-prefill="<?php echo h(json_encode(array_slice($form['people'], 1))); ?>">
-      <input 
-        type="search" 
-        class="user" 
-        id="user0name" 
-        name="user[0][name]" 
-        value="<?php echo h($first_person['name']); ?>"
-        data-userid="<?php echo $_SESSION['user_id']; ?>"
-        data-playerid="<?php echo $_SESSION['player_id']; ?>"
-        data-listposition="0"
-      >
-      <input 
-        type="hidden" 
-        id="user0id" 
-        name="user[0][id]" 
-        value="<?php echo $first_person['id']; ?>"
-        data-listposition="0"
-      >
-      <div id="userResultsDiv0" class="userResults user" style="display: none;">
-        <ul id="userResults0" class="userResults user" style="margin-top: 0;">
-          <li></li>
-        </ul>
-      </div>
-    </section>
-
-    <div id="interactorControls">
-      <button
-        id="addUser"
-        class="user"
-        type="button"
-        >
-        +
-      </button>
-
+    <div class="field-head">
+      <label for="user0name">People</label>
       <button type="button" id="showNewInteractor" class="new-interactor-toggle">
         + New person
       </button>
     </div>
+    <section id="users" data-prefill="<?php echo h(json_encode(array_slice($form['people'], 1))); ?>">
+      <div class="person-row">
+        <input 
+          type="search" 
+          class="user" 
+          id="user0name" 
+          name="user[0][name]" 
+          value="<?php echo h($first_person['name']); ?>"
+          data-userid="<?php echo $_SESSION['user_id']; ?>"
+          data-playerid="<?php echo $_SESSION['player_id']; ?>"
+          data-listposition="0"
+        >
+        <input 
+          type="hidden" 
+          id="user0id" 
+          name="user[0][id]" 
+          value="<?php echo $first_person['id']; ?>"
+          data-listposition="0"
+        >
+        <button id="addUser" class="user" type="button" aria-label="Add another person">+</button>
+        <div id="userResultsDiv0" class="userResults user" style="display: none;">
+          <ul id="userResults0" class="userResults user" style="margin-top: 0;">
+            <li></li>
+          </ul>
+        </div>
+      </div>
+    </section>
 
     <div id="newInteractorForm" class="new-interactor-form" style="display: none;">
       <input type="text" id="newInteractorFirst" placeholder="First name" autocomplete="off">
@@ -215,15 +211,20 @@
       <span id="newInteractorMsg" class="new-interactor-msg" role="status" aria-live="polite"></span>
     </div>
 
-    <label for="date">Date</label>
-    <input type="date" name="useDate" id="date" 
-      value="<?php echo h($form['useDate']); ?>"
-    >
-
-    <label for="useCount">Number of uses</label>
-    <input type="number" name="useCount" id="useCount"
-      value="1" min="1" max="<?php echo RECORD_USE_MAX_COUNT; ?>" step="1"
-    >
+    <div class="field-pair">
+      <div>
+        <label for="date">Date</label>
+        <input type="date" name="useDate" id="date" 
+          value="<?php echo h($form['useDate']); ?>"
+        >
+      </div>
+      <div>
+        <label for="useCount">Number of uses</label>
+        <input type="number" name="useCount" id="useCount"
+          value="1" min="1" max="<?php echo RECORD_USE_MAX_COUNT; ?>" step="1"
+        >
+      </div>
+    </div>
 
     <label for="Note">Setting</label>
     <input type="text" 
@@ -235,7 +236,7 @@
     <label for="NotesTwo">Notes</label>
     <textarea 
       cols="30" 
-      rows="5"
+      rows="3"
       name="NotesTwo" 
       id="NotesTwo"
     ></textarea>
