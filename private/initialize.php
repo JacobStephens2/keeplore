@@ -76,7 +76,6 @@
   require_once('classes/DatabaseObject.class.php');
   DatabaseObject::set_database($db);
   require_once('classes/Artifact.class.php');
-  require_once('classes/User.class.php');
 
   $logger = new AppLogger();
   $cache = new Cache();

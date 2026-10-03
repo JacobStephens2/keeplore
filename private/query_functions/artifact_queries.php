@@ -247,18 +247,6 @@ require_once dirname(__DIR__) . '/classes/UseByQueue.php';
     return $result;
   }
 
-  function list_users_by_query($query) {
-    global $db;
-    $sql = "SELECT players.id, players.FirstName, players.LastName FROM players WHERE players.FirstName LIKE ? ORDER BY players.FirstName ASC, LastName ASC";
-    $like_param = '%' . $query . '%';
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, "s", $like_param);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    confirm_result_set($result);
-    return $result;
-  }
-
   function first_play_by() {
     global $db;
 

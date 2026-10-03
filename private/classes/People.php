@@ -22,6 +22,28 @@ final class People
         ));
     }
 
+    /**
+     * The owner's people whose current name contains the query, ignoring
+     * case and matching % and _ literally, in name order. A blank query
+     * returns everyone.
+     */
+    public function search(string $query): array
+    {
+        $query = trim($query);
+        if ($query === '') {
+            return $this->all();
+        }
+        $pattern = '%' . strtr($query, ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
+        // The name matched is person()'s name: first and last joined, trimmed.
+        return array_map([$this, 'person'], $this->rows(
+            'SELECT ' . self::COLUMNS . " FROM players
+             WHERE user_id = ?
+               AND LOWER(TRIM(CONCAT(COALESCE(FirstName, ''), ' ', COALESCE(LastName, '')))) LIKE LOWER(?) ESCAPE '!'
+             ORDER BY FirstName, LastName, id",
+            'is', [$this->userId, $pattern]
+        ));
+    }
+
     public function find(int $id): ?array
     {
         $row = $this->rows(

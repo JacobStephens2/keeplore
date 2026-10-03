@@ -45,7 +45,6 @@ DatabaseObject::set_database($database);
 
 // Classes that extend DatabaseObject
 require_once('../private/classes/Artifact.class.php');
-require_once('../private/classes/User.class.php');
 require_once('../private/classes/ProposalOutcomes.php');
 require_once('../private/classes/Items.php');
 require_once('../private/item_api.php');
