@@ -50,7 +50,7 @@ class ApiOriginTest extends TestCase
 
         $this->assertStringNotContainsString('Access-Control-Allow-Origin "https://keeplore.app"', $source);
         $this->assertMatchesRegularExpression('/SetEnvIf Host "\^api\\\\\.\(\.\+\)\$" KEEPLORE_UI_ORIGIN=https:\/\/\$1/', $source);
-        $this->assertStringContainsString('Header set Access-Control-Allow-Origin "%{KEEPLORE_UI_ORIGIN}e"', $source);
+        $this->assertStringContainsString('Header set Access-Control-Allow-Origin "%{KEEPLORE_UI_ORIGIN}e" env=KEEPLORE_UI_ORIGIN', $source);
     }
 
     private function apiOrigin(string $module, ?string $metaContent): string

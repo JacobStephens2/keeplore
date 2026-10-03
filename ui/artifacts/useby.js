@@ -3,7 +3,7 @@ document.querySelector('#send_use_email').addEventListener('click', function(eve
     var originalLabel = button.textContent;
 
     async function getData(userID) {
-      var apiOrigin = document.querySelector('#apiOrigin').content;
+      var apiOrigin = document.querySelector('meta[name="keeplore-api-origin"]').content;
       const url = `https://${apiOrigin}/send_use_email.php?userID=${userID}`;
       button.disabled = true;
       button.textContent = 'Sending…';
