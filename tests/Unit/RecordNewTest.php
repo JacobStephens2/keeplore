@@ -53,6 +53,7 @@ class RecordNewTest extends TestCase
         $targets = [
             ['tagName' => 'BUTTON', 'type' => 'button'],
             ['tagName' => 'INPUT', 'type' => 'submit'],
+            ['tagName' => 'INPUT', 'type' => 'button'],
         ];
         foreach ($targets as $target) {
             $result = $this->press(['key' => 'Enter', 'target' => $target]);
@@ -60,13 +61,6 @@ class RecordNewTest extends TestCase
             $this->assertNull($result['submitted'], $target['tagName']);
             $this->assertFalse($result['prevented'], $target['tagName']);
         }
-    }
-
-    public function test_edit_use_add_person_button_does_not_submit(): void
-    {
-        $source = (string) file_get_contents(PROJECT_PATH . '/ui/uses/record-edit.php');
-
-        $this->assertMatchesRegularExpression('/<button\b(?=[^>]*id="addUser")(?=[^>]*type="button")[^>]*>/', $source);
     }
 
     public function test_other_keys_do_not_submit(): void

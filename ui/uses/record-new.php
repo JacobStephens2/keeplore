@@ -118,7 +118,7 @@
 <script type="module" src="modules/getUsers.js"></script>
 <script type="module" src="modules/addNewUser.js"></script>
 <script type="module" src="modules/addNewEntity.js"></script>
-<script defer src="record-new.js?v=3"></script>
+<script defer src="record-new.js?v=4"></script>
 
 <main>
 

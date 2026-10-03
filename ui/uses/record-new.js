@@ -12,7 +12,7 @@
 // Callers pass the document and elements so tests can observe them
 // without a browser.
 (function () {
-  var BUTTON_INPUT_TYPES = ['button', 'submit', 'reset', 'image'];
+  var BUTTON_INPUT_TYPES = ['button', 'submit'];
 
   function keepsOwnEnter(target) {
     if (!target) return false;
