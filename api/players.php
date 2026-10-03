@@ -3,7 +3,7 @@
   require_once('private/initialize.php');
   require_once('../private/rate_limiter.php');
   require_once('../private/app_logger.php');
-  require_once('../private/players_list.php');
+  require_once('../private/people_api.php');
   header('Content-Type: application/json');
 
   $logger = new AppLogger();
@@ -34,14 +34,11 @@
 
     case 'GET':
       // Read-only household players, scoped to the authenticated user
-      if (!isset($authentication_response->user_id)) {
-        http_response_code(400);
-        $response->message = 'players.php requires a user-scoped key.';
-        echo json_encode($response);
-        exit;
+      [$status, $fields] = list_players_over_api($database, $authentication_response);
+      http_response_code($status);
+      foreach ($fields as $field => $value) {
+        $response->$field = $value;
       }
-
-      $response->players = list_players_for_user($database, (int) $authentication_response->user_id);
       echo json_encode($response);
       break;
 

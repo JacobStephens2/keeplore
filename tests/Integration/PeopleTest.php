@@ -103,6 +103,46 @@ final class PeopleTest extends TestCase
         $this->assertSame('Sam Lee', $this->people->find(100)['name']);
     }
 
+    public function test_search_finds_only_the_owners_people(): void
+    {
+        $this->assertSame([], $this->people->search('Other'));
+        $this->assertSame([200], array_column((new People($this->db, 2))->search('Other'), 'id'));
+    }
+
+    public function test_search_matches_part_of_a_first_last_or_whole_name_in_name_order(): void
+    {
+        $this->db->query("INSERT INTO players (id, user_id, FirstName, LastName) VALUES (102, 1, 'Ada', 'Lee')");
+
+        $this->assertSame([100], array_column($this->people->search('am'), 'id'));
+        $this->assertSame([101], array_column($this->people->search('SMI'), 'id'));
+        $this->assertSame([102, 100], array_column($this->people->search('lee'), 'id'));
+        $this->assertSame([101], array_column($this->people->search(' jo smith '), 'id'));
+        $this->assertSame($this->people->find(100), $this->people->search('Sam L')[0]);
+    }
+
+    public function test_search_finds_a_renamed_person_by_the_new_name(): void
+    {
+        $this->people->update(100, ['first_name' => 'Samuel', 'last_name' => 'Park']);
+
+        $this->assertSame([100], array_column($this->people->search('Park'), 'id'));
+        $this->assertSame([], $this->people->search('Lee'));
+    }
+
+    public function test_a_blank_search_returns_all_the_owners_people(): void
+    {
+        $this->assertSame($this->people->all(), $this->people->search(''));
+        $this->assertSame($this->people->all(), $this->people->search('   '));
+    }
+
+    public function test_search_matches_like_wildcards_literally(): void
+    {
+        $this->db->query("INSERT INTO players (id, user_id, FirstName, LastName) VALUES (102, 1, '100%', 'Fan')");
+
+        $this->assertSame([102], array_column($this->people->search('%'), 'id'));
+        $this->assertSame([], $this->people->search('_'));
+        $this->assertSame([], $this->people->search('S%e'));
+    }
+
     public function test_create_defaults_gender_and_blank_birth_year_and_keeps_a_single_name(): void
     {
         $id = $this->people->create(['first_name' => '', 'last_name' => 'Cher', 'gender' => ' ', 'birth_year' => '']);
