@@ -48,29 +48,21 @@ function normalize_item_image_url($value) {
   return $url;
 }
 
-// The Items module's input from a Create Item or Edit Item form post: the
-// fields the post carries, under the module's keys.
+// The Items module's input from a Create Item or Edit Item form post. The
+// forms name the type and age fields differently; the module ignores the
+// rest of the post it doesn't write.
 function item_input_from_form(array $form) {
-  $keys = [
-    'Title' => 'Title', 'Notes' => 'Notes', 'Acq' => 'Acq', 'type' => 'type_id',
-    'is_kept' => 'is_kept', 'to_get_rid_of' => 'to_get_rid_of',
-    'is_in_secondary_collection' => 'is_in_secondary_collection', 'Candidate' => 'Candidate',
-    'interaction_frequency_days' => 'interaction_frequency_days',
-    'SS' => 'SS', 'MnT' => 'MnT', 'MxT' => 'MxT', 'MnP' => 'MnP', 'MxP' => 'MxP', 'age' => 'Age', 'Yr' => 'Yr',
-    'image_url' => 'image_url', 'bgg_url' => 'bgg_url', 'bgg_player_votes' => 'bgg_player_votes',
-    'bgg_age_basis' => 'bgg_age_basis', 'BGG_Rat' => 'BGG_Rat', 'tags' => 'tags',
-  ];
-  $input = [];
-  foreach ($keys as $field => $key) {
+  foreach (['type' => 'type_id', 'age' => 'Age'] as $field => $key) {
     if (array_key_exists($field, $form)) {
-      $input[$key] = $form[$field];
+      $form[$key] = $form[$field];
+      unset($form[$field]);
     }
   }
-  return $input;
+  return $form;
 }
 
 // An item's publication year as stored: blank is null.
-function normalize_artifact_year($year) {
+function normalize_item_year($year) {
   if ($year === null) {
     return null;
   }

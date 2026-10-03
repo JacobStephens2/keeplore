@@ -38,12 +38,14 @@
       redirect_to(url_for('/artifacts/edit.php?id=' . $id));
     } catch (ItemInvalid $invalid) {
       $errors = $invalid->errors;
+      $submitted = array_diff_key($input, ['id' => true, 'user_id' => true]);
     } catch (OutOfBoundsException $not_found) {
       error_404();
     }
   }
 
-  $artifact = $items->find($id);
+  // After a rejected save the form shows what was typed, to fix in one pass.
+  $artifact = array_replace($items->find($id), $submitted ?? []);
   $item_tags = find_item_tags_for_artifacts($db, [$id], (int) $_SESSION['user_id'])[$id] ?? [];
   if (is_post_request() && isset($_POST['tags'])) {
     $item_tags = parse_item_tags_input($_POST['tags']);

@@ -22,10 +22,13 @@ final class ItemInvalid extends InvalidArgumentException
  * tags (a comma-separated string or a list) for the tags. Unknown keys are
  * ignored. Every write applies the same validation and normalizers, and
  * writes the Item with its tags in one transaction.
+ *
+ * Invalid input throws ItemInvalid with every problem; an id the owner
+ * doesn't have throws OutOfBoundsException.
  */
 final class Items
 {
-    /** What create gives a missing or blank field, besides today and the owner's interval. */
+    /** What create gives a missing or blank field, besides today's date and the owner's interval. */
     public const DEFAULTS = ['MnT' => 30, 'MxT' => 60, 'MnP' => 1, 'MxP' => 1, 'SS' => '01', 'Age' => 0, 'is_kept' => 1];
 
     private const WRITABLE = [
@@ -51,17 +54,10 @@ final class Items
     public function create(array $input): int
     {
         return $this->transaction(function () use ($input) {
-            $item = $this->writable($input);
-            $defaults = self::DEFAULTS + [
-                'Acq' => date('Y-m-d'),
+            $item = $this->fillBlanks($this->writable($input), $this->createDefaults() + [
                 'interaction_frequency_days' => $this->defaultUseInterval(),
                 'type_id' => null,
-            ];
-            foreach ($defaults as $field => $default) {
-                if ($this->isBlank($item[$field] ?? null)) {
-                    $item[$field] = $default;
-                }
-            }
+            ]);
             $this->validate($item, $item);
             $columns = $this->columns($item, $item) + [
                 'user_id' => $this->userId,
@@ -102,16 +98,14 @@ final class Items
         $this->transaction(function () use ($id, $changes) {
             $current = $this->lockedItem($id);
             $patch = $this->writable($changes);
-            foreach (self::BLANK_TAKES_DEFAULT as $field) {
-                if (array_key_exists($field, $patch) && $this->isBlank($patch[$field])) {
-                    $patch[$field] = $field === 'Acq' ? date('Y-m-d') : self::DEFAULTS[$field];
-                }
-            }
+            $patch = $this->fillBlanks($patch, array_intersect_key(
+                $this->createDefaults(), array_flip(self::BLANK_TAKES_DEFAULT), $patch
+            ));
             if (array_key_exists('type_id', $patch) && $this->isBlank($patch['type_id'])) {
                 unset($patch['type_id']);
             }
             $this->validate(array_replace($current, $patch), $patch);
-            $columns = $this->columns($patch, array_replace($current, $patch));
+            $columns = $this->columns(array_replace($current, $patch), $patch);
             if ($columns !== []) {
                 $this->statement(
                     'UPDATE games SET `' . implode('` = ?, `', array_keys($columns)) . '` = ?
@@ -147,6 +141,22 @@ final class Items
             ?? throw new OutOfBoundsException('Item not found.');
     }
 
+    /** Create's default for each blank field it fills, besides the owner's interval and the type. */
+    private function createDefaults(): array
+    {
+        return self::DEFAULTS + ['Acq' => date('Y-m-d')];
+    }
+
+    private function fillBlanks(array $fields, array $defaults): array
+    {
+        foreach ($defaults as $field => $default) {
+            if ($this->isBlank($fields[$field] ?? null)) {
+                $fields[$field] = $default;
+            }
+        }
+        return $fields;
+    }
+
     private function defaultUseInterval(): ?string
     {
         $interval = $this->rows('SELECT default_use_interval FROM users WHERE id = ?', 'i', [$this->userId])[0]['default_use_interval'] ?? null;
@@ -157,9 +167,9 @@ final class Items
     private function writable(array $input): array
     {
         $fields = array_intersect_key($input, array_flip(self::WRITABLE));
-        $notSingle = array_keys(array_filter($fields, fn ($value) => $value !== null && !is_scalar($value)));
-        if ($notSingle !== []) {
-            throw new ItemInvalid(array_map(fn ($field) => "{$field} must be a single value.", $notSingle));
+        $listFields = array_keys(array_filter($fields, fn ($value) => $value !== null && !is_scalar($value)));
+        if ($listFields !== []) {
+            throw new ItemInvalid(array_map(fn ($field) => "{$field} must be a single value.", $listFields));
         }
         return $fields;
     }
@@ -171,9 +181,9 @@ final class Items
 
     /**
      * Throw ItemInvalid listing every rule $item breaks. The type is checked
-     * only when $given sets one: it must be one of the owner's types.
+     * only when $changes sets one: it must be one of the owner's types.
      */
-    private function validate(array $item, array $given): void
+    private function validate(array $item, array $changes): void
     {
         $errors = [];
 
@@ -204,7 +214,7 @@ final class Items
             $errors[] = 'Minimum Age must be a non-negative number.';
         }
 
-        $year = normalize_artifact_year($item['Yr'] ?? null);
+        $year = normalize_item_year($item['Yr'] ?? null);
         if ($year !== null && !preg_match('/^\d{1,4}$/', $year)) {
             $errors[] = 'Year must be a 1 to 4 digit number.';
         }
@@ -227,7 +237,7 @@ final class Items
             $errors[] = 'Interaction Frequency must be a positive number.';
         }
 
-        if (!$this->isBlank($given['type_id'] ?? null) && $this->ownerType($given['type_id']) === null) {
+        if (!$this->isBlank($changes['type_id'] ?? null) && $this->ownerType($changes['type_id']) === null) {
             $errors[] = 'Type must be one of your types.';
         }
 
@@ -243,18 +253,19 @@ final class Items
     }
 
     /**
-     * The column values to write for the $given fields, normalized. The
+     * The column values to write for the $changes, normalized. The
      * BoardGameGeek columns are written together, from the $item they
      * leave, and the type name follows type_id.
      */
-    private function columns(array $given, array $item): array
+    private function columns(array $item, array $changes): array
     {
         $columns = [];
-        foreach ($given as $field => $value) {
+        foreach ($changes as $field => $value) {
             $columns[$field] = match ($field) {
-                'is_kept', 'is_in_secondary_collection', 'to_get_rid_of' => normalize_kept_value((string) $value),
+                'is_kept', 'to_get_rid_of' => normalize_kept_value((string) $value),
+                'is_in_secondary_collection' => normalize_secondary_membership((string) $value),
                 'is_digital', 'is_physical' => normalize_format_flag($value === null ? null : (string) $value),
-                'Yr' => normalize_artifact_year($value),
+                'Yr' => normalize_item_year($value),
                 'image_url' => normalize_item_image_url($value),
                 'type_id', 'age_max', 'FavCt', 'interaction_frequency_days' => $this->isBlank($value) ? null : trim((string) $value),
                 default => $value,
@@ -263,7 +274,7 @@ final class Items
         if (array_key_exists('type_id', $columns)) {
             $columns['type'] = $columns['type_id'] === null ? null : $this->ownerType($columns['type_id'])['name'];
         }
-        if (array_intersect_key($given, array_flip(self::BGG)) !== []) {
+        if (array_intersect_key($changes, array_flip(self::BGG)) !== []) {
             $columns = item_bgg_fields_for_storage($item) + $columns;
         }
         return $columns;
