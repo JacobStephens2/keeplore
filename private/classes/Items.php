@@ -41,7 +41,7 @@ final class Items
     ];
 
     /** The BoardGameGeek columns, stored together by item_bgg_fields_for_storage(). */
-    private const BGG = ['bgg_url', 'bgg_player_votes', 'bgg_age_basis', 'BGG_Rat'];
+    private const BGG_COLUMNS = ['bgg_url', 'bgg_player_votes', 'bgg_age_basis', 'BGG_Rat'];
 
     /** Fields an update gives their create default when blank. */
     private const BLANK_TAKES_DEFAULT = ['MnT', 'MxT', 'MnP', 'MxP', 'SS', 'Age', 'Acq'];
@@ -274,7 +274,7 @@ final class Items
         if (array_key_exists('type_id', $columns)) {
             $columns['type'] = $columns['type_id'] === null ? null : $this->ownerType($columns['type_id'])['name'];
         }
-        if (array_intersect_key($changes, array_flip(self::BGG)) !== []) {
+        if (array_intersect_key($changes, array_flip(self::BGG_COLUMNS)) !== []) {
             $columns = item_bgg_fields_for_storage($item) + $columns;
         }
         return $columns;

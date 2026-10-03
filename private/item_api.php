@@ -4,11 +4,14 @@ require_once __DIR__ . '/agent_keys.php';
 require_once __DIR__ . '/item_tags.php';
 require_once __DIR__ . '/classes/Items.php';
 
-/** What each item write over HTTP answers with, and the log action it records. */
+/** What each item write over HTTP answers with. */
 const ITEM_API_WRITES = [
-  'POST' => ['status' => 201, 'done' => 'Item created successfully.', 'failed' => 'Failed to create item.', 'action' => 'create'],
-  'PUT' => ['status' => 200, 'done' => 'Item updated successfully.', 'failed' => 'Failed to update item.', 'action' => 'update'],
+  'POST' => ['status' => 201, 'succeeded' => 'Item created successfully.', 'failed' => 'Failed to create item.'],
+  'PUT' => ['status' => 200, 'succeeded' => 'Item updated successfully.', 'failed' => 'Failed to update item.'],
 ];
+
+/** The log action each item write over HTTP records. */
+const ITEM_API_LOG_ACTIONS = ['POST' => 'create', 'PUT' => 'update', 'DELETE' => 'delete'];
 
 /**
  * The HTTP API item endpoint's writes: POST creates an Item, PUT patches
@@ -38,7 +41,7 @@ function write_item_over_api(mysqli $db, object $authentication, string $method,
 
   $id = null;
   if ($method === 'PUT') {
-    $id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: null;
+    $id = item_api_positive_int($input['id'] ?? null);
     if ($id === null) {
       return [400, ['message' => 'Missing or invalid required field: id']];
     }
@@ -58,7 +61,7 @@ function write_item_over_api(mysqli $db, object $authentication, string $method,
   }
 
   return [$write['status'], [
-    'message' => $write['done'],
+    'message' => $write['succeeded'],
     'artifact' => with_item_tags($db, [$items->find($id)], $owner)[0],
   ]];
 }
@@ -72,8 +75,8 @@ function item_api_owner(mysqli $db, object $authentication, $requested_user_id):
   if (isset($authentication->user_id)) {
     return (int) $authentication->user_id;
   }
-  $user_id = filter_var($requested_user_id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-  if ($user_id === false) {
+  $user_id = item_api_positive_int($requested_user_id);
+  if ($user_id === null) {
     return null;
   }
   $stmt = $db->prepare('SELECT id FROM users WHERE id = ?');
@@ -82,6 +85,43 @@ function item_api_owner(mysqli $db, object $authentication, $requested_user_id):
   $exists = $stmt->get_result()->num_rows > 0;
   $stmt->close();
   return $exists ? $user_id : null;
+}
+
+/**
+ * The HTTP API item endpoint's DELETE: removes the Item the query's id
+ * names, with its tags and Event plan entries, through the Items module.
+ * The master key names the owner in the query's user_id. Agent keys are
+ * refused (ADR-0002). Returns [status, response fields]; on success the
+ * fields' artifact is the deleted Item.
+ */
+function delete_item_over_api(mysqli $db, object $authentication, array $query): array {
+  $refusal = agent_key_write_refusal($authentication);
+  if ($refusal !== null) {
+    return [403, $refusal];
+  }
+  $id = item_api_positive_int($query['id'] ?? null);
+  if ($id === null) {
+    return [400, ['message' => 'Missing or invalid required parameter: id']];
+  }
+  $owner = item_api_owner($db, $authentication, $query['user_id'] ?? null);
+  if ($owner === null) {
+    return [400, ['message' => 'Missing or invalid required parameter: user_id']];
+  }
+
+  $items = new Items($db, $owner);
+  $item = $items->find($id);
+  try {
+    $items->delete($id);
+  } catch (OutOfBoundsException $not_found) {
+    return [404, ['message' => 'Item not found.']];
+  }
+  return [200, ['message' => 'Item deleted successfully.', 'artifact' => $item]];
+}
+
+/** A request's id as a positive whole number, or null. */
+function item_api_positive_int($value): ?int {
+  $int = filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+  return $int === false ? null : $int;
 }
 
 /** The body's fields as module input, with JSON booleans as the 1/0 flags the module stores. */

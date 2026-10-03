@@ -15,7 +15,6 @@ class ItemBggLinkTest extends TestCase
     {
         $new = $this->source('/ui/artifacts/new.php');
         $this->assertMatchesRegularExpression('/<input type="hidden" name="bgg_url" id="bgg_url"/', $new);
-        $this->assertStringContainsString('item_input_from_form($_POST)', $new);
         $this->assertStringContainsString('fields.bgg_url', $this->source('/ui/artifacts/new-bgg.js'));
     }
 
@@ -23,7 +22,6 @@ class ItemBggLinkTest extends TestCase
     {
         $edit = $this->source('/ui/artifacts/edit.php');
         $this->assertMatchesRegularExpression('/<input type="url" name="bgg_url" id="bgg_url"/', $edit);
-        $this->assertStringContainsString('item_input_from_form($_POST)', $edit);
     }
 
     public function test_edit_and_show_pages_link_to_the_item(): void

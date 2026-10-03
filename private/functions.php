@@ -223,9 +223,9 @@ function error_500() {
 // The signed-in owner's Item for the quick item actions (Snooze, Mark to get
 // rid of, Mark kept). Another owner's or a missing Item ends the request as
 // "Item not found.": a JSON 404 for AJAX, otherwise a message on the Items page.
-function find_owned_item_or_exit(int $artifact_id, bool $is_ajax): array {
+function find_owned_item_or_exit(int $item_id, bool $is_ajax): array {
   global $db;
-  $item = (new Items($db, (int) $_SESSION['user_id']))->find($artifact_id);
+  $item = (new Items($db, (int) $_SESSION['user_id']))->find($item_id);
   if ($item) {
     return $item;
   }

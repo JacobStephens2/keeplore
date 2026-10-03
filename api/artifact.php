@@ -65,53 +65,19 @@
 
     case 'POST':
     case 'PUT':
-      [$status, $fields] = write_item_over_api(
-        $database, $authentication_response, $method, json_decode(file_get_contents('php://input'))
-      );
+    case 'DELETE':
+      [$status, $fields] = $method === 'DELETE'
+        ? delete_item_over_api($database, $authentication_response, $_GET)
+        : write_item_over_api(
+          $database, $authentication_response, $method, json_decode(file_get_contents('php://input'))
+        );
       http_response_code($status);
       if (isset($fields['artifact'])) {
-        $logger->logDataChange(ITEM_API_WRITES[$method]['action'], 'artifact', $fields['artifact']['id'], ['title' => $fields['artifact']['Title']]);
+        $logger->logDataChange(ITEM_API_LOG_ACTIONS[$method], 'artifact', $fields['artifact']['id'], ['title' => $fields['artifact']['Title']]);
       }
       foreach ($fields as $field => $value) {
         $response->$field = $value;
       }
-      echo json_encode($response);
-      break;
-
-    case 'DELETE':
-      // Agent keys permit reads plus the kept toggle only.
-      deny_agent_key_writes($authentication_response);
-      // Delete an artifact by ID, scoped to authenticated user
-      if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-        http_response_code(400);
-        $response->message = 'Missing or invalid required parameter: id';
-        echo json_encode($response);
-        exit;
-      }
-
-      $id = (int) $_GET['id'];
-      // The master key has no user of its own: it names the owner in the query.
-      $user_id = item_api_owner($database, $authentication_response, $_GET['user_id'] ?? null);
-      if ($user_id === null) {
-        http_response_code(400);
-        $response->message = 'Missing or invalid required parameter: user_id';
-        echo json_encode($response);
-        exit;
-      }
-
-      $items = new Items($database, $user_id);
-      $artifact = $items->find($id);
-      try {
-        $items->delete($id);
-      } catch (OutOfBoundsException $not_found) {
-        http_response_code(404);
-        $response->message = 'Item not found.';
-        echo json_encode($response);
-        exit;
-      }
-
-      $logger->logDataChange('delete', 'artifact', $id, ['title' => $artifact['Title']]);
-      $response->message = 'Item deleted successfully.';
       echo json_encode($response);
       break;
 

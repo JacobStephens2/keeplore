@@ -2,10 +2,14 @@
   require_once SHARED_PATH . '/artifact_type_array.php';
   global $typesArray;
 
-  $current_type_id = isset($type_id) ? (string) $type_id : '';
+  // Only one of the user's types is preselected: an id they don't own (such
+  // as a configured default type from another account) posts no type.
+  $wanted_type_id = isset($type_id) ? (string) $type_id : '';
+  $current_type_id = '';
   $current_type_name = '';
   foreach ($typesArray as $type_name => $tid) {
-    if ((string) $tid === $current_type_id) {
+    if ((string) $tid === $wanted_type_id) {
+      $current_type_id = $wanted_type_id;
       $current_type_name = $type_name;
       break;
     }

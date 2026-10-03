@@ -6,10 +6,11 @@ use Items;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Seam: write_item_over_api(), the HTTP API item endpoint's POST and PUT.
- * Both write through the Items module for the owner: the session's user,
- * or with the master key the user_id the body names. The result is the
- * status code and the response fields.
+ * Seams: write_item_over_api() and delete_item_over_api(), the HTTP API
+ * item endpoint's POST, PUT and DELETE. All write through the Items module
+ * for the owner: the session's user, or with the master key the user_id
+ * the body (or for DELETE the query) names. The result is the status code
+ * and the response fields.
  */
 final class ItemApiWriteTest extends TestCase
 {
@@ -286,5 +287,62 @@ final class ItemApiWriteTest extends TestCase
         $this->assertSame(200, $status);
         $this->assertSame('Shuffled', $response['artifact']['Notes']);
         $this->assertSame(['mine'], $response['artifact']['tags']);
+    }
+
+    public function test_delete_removes_the_session_users_item_and_its_tags(): void
+    {
+        [$status, $response] = delete_item_over_api($this->db, $this->session(), ['id' => '10']);
+
+        $this->assertSame(200, $status);
+        $this->assertSame('Item deleted successfully.', $response['message']);
+        $this->assertSame('Catan', $response['artifact']['Title']);
+        $this->assertNull($this->item(10));
+        $this->assertSame([], $this->tagsOf(10));
+    }
+
+    public function test_delete_of_an_item_the_owner_does_not_have_returns_404_and_leaves_it(): void
+    {
+        [$status, $response] = delete_item_over_api($this->db, $this->session(), ['id' => '20']);
+
+        $this->assertSame(404, $status);
+        $this->assertSame('Item not found.', $response['message']);
+        $this->assertSame('Private item', $this->item(20, 2)['Title']);
+        $this->assertSame(['mine'], $this->tagsOf(20));
+    }
+
+    public function test_delete_without_a_valid_id_returns_400(): void
+    {
+        foreach ([[], ['id' => 'ten'], ['id' => '0']] as $query) {
+            [$status, $response] = delete_item_over_api($this->db, $this->session(), $query);
+            $this->assertSame(400, $status);
+            $this->assertSame('Missing or invalid required parameter: id', $response['message']);
+        }
+    }
+
+    public function test_delete_with_the_master_key_needs_the_owner_in_the_query(): void
+    {
+        foreach ([['id' => '20'], ['id' => '20', 'user_id' => 'me'], ['id' => '20', 'user_id' => '999']] as $query) {
+            [$status, $response] = delete_item_over_api($this->db, $this->masterKey(), $query);
+            $this->assertSame(400, $status);
+            $this->assertSame('Missing or invalid required parameter: user_id', $response['message']);
+        }
+        [$status] = delete_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => '1']);
+        $this->assertSame(404, $status);
+        $this->assertSame('Private item', $this->item(20, 2)['Title']);
+
+        [$status] = delete_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => '2']);
+        $this->assertSame(200, $status);
+        $this->assertNull($this->item(20, 2));
+    }
+
+    public function test_delete_with_an_agent_key_is_refused_and_leaves_the_item(): void
+    {
+        $agent = (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => 1];
+
+        [$status, $response] = delete_item_over_api($this->db, $agent, ['id' => '10']);
+
+        $this->assertSame(403, $status);
+        $this->assertSame('Agent keys permit reads plus the kept toggle only.', $response['message']);
+        $this->assertSame('Catan', $this->item(10)['Title']);
     }
 }
