@@ -20,6 +20,19 @@ function record_use_count(array $post): int
     return max(1, min(RECORD_USE_MAX_COUNT, $count));
 }
 
+/**
+ * Write record_use_count($post) identical uses through $insert_use and
+ * return how many were written. Callers own the transaction.
+ */
+function record_uses(array $post, callable $insert_use): int
+{
+    $count = record_use_count($post);
+    for ($i = 0; $i < $count; $i++) {
+        $insert_use($post);
+    }
+    return $count;
+}
+
 function record_use_success_message(array $post): string
 {
     $user_count = count($post['user'] ?? []);

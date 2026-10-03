@@ -170,11 +170,31 @@ class RecordUseTest extends TestCase
         );
     }
 
-    public function test_record_new_page_posts_and_honors_the_number_of_uses(): void
+    public function test_record_uses_writes_one_identical_use_per_count(): void
     {
-        $source = (string) file_get_contents(PROJECT_PATH . '/ui/uses/record-new.php');
+        $post = [
+            'artifact' => ['id' => '12', 'name' => 'Old Maid'],
+            'useDate' => '2026-10-02',
+            'useCount' => '2',
+        ];
+        $written = [];
 
-        $this->assertStringContainsString('name="useCount"', $source);
-        $this->assertStringContainsString('record_use_count($_POST)', $source);
+        $count = record_uses($post, function (array $p) use (&$written) {
+            $written[] = $p;
+        });
+
+        $this->assertSame(2, $count);
+        $this->assertSame([$post, $post], $written);
+    }
+
+    public function test_record_uses_writes_one_use_without_a_count(): void
+    {
+        $written = 0;
+
+        record_uses([], function () use (&$written) {
+            $written++;
+        });
+
+        $this->assertSame(1, $written);
     }
 }

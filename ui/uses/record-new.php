@@ -56,15 +56,14 @@
 
     } else {
 
-      for ($i = 0; $i < record_use_count($_POST); $i++) {
-        $insertResult = insert_use($_POST);
-        if ($insertResult !== true) {
-          break;
-        }
-      }
+      // insert_use exits on a DB error, so an unfinished batch is rolled
+      // back when the connection closes instead of half-saving.
+      mysqli_begin_transaction($db);
+      record_uses($_POST, 'insert_use');
+      $new_id = mysqli_insert_id($db);
+      $insertResult = mysqli_commit($db);
 
       if($insertResult === true) {
-        $new_id = mysqli_insert_id($db);
         $message = record_use_success_message($_POST);
 
         if ($is_ajax) {
