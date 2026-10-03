@@ -39,7 +39,7 @@ require_once dirname(__DIR__) . '/use_by_date.php';
     }
     $most_recent_date = $most_recent_raw !== null ? substr($most_recent_raw, 0, 10) : null;
 
-    $use_by = use_by_date(
+    $use_by_date = use_by_date(
       $row['Acq'],
       $most_recent_date,
       $row['interaction_frequency_days'],
@@ -48,9 +48,9 @@ require_once dirname(__DIR__) . '/use_by_date.php';
 
     date_default_timezone_set('America/New_York');
     return [
-      'use_by_date' => $use_by,
+      'use_by_date' => $use_by_date,
       'most_recent_use_date' => $most_recent_date,
-      'is_overdue' => $use_by !== null && $use_by < date('Y-m-d'),
+      'is_overdue' => $use_by_date !== null && $use_by_date < date('Y-m-d'),
     ];
   }
 

@@ -21,9 +21,15 @@ const USE_BY_FALLBACK_INTERVAL = 90;
  * the result a day. Whether it is overdue is the caller's call.
  */
 function use_by_date($acquired, $last_use, $frequency, $default_interval) {
+    // Midnight UTC on the date that starts $value, or null if it holds no valid date.
+    $parse = static function ($value) {
+        $date = substr((string) $value, 0, 10);
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date, new DateTimeZone('UTC'));
+        return $parsed !== false && $parsed->format('Y-m-d') === $date ? $parsed : null;
+    };
     $interval = $frequency !== null && $frequency !== '' ? (float) $frequency : (float) $default_interval;
-    $acquired = use_by_parse_date($acquired);
-    $last_use = use_by_parse_date($last_use);
+    $acquired = $parse($acquired);
+    $last_use = $parse($last_use);
 
     if ($last_use !== null && ($acquired === null || $last_use >= $acquired)) {
         $base = $last_use;
@@ -49,11 +55,4 @@ function default_use_interval($db, $user_id) {
     mysqli_stmt_close($stmt);
     $interval = $row['default_use_interval'] ?? null;
     return $interval !== null ? (float) $interval : (float) USE_BY_FALLBACK_INTERVAL;
-}
-
-/** Midnight UTC on the date that starts $value, or null if it holds no valid date. */
-function use_by_parse_date($value) {
-    $date = substr((string) $value, 0, 10);
-    $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date, new DateTimeZone('UTC'));
-    return $parsed !== false && $parsed->format('Y-m-d') === $date ? $parsed : null;
 }

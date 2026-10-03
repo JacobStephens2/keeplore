@@ -54,17 +54,17 @@ $tracked_count = 0;
 
 while ($artifact = mysqli_fetch_assoc($artifact_result)) {
   $tracked_count++;
-  $use_by = use_by_date($artifact['Acq'], $artifact['MostRecentUseOrResponse'], $artifact['interaction_frequency_days'], $default_interval);
-  if ($use_by === null) {
+  $use_by_date = use_by_date($artifact['Acq'], $artifact['MostRecentUseOrResponse'], $artifact['interaction_frequency_days'], $default_interval);
+  if ($use_by_date === null) {
     continue; // no acquisition date and no use: nothing to be due
   }
-  $diff = (int) $now->diff(new DateTime($use_by))->format('%r%a'); // negative = overdue
+  $diff = (int) $now->diff(new DateTime($use_by_date))->format('%r%a'); // negative = overdue
 
   $overdue_items[] = [
     'id' => $artifact['id'],
     'title' => $artifact['Title'],
     'type' => $artifact['type'],
-    'use_by' => $use_by,
+    'use_by' => $use_by_date,
     'days_diff' => $diff,
     'most_recent' => $artifact['MostRecentUseOrResponse'] !== null
       ? substr($artifact['MostRecentUseOrResponse'], 0, 10)

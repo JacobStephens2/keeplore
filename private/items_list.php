@@ -236,7 +236,7 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
     }
 
     // The view's interval is a default only; the item's own frequency wins.
-    $use_by = use_by_date(
+    $use_by_date = use_by_date(
         $artifact['Acq'] ?? null,
         $most_recent_use,
         $artifact['interaction_frequency_days'] ?? null,
@@ -244,7 +244,7 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
     ) ?? '';
 
     $is_kept = artifact_is_kept($artifact);
-    $overdue = $use_by !== '' && $use_by < $today && $is_kept;
+    $overdue = $use_by_date !== '' && $use_by_date < $today && $is_kept;
 
     $mnt = (float) ($artifact['mnt'] ?? $artifact['MnT'] ?? 0);
     $mxt = (float) ($artifact['mxt'] ?? $artifact['MxT'] ?? 0);
@@ -259,7 +259,7 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
         'is_kept' => $is_kept,
         'acq' => (string) ($artifact['Acq'] ?? ''),
         'most_recent_use' => $most_recent_use,
-        'use_by' => $use_by,
+        'use_by' => $use_by_date,
         'use_by_overdue' => $overdue,
         'ss' => (string) ($artifact['ss'] ?? $artifact['SS'] ?? ''),
         'players' => items_list_players_label(
