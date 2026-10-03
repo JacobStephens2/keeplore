@@ -7,9 +7,10 @@ use PHPUnit\Framework\TestCase;
 /**
  * Seam: ui/uses/record-new.js (RecordNew).
  *
- * bindEnter: Enter anywhere on Record Use submits the form through
+ * bindEnter: Enter in a field on Record Use submits the form through
  * requestSubmit, so the browser still checks Number of uses against its
- * 1-20 range instead of form.submit() posting past it.
+ * 1-20 range instead of form.submit() posting past it. Enter in Notes
+ * and on a focused button keeps its own meaning: a new line, a press.
  *
  * keepValueOnWheel: scrolling over a focused Number of uses scrolls the
  * page instead of changing the number.
@@ -27,6 +28,45 @@ class RecordNewTest extends TestCase
     public function test_enter_falls_back_to_submit_without_request_submit(): void
     {
         $this->assertSame('submit', $this->press(['key' => 'Enter'], false)['submitted']);
+    }
+
+    public function test_enter_in_each_field_submits(): void
+    {
+        foreach (['search', 'date', 'number', 'text'] as $type) {
+            $result = $this->press(['key' => 'Enter', 'target' => ['tagName' => 'INPUT', 'type' => $type]]);
+
+            $this->assertSame('requestSubmit', $result['submitted'], $type);
+            $this->assertTrue($result['prevented'], $type);
+        }
+    }
+
+    public function test_enter_in_notes_makes_a_new_line(): void
+    {
+        $result = $this->press(['key' => 'Enter', 'target' => ['tagName' => 'TEXTAREA']]);
+
+        $this->assertNull($result['submitted']);
+        $this->assertFalse($result['prevented']);
+    }
+
+    public function test_enter_on_a_focused_button_presses_it(): void
+    {
+        $targets = [
+            ['tagName' => 'BUTTON', 'type' => 'button'],
+            ['tagName' => 'INPUT', 'type' => 'submit'],
+        ];
+        foreach ($targets as $target) {
+            $result = $this->press(['key' => 'Enter', 'target' => $target]);
+
+            $this->assertNull($result['submitted'], $target['tagName']);
+            $this->assertFalse($result['prevented'], $target['tagName']);
+        }
+    }
+
+    public function test_edit_use_add_person_button_does_not_submit(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/ui/uses/record-edit.php');
+
+        $this->assertMatchesRegularExpression('/<button\b(?=[^>]*id="addUser")(?=[^>]*type="button")[^>]*>/', $source);
     }
 
     public function test_other_keys_do_not_submit(): void

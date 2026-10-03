@@ -111,6 +111,7 @@ include(SHARED_PATH . '/header.php');
       </section>
 
       <button 
+        type="button"
         id="addUser"
         class="user"
         style="display: block;"
