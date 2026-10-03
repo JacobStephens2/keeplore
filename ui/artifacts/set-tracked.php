@@ -18,8 +18,8 @@
     redirect_to(url_for('/artifacts/useby.php'));
   }
 
-  $artifact_record = find_artifact_by_id($artifact_id);
-  if (!$artifact_record || (int) $artifact_record['user_id'] !== (int) $_SESSION['user_id']) {
+  $artifact_record = (new Items($db, (int) $_SESSION['user_id']))->find((int) $artifact_id);
+  if (!$artifact_record) {
     if ($is_ajax) {
       header('Content-Type: application/json');
       http_response_code(404);
@@ -29,7 +29,7 @@
     $_SESSION['message'] = 'Item not found.';
     redirect_to(url_for('/artifacts/index.php'));
   }
-  $artifact_name = $artifact_record['Title'] ?? ($_REQUEST['artifact_name'] ?? 'Item');
+  $artifact_name = $artifact_record['Title'];
 
   // Single kept seam: flips kept through one setter (dual-writes the new
   // and legacy columns during the overlap release).

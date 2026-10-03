@@ -47,5 +47,6 @@ DatabaseObject::set_database($database);
 require_once('../private/classes/Artifact.class.php');
 require_once('../private/classes/User.class.php');
 require_once('../private/classes/ProposalOutcomes.php');
+require_once('../private/classes/Items.php');
 
 ?>

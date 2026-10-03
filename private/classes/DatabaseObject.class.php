@@ -245,16 +245,6 @@ class DatabaseObject {
     return $sanitized;
   }
 
-  public function delete() {
-    $stmt = self::$database->prepare(
-      "DELETE FROM " . static::$table_name . " WHERE id = ? LIMIT 1"
-    );
-    $stmt->bind_param("i", $this->id);
-    $result = $stmt->execute();
-    $stmt->close();
-    return $result;
-  }
-
   static public function find_paginated($per_page = 50, $cursor = null, $direction = 'next') {
     $per_page = max(1, min(200, (int) $per_page));
     $direction = ($direction === 'prev') ? 'prev' : 'next';
@@ -407,29 +397,6 @@ class DatabaseObject {
       'prev_cursor' => $prev_cursor,
       'has_more' => $has_more,
     ];
-  }
-
-  public function delete_by_user_id() {
-    // Check existence
-    $check_stmt = self::$database->prepare(
-      "SELECT id FROM " . static::$table_name . " WHERE id = ? AND user_id = ?"
-    );
-    $check_stmt->bind_param("ii", $this->id, $this->user_id);
-    $check_stmt->execute();
-    $check_result = $check_stmt->get_result();
-    if ($check_result->num_rows === 0) {
-      $check_stmt->close();
-      return 'Record not found.';
-    }
-    $check_stmt->close();
-
-    $stmt = self::$database->prepare(
-      "DELETE FROM " . static::$table_name . " WHERE id = ? AND user_id = ? LIMIT 1"
-    );
-    $stmt->bind_param("ii", $this->id, $this->user_id);
-    $result = $stmt->execute();
-    $stmt->close();
-    return $result;
   }
 
 
