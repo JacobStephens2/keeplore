@@ -3,20 +3,22 @@
   require_once('../../private/initialize.php');
   require_login();
 
-  if(!isset($_GET['id'])) {
+  $uses = new Uses($db, (int) $_SESSION['user_id']);
+  $use = $uses->find((int) ($_GET['id'] ?? 0));
+  if ($use === null) {
+    $_SESSION['message'] = 'That use was not found.';
     redirect_to(url_for('/uses/interactions.php'));
   }
-  $id = $_GET['id'];
 
   if(is_post_request()) {
-
-    $result = delete_use_by_id($id);
-    $_SESSION['message'] = 'The use was deleted successfully.';
+    try {
+      $uses->delete($use['id']);
+      $_SESSION['message'] = 'The use was deleted successfully.';
+    } catch (OutOfBoundsException $error) {
+      $_SESSION['message'] = 'That use was not found.';
+    }
     redirect_to(url_for('/uses/interactions.php'));
-
-  } else {
-    $use = find_use_details_by_id($id);
-}
+  }
 
 ?>
 
@@ -29,20 +31,10 @@
     <h1><?php echo $page_title; ?></h1>
     <p>Are you sure you want to delete this use?</p>
     <p class="item">Interaction id: <?php echo h($use['id']); ?></p>
-    <p class="item">Interaction date: <?php echo h(substr($use['use_date'], 0, 10)); ?></p>
-    <p class="item">Item: <?php echo h($use['artifact']); ?></p>
+    <p class="item">Interaction date: <?php echo h($use['use_date']); ?></p>
+    <p class="item">Item: <?php echo h($use['item_title']); ?></p>
     <p class="item">People: 
-    <?php
-      $usersResultObject = find_users_by_use_id($use['id']);
-      $i = 0;
-      foreach ($usersResultObject as $user) {
-        $i++;
-        echo h($user['FirstName']) . ' ' . h($user['LastName']);
-        if ($i != $usersResultObject->num_rows) {
-          echo ', ';
-        }
-      }
-    ?>
+    <?php echo h(implode(', ', array_column($use['people'], 'name'))); ?>
     </p>
 
     <form action="<?php echo url_for('/uses/record-delete.php?id=' . h(u($use['id']))); ?>" method="post">

@@ -540,14 +540,13 @@ require_once dirname(__DIR__) . '/use_by_date.php';
     }
   }
 
-  function list_artifacts() {
+  function list_artifacts(int $user_id) {
     global $db;
-    $sql = "SELECT ";
-    $sql .= "games.id, ";
-    $sql .= "games.Title ";
-    $sql .= "FROM games ";
-    $sql .= "ORDER BY games.Title ASC";
-    $result = mysqli_query($db, $sql);
+    $sql = "SELECT games.id, games.Title FROM games WHERE games.user_id = ? ORDER BY games.Title ASC";
+    $stmt = mysqli_prepare($db, $sql);
+    mysqli_stmt_bind_param($stmt, "i", $user_id);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
     confirm_result_set($result);
     return $result;
   }

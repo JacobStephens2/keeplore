@@ -190,7 +190,7 @@ JS);
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/uses/record-edit.php');
 
-        $this->assertStringContainsString("h(\$user['FirstName'] . ' ' . \$user['LastName'])", $source);
+        $this->assertStringContainsString("h(\$user['name'])", $source);
     }
 
     public function test_results_close_when_focus_leaves_the_row(): void
