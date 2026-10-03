@@ -94,17 +94,6 @@ function with_item_tags($conn, array $items, $user_id) {
   return attach_item_tags($items, find_item_tags_for_artifacts($conn, $ids, $user_id));
 }
 
-function persist_and_attach_item_tags($conn, $item, $user_id, $tags = null) {
-  $id = is_object($item) ? (int) ($item->id ?? 0) : (int) ($item['id'] ?? 0);
-  if ($user_id && $tags !== null) {
-    replace_item_tags($conn, $id, $user_id, $tags);
-  }
-  if ($user_id) {
-    return with_item_tags($conn, [$item], $user_id)[0];
-  }
-  return $item;
-}
-
 function replace_item_tags($conn, $artifact_id, $user_id, $tags) {
   $artifact_id = (int) $artifact_id;
   $user_id = (int) $user_id;

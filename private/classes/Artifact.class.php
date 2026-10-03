@@ -5,12 +5,6 @@ require_once dirname(__DIR__) . '/item_tags.php';
 class Artifact extends DatabaseObject {
 
   static protected $table_name = 'games';
-  static protected $db_columns = [
-    'Access', 'Acq', 'Age', 'age_max', 'Av', 'BGG_Rat', 'Candidate', 'FavCt', 'FullTitle', 'id',
-    'is_digital', 'is_in_secondary_collection', 'is_kept', 'is_physical',
-    'MnP', 'MnT', 'MxP', 'MxT', 'OrigPlat', 'SS', 'System', 'Title',
-    'to_get_rid_of', 'type', 'UsedRecUserCt', 'user_id', 'Wt', 'Yr'
-  ];
 
   public $id;
   public $tags = [];
