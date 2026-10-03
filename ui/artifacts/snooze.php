@@ -30,17 +30,8 @@
     $days = $default_snooze_days;
   }
 
-  $artifact_record = (new Items($db, (int) $_SESSION['user_id']))->find((int) $artifact_id);
-  if (!$artifact_record) {
-    if ($is_ajax) {
-      header('Content-Type: application/json');
-      http_response_code(404);
-      echo json_encode(['ok' => false, 'message' => 'Item not found.']);
-      exit;
-    }
-    $_SESSION['message'] = 'Item not found.';
-    redirect_to(url_for('/artifacts/index.php'));
-  }
+  $artifact_id = (int) $artifact_id;
+  $artifact_record = find_owned_item_or_exit($artifact_id, $is_ajax);
   $artifact_name = $artifact_record['Title'];
 
   $snooze_until = snooze_artifact($artifact_id, $days);
