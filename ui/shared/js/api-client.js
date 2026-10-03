@@ -8,10 +8,10 @@
 // publicEnvironmentVariables.js). Override it after import if needed:
 // ApiClient.baseUrl = 'https://other-host';
 
-import { API_ORIGIN } from '../../uses/modules/publicEnvironmentVariables.js';
+import { API_BASE } from '../../uses/modules/publicEnvironmentVariables.js';
 
 const ApiClient = {
-  baseUrl: `https://${API_ORIGIN}`,
+  baseUrl: API_BASE,
 
   /**
    * Core request method. All other methods delegate here.

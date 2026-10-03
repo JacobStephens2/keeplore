@@ -26,6 +26,15 @@ class ApiOriginTest extends TestCase
         $this->assertSame('api.keeplore.app', $this->apiOrigin(null));
     }
 
+    public function test_api_base_is_the_https_url_of_the_api_origin(): void
+    {
+        $url = json_encode('file://' . self::MODULE);
+        $this->assertSame('https://api.staging.keeplore.app', $this->node('api.staging.keeplore.app', <<<JS
+const { API_BASE } = await import({$url});
+process.stdout.write(API_BASE);
+JS));
+    }
+
     public function test_native_notifications_fetch_from_the_meta_tag_host(): void
     {
         $this->assertSame(

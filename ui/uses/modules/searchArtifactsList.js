@@ -1,4 +1,4 @@
-import { API_ORIGIN } from "./publicEnvironmentVariables.js";
+import { API_BASE } from "./publicEnvironmentVariables.js";
 
 // Search artifacts
 
@@ -7,7 +7,7 @@ function searchArtifacts(e) {
     query: e.target.value,
     userid: e.srcElement.dataset.userid
   };
-  fetch("https://" + API_ORIGIN + "/artifacts.php", {
+  fetch(API_BASE + "/artifacts.php", {
     method: "POST",
     credentials: "include",
     body: JSON.stringify(requestBody),
