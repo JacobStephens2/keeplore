@@ -3,7 +3,16 @@
 /**
  * The owner's people list: everyone who can be recorded on uses, item
  * proposals and events, one of whom can be marked as the owner themself.
- * Every read and write is scoped to the owner.
+ * Every read and write is scoped to the owner: another owner's person is
+ * never found and never changed.
+ *
+ * A person is an array of id, first_name, last_name, name (first and last
+ * joined), gender, birth_year (int or null) and is_me. Input for create and
+ * update uses the same names, with is_me read only by update.
+ *
+ * Invalid input, and a merge its guardrails refuse, throws
+ * InvalidArgumentException; update or delete of a person the owner doesn't
+ * have throws OutOfBoundsException. Nothing is written either way.
  */
 final class People
 {
@@ -44,6 +53,7 @@ final class People
         ));
     }
 
+    /** The owner's person with this id, or null if the owner has none. */
     public function find(int $id): ?array
     {
         $row = $this->rows(
