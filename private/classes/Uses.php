@@ -20,8 +20,8 @@ final class Uses
     public function record(array $input): array
     {
         $count = max(1, min(self::MAX_COUNT, (int) ($input['count'] ?? 1)));
-        $input = $this->validate($input);
         return $this->transaction(function () use ($input, $count) {
+            $input = $this->validate($input);
             $ids = [];
             for ($i = 0; $i < $count; $i++) {
                 $this->statement(
@@ -41,7 +41,7 @@ final class Uses
         $use = $this->rows(
             'SELECT uses.id, uses.artifact_id AS item_id, games.Title AS item_title, uses.use_date,
                 uses.note AS setting, uses.notesTwo AS notes
-             FROM uses LEFT JOIN games ON games.id = uses.artifact_id
+             FROM uses LEFT JOIN games ON games.id = uses.artifact_id AND games.user_id = uses.user_id
              WHERE uses.id = ? AND uses.user_id = ?',
             'ii', [$id, $this->userId]
         )[0] ?? null;
@@ -60,9 +60,9 @@ final class Uses
         ], $this->rows(
             "SELECT players.id, TRIM(CONCAT(COALESCE(players.FirstName, ''), ' ', COALESCE(players.LastName, ''))) AS name
              FROM uses_players JOIN players ON players.id = uses_players.player_id
-             WHERE uses_players.use_id = ? AND uses_players.user_id = ?
+             WHERE uses_players.use_id = ? AND uses_players.user_id = ? AND players.user_id = ?
              ORDER BY uses_players.id",
-            'ii', [$id, $this->userId]
+            'iii', [$id, $this->userId, $this->userId]
         ));
         return $use;
     }
@@ -70,8 +70,8 @@ final class Uses
     /** Replace the use's item, date, Setting, notes and people. */
     public function update(int $id, array $input): void
     {
-        $input = $this->validate($input);
         $this->transaction(function () use ($id, $input) {
+            $input = $this->validate($input);
             $this->requireUse($id);
             $this->statement(
                 'UPDATE uses SET artifact_id = ?, use_date = ?, note = ?, notesTwo = ? WHERE id = ? AND user_id = ?',
@@ -128,7 +128,7 @@ final class Uses
         }
 
         $playerIds = $input['player_ids'] ?? [];
-        if (!is_array($playerIds)) {
+        if (!is_array($playerIds) || array_filter($playerIds, fn ($playerId) => !is_scalar($playerId) && $playerId !== null)) {
             throw new InvalidArgumentException('Choose people from your own people list.');
         }
         $playerIds = array_values(array_unique(array_filter(array_map('intval', $playerIds))));

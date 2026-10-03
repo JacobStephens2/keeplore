@@ -178,7 +178,7 @@ class RecordUseTest extends TestCase
             'setting' => 'Cabin',
             'notes' => 'Close game',
             'player_ids' => ['1', '', '2'],
-            'count' => 2,
+            'count' => '2',
         ], record_use_input([
             'artifact' => ['id' => '12', 'name' => 'Old Maid'],
             'user' => [

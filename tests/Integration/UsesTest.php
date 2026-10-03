@@ -154,6 +154,7 @@ final class UsesTest extends TestCase
             'another user\'s item' => [['item_id' => 20]],
             'another user\'s person' => [['player_ids' => [100, 200]]],
             'missing person' => [['player_ids' => [999]]],
+            'malformed person' => [['player_ids' => [['1']]]],
             'missing item' => [['item_id' => 999]],
             'no item' => [['item_id' => '']],
             'impossible date' => [['use_date' => '2026-02-30']],

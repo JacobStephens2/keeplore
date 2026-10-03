@@ -29,7 +29,7 @@ function record_use_input(array $post): array
         'setting' => $post['Note'] ?? '',
         'notes' => $post['NotesTwo'] ?? '',
         'player_ids' => array_column($post['user'] ?? [], 'id'),
-        'count' => record_use_count($post),
+        'count' => $post['useCount'] ?? 1,
     ];
 }
 

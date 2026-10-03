@@ -9,8 +9,7 @@ A tracked entity or object for which an interaction or use can be recorded, incl
 _Avoid_: Game (when referring to all supported item types).
 
 **Use**:
-A recorded occasion when an item was used, on a date, optionally with people, a Setting (where it was used) and notes. One Record Use submit can record several identical uses at once through its Number of uses.
-_Avoid_: Item proposal (a proposal is never a use).
+A recorded occasion when an item was used, on a date, optionally with people, a Setting (where it was used) and notes. One Record Use submit can record several identical uses at once through its Number of uses. Distinct from an item proposal, which is never a use.
 
 **Item proposal**:
 A suggestion to a group to use a particular item, as observed by the Keeplore user. Its recorded outcome describes the proposal as a whole, with optional participants and a note identifying individual objections.
