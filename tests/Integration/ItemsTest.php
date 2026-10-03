@@ -2,13 +2,16 @@
 
 namespace Tests\Integration;
 
+use ItemInvalid;
 use Items;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Seam: Items, the owner's Items. Another owner's Item is never found and
- * never deleted, and deleting an Item removes its tags and its Event plan
- * entries with it.
+ * Seam: Items, the owner's Items. Another owner's Item is never found,
+ * changed or deleted. Create and update share one set of defaults,
+ * validation and normalizers, and write the Item with its tags in one
+ * transaction. Deleting an Item removes its tags and its Event plan entries
+ * with it.
  */
 final class ItemsTest extends TestCase
 {
@@ -34,6 +37,20 @@ final class ItemsTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        // Items write every item column, so games and owner-scoped types
+        // come from the app's schema rather than the shared fixture.
+        $this->runSql('DROP TABLE games, types');
+        $this->runSql($this->schemaTable('types') . $this->schemaTable('games'));
+        $this->runSql("INSERT INTO types (id, objectType, user_id) VALUES
+            (1, 'board-game', 1), (2, 'film', 1), (3, 'card game', 2)");
+        $this->runSql("INSERT INTO games (id, user_id, Title, type_id, type, is_kept, is_digital, is_physical,
+                Candidate, CandidateGroupDate, UsedRecUserCt, image_url, SS, MnT, MxT, MnP, MxP, Age, Acq)
+            VALUES
+            (10, 1, 'Catan', 1, 'board-game', 1, 1, 1, 'yes', '2020-05-01', '3',
+                'https://cf.geekdo-images.com/catan.jpg', '04', 60, 120, 3, 4, 10, '2020-01-01'),
+            (11, 1, 'Azul', 1, 'board-game', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-01'),
+            (20, 2, 'Private item', 3, 'card game', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-01')");
+        $this->runSql('UPDATE users SET default_use_interval = 120 WHERE id = 1');
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-events.sql'));
         $this->runSql("INSERT INTO item_tags (user_id, artifact_id, tag) VALUES
@@ -60,6 +77,13 @@ final class ItemsTest extends TestCase
                 $result->free();
             }
         } while ($this->db->more_results() && $this->db->next_result());
+    }
+
+    private function schemaTable(string $table): string
+    {
+        $schema = file_get_contents(PROJECT_PATH . '/database/local-schema.sql');
+        preg_match('/CREATE TABLE IF NOT EXISTS ' . $table . ' \(.*?\) ENGINE=[^;]*;/s', $schema, $match);
+        return $match[0];
     }
 
     private function column(string $sql): array
@@ -149,5 +173,335 @@ final class ItemsTest extends TestCase
         $this->assertSame('Catan', $this->items->find(10)['Title']);
         $this->assertSame(['beach-safe', 'family'], $this->tagsOf(10));
         $this->assertSame([1], $this->plannedOn(10));
+    }
+
+    private function invalid(callable $write): ItemInvalid
+    {
+        try {
+            $write();
+        } catch (ItemInvalid $invalid) {
+            return $invalid;
+        }
+        $this->fail('The write must be rejected as invalid.');
+    }
+
+    private function itemCount(): int
+    {
+        return $this->column('SELECT COUNT(*) FROM games')[0];
+    }
+
+    public function test_create_applies_the_create_defaults(): void
+    {
+        $item = $this->items->find($this->items->create(['Title' => 'Quelf']));
+
+        $this->assertSame(1, (int) $item['user_id']);
+        $this->assertSame(30, (int) $item['MnT']);
+        $this->assertSame(60, (int) $item['MxT']);
+        $this->assertSame(1, (int) $item['MnP']);
+        $this->assertSame(1, (int) $item['MxP']);
+        $this->assertSame('01', $item['SS']);
+        $this->assertSame(0, (int) $item['Age']);
+        $this->assertSame(date('Y-m-d'), $item['Acq']);
+        $this->assertSame(1, (int) $item['is_kept']);
+        $this->assertEquals(120, $item['interaction_frequency_days']);
+        $this->assertSame(date('Y-m-d'), $item['CandidateGroupDate']);
+        $this->assertSame('0', $item['UsedRecUserCt']);
+        $this->assertNull($item['type_id']);
+        $this->assertNull($item['type']);
+        $this->assertNull($item['is_digital']);
+        $this->assertNull($item['is_physical']);
+        $this->assertSame(0, (int) $item['to_get_rid_of']);
+    }
+
+    public function test_create_treats_blank_fields_as_missing(): void
+    {
+        $item = $this->items->find($this->items->create([
+            'Title' => 'Quelf', 'MnT' => '', 'MxT' => '', 'MnP' => '', 'MxP' => '', 'SS' => '',
+            'Age' => '', 'Acq' => '', 'is_kept' => '', 'interaction_frequency_days' => '', 'type_id' => '', 'Yr' => '',
+        ]));
+
+        $this->assertSame([30, 60, 1, 1], [(int) $item['MnT'], (int) $item['MxT'], (int) $item['MnP'], (int) $item['MxP']]);
+        $this->assertSame('01', $item['SS']);
+        $this->assertSame(0, (int) $item['Age']);
+        $this->assertSame(date('Y-m-d'), $item['Acq']);
+        $this->assertSame(1, (int) $item['is_kept']);
+        $this->assertEquals(120, $item['interaction_frequency_days']);
+        $this->assertNull($item['type_id']);
+        $this->assertNull($item['Yr']);
+    }
+
+    public function test_create_writes_the_given_fields_through_the_normalizers(): void
+    {
+        $cover = 'https://cf.geekdo-images.com/SfNSwt9FWMx3FHM5ljzicQ__itemrep/img/1jsqDH3ag4F7k82kgg-j_6TOrj4=/fit-in/246x300/filters:strip_icc()/pic200936.jpg';
+        $id = $this->items->create([
+            'Title' => 'Quelf', 'Notes' => 'Party game', 'Acq' => '2026-09-20', 'type_id' => '2',
+            'is_kept' => '0', 'is_in_secondary_collection' => '1', 'is_digital' => '1', 'is_physical' => '0',
+            'SS' => '05,06', 'MnT' => '60', 'MxT' => '60', 'MnP' => '3', 'MxP' => '8', 'Age' => '12', 'Yr' => ' 2005 ',
+            'interaction_frequency_days' => '182.5', 'image_url' => $cover,
+            'bgg_url' => 'boardgamegeek.com/boardgame/19370/quelf', 'bgg_player_votes' => '19',
+            'bgg_age_basis' => 'community', 'BGG_Rat' => '6.123', 'tags' => 'Party, family',
+        ]);
+
+        $item = $this->items->find($id);
+        $this->assertSame('Quelf', $item['Title']);
+        $this->assertSame('Party game', $item['Notes']);
+        $this->assertSame('2026-09-20', $item['Acq']);
+        $this->assertSame(2, (int) $item['type_id']);
+        $this->assertSame('film', $item['type']);
+        $this->assertSame('film', $item['type_name']);
+        $this->assertSame([0, 1, 1, 0], [(int) $item['is_kept'], (int) $item['is_in_secondary_collection'], (int) $item['is_digital'], (int) $item['is_physical']]);
+        $this->assertSame('05,06', $item['SS']);
+        $this->assertSame([60, 60, 3, 8, 12], [(int) $item['MnT'], (int) $item['MxT'], (int) $item['MnP'], (int) $item['MxP'], (int) $item['Age']]);
+        $this->assertEquals(2005, $item['Yr']);
+        $this->assertEquals(182.5, $item['interaction_frequency_days']);
+        $this->assertSame($cover, $item['image_url']);
+        $this->assertSame('https://boardgamegeek.com/boardgame/19370/quelf', $item['bgg_url']);
+        $this->assertSame(19, (int) $item['bgg_player_votes']);
+        $this->assertSame('community', $item['bgg_age_basis']);
+        $this->assertSame('6.12', $item['BGG_Rat']);
+        $this->assertSame(['family', 'party'], $this->tagsOf($id));
+    }
+
+    public function test_create_ignores_unknown_keys_and_never_writes_the_owner_or_snooze(): void
+    {
+        $item = $this->items->find($this->items->create([
+            'Title' => 'Quelf', 'user_id' => 2, 'snoozed_until' => '2030-01-01', 'no_such_column' => 'x',
+        ]));
+
+        $this->assertSame(1, (int) $item['user_id']);
+        $this->assertNull($item['snoozed_until']);
+    }
+
+    public function test_create_rejects_a_type_that_is_not_the_owners(): void
+    {
+        $before = $this->itemCount();
+
+        $this->assertSame(['Type must be one of your types.'], $this->invalid(fn () => $this->items->create(['Title' => 'Quelf', 'type_id' => 3]))->errors);
+        $this->assertSame(['Type must be one of your types.'], $this->invalid(fn () => $this->items->create(['Title' => 'Quelf', 'type_id' => 999]))->errors);
+        $this->assertSame(['Type must be one of your types.'], $this->invalid(fn () => $this->items->create(['Title' => 'Quelf', 'type_id' => 'film']))->errors);
+        $this->assertSame($before, $this->itemCount());
+    }
+
+    public function test_create_reports_every_validation_error_together(): void
+    {
+        $before = $this->itemCount();
+
+        $invalid = $this->invalid(fn () => $this->items->create([
+            'Title' => 'Q', 'is_kept' => 'maybe', 'MnT' => 'long', 'MxP' => 'many', 'MnP' => '6', 'Age' => '-1',
+            'Yr' => '20055', 'Acq' => '2026-02-30', 'bgg_url' => 'https://example.com/quelf',
+            'interaction_frequency_days' => '0', 'tags' => 'party',
+        ]));
+
+        $expected = [
+            'Title must be between 2 and 255 characters.',
+            'Kept must be true or false.',
+            'Minimum Time must be a number.',
+            'Maximum User Count must be a number.',
+            'Minimum Age must be a non-negative number.',
+            'Year must be a 1 to 4 digit number.',
+            'Tracking Start Date must be a valid date (YYYY-MM-DD).',
+            'BoardGameGeek Link must be a boardgamegeek.com, rpggeek.com, or videogamegeek.com page.',
+            'Interaction Frequency must be a positive number.',
+        ];
+        $this->assertInstanceOf(\InvalidArgumentException::class, $invalid);
+        $this->assertSame($expected, $invalid->errors);
+        $this->assertSame(implode(' ', $expected), $invalid->getMessage());
+        $this->assertSame($before, $this->itemCount());
+        $this->assertSame(0, $this->column("SELECT COUNT(*) FROM item_tags WHERE tag = 'party'")[0]);
+    }
+
+    public function test_create_rejects_a_blank_title_and_unordered_ranges(): void
+    {
+        $this->assertSame(['Title cannot be blank.'], $this->invalid(fn () => $this->items->create([]))->errors);
+        $this->assertSame(
+            ['Minimum Time cannot exceed Maximum Time.', 'Minimum User Count cannot exceed Maximum User Count.'],
+            $this->invalid(fn () => $this->items->create(['Title' => 'Quelf', 'MnT' => '90', 'MnP' => '4']))->errors
+        );
+    }
+
+    public function test_a_failed_create_leaves_no_item_and_no_tags(): void
+    {
+        $before = $this->itemCount();
+        $this->runSql('CREATE TRIGGER item_tags_no_insert BEFORE INSERT ON item_tags FOR EACH ROW
+            SIGNAL SQLSTATE \'45000\' SET MESSAGE_TEXT = \'no tags\'');
+
+        try {
+            $this->items->create(['Title' => 'Quelf', 'tags' => 'party']);
+            $this->fail('The create must fail.');
+        } catch (\mysqli_sql_exception $expected) {
+        }
+
+        $this->assertSame($before, $this->itemCount());
+    }
+
+    public function test_update_changes_only_the_given_fields(): void
+    {
+        $before = $this->items->find(10);
+
+        $this->items->update(10, ['Notes' => 'Seafarers expansion']);
+
+        $after = $this->items->find(10);
+        $this->assertSame('Seafarers expansion', $after['Notes']);
+        unset($before['Notes'], $after['Notes']);
+        $this->assertSame($before, $after);
+        $this->assertSame(['beach-safe', 'family'], $this->tagsOf(10));
+    }
+
+    public function test_update_leaves_the_format_flags_and_legacy_fields_alone(): void
+    {
+        $this->items->update(10, [
+            'Title' => 'Catan', 'is_kept' => '0', 'to_get_rid_of' => '1', 'is_in_secondary_collection' => '1',
+            'CandidateGroupDate' => '2030-01-01', 'UsedRecUserCt' => '99',
+        ]);
+
+        $item = $this->items->find(10);
+        $this->assertSame([0, 1, 1], [(int) $item['is_kept'], (int) $item['to_get_rid_of'], (int) $item['is_in_secondary_collection']]);
+        $this->assertSame([1, 1], [(int) $item['is_digital'], (int) $item['is_physical']]);
+        $this->assertSame('yes', $item['Candidate']);
+        $this->assertSame('2020-05-01', $item['CandidateGroupDate']);
+        $this->assertSame('3', $item['UsedRecUserCt']);
+        $this->assertSame('https://cf.geekdo-images.com/catan.jpg', $item['image_url']);
+    }
+
+    public function test_update_writes_the_format_flags_when_given(): void
+    {
+        $this->items->update(10, ['is_digital' => '0', 'is_physical' => '']);
+
+        $item = $this->items->find(10);
+        $this->assertSame(0, (int) $item['is_digital']);
+        $this->assertNull($item['is_physical']);
+    }
+
+    public function test_update_gives_blank_times_counts_sweet_spot_age_and_acquisition_their_create_defaults(): void
+    {
+        $this->items->update(10, ['MnT' => '', 'MxT' => '', 'MnP' => '', 'MxP' => '', 'SS' => '', 'Age' => '', 'Acq' => '']);
+
+        $item = $this->items->find(10);
+        $this->assertSame([30, 60, 1, 1], [(int) $item['MnT'], (int) $item['MxT'], (int) $item['MnP'], (int) $item['MxP']]);
+        $this->assertSame('01', $item['SS']);
+        $this->assertSame(0, (int) $item['Age']);
+        $this->assertSame(date('Y-m-d'), $item['Acq']);
+    }
+
+    public function test_update_with_a_blank_type_keeps_the_current_type(): void
+    {
+        $this->items->update(10, ['type_id' => '']);
+
+        $this->assertSame('board-game', $this->items->find(10)['type']);
+
+        $this->items->update(10, ['type_id' => '2']);
+
+        $item = $this->items->find(10);
+        $this->assertSame(2, (int) $item['type_id']);
+        $this->assertSame('film', $item['type']);
+    }
+
+    public function test_update_rejects_a_type_that_is_not_the_owners(): void
+    {
+        $invalid = $this->invalid(fn () => $this->items->update(10, ['type_id' => 3]));
+
+        $this->assertSame(['Type must be one of your types.'], $invalid->errors);
+        $this->assertSame(1, (int) $this->items->find(10)['type_id']);
+    }
+
+    public function test_update_replaces_the_tags_only_when_given(): void
+    {
+        $this->items->update(10, ['tags' => ['Outdoor', 'family']]);
+        $this->assertSame(['family', 'outdoor'], $this->tagsOf(10));
+
+        $this->items->update(10, ['Title' => 'Catan']);
+        $this->assertSame(['family', 'outdoor'], $this->tagsOf(10));
+
+        $this->items->update(10, ['tags' => '']);
+        $this->assertSame([], $this->tagsOf(10));
+    }
+
+    public function test_update_stores_the_year(): void
+    {
+        $this->items->update(10, ['Yr' => '1995']);
+        $this->assertEquals(1995, $this->items->find(10)['Yr']);
+
+        $this->items->update(10, ['Yr' => ' ']);
+        $this->assertNull($this->items->find(10)['Yr']);
+    }
+
+    public function test_update_stores_the_bgg_link_and_its_vote_basis(): void
+    {
+        $link = 'https://boardgamegeek.com/boardgame/13/catan';
+        $this->items->update(10, ['bgg_url' => 'http://boardgamegeek.com/boardgame/13/catan', 'bgg_player_votes' => '19', 'bgg_age_basis' => 'community']);
+        $item = $this->items->find(10);
+        $this->assertSame($link, $item['bgg_url']);
+        $this->assertSame(19, (int) $item['bgg_player_votes']);
+
+        $this->assertSame(
+            ['BoardGameGeek Link must be a boardgamegeek.com, rpggeek.com, or videogamegeek.com page.'],
+            $this->invalid(fn () => $this->items->update(10, ['bgg_url' => 'javascript:alert(1)']))->errors
+        );
+        $this->assertSame($link, $this->items->find(10)['bgg_url']);
+
+        $this->items->update(10, ['bgg_player_votes' => 'many', 'bgg_age_basis' => 'guess']);
+        $item = $this->items->find(10);
+        $this->assertSame($link, $item['bgg_url']);
+        $this->assertNull($item['bgg_player_votes']);
+        $this->assertNull($item['bgg_age_basis']);
+
+        $this->items->update(10, ['bgg_player_votes' => '19', 'bgg_age_basis' => 'community']);
+        $this->items->update(10, ['bgg_url' => '']);
+        $item = $this->items->find(10);
+        $this->assertNull($item['bgg_url']);
+        $this->assertNull($item['bgg_player_votes']);
+        $this->assertNull($item['bgg_age_basis']);
+    }
+
+    public function test_update_never_writes_the_id_owner_or_snooze(): void
+    {
+        $this->items->update(10, ['id' => 99, 'user_id' => 2, 'snoozed_until' => '2030-01-01']);
+
+        $item = $this->items->find(10);
+        $this->assertSame(1, (int) $item['user_id']);
+        $this->assertNull($item['snoozed_until']);
+    }
+
+    public function test_updating_another_owners_item_is_not_found_and_changes_nothing(): void
+    {
+        try {
+            $this->items->update(20, ['Title' => 'Mine now', 'tags' => 'stolen']);
+            $this->fail('Another owner\'s Item must not be updated.');
+        } catch (\OutOfBoundsException $expected) {
+        }
+
+        $this->assertSame('Private item', (new Items($this->db, 2))->find(20)['Title']);
+        $this->assertSame(['mine'], $this->tagsOf(20));
+    }
+
+    public function test_updating_a_missing_item_is_not_found(): void
+    {
+        $this->expectException(\OutOfBoundsException::class);
+        $this->items->update(999, ['Title' => 'Nothing']);
+    }
+
+    public function test_an_invalid_update_leaves_the_item_and_its_tags(): void
+    {
+        $invalid = $this->invalid(fn () => $this->items->update(10, ['Title' => 'C', 'MnT' => '500', 'tags' => 'new']));
+
+        $this->assertSame(['Title must be between 2 and 255 characters.', 'Minimum Time cannot exceed Maximum Time.'], $invalid->errors);
+        $this->assertSame('Catan', $this->items->find(10)['Title']);
+        $this->assertSame(60, (int) $this->items->find(10)['MnT']);
+        $this->assertSame(['beach-safe', 'family'], $this->tagsOf(10));
+    }
+
+    public function test_a_failed_update_leaves_the_item_and_its_tags(): void
+    {
+        $this->runSql('CREATE TRIGGER item_tags_no_insert BEFORE INSERT ON item_tags FOR EACH ROW
+            SIGNAL SQLSTATE \'45000\' SET MESSAGE_TEXT = \'no tags\'');
+
+        try {
+            $this->items->update(10, ['Title' => 'Catan Junior', 'tags' => 'kids']);
+            $this->fail('The update must fail.');
+        } catch (\mysqli_sql_exception $expected) {
+        }
+
+        $this->assertSame('Catan', $this->items->find(10)['Title']);
+        $this->assertSame(['beach-safe', 'family'], $this->tagsOf(10));
     }
 }
