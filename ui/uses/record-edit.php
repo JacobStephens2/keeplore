@@ -113,6 +113,7 @@ include(SHARED_PATH . '/header.php');
       <button 
         id="addUser"
         class="user"
+        type="button"
         style="display: block;"
         >
         +
