@@ -249,7 +249,7 @@ final class Items
     private function ownerType($typeId): ?array
     {
         $typeId = trim((string) $typeId);
-        return preg_match('/^[1-9][0-9]*$/', $typeId) ? user_type($this->db, $this->userId, (int) $typeId) : null;
+        return preg_match('/^[1-9][0-9]*$/', $typeId) ? (new Types($this->db, $this->userId))->find((int) $typeId) : null;
     }
 
     /**

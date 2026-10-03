@@ -3,6 +3,7 @@
 namespace Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
+use Types;
 
 /**
  * An owner's Type for BoardGameGeek items, used on Create Item and set on
@@ -173,8 +174,8 @@ final class BggDefaultTypeTest extends TestCase
 
     public function test_an_owners_types_are_listed_by_name(): void
     {
-        $this->assertSame(['board-game' => 1, 'film' => 2], user_types($this->db, 1));
-        $this->assertSame(['table game' => 3], user_types($this->db, 2));
+        $this->assertSame(['board-game' => 1, 'film' => 2], array_column((new Types($this->db, 1))->all(), 'id', 'name'));
+        $this->assertSame(['table game' => 3], array_column((new Types($this->db, 2))->all(), 'id', 'name'));
     }
 
     private function runSql(string $sql): void

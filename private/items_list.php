@@ -11,10 +11,9 @@ require_once __DIR__ . '/item_types.php';
 require_once __DIR__ . '/use_by_date.php';
 
 function items_list_load_filter_defaults($user_id) {
-    global $db, $typesArray;
+    global $db;
     $default_interval = default_use_interval($db, $user_id);
-    require_once SHARED_PATH . '/artifact_type_array.php';
-    return [$default_interval, $typesArray ?? []];
+    return [$default_interval, array_column((new Types($db, (int) $user_id))->all(), 'id', 'name')];
 }
 
 function items_list_filters_from_request(

@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/classes/Types.php';
+
 /**
  * Which item types fall in the Items page's type categories: games, and
  * Other (items still waiting for a real type).
@@ -38,19 +40,6 @@ function item_type_ids_where(array $types_by_name, callable $matches) {
   return $ids;
 }
 
-// The owner's types as [type name => id], by name.
-function user_types($conn, int $user_id): array {
-  $stmt = mysqli_prepare($conn, "SELECT id, objectType FROM types WHERE user_id = ? ORDER BY objectType ASC");
-  mysqli_stmt_bind_param($stmt, 'i', $user_id);
-  mysqli_stmt_execute($stmt);
-  $types = [];
-  foreach (mysqli_stmt_get_result($stmt) as $row) {
-    $types[(string) $row['objectType']] = (int) $row['id'];
-  }
-  mysqli_stmt_close($stmt);
-  return $types;
-}
-
 /**
  * The owner's Type for BoardGameGeek items, used on Create Item, as
  * ['id' => int, 'name' => string], or null when none is set or the stored
@@ -83,10 +72,11 @@ function user_bgg_default_type_set($conn, int $user_id, $raw): array {
   try {
     $type = null;
     if ($raw !== '') {
-      $type = user_type($conn, $user_id, (int) $raw);
+      $type = (new Types($conn, $user_id))->find((int) $raw);
       if ($type === null) {
         return ['ok' => false, 'error' => 'That type is not one of yours.'];
       }
+      $type = ['id' => $type['id'], 'name' => $type['name']];
     }
     $value = $type['id'] ?? null;
     $stmt = mysqli_prepare($conn, "SELECT bgg_default_type_id FROM users WHERE id = ? LIMIT 1");
@@ -110,15 +100,4 @@ function user_bgg_default_type_set($conn, int $user_id, $raw): array {
   return ['ok' => true, 'type' => $type, 'message' => $type === null
     ? 'You no longer have a type for BoardGameGeek items.'
     : 'Your type for BoardGameGeek items is now ' . $type['name'] . '.'];
-}
-
-// One of the owner's types as ['id' => int, 'name' => string], or null when
-// the id is not one of theirs.
-function user_type($conn, int $user_id, int $type_id): ?array {
-  $stmt = mysqli_prepare($conn, "SELECT id, objectType FROM types WHERE id = ? AND user_id = ? LIMIT 1");
-  mysqli_stmt_bind_param($stmt, 'ii', $type_id, $user_id);
-  mysqli_stmt_execute($stmt);
-  $row = mysqli_fetch_row(mysqli_stmt_get_result($stmt));
-  mysqli_stmt_close($stmt);
-  return $row ? ['id' => (int) $row[0], 'name' => (string) $row[1]] : null;
 }
