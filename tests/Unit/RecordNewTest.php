@@ -5,13 +5,16 @@ namespace Tests\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Seam: RecordNewEnter.bind(document, form).
+ * Seam: ui/uses/record-new.js (RecordNew).
  *
- * Enter anywhere on Record Use submits the form through requestSubmit, so
- * the browser still checks Number of uses against its 1-20 range instead
- * of form.submit() posting past it.
+ * bindEnter: Enter anywhere on Record Use submits the form through
+ * requestSubmit, so the browser still checks Number of uses against its
+ * 1-20 range instead of form.submit() posting past it.
+ *
+ * keepValueOnWheel: scrolling over a focused Number of uses scrolls the
+ * page instead of changing the number.
  */
-class RecordNewEnterTest extends TestCase
+class RecordNewTest extends TestCase
 {
     public function test_enter_submits_through_validation(): void
     {
@@ -34,6 +37,16 @@ class RecordNewEnterTest extends TestCase
         $this->assertFalse($result['prevented']);
     }
 
+    public function test_wheel_over_the_focused_number_blurs_it_so_the_page_scrolls(): void
+    {
+        $this->assertSame(['blurred' => true, 'prevented' => false], $this->wheel(true));
+    }
+
+    public function test_wheel_over_the_number_when_not_focused_does_nothing(): void
+    {
+        $this->assertSame(['blurred' => false, 'prevented' => false], $this->wheel(false));
+    }
+
     public function test_record_new_page_binds_the_enter_handler_instead_of_inline_submit(): void
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/uses/record-new.php');
@@ -52,7 +65,7 @@ class RecordNewEnterTest extends TestCase
         $eventJson = json_encode($event);
         $hasRequestSubmitJson = json_encode($hasRequestSubmit);
         $script = <<<JS
-const RecordNewEnter = require({$module});
+const RecordNew = require({$module});
 const listeners = {};
 let submitted = null;
 const form = { submit: function () { submitted = 'submit'; } };
@@ -60,7 +73,7 @@ if ({$hasRequestSubmitJson}) {
   form.requestSubmit = function () { submitted = 'requestSubmit'; };
 }
 const doc = { addEventListener: (type, fn) => { listeners[type] = fn; } };
-RecordNewEnter.bind(doc, form);
+RecordNew.bindEnter(doc, form);
 const event = {$eventJson};
 event.prevented = false;
 event.preventDefault = function () { event.prevented = true; };
@@ -68,6 +81,38 @@ if (listeners.keypress) {
   listeners.keypress(event);
 }
 process.stdout.write(JSON.stringify({ submitted: submitted, prevented: event.prevented }));
+JS;
+
+        $cmd = 'node -e ' . escapeshellarg($script) . ' 2>&1';
+        $output = [];
+        $code = 0;
+        exec($cmd, $output, $code);
+        $raw = implode("\n", $output);
+        $this->assertSame(0, $code, $raw);
+
+        $decoded = json_decode($raw, true);
+        $this->assertIsArray($decoded);
+        return $decoded;
+    }
+
+    /** @return array{blurred: bool, prevented: bool} */
+    private function wheel(bool $focused): array
+    {
+        $module = json_encode(PROJECT_PATH . '/ui/uses/record-new.js');
+        $focusedJson = json_encode($focused);
+        $script = <<<JS
+const RecordNew = require({$module});
+const listeners = {};
+let blurred = false;
+const input = {
+  addEventListener: (type, fn) => { listeners[type] = fn; },
+  blur() { blurred = true; },
+};
+const doc = { activeElement: {$focusedJson} ? input : null };
+RecordNew.keepValueOnWheel(doc, input);
+const event = { prevented: false, preventDefault() { event.prevented = true; } };
+listeners.wheel(event);
+process.stdout.write(JSON.stringify({ blurred, prevented: event.prevented }));
 JS;
 
         $cmd = 'node -e ' . escapeshellarg($script) . ' 2>&1';

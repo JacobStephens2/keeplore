@@ -1,11 +1,18 @@
-// Record Use: Enter anywhere submits the form.
+// Record Use page behaviour.
 //
-// requestSubmit runs the browser's constraint checks (Number of uses must
-// be 1-20); form.submit() would post past them. Callers pass the form so
-// tests can observe the submit without a browser.
+// bindEnter: Enter anywhere submits the form. requestSubmit runs the
+// browser's constraint checks (Number of uses must be 1-20); form.submit()
+// would post past them.
+//
+// keepValueOnWheel: a mouse wheel over a focused number input changes its
+// value. Nobody scrolls Number of uses on purpose, so the wheel blurs it
+// and scrolls the page instead.
+//
+// Callers pass the document and elements so tests can observe them
+// without a browser.
 (function () {
-  var RecordNewEnter = {
-    bind: function (doc, form) {
+  var RecordNew = {
+    bindEnter: function (doc, form) {
       if (!form) return;
 
       doc.addEventListener('keypress', function (event) {
@@ -17,13 +24,22 @@
           form.submit();
         }
       });
+    },
+
+    keepValueOnWheel: function (doc, input) {
+      if (!input) return;
+
+      input.addEventListener('wheel', function () {
+        if (doc.activeElement === input) input.blur();
+      }, { passive: true });
     }
   };
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = RecordNewEnter;
+    module.exports = RecordNew;
   } else if (typeof document !== 'undefined') {
     document.querySelector('#SearchTitles').focus();
-    RecordNewEnter.bind(document, document.querySelector('main form'));
+    RecordNew.bindEnter(document, document.querySelector('main form'));
+    RecordNew.keepValueOnWheel(document, document.querySelector('#useCount'));
   }
 })();
