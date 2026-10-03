@@ -91,7 +91,7 @@ final class UsesTest extends TestCase
             $this->assertSame('2026-09-12', $use['use_date']);
             $this->assertSame('Kitchen table', $use['setting']);
             $this->assertSame('Close game', $use['notes']);
-            $this->assertSame([['id' => 100, 'name' => 'Sam Lee'], ['id' => 101, 'name' => 'Jo Smith']], $use['people']);
+            $this->assertSame([['id' => 100, 'name' => 'Sam Lee', 'first_name' => 'Sam', 'last_name' => 'Lee'], ['id' => 101, 'name' => 'Jo Smith', 'first_name' => 'Jo', 'last_name' => 'Smith']], $use['people']);
         }
     }
 
@@ -189,7 +189,7 @@ final class UsesTest extends TestCase
         $this->assertSame('2026-09-01', $use['use_date']);
         $this->assertSame('Cabin', $use['setting']);
         $this->assertSame('Rematch', $use['notes']);
-        $this->assertSame([['id' => 101, 'name' => 'Jo Smith']], $use['people']);
+        $this->assertSame([['id' => 101, 'name' => 'Jo Smith', 'first_name' => 'Jo', 'last_name' => 'Smith']], $use['people']);
     }
 
     public function test_a_rejected_update_leaves_the_use_alone(): void
@@ -251,5 +251,42 @@ final class UsesTest extends TestCase
         $this->assertNull($this->uses->find(999));
         $this->expectException(\OutOfBoundsException::class);
         $this->uses->delete(999);
+    }
+
+    public function test_all_lists_the_owners_uses_newest_first_each_as_find_reads_it(): void
+    {
+        $first = $this->db->query('SELECT id FROM uses')->fetch_row()[0];
+        [$older] = $this->uses->record($this->use(['use_date' => '2026-03-01', 'player_ids' => [101, 100]]));
+        [$sameDay, $newest] = $this->uses->record($this->use(['count' => 2]));
+        (new Uses($this->db, 2))->record(['item_id' => 20, 'use_date' => '2026-12-01', 'player_ids' => [200]]);
+
+        $all = $this->uses->all();
+
+        $this->assertSame([$newest, $sameDay, $older, (int) $first], array_column($all, 'id'));
+        foreach ($all as $use) {
+            $this->assertSame($this->uses->find($use['id']), $use);
+        }
+        $this->assertSame([101, 100], array_column($all[2]['people'], 'id'));
+    }
+
+    public function test_all_filters_by_item_and_by_person(): void
+    {
+        [$catanWithJo] = $this->uses->record($this->use(['player_ids' => [101]]));
+        [$azulWithJo] = $this->uses->record($this->use(['item_id' => 11, 'use_date' => '2026-09-13', 'player_ids' => [101]]));
+        [$catanWithSam] = $this->uses->record($this->use(['use_date' => '2026-09-14', 'player_ids' => [100]]));
+
+        $this->assertSame([$azulWithJo, $catanWithJo], array_column($this->uses->all(null, 101), 'id'));
+        $this->assertSame([$catanWithJo], array_column($this->uses->all(10, 101), 'id'));
+        $this->assertSame([$azulWithJo], array_column($this->uses->all(11), 'id'));
+        $this->assertContains($catanWithSam, array_column($this->uses->all(10), 'id'));
+    }
+
+    public function test_all_matches_nothing_for_another_owners_item_or_person(): void
+    {
+        (new Uses($this->db, 2))->record(['item_id' => 20, 'use_date' => '2026-09-12', 'player_ids' => [200]]);
+        $this->uses->record($this->use());
+
+        $this->assertSame([], $this->uses->all(20));
+        $this->assertSame([], $this->uses->all(null, 200));
     }
 }

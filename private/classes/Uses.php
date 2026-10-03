@@ -38,33 +38,80 @@ final class Uses
 
     public function find(int $id): ?array
     {
-        $use = $this->rows(
-            'SELECT uses.id, uses.artifact_id AS item_id, games.Title AS item_title, uses.use_date,
+        return $this->read('uses.id = ?', 'i', [$id])[0] ?? null;
+    }
+
+    /**
+     * The owner's uses, newest first (by use date, then id), each as find()
+     * reads it. An item or person filter keeps only that item's uses, or
+     * the uses that person took part in.
+     */
+    public function all(?int $itemId = null, ?int $personId = null): array
+    {
+        $where = ['TRUE'];
+        $types = '';
+        $params = [];
+        if ($itemId !== null) {
+            $where[] = 'uses.artifact_id = ?';
+            $types .= 'i';
+            $params[] = $itemId;
+        }
+        if ($personId !== null) {
+            $where[] = 'EXISTS (SELECT 1 FROM uses_players
+                WHERE uses_players.use_id = uses.id AND uses_players.player_id = ? AND uses_players.user_id = uses.user_id)';
+            $types .= 'i';
+            $params[] = $personId;
+        }
+        return $this->read(implode(' AND ', $where), $types, $params);
+    }
+
+    /** The owner's uses matching $where, newest first, each with its people. */
+    private function read(string $where, string $types, array $params): array
+    {
+        $uses = array_map(fn (array $use) => [
+            'id' => (int) $use['id'],
+            'item_id' => (int) $use['item_id'],
+            'item_title' => (string) $use['item_title'],
+            'use_date' => substr((string) $use['use_date'], 0, 10),
+            'setting' => (string) $use['setting'],
+            'notes' => (string) $use['notes'],
+        ], $this->rows(
+            "SELECT uses.id, uses.artifact_id AS item_id, games.Title AS item_title, uses.use_date,
                 uses.note AS setting, uses.notesTwo AS notes
              FROM uses LEFT JOIN games ON games.id = uses.artifact_id AND games.user_id = uses.user_id
-             WHERE uses.id = ? AND uses.user_id = ?',
-            'ii', [$id, $this->userId]
-        )[0] ?? null;
-        if ($use === null) {
-            return null;
-        }
-        $use['id'] = (int) $use['id'];
-        $use['item_id'] = (int) $use['item_id'];
-        $use['item_title'] = (string) $use['item_title'];
-        $use['use_date'] = substr((string) $use['use_date'], 0, 10);
-        $use['setting'] = (string) $use['setting'];
-        $use['notes'] = (string) $use['notes'];
-        $use['people'] = array_map(fn (array $person) => [
-            'id' => (int) $person['id'],
-            'name' => $person['name'],
-        ], $this->rows(
-            "SELECT players.id, TRIM(CONCAT(COALESCE(players.FirstName, ''), ' ', COALESCE(players.LastName, ''))) AS name
-             FROM uses_players JOIN players ON players.id = uses_players.player_id
-             WHERE uses_players.use_id = ? AND uses_players.user_id = ? AND players.user_id = ?
-             ORDER BY uses_players.id",
-            'iii', [$id, $this->userId, $this->userId]
+             WHERE uses.user_id = ? AND $where
+             ORDER BY uses.use_date DESC, uses.id DESC",
+            'i' . $types, array_merge([$this->userId], $params)
         ));
-        return $use;
+        $people = $this->peopleOf(array_column($uses, 'id'));
+        return array_map(fn (array $use) => $use + ['people' => $people[$use['id']] ?? []], $uses);
+    }
+
+    /** Each use's people, keyed by use id, in the order they were recorded. */
+    private function peopleOf(array $useIds): array
+    {
+        if (!$useIds) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($useIds), '?'));
+        $people = [];
+        foreach ($this->rows(
+            "SELECT uses_players.use_id, players.id, players.FirstName, players.LastName
+             FROM uses_players JOIN players ON players.id = uses_players.player_id
+             WHERE uses_players.use_id IN ($placeholders) AND uses_players.user_id = ? AND players.user_id = ?
+             ORDER BY uses_players.id",
+            str_repeat('i', count($useIds) + 2), array_merge($useIds, [$this->userId, $this->userId])
+        ) as $person) {
+            $firstName = (string) $person['FirstName'];
+            $lastName = (string) $person['LastName'];
+            $people[(int) $person['use_id']][] = [
+                'id' => (int) $person['id'],
+                'name' => trim($firstName . ' ' . $lastName),
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+            ];
+        }
+        return $people;
     }
 
     /** Replace the use's item, date, Setting, notes and people. */

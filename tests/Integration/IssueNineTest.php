@@ -45,7 +45,7 @@ final class IssueNineTest extends TestCase
             ) ENGINE=InnoDB'
         );
         require_once PRIVATE_PATH . '/database.php';
-        require_once PRIVATE_PATH . '/use_participants.php';
+        require_once PRIVATE_PATH . '/classes/Uses.php';
         $GLOBALS['db'] = $this->db;
         $_SESSION['user_id'] = 1;
     }
@@ -73,11 +73,9 @@ final class IssueNineTest extends TestCase
     public function test_uses_carry_participants(): void
     {
         $this->db->query("INSERT INTO uses_players (use_id, player_id, user_id) VALUES (1, 100, 1)");
-        $uses = [['id' => 1, 'artifact_id' => 10]];
-        $rows = find_participants_for_uses($this->db, [1], 1);
-        $attached = attach_participants_to_uses($uses, $rows);
-        $this->assertCount(1, $attached[0]['participants']);
-        $this->assertSame('Sam', $attached[0]['participants'][0]['FirstName']);
+        $uses = (new \Uses($this->db, 1))->all();
+        $this->assertCount(1, $uses[0]['people']);
+        $this->assertSame('Sam', $uses[0]['people'][0]['first_name']);
     }
 
     // Brief 2: the uniqueness constraint rejects a duplicate link.
