@@ -7,8 +7,8 @@
   $wanted_type_id = isset($type_id) ? (string) $type_id : '';
   $current_type_id = '';
   $current_type_name = '';
-  foreach ($type_ids_by_name as $type_name => $tid) {
-    if ((string) $tid === $wanted_type_id) {
+  foreach ($type_ids_by_name as $type_name => $listed_type_id) {
+    if ((string) $listed_type_id === $wanted_type_id) {
       $current_type_id = $wanted_type_id;
       $current_type_name = $type_name;
       break;
@@ -23,8 +23,8 @@
 />
 <input type="hidden" name="type" id="type" value="<?php echo h($current_type_id); ?>" />
 <datalist id="type_list">
-  <?php foreach ($type_ids_by_name as $type_name => $tid) { ?>
-    <option value="<?php echo h($type_name); ?>" data-id="<?php echo h($tid); ?>"></option>
+  <?php foreach ($type_ids_by_name as $type_name => $listed_type_id) { ?>
+    <option value="<?php echo h($type_name); ?>" data-id="<?php echo h($listed_type_id); ?>"></option>
   <?php } ?>
 </datalist>
 <script>

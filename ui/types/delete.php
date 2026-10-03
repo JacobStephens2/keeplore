@@ -48,7 +48,7 @@ include(SHARED_PATH . '/header.php');
         Move its items to
       </label>
       <select name="move_items_to" id="move_items_to">
-        <option value="">Leave them without a type</option>
+        <option value=""<?php if ($move_items_to === '') { echo ' selected'; } ?>>Leave them without a type</option>
         <?php foreach ($types->all() as $other) { ?>
           <?php if ($other['id'] !== $id) { ?>
           <option value="<?php echo $other['id']; ?>"<?php if ($move_items_to === (string) $other['id']) { echo ' selected'; } ?>>
