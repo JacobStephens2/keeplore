@@ -8,12 +8,11 @@
 require_once __DIR__ . '/kept_status.php';
 require_once __DIR__ . '/bgg_ratings.php';
 require_once __DIR__ . '/item_types.php';
+require_once __DIR__ . '/use_by_date.php';
 
 function items_list_load_filter_defaults($user_id) {
-    $default_interval = singleValueQuery(
-        "SELECT default_use_interval FROM users WHERE id = " . (int) $user_id
-    );
-    global $typesArray;
+    global $db, $typesArray;
+    $default_interval = default_use_interval($db, $user_id);
     require_once SHARED_PATH . '/artifact_type_array.php';
     return [$default_interval, $typesArray ?? []];
 }
@@ -224,7 +223,7 @@ function items_list_query_params(array $filters, array $all_types = []) {
     return $params;
 }
 
-function items_list_present_row(array $artifact, $interval, $today = null) {
+function items_list_present_row(array $artifact, $default_interval, $today = null) {
     $today = $today ?? date('Y-m-d');
     $max_play = $artifact['MaxPlay'] ?? null;
     $max_use = $artifact['MaxUse'] ?? null;
@@ -236,21 +235,16 @@ function items_list_present_row(array $artifact, $interval, $today = null) {
         $most_recent_use = (string) ($max_use ?? '');
     }
 
-    if ($most_recent_use === '') {
-        $conditional_interval = (int) floor($interval);
-        $starting_date = $artifact['Acq'] ?? '';
-    } else {
-        $conditional_interval = (int) floor($interval * 2);
-        $starting_date = $most_recent_use;
-    }
-    $timestamp = strtotime($starting_date . ' + ' . $conditional_interval . ' days');
-    $use_by = ($timestamp === false) ? '1970-01-01' : date('Y-m-d', $timestamp);
-    if ($use_by === '1970-01-01') {
-        $use_by = '';
-    }
+    // The view's interval is a default only; the item's own frequency wins.
+    $use_by_date = use_by_date(
+        $artifact['Acq'] ?? null,
+        $most_recent_use,
+        $artifact['interaction_frequency_days'] ?? null,
+        $default_interval
+    ) ?? '';
 
     $is_kept = artifact_is_kept($artifact);
-    $overdue = $use_by !== '' && $use_by < $today && $is_kept;
+    $overdue = $use_by_date !== '' && $use_by_date < $today && $is_kept;
 
     $mnt = (float) ($artifact['mnt'] ?? $artifact['MnT'] ?? 0);
     $mxt = (float) ($artifact['mxt'] ?? $artifact['MxT'] ?? 0);
@@ -265,7 +259,7 @@ function items_list_present_row(array $artifact, $interval, $today = null) {
         'is_kept' => $is_kept,
         'acq' => (string) ($artifact['Acq'] ?? ''),
         'most_recent_use' => $most_recent_use,
-        'use_by' => $use_by,
+        'use_by' => $use_by_date,
         'use_by_overdue' => $overdue,
         'ss' => (string) ($artifact['ss'] ?? $artifact['SS'] ?? ''),
         'players' => items_list_players_label(

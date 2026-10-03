@@ -32,6 +32,13 @@ The number of an item's proposals recorded as “chose something else” within 
 **Item chosen instead**:
 The alternative selected by the group, optionally recorded as an existing item or a name without adding it to the collection. Selection does not establish actual use, so recording it does not create a use or change the alternative's use history.
 
+**Use-by date**:
+The date by which an item should next be used, shown as "Interact by". With no recorded use, or a most recent use before acquisition, it is the acquisition date plus the item's interval; otherwise the most recent use plus twice the interval. An item with neither an acquisition date nor a use has none. A use-by date before today is overdue.
+_Avoid_: Play by.
+
+**Interaction frequency**:
+An item's own interval in days, used for its use-by date in place of the default use interval. A page's interval setting changes only the default, never an item's own frequency.
+
 **Kept**:
 An item the user has chosen to keep in the primary collection.
 _Avoid_: Tracked (a legacy form label for the same idea).
