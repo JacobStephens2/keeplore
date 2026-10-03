@@ -119,8 +119,8 @@ final class People
             if ($survivorId === $loserId) {
                 throw new InvalidArgumentException('Cannot merge a player into itself.');
             }
-            $accountIsLoser = (bool) $this->rows('SELECT id FROM users WHERE id = ? AND player_id = ?', 'ii', [$this->userId, $loserId]);
-            if (($isMe[$loserId] && !$isMe[$survivorId]) || $accountIsLoser) {
+            $accountLinksToLoser = (bool) $this->rows('SELECT id FROM users WHERE id = ? AND player_id = ?', 'ii', [$this->userId, $loserId]);
+            if (($isMe[$loserId] && !$isMe[$survivorId]) || $accountLinksToLoser) {
                 throw new InvalidArgumentException('The surviving player must be the one marked as you.');
             }
 

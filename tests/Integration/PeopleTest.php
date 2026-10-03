@@ -329,7 +329,9 @@ final class PeopleTest extends TestCase
         $this->assertMergeRefused($survivorId, $loserId, $message);
 
         $this->assertSame(1, (int) $this->db->query('SELECT COUNT(*) FROM players WHERE id = 200')->fetch_row()[0]);
-        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(200));
+        foreach ([100, 101, 200] as $playerId) {
+            $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links($playerId));
+        }
     }
 
     public function test_merge_keeps_the_person_who_is_me_as_the_survivor(): void
