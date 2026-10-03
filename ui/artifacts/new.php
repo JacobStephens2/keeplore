@@ -155,6 +155,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
         <?php
           require_once PRIVATE_PATH . '/item_types.php';
           $bgg_default_type = user_bgg_default_type($db, (int) $_SESSION['user_id']);
+          $bgg_form_default_type_id = DEFAULT_TYPE;
           include(SHARED_PATH . '/bgg_lookup_panel.php');
         ?>
         <?php $preview_url = normalize_item_image_url($artifact['image_url'] ?? ''); ?>
@@ -268,8 +269,8 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
 
 </main>
 
-<script src="<?php echo url_for('/artifacts/bgg-default-type.js'); ?>?v=1"></script>
-<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=11"></script>
+<script src="<?php echo url_for('/artifacts/bgg-default-type.js'); ?>?v=2"></script>
+<script src="<?php echo url_for('/artifacts/new-bgg.js'); ?>?v=12"></script>
 <script src="<?php echo url_for('/shared/js/form-save-shortcut.js'); ?>?v=1"></script>
 <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=3"></script>
 <script type="application/json" id="create-item-lookup-config"><?php
