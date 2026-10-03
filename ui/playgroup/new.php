@@ -1,6 +1,7 @@
 <?php
 require_once('../../private/initialize.php');
 require_login();
+$people = (new People($db, (int) $_SESSION['user_id']))->all();
 
 if(is_post_request()) {
 
@@ -87,12 +88,10 @@ include(SHARED_PATH . '/header.php');
         <select name="Player1">
             <option value='141'>Jacob Stephens</option>
           <?php
-            $player_set = list_players();
-            while($player = mysqli_fetch_assoc($player_set)) {
-              echo "<option value=\"" . h($player['id']) . "\"";
-              echo ">" . h($player['FirstName']) . ' ' . h($player['LastName']) . "</option>";
+            foreach ($people as $person) {
+              echo "<option value=\"" . h($person['id']) . "\"";
+              echo ">" . h($person['name']) . "</option>";
             }
-            mysqli_free_result($player_set);
           ?>
           </select>
         </dd>
@@ -102,12 +101,10 @@ include(SHARED_PATH . '/header.php');
           $p = 2;
           while ($playerCount > $i) {
             echo '<dd><select name="Player' . $p . '"><option value="">Choose a player</option>'; 
-            $player_set = list_players();
-            while($player = mysqli_fetch_assoc($player_set)) {
-              echo "<option value=\"" . h($player['id']) . "\"";
-              echo ">" . h($player['FirstName']) . ' ' . h($player['LastName']) . "</option>";
+            foreach ($people as $person) {
+              echo "<option value=\"" . h($person['id']) . "\"";
+              echo ">" . h($person['name']) . "</option>";
             }
-            mysqli_free_result($player_set);            
             echo '</select></dd>';
             $i++;
             $p++;

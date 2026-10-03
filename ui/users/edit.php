@@ -6,9 +6,22 @@
   if(!isset($_GET['id'])) {
     redirect_to(url_for('/users/index.php'));
   }
-  $id = $_GET['id'];
+  $id = (int) $_GET['id'];
 
   $user_id = $_SESSION['user_id'];
+  $people = new People($db, (int) $user_id);
+  $person = $people->find($id);
+  if ($person === null) {
+    $_SESSION['message'] = 'That user was not found.';
+    redirect_to(url_for('/users/index.php'));
+  }
+  $form = [
+    'FirstName' => $person['first_name'],
+    'LastName' => $person['last_name'],
+    'G' => $person['gender'],
+    'birth_year' => (string) $person['birth_year'],
+    'is_me' => $person['is_me'],
+  ];
 
   if(is_post_request()) {
 
@@ -27,32 +40,34 @@
         }
       }
       $errors = $merge_errors;
-      $player = find_player_by_id($id);
     } else {
 
-    // Handle form values sent by new.php
-    $player = [];
-    $player['id'] = $id ?? '';
-    $player['FirstName'] = $_POST['FirstName'] ?? '';
-    $player['LastName'] = $_POST['LastName'] ?? '';
-    $player['G'] = $_POST['G'] ?? '';
-    $player['birth_year'] = $_POST['birth_year'] ?? '';
-    $player['thisPlayerIsMe'] = $_POST['thisPlayerIsMe'] ?? '';
-    $player['user_id'] = $user_id ?? '';
+    $form = [
+      'FirstName' => $_POST['FirstName'] ?? '',
+      'LastName' => $_POST['LastName'] ?? '',
+      'G' => $_POST['G'] ?? '',
+      'birth_year' => $_POST['birth_year'] ?? '',
+      'is_me' => ($_POST['thisPlayerIsMe'] ?? '') === 'yes',
+    ];
 
-    $result = update_player($player);
-    if($result === true) {
+    try {
+      $people->update($id, [
+        'first_name' => $form['FirstName'],
+        'last_name' => $form['LastName'],
+        'gender' => $form['G'],
+        'birth_year' => $form['birth_year'],
+        'is_me' => $form['is_me'],
+      ]);
       $_SESSION['message'] = 'The user was updated successfully.';
       redirect_to(url_for('/users/show.php?id=' . $id));
-    } else {
-      $errors = $result;
+    } catch (InvalidArgumentException $error) {
+      $errors[] = $error->getMessage();
+    } catch (OutOfBoundsException) {
+      $_SESSION['message'] = 'That user was not found.';
+      redirect_to(url_for('/users/index.php'));
     }
 
   }
-
-  } else {
-
-    $player = find_player_by_id($id);
 
   }
 
@@ -77,7 +92,7 @@
           type="text"
           name="FirstName"
           id="FirstName"
-          value="<?php echo h($player['FirstName']); ?>"
+          value="<?php echo h($form['FirstName']); ?>"
         />
       </div>
 
@@ -87,35 +102,25 @@
           type="text"
           id="LastName"
           name="LastName"
-          value="<?php echo h($player['LastName']); ?>"
+          value="<?php echo h($form['LastName']); ?>"
         />
       </div>
 
       <div class="form-field">
         <label for="Gender">Gender (M, F, or Other)</label>
-        <input type="text" id="Gender" name="G" value="<?php echo h($player['G']); ?>" />
+        <input type="text" id="Gender" name="G" value="<?php echo h($form['G']); ?>" />
       </div>
 
       <div class="form-field">
         <label for="birth_year">Birth Year</label>
-        <input type="number" id="birth_year" name="birth_year" value="<?php echo h($player['birth_year']); ?>" />
+        <input type="number" id="birth_year" name="birth_year" value="<?php echo h($form['birth_year']); ?>" />
       </div>
 
       <div class="form-field form-field-check">
         <input type="hidden" name="thisPlayerIsMe" value="no">
         <input type="checkbox" name="thisPlayerIsMe" id="thisPlayerIsMe"
           value="yes"
-          <?php
-            $stmt_rep = mysqli_prepare($db, "SELECT represents_user_id FROM players WHERE id = ?");
-            mysqli_stmt_bind_param($stmt_rep, "i", $id);
-            mysqli_stmt_execute($stmt_rep);
-            $rep_result = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt_rep));
-            mysqli_stmt_close($stmt_rep);
-            $userIDThisPlayerIDRepresents = $rep_result['represents_user_id'] ?? null;
-            if ($userIDThisPlayerIDRepresents == $_SESSION['user_id']) {
-              echo 'checked';
-            }
-          ?>
+          <?php echo $form['is_me'] ? 'checked' : ''; ?>
         >
         <label for="thisPlayerIsMe">This User Is Me</label>
       </div>
@@ -129,7 +134,7 @@
     <h2>Merge another player into this one</h2>
     <p>
       All of the selected player's recorded interactions move to
-      <?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?>,
+      <?php echo h($person['name']); ?>,
       and the selected player is deleted. This cannot be undone.
     </p>
 
@@ -138,24 +143,16 @@
 
       <label for="merge_loser_id">Player to merge in and delete</label>
       <select id="merge_loser_id" name="merge_loser_id">
-        <?php
-          $merge_candidates = find_players_by_user_id();
-          while($candidate = mysqli_fetch_assoc($merge_candidates)) {
-            if((int) $candidate['id'] === (int) $id) {
-              continue;
-            }
-            echo "<option value=\"" . h($candidate['id']) . "\">"
-              . h($candidate['FirstName'] . ' ' . $candidate['LastName'])
-              . "</option>";
-          }
-          mysqli_free_result($merge_candidates);
-        ?>
+        <?php foreach ($people->all() as $candidate) { ?>
+          <?php if ($candidate['id'] === $person['id']) { continue; } ?>
+          <option value="<?php echo h($candidate['id']); ?>"><?php echo h($candidate['name']); ?></option>
+        <?php } ?>
       </select>
 
       <label for="merge_confirm">
         <input type="checkbox" id="merge_confirm" name="merge_confirm" value="yes">
         <span id="merge_confirm_text">Yes, merge the selected player into
-        <?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?>
+        <?php echo h($person['name']); ?>
         and delete it</span>
       </label>
 
@@ -167,7 +164,7 @@
       (function() {
         var loser = document.getElementById('merge_loser_id');
         var text = document.getElementById('merge_confirm_text');
-        var survivor = <?php echo json_encode($player['FirstName'] . ' ' . $player['LastName']); ?>;
+        var survivor = <?php echo json_encode($person['name']); ?>;
         function updateMergeConfirm() {
           var name = loser.options[loser.selectedIndex].text;
           text.textContent = 'Yes, merge ' + name + ' into ' + survivor

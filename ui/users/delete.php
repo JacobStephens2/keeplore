@@ -3,19 +3,23 @@
 require_once('../../private/initialize.php');
 require_login();
 
-if(!isset($_GET['id'])) {
-  redirect_to(url_for('/users/index.php'));
-}
-$id = $_GET['id'];
+$people = new People($db, (int) $_SESSION['user_id']);
+$id = (int) ($_GET['id'] ?? 0);
 
 if(is_post_request()) {
-
-  $result = delete_player($id);
-  $_SESSION['message'] = 'The player was deleted successfully.';
+  try {
+    $people->delete($id);
+    $_SESSION['message'] = 'The player was deleted successfully.';
+  } catch (OutOfBoundsException) {
+    $_SESSION['message'] = 'That user was not found.';
+  }
   redirect_to(url_for('/users/index.php'));
+}
 
-} else {
-  $player = find_player_by_id($id);
+$person = $people->find($id);
+if ($person === null) {
+  $_SESSION['message'] = 'That user was not found.';
+  redirect_to(url_for('/users/index.php'));
 }
 
 ?>
@@ -30,9 +34,9 @@ if(is_post_request()) {
   <div class="object delete">
     <h1>Delete player</h1>
     <p>Are you sure you want to delete this player?</p>
-    <p class="item"><?php echo h($player['FirstName']) . ' ' . h($player['LastName']); ?></p>
+    <p class="item"><?php echo h($person['name']); ?></p>
 
-    <form action="<?php echo url_for('/users/delete.php?id=' . h(u($player['id']))); ?>" method="post">
+    <form action="<?php echo url_for('/users/delete.php?id=' . h(u($person['id']))); ?>" method="post">
       <?php echo csrf_input(); ?>
       <div id="operations">
         <input type="submit" name="commit" value="Delete player" />

@@ -3,62 +3,49 @@ require_once('../../private/initialize.php');
 
 require_login();
 
+$player = [
+  'FirstName' => $_POST['FirstName'] ?? '',
+  'LastName' => $_POST['LastName'] ?? '',
+  'G' => $_POST['G'] ?? '',
+  'birth_year' => $_POST['birth_year'] ?? '',
+];
+
 if(is_post_request()) {
 
   $is_ajax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
+  $people = new People($db, (int) $_SESSION['user_id']);
 
-  $player = [];
-  $player['FirstName'] = trim($_POST['FirstName'] ?? '');
-  $player['LastName'] = trim($_POST['LastName'] ?? '');
-  $player['G'] = $_POST['G'] ?? '';
-  if ($player['G'] == '') {
-    $player['G'] = 'other';
-  }
-  $player['birth_year'] = $_POST['birth_year'] ?? '';
-
-  if ($is_ajax && $player['FirstName'] === '' && $player['LastName'] === '') {
-    header('Content-Type: application/json');
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'message' => 'Please enter a name.']);
-    exit;
-  }
-
-  $result = insert_player($player);
-  if($result === true) {
-    $new_id = mysqli_insert_id($db);
-
+  try {
+    $new_id = $people->create([
+      'first_name' => $player['FirstName'],
+      'last_name' => $player['LastName'],
+      'gender' => $player['G'],
+      'birth_year' => $player['birth_year'],
+    ]);
     if ($is_ajax) {
-      $fullName = trim($player['FirstName'] . ' ' . $player['LastName']);
+      $person = $people->find($new_id);
       header('Content-Type: application/json');
       echo json_encode([
         'ok' => true,
-        'id' => $new_id,
-        'FirstName' => $player['FirstName'],
-        'LastName' => $player['LastName'],
-        'FullName' => $fullName,
+        'id' => $person['id'],
+        'FirstName' => $person['first_name'],
+        'LastName' => $person['last_name'],
+        'FullName' => $person['name'],
       ]);
       exit;
     }
-
     $_SESSION['message'] = 'The player record was created successfully.';
     redirect_to(url_for('/users/show.php?id=' . $new_id));
-  } else {
+  } catch (InvalidArgumentException $error) {
     if ($is_ajax) {
       header('Content-Type: application/json');
-      http_response_code(500);
-      echo json_encode(['ok' => false, 'message' => 'Failed to create person.']);
+      http_response_code(400);
+      echo json_encode(['ok' => false, 'message' => $error->getMessage()]);
       exit;
     }
-    $errors = $result;
+    $errors[] = $error->getMessage();
   }
 
-} else {
-  // display the blank form
-  $player = [];
-  $player["FirstName"] = '';
-  $player["LastName"] = '';
-  $player["G"] = '';
-  $player["birth_year"] = '';
 }
 
 ?>
