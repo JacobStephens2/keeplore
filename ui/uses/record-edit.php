@@ -35,7 +35,6 @@ include(SHARED_PATH . '/header.php');
 
 ?>
 
-<script type="module" src="modules/searchUsersList.js"></script>
 <script type="module" src="modules/getUsers.js"></script>
 
 <main>

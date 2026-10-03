@@ -110,13 +110,11 @@
     'useDate' => record_use_today(),
     'Note' => most_recent_use_setting((int) $_SESSION['user_id']),
   ]);
-  $first_person = $form['people'][0];
 
   include(SHARED_PATH . '/header.php'); 
 ?>
 
 <script type="module" src="modules/searchArtifactsList.js"></script>
-<script type="module" src="modules/searchUsersList.js"></script>
 <script type="module" src="modules/getUsers.js"></script>
 <script type="module" src="modules/addNewUser.js"></script>
 <script type="module" src="modules/addNewEntity.js"></script>
@@ -176,32 +174,36 @@
         + New person
       </button>
     </div>
-    <section id="users" data-prefill="<?php echo h(json_encode(array_slice($form['people'], 1))); ?>">
-      <div class="person-row">
-        <input 
-          type="search" 
-          class="user" 
-          id="user0name" 
-          name="user[0][name]" 
-          value="<?php echo h($first_person['name']); ?>"
-          data-userid="<?php echo $_SESSION['user_id']; ?>"
-          data-playerid="<?php echo $_SESSION['player_id']; ?>"
-          data-listposition="0"
-        >
-        <input 
-          type="hidden" 
-          id="user0id" 
-          name="user[0][id]" 
-          value="<?php echo $first_person['id']; ?>"
-          data-listposition="0"
-        >
-        <button id="addUser" class="user" type="button" aria-label="Add another person">+</button>
-        <div id="userResultsDiv0" class="userResults user" style="display: none;">
-          <ul id="userResults0" class="userResults user" style="margin-top: 0;">
-            <li></li>
-          </ul>
+    <section id="users">
+      <?php foreach ($form['people'] as $i => $person) { ?>
+        <div class="<?php echo $i === 0 ? 'person-row' : 'sweetSpot'; ?>" id="SwSDiv<?php echo $i; ?>">
+          <input
+            type="search"
+            class="user"
+            id="user<?php echo $i; ?>name"
+            name="user[<?php echo $i; ?>][name]"
+            value="<?php echo h($person['name']); ?>"
+            data-userid="<?php echo $_SESSION['user_id']; ?>"
+            data-listposition="<?php echo $i; ?>"
+            autocomplete="off"
+          >
+          <!-- Right after the search so Tab reaches results before the buttons. -->
+          <div id="userResultsDiv<?php echo $i; ?>" class="userResults" style="display: none;">
+            <ul id="userResults<?php echo $i; ?>" class="userResults"></ul>
+          </div>
+          <input
+            type="hidden"
+            id="user<?php echo $i; ?>id"
+            name="user[<?php echo $i; ?>][id]"
+            value="<?php echo (int) $person['id']; ?>"
+          >
+          <?php if ($i === 0) { ?>
+            <button id="addUser" class="user" type="button" aria-label="Add another person">+</button>
+          <?php } else { ?>
+            <button class="user remove-user" type="button" aria-label="Remove this person">-</button>
+          <?php } ?>
         </div>
-      </div>
+      <?php } ?>
     </section>
 
     <div id="newInteractorForm" class="new-interactor-form" style="display: none;">

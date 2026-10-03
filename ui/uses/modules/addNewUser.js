@@ -1,4 +1,4 @@
-import { addUserRow } from "./getUsers.js";
+import { addUserRow } from "./userRows.js";
 
 // Lets you create a brand-new interactor (player) without leaving the page.
 // On success the new person is added as a selected interactor row.

@@ -2,6 +2,7 @@
   /* Digital Curator tokens - aligned to style/the-digital-curator-style-board.png */
   color-scheme: light;
   --primary: #30395c;
+  --field-width: 42rem;
   --primary-soft: #3d4668;
   --secondary: #64748b;
   --tertiary: #002939;
@@ -511,7 +512,7 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]),
 select,
 textarea,
 .input-box {
-  width: min(100%, 42rem);
+  width: min(100%, var(--field-width));
   min-height: 3.5rem;
   padding: 0.95rem 1rem;
   border: 1px solid transparent;
@@ -1206,7 +1207,8 @@ ul.userResults {
 
 .searchResults li:hover,
 .user li:hover,
-.userResults li:hover {
+.userResults li:hover,
+.userResults li:focus-visible {
   background: rgba(48, 57, 92, 0.08);
   cursor: pointer;
 }
@@ -3534,7 +3536,8 @@ html[data-theme="dark"] .guest-banner {
 
 html[data-theme="dark"] .searchResults li:hover,
 html[data-theme="dark"] .user li:hover,
-html[data-theme="dark"] .userResults li:hover {
+html[data-theme="dark"] .userResults li:hover,
+html[data-theme="dark"] .userResults li:focus-visible {
   background: rgba(157, 177, 217, 0.12);
 }
 
@@ -3622,7 +3625,7 @@ html[data-theme="dark"] .modal-panel {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  max-width: 42rem;
+  max-width: var(--field-width);
 }
 
 .record-use-page div.sweetSpot {
@@ -3648,26 +3651,22 @@ html[data-theme="dark"] .modal-panel {
   padding: 0.7rem 0.9rem;
 }
 
-.record-use-page .person-row .userResults,
-.record-use-page div.sweetSpot ul.user {
+.record-use-page .person-row > .userResults,
+.record-use-page div.sweetSpot > .userResults {
   flex-basis: 100%;
-  margin: 0;
-}
-
-.record-use-page div.sweetSpot ul.user:empty {
-  display: none;
+  order: 1;
 }
 
 .record-use-page #SearchTitles {
   width: 100%;
-  max-width: 42rem;
+  max-width: var(--field-width);
 }
 
 .record-use-page .field-pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 9rem);
   gap: 0 0.75rem;
-  max-width: 42rem;
+  max-width: var(--field-width);
 }
 
 .record-use-page .field-pair input {
@@ -3679,7 +3678,7 @@ html[data-theme="dark"] .modal-panel {
   align-items: flex-end;
   justify-content: space-between;
   gap: 0.5rem;
-  max-width: 42rem;
+  max-width: var(--field-width);
 }
 
 .record-use-page .field-head .new-interactor-toggle {
@@ -3691,7 +3690,7 @@ html[data-theme="dark"] .modal-panel {
 .record-use-page textarea {
   display: block;
   width: 100%;
-  max-width: 42rem;
+  max-width: var(--field-width);
   min-height: 0;
   margin-bottom: 0.75rem;
 }
