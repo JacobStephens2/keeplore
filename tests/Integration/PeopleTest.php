@@ -280,6 +280,109 @@ final class PeopleTest extends TestCase
         $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(101));
     }
 
+    public function test_merge_drops_shared_links_repoints_the_rest_and_deletes_the_merged_person(): void
+    {
+        $this->seedLinks();
+        $this->runSql("
+            INSERT INTO uses_players (use_id, player_id, user_id) VALUES (3, 101, 1);
+            INSERT INTO proposal_outcomes (id, user_id, item_id, proposal_date, outcome, note) VALUES
+                (3, 1, 10, '2026-03-02', 'explicit_decline', '');
+            INSERT INTO proposal_outcome_players VALUES (3, 101);
+            INSERT INTO event_players VALUES (2, 101);
+        ");
+
+        $this->people->merge(100, 101);
+
+        $this->assertNull($this->people->find(101));
+        $this->assertSame('Sam Lee', $this->people->find(100)['name']);
+        $this->assertSame(['uses' => 0, 'proposals' => 0, 'events' => 1, 'playgroup' => 0], $this->links(101));
+        $this->assertSame(['uses' => 2, 'proposals' => 2, 'events' => 1, 'playgroup' => 2], $this->links(100));
+        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(200));
+    }
+
+    public function test_merge_moves_the_merged_persons_events_to_the_survivor(): void
+    {
+        $this->runSql("INSERT INTO events (id, user_id, name) VALUES (1, 1, 'Beach week'), (2, 1, 'Game night');
+            INSERT INTO event_players (event_id, player_id) VALUES (1, 100), (1, 101), (2, 101)");
+
+        $this->people->merge(100, 101);
+
+        $rows = $this->db->query('SELECT event_id, player_id FROM event_players ORDER BY event_id')->fetch_all();
+        $this->assertSame([['1', '100'], ['2', '100']], $rows);
+    }
+
+    public static function refusedMerges(): array
+    {
+        return [
+            'another owner\'s merged person' => [100, 200, 'Both players must exist.'],
+            'another owner\'s survivor' => [200, 100, 'Both players must exist.'],
+            'a missing person' => [100, 999, 'Both players must exist.'],
+            'the same person' => [100, 100, 'Cannot merge a player into itself.'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('refusedMerges')]
+    public function test_merge_refuses_and_changes_nothing(int $survivorId, int $loserId, string $message): void
+    {
+        $this->seedLinks();
+
+        $this->assertMergeRefused($survivorId, $loserId, $message);
+
+        $this->assertSame(1, (int) $this->db->query('SELECT COUNT(*) FROM players WHERE id = 200')->fetch_row()[0]);
+        foreach ([100, 101, 200] as $playerId) {
+            $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links($playerId));
+        }
+    }
+
+    public function test_merge_keeps_the_person_who_is_me_as_the_survivor(): void
+    {
+        $this->people->update(101, ['first_name' => 'Jo', 'last_name' => 'Smith', 'is_me' => true]);
+
+        $this->assertMergeRefused(100, 101, 'The surviving player must be the one marked as you.');
+
+        $this->people->merge(101, 100);
+        $this->assertNull($this->people->find(100));
+        $this->assertTrue($this->people->find(101)['is_me']);
+        $this->assertSame(101, $this->accountLink());
+    }
+
+    public function test_merge_refuses_to_delete_the_person_the_account_links_to(): void
+    {
+        $this->db->query('UPDATE users SET player_id = 101 WHERE id = 1');
+
+        $this->assertMergeRefused(100, 101, 'The surviving player must be the one marked as you.');
+        $this->assertSame(101, $this->accountLink());
+    }
+
+    public function test_a_merge_that_fails_partway_leaves_both_people_and_their_links(): void
+    {
+        $this->seedLinks();
+        $this->db->query('RENAME TABLE event_players TO event_players_away');
+
+        try {
+            $this->people->merge(100, 101);
+            $this->fail('The merge did not fail.');
+        } catch (\mysqli_sql_exception) {
+        }
+        $this->db->query('RENAME TABLE event_players_away TO event_players');
+
+        $this->assertSame('Jo Smith', $this->people->find(101)['name']);
+        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(101));
+        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(100));
+    }
+
+    private function assertMergeRefused(int $survivorId, int $loserId, string $message): void
+    {
+        $people = array_column($this->people->all(), 'id');
+        try {
+            $this->people->merge($survivorId, $loserId);
+            $this->fail('The merge was not refused.');
+        } catch (\InvalidArgumentException $error) {
+            $this->assertSame($message, $error->getMessage());
+        }
+        $this->assertSame($people, array_column($this->people->all(), 'id'));
+    }
+
     /** Link 100 and 101 to one of owner 1's uses, proposals, events and playgroup slots, and 200 to owner 2's. */
     private function seedLinks(): void
     {

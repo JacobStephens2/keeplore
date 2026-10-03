@@ -31,12 +31,12 @@
       if(!isset($_POST['merge_confirm']) || $_POST['merge_confirm'] !== 'yes') {
         $merge_errors[] = "Confirm the merge before continuing.";
       } else {
-        $merge_result = merge_players($id, $_POST['merge_loser_id'], $user_id);
-        if($merge_result === true) {
+        try {
+          $people->merge($id, (int) $_POST['merge_loser_id']);
           $_SESSION['message'] = 'The players were merged successfully.';
           redirect_to(url_for('/users/show.php?id=' . h(u($id))));
-        } else {
-          $merge_errors = $merge_result;
+        } catch (InvalidArgumentException $error) {
+          $merge_errors[] = $error->getMessage();
         }
       }
       $errors = $merge_errors;

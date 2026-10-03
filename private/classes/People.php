@@ -98,6 +98,76 @@ final class People
         });
     }
 
+    /**
+     * Move everything recorded with the loser to the survivor, then delete
+     * the loser. Where both were on the same use, proposal or event, the
+     * loser's link is dropped. The person who is the owner can only survive.
+     */
+    public function merge(int $survivorId, int $loserId): void
+    {
+        $this->transaction(function () use ($survivorId, $loserId) {
+            $isMe = [];
+            foreach ($this->rows(
+                'SELECT id, represents_user_id FROM players WHERE id IN (?, ?) AND user_id = ? FOR UPDATE',
+                'iii', [$survivorId, $loserId, $this->userId]
+            ) as $row) {
+                $isMe[(int) $row['id']] = (int) $row['represents_user_id'] === $this->userId;
+            }
+            if (!isset($isMe[$survivorId], $isMe[$loserId])) {
+                throw new InvalidArgumentException('Both players must exist.');
+            }
+            if ($survivorId === $loserId) {
+                throw new InvalidArgumentException('Cannot merge a player into itself.');
+            }
+            $accountLinksToLoser = (bool) $this->rows('SELECT id FROM users WHERE id = ? AND player_id = ?', 'ii', [$this->userId, $loserId]);
+            if (($isMe[$loserId] && !$isMe[$survivorId]) || $accountLinksToLoser) {
+                throw new InvalidArgumentException('The surviving player must be the one marked as you.');
+            }
+
+            $this->statement(
+                'DELETE loser FROM uses_players AS loser
+                 JOIN uses_players AS survivor ON survivor.use_id = loser.use_id AND survivor.player_id = ?
+                 WHERE loser.player_id = ? AND loser.user_id = ?',
+                'iii', [$survivorId, $loserId, $this->userId]
+            )->close();
+            $this->statement(
+                'UPDATE uses_players SET player_id = ? WHERE player_id = ? AND user_id = ?',
+                'iii', [$survivorId, $loserId, $this->userId]
+            )->close();
+            $this->statement(
+                'DELETE loser FROM proposal_outcome_players AS loser
+                 JOIN proposal_outcome_players AS survivor ON survivor.proposal_id = loser.proposal_id AND survivor.player_id = ?
+                 JOIN proposal_outcomes AS po ON po.id = loser.proposal_id AND po.user_id = ?
+                 WHERE loser.player_id = ?',
+                'iii', [$survivorId, $this->userId, $loserId]
+            )->close();
+            $this->statement(
+                'UPDATE proposal_outcome_players AS pop
+                 JOIN proposal_outcomes AS po ON po.id = pop.proposal_id AND po.user_id = ?
+                 SET pop.player_id = ? WHERE pop.player_id = ?',
+                'iii', [$this->userId, $survivorId, $loserId]
+            )->close();
+            $this->statement(
+                'DELETE loser FROM event_players AS loser
+                 JOIN event_players AS survivor ON survivor.event_id = loser.event_id AND survivor.player_id = ?
+                 JOIN events AS e ON e.id = loser.event_id AND e.user_id = ?
+                 WHERE loser.player_id = ?',
+                'iii', [$survivorId, $this->userId, $loserId]
+            )->close();
+            $this->statement(
+                'UPDATE event_players AS ep
+                 JOIN events AS e ON e.id = ep.event_id AND e.user_id = ?
+                 SET ep.player_id = ? WHERE ep.player_id = ?',
+                'iii', [$this->userId, $survivorId, $loserId]
+            )->close();
+            $this->statement(
+                'UPDATE playgroup SET FullName = ? WHERE FullName = ? AND user_id = ?',
+                'iii', [$survivorId, $loserId, $this->userId]
+            )->close();
+            $this->statement('DELETE FROM players WHERE id = ? AND user_id = ?', 'ii', [$loserId, $this->userId])->close();
+        });
+    }
+
     private function unlinkAccountFrom(int $id): void
     {
         $this->statement('UPDATE users SET player_id = NULL WHERE id = ? AND player_id = ?', 'ii', [$this->userId, $id])->close();
