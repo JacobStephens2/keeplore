@@ -19,17 +19,25 @@ export function nextUserIndex(doc) {
   return highest + 1;
 }
 
+function displayName(user) {
+  return user.FirstName + " " + user.LastName;
+}
+
 // Fill list with up to 10 people. Each is a tab stop; click, Enter, or
-// Space picks it.
-export function renderUserResults(doc, list, users, onPick) {
+// Space picks it, and Escape calls onEscape.
+export function renderUserResults(doc, list, users, onPick, onEscape = () => {}) {
   list.replaceChildren();
   users.slice(0, MAX_RESULTS).forEach((user) => {
     const li = doc.createElement("li");
     li.tabIndex = 0;
-    li.setAttribute("role", "option");
-    li.textContent = user.FirstName + " " + user.LastName;
+    li.textContent = displayName(user);
     li.addEventListener("click", () => onPick(user));
     li.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onEscape();
+        return;
+      }
       if (event.key !== "Enter" && event.key !== " ") return;
       // Also stops Record Use's Enter-submits-the-form keypress.
       event.preventDefault();
@@ -39,18 +47,18 @@ export function renderUserResults(doc, list, users, onPick) {
   });
 }
 
-// A row added with +, matching the markup the server renders.
+// A row added with +, matching the person-row markup Record Use and Edit
+// Use render.
 export function buildUserRow(doc, index, userid) {
   const row = doc.createElement("div");
   row.setAttribute("id", "SwSDiv" + index);
-  row.classList.add("sweetSpot");
+  row.classList.add("person-row");
 
   const name = doc.createElement("input");
   name.setAttribute("type", "search");
   name.setAttribute("id", "user" + index + "name");
   name.setAttribute("name", "user[" + index + "][name]");
   name.setAttribute("data-userid", userid);
-  name.setAttribute("data-listposition", index);
   name.setAttribute("autocomplete", "off");
   name.classList.add("user");
 
@@ -115,34 +123,48 @@ export async function searchPeople(query, userid) {
 // search and wait for its results.
 export function wireUserRow(doc, row, { search = searchPeople } = {}) {
   const parts = rowParts(row);
+  let latestSearch = 0;
 
   function hideResults() {
     parts.results.style.display = "none";
   }
 
-  function pick(user) {
-    parts.id.value = String(user.id);
-    parts.name.value = user.FirstName + " " + user.LastName;
-    // Clear, not just hide, so refocusing the search doesn't reopen them.
+  // Clear, not just hide, so refocusing the search doesn't reopen them.
+  function closeResults() {
     parts.list.replaceChildren();
     hideResults();
     parts.name.focus();
   }
 
+  function pick(user) {
+    parts.id.value = String(user.id);
+    parts.name.value = displayName(user);
+    closeResults();
+  }
+
   async function runSearch(query) {
+    const thisSearch = ++latestSearch;
     if (query.length === 0) {
       parts.list.replaceChildren();
       hideResults();
       return;
     }
     const users = await search(query, parts.name.dataset.userid);
-    renderUserResults(doc, parts.list, users, pick);
+    // A slower earlier search must not replace newer results.
+    if (thisSearch !== latestSearch) return;
+    renderUserResults(doc, parts.list, users, pick, closeResults);
     parts.results.style.display = users.length > 0 ? "block" : "none";
   }
+
+  // Server markup may carry a placeholder result; start empty.
+  parts.list.replaceChildren();
 
   parts.name.addEventListener("input", () => runSearch(parts.name.value));
   parts.name.addEventListener("focus", () => {
     if (parts.list.children.length > 0) parts.results.style.display = "block";
+  });
+  row.addEventListener("focusout", (event) => {
+    if (!row.contains(event.relatedTarget)) hideResults();
   });
   if (parts.remove) {
     parts.remove.addEventListener("click", (event) => {
@@ -155,15 +177,15 @@ export function wireUserRow(doc, row, { search = searchPeople } = {}) {
 }
 
 // + : append an empty row (or one for a just-created person) and focus it.
-export function addUserRow(prefill) {
-  const userid = document.querySelector("#user0name").dataset.userid;
-  const row = buildUserRow(document, nextUserIndex(document), userid);
-  document.querySelector("section#users").appendChild(row);
-  wireUserRow(document, row);
+export function addUserRow(doc, prefill) {
+  const userid = doc.querySelector("#user0name").dataset.userid;
+  const row = buildUserRow(doc, nextUserIndex(doc), userid);
+  doc.querySelector("section#users").appendChild(row);
+  wireUserRow(doc, row);
 
   const parts = rowParts(row);
   if (prefill) {
-    parts.id.value = prefill.id;
+    parts.id.value = String(prefill.id);
     parts.name.value = prefill.name;
   }
   parts.name.focus();

@@ -2,7 +2,6 @@
   /* Digital Curator tokens - aligned to style/the-digital-curator-style-board.png */
   color-scheme: light;
   --primary: #30395c;
-  --field-width: 42rem;
   --primary-soft: #3d4668;
   --secondary: #64748b;
   --tertiary: #002939;
@@ -28,6 +27,7 @@
   --radius-lg: 28px;
   --page-width: 1200px;
   --header-height: 4.5rem;
+  --field-width: 42rem;
 }
 
 html {
@@ -3619,8 +3619,12 @@ html[data-theme="dark"] .modal-panel {
   font-size: 0.9rem;
 }
 
-.record-use-page .person-row,
-.record-use-page div.sweetSpot {
+/* Person rows on Record Use and Edit Use. */
+.person-row + .person-row {
+  margin-top: 0.5rem;
+}
+
+.record-use-page .person-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -3628,20 +3632,14 @@ html[data-theme="dark"] .modal-panel {
   max-width: var(--field-width);
 }
 
-.record-use-page div.sweetSpot {
-  margin-top: 0.5rem;
-}
-
-.record-use-page .person-row input.user,
-.record-use-page div.sweetSpot input.user {
+.record-use-page .person-row input.user {
   flex: 1 1 12rem;
   width: auto;
   min-width: 0;
   margin: 0;
 }
 
-.record-use-page .person-row button,
-.record-use-page div.sweetSpot button {
+.record-use-page .person-row button {
   flex: 0 0 auto;
   margin: 0;
 }
@@ -3651,8 +3649,7 @@ html[data-theme="dark"] .modal-panel {
   padding: 0.7rem 0.9rem;
 }
 
-.record-use-page .person-row > .userResults,
-.record-use-page div.sweetSpot > .userResults {
+.record-use-page .person-row > .userResults {
   flex-basis: 100%;
   order: 1;
 }

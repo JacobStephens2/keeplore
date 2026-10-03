@@ -83,7 +83,7 @@ include(SHARED_PATH . '/header.php');
         $i = 0;
         foreach ($usersResultObject as $user) {
           ?>
-          <div class="sweetSpot">
+          <div class="person-row" id="SwSDiv<?php echo $i; ?>">
             <input 
               type="search" 
               class="user" 
@@ -91,19 +91,16 @@ include(SHARED_PATH . '/header.php');
               name="user[<?php echo $i; ?>][name]" 
               value="<?php echo $user['FirstName'] . ' ' . $user['LastName']; ?>"
               data-userid="<?php echo $_SESSION['user_id']; ?>"
-              data-listposition="<?php echo $i; ?>"
+              autocomplete="off"
             >
             <input 
               type="hidden" 
               id="user<?php echo $i; ?>id" 
               name="user[<?php echo $i; ?>][id]" 
               value="<?php echo $user['id']; ?>"
-              data-listposition="<?php echo $i; ?>"
             >
-            <div class="userResults user" id="userResultsDiv<?php echo $i; ?>" style="display: none;">
-              <ul class="userResults user" id="userResults<?php echo $i; ?>" style="margin-top: 0;">
-                <li></li>
-              </ul>
+            <div class="userResults" id="userResultsDiv<?php echo $i; ?>" style="display: none;">
+              <ul class="userResults" id="userResults<?php echo $i; ?>"></ul>
             </div>
           </div>
           <?php

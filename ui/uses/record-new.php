@@ -176,7 +176,7 @@
     </div>
     <section id="users">
       <?php foreach ($form['people'] as $i => $person) { ?>
-        <div class="<?php echo $i === 0 ? 'person-row' : 'sweetSpot'; ?>" id="SwSDiv<?php echo $i; ?>">
+        <div class="person-row" id="SwSDiv<?php echo $i; ?>">
           <input
             type="search"
             class="user"
@@ -184,7 +184,6 @@
             name="user[<?php echo $i; ?>][name]"
             value="<?php echo h($person['name']); ?>"
             data-userid="<?php echo $_SESSION['user_id']; ?>"
-            data-listposition="<?php echo $i; ?>"
             autocomplete="off"
           >
           <!-- Right after the search so Tab reaches results before the buttons. -->

@@ -102,7 +102,7 @@ const parts = rowParts(row);
 return [row.className, parts.name.id, parts.name.getAttribute('name'), parts.id.getAttribute('name'), parts.name.dataset.userid, parts.remove.textContent];
 JS);
 
-        $this->assertSame(['sweetSpot', 'user4name', 'user[4][name]', 'user[4][id]', '7', '-'], $result);
+        $this->assertSame(['person-row', 'user4name', 'user[4][name]', 'user[4][id]', '7', '-'], $result);
     }
 
     public function test_remove_button_drops_the_row(): void
@@ -117,6 +117,98 @@ return removed;
 JS);
 
         $this->assertTrue($result);
+    }
+
+    public function test_space_on_a_result_picks_it(): void
+    {
+        $result = $this->run_(<<<'JS'
+const list = el('ul');
+const picked = [];
+renderUserResults(doc, list, people(2), (person) => picked.push(person.id));
+const space = key(' ');
+list.children[0].fire('keydown', space);
+return { picked, prevented: space.prevented };
+JS);
+
+        $this->assertSame(['picked' => [0], 'prevented' => true], $result);
+    }
+
+    public function test_a_server_placeholder_result_does_not_open_an_empty_box(): void
+    {
+        $result = $this->run_(<<<'JS'
+const row = buildUserRow(doc, 0, '7');
+rowParts(row).list.append(el('li'));
+wireUserRow(doc, row, { search: async () => [] });
+rowParts(row).name.focus();
+return rowParts(row).results.style.display;
+JS);
+
+        $this->assertSame('none', $result);
+    }
+
+    public function test_escape_on_a_result_closes_them_and_returns_to_the_search(): void
+    {
+        $result = $this->run_(<<<'JS'
+const row = buildUserRow(doc, 1, '7');
+const parts = rowParts(row);
+await wireUserRow(doc, row, { search: async () => people(2) }).search('Fi');
+const escape = key('Escape');
+parts.list.children[0].fire('keydown', escape);
+return { shown: parts.results.style.display, focused: doc.activeElement === parts.name, id: parts.id.value };
+JS);
+
+        $this->assertSame(['shown' => 'none', 'focused' => true, 'id' => ''], $result);
+    }
+
+    public function test_results_close_when_focus_leaves_the_row(): void
+    {
+        $result = $this->run_(<<<'JS'
+const row = buildUserRow(doc, 1, '7');
+const parts = rowParts(row);
+await wireUserRow(doc, row, { search: async () => people(2) }).search('Fi');
+row.fire('focusout', { relatedTarget: parts.list.children[0] });
+const withinRow = parts.results.style.display;
+row.fire('focusout', { relatedTarget: el('input') });
+return [withinRow, parts.results.style.display];
+JS);
+
+        $this->assertSame(['block', 'none'], $result);
+    }
+
+    public function test_a_slower_earlier_search_does_not_replace_newer_results(): void
+    {
+        $result = $this->run_(<<<'JS'
+const row = buildUserRow(doc, 1, '7');
+const parts = rowParts(row);
+let releaseFirst;
+const first = new Promise((resolve) => { releaseFirst = resolve; });
+const search = (query) => (query === 'F' ? first : Promise.resolve([{ id: 9, FirstName: 'Fran', LastName: 'Kay' }]));
+const wired = wireUserRow(doc, row, { search });
+const older = wired.search('F');
+await wired.search('Fr');
+releaseFirst(people(3));
+await older;
+return parts.list.children.map((li) => li.textContent);
+JS);
+
+        $this->assertSame(['Fran Kay'], $result);
+    }
+
+    public function test_add_user_row_appends_a_wired_row_for_a_new_person(): void
+    {
+        $result = $this->run_(<<<'JS'
+const section = el('section');
+section.setAttribute('id', 'users');
+const first = buildUserRow(doc, 0, '7');
+section.append(first);
+body.append(section);
+addUserRow(doc, { id: 12, name: 'New Person' });
+const added = section.children[1];
+const parts = rowParts(added);
+return [added.id, parts.id.value, parts.name.value, parts.name.dataset.userid, doc.activeElement === parts.name];
+JS);
+
+        $this->assertSame(['SwSDiv1', '12', 'New Person', '7', true], $result);
     }
 
     public function test_record_pages_use_the_one_row_module(): void
@@ -154,11 +246,20 @@ function el(tag) {
     fire(t, e) { (listeners[t] || []).forEach((fn) => fn(e)); },
     focus() { doc.activeElement = node; node.fire('focus', {}); },
     remove() {},
+    contains(other) { return other === node || node.all().includes(other); },
     all() { return node.children.flatMap((c) => [c, ...c.all()]); },
   };
   return node;
 }
-const doc = { activeElement: null, createElement: el };
+const body = el('body');
+const doc = {
+  activeElement: null,
+  createElement: el,
+  querySelector: (sel) => body.all().find((n) => n.id === sel.replace(/^\w*#/, '')) || null,
+  querySelectorAll: (sel) => (sel === 'input.user'
+    ? body.all().filter((n) => n.tagName === 'INPUT' && /\buser\b/.test(n.className))
+    : []),
+};
 globalThis.document = { querySelector: () => null };
 function rowsDoc(ids) {
   return { querySelectorAll: (sel) => (sel === 'input.user' ? ids.map((id) => ({ id })) : []) };
@@ -167,17 +268,19 @@ function people(n) {
   return Array.from({ length: n }, (_, i) => ({ id: i, FirstName: 'First' + i, LastName: 'Last' + i }));
 }
 function key(k) { const e = { key: k, prevented: false, preventDefault() { e.prevented = true; } }; return e; }
+// The row contract the server markup and buildUserRow share: fields by id.
 function rowParts(row) {
-  const all = row.all();
+  const i = row.id.replace('SwSDiv', '');
+  const byId = (id) => row.all().find((n) => n.id === id);
   return {
-    name: all.find((n) => n.tagName === 'INPUT' && n.type === 'search'),
-    id: all.find((n) => n.tagName === 'INPUT' && n.type === 'hidden'),
-    remove: all.find((n) => n.tagName === 'BUTTON'),
-    results: all.find((n) => n.tagName === 'DIV'),
-    list: all.find((n) => n.tagName === 'UL'),
+    name: byId('user' + i + 'name'),
+    id: byId('user' + i + 'id'),
+    remove: row.all().find((n) => /\bremove-user\b/.test(n.className)),
+    results: byId('userResultsDiv' + i),
+    list: byId('userResults' + i),
   };
 }
-const { nextUserIndex, renderUserResults, buildUserRow, wireUserRow } = await import({$url});
+const { nextUserIndex, renderUserResults, buildUserRow, wireUserRow, addUserRow } = await import({$url});
 const out = await (async () => { {$body} })();
 process.stdout.write(JSON.stringify(out));
 JS;
