@@ -65,16 +65,14 @@
 
     case 'POST':
     case 'PUT':
-      // Agent keys permit reads plus the kept toggle only.
-      deny_agent_key_writes($authentication_response);
-      [$status, $result] = write_item_over_api(
+      [$status, $fields] = write_item_over_api(
         $database, $authentication_response, $method, json_decode(file_get_contents('php://input'))
       );
       http_response_code($status);
-      if (isset($result['artifact'])) {
-        $logger->logDataChange($method === 'POST' ? 'create' : 'update', 'artifact', $result['artifact']['id'], ['title' => $result['artifact']['Title']]);
+      if (isset($fields['artifact'])) {
+        $logger->logDataChange(ITEM_API_WRITES[$method]['action'], 'artifact', $fields['artifact']['id'], ['title' => $fields['artifact']['Title']]);
       }
-      foreach ($result as $field => $value) {
+      foreach ($fields as $field => $value) {
         $response->$field = $value;
       }
       echo json_encode($response);
@@ -93,10 +91,8 @@
 
       $id = (int) $_GET['id'];
       // The master key has no user of its own: it names the owner in the query.
-      $user_id = isset($authentication_response->user_id)
-        ? (int) $authentication_response->user_id
-        : filter_var($_GET['user_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-      if (!$user_id) {
+      $user_id = item_api_owner($database, $authentication_response, $_GET['user_id'] ?? null);
+      if ($user_id === null) {
         http_response_code(400);
         $response->message = 'Missing or invalid required parameter: user_id';
         echo json_encode($response);

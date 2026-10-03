@@ -192,7 +192,7 @@ final class ItemApiWriteTest extends TestCase
     {
         $before = $this->itemCount();
 
-        foreach (['{"Title": "Quelf"}', '{"Title": "Quelf", "user_id": 0}', '{"Title": "Quelf", "user_id": "me"}'] as $json) {
+        foreach (['{"Title": "Quelf"}', '{"Title": "Quelf", "user_id": 0}', '{"Title": "Quelf", "user_id": "me"}', '{"Title": "Quelf", "user_id": 999}'] as $json) {
             [$status, $response] = write_item_over_api($this->db, $this->masterKey(), 'POST', $this->body($json));
             $this->assertSame(400, $status, $json);
             $this->assertSame('Missing or invalid required field: user_id', $response['message']);
@@ -202,6 +202,22 @@ final class ItemApiWriteTest extends TestCase
 
         $this->assertSame($before, $this->itemCount());
         $this->assertSame('Private item', $this->item(20, 2)['Title']);
+    }
+
+    public function test_agent_keys_are_refused_and_write_nothing(): void
+    {
+        $agent = (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => 1];
+        $before = $this->itemCount();
+
+        [$status, $response] = write_item_over_api($this->db, $agent, 'POST', $this->body('{"Title": "Quelf"}'));
+        $this->assertSame(403, $status);
+        $this->assertSame('Agent keys permit reads plus the kept toggle only.', $response['message']);
+
+        [$status] = write_item_over_api($this->db, $agent, 'PUT', $this->body('{"id": 10, "Title": "Catan Junior"}'));
+        $this->assertSame(403, $status);
+
+        $this->assertSame($before, $this->itemCount());
+        $this->assertSame('Catan', $this->item(10)['Title']);
     }
 
     public function test_put_patches_only_the_fields_sent_and_returns_the_item_with_its_tags(): void

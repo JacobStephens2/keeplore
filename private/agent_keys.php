@@ -80,20 +80,31 @@ function find_agent_key_by_token($conn, $token) {
 }
 
 /**
- * Scope gate: agent keys may read and flip kept, nothing else. Call from
- * every mutating API endpoint (and any read outside the agent scope).
- * Exits 403 when the caller authenticated with an agent key.
+ * Scope gate: agent keys may read and flip kept, nothing else. The 403
+ * response body when the caller authenticated with an agent key, else null.
  */
-function deny_agent_key_writes($authentication_response) {
+function agent_key_write_refusal($authentication_response) {
   if (is_object($authentication_response)
       && isset($authentication_response->auth_type)
       && $authentication_response->auth_type === 'agent_key') {
-    http_response_code(403);
-    header('Content-Type: application/json');
-    echo json_encode([
+    return [
       'authenticated' => true,
       'message' => 'Agent keys permit reads plus the kept toggle only.',
-    ]);
+    ];
+  }
+  return null;
+}
+
+/**
+ * Call from every mutating API endpoint (and any read outside the agent
+ * scope). Exits 403 when the caller authenticated with an agent key.
+ */
+function deny_agent_key_writes($authentication_response) {
+  $refusal = agent_key_write_refusal($authentication_response);
+  if ($refusal !== null) {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode($refusal);
     exit;
   }
 }
