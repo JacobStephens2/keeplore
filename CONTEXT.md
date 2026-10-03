@@ -62,8 +62,9 @@ A player count BoardGameGeek's community voted Best for a game. An open-ended vo
 **BGG reviewer**:
 A BoardGameGeek user, such as Gyges, whose ratings and comments on the owner's items are imported or entered by hand. The owner names their own reviewer on Settings, whether their own BGG account or someone else's, and may have older ones from earlier imports. Settings imports all of their ratings in the background. Items and Search BGG show one column per reviewer; Search BGG fills it from the owner's items that link to the game, kept or not.
 
-**BGG type**:
+**Type for BoardGameGeek items**:
 The owner's type, such as table game, for items filled from a BoardGameGeek match on Create Item, set on Settings. A type the owner already picked on the form stays.
+_Avoid_: BGG type (reads like BoardGameGeek's own subtype, such as boardgame or expansion).
 
 **Digital item**:
 An item with a digital form. Independent of whether it is kept. An item can be both physical and digital.
