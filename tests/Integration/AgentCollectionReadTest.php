@@ -232,9 +232,9 @@ final class AgentCollectionReadTest extends TestCase
         $this->assertSame([], list_uses_over_api($this->db, $this->agentKey(1), ['player_id' => '200'])[1]['uses']);
     }
 
-    private function agentKey(int $userId): object
+    private function agentKey(int $userId): \ApiCaller
     {
-        return (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => $userId];
+        return \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => $userId]);
     }
 
     public function test_players_list_is_scoped_to_the_user_with_the_published_fields(): void
@@ -251,7 +251,7 @@ final class AgentCollectionReadTest extends TestCase
 
     public function test_players_list_refuses_the_master_key(): void
     {
-        [$status, $fields] = list_people_over_api($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']);
+        [$status, $fields] = list_people_over_api($this->db, \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']));
 
         $this->assertSame(400, $status);
         $this->assertSame(['message' => 'players.php requires a user-scoped key.'], $fields);

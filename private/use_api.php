@@ -1,7 +1,8 @@
 <?php
 
-require_once __DIR__ . '/agent_keys.php';
 require_once __DIR__ . '/item_api.php';
+require_once __DIR__ . '/app_logger.php';
+require_once __DIR__ . '/classes/ApiCaller.php';
 require_once __DIR__ . '/classes/Uses.php';
 
 /** The log action each use write over HTTP records. */
@@ -11,17 +12,18 @@ const USE_API_LOG_ACTIONS = ['POST' => 'create', 'DELETE' => 'delete'];
  * GET /uses.php: the owner's uses, newest first, through the Uses module.
  * The query's artifact_id and player_id keep one item's uses or the uses a
  * person took part in. The master key names the owner in the query's
- * user_id, or failing that reads the uses of the artifact_id's owner.
+ * user_id, or naming none reads the uses of the artifact_id's owner.
  *
  * Returns [status, response fields] with the legacy field names: note is
  * the Setting, notesTwo the notes, players the person ids.
  */
-function list_uses_over_api(mysqli $db, object $authentication, array $query): array {
+function list_uses_over_api(mysqli $db, ApiCaller $caller, array $query): array {
   $item_id = item_api_positive_int($query['artifact_id'] ?? null);
   $person_id = item_api_positive_int($query['player_id'] ?? null);
-  $owner = isset($authentication->user_id) || isset($query['user_id'])
-    ? item_api_owner($db, $authentication, $query['user_id'] ?? null)
-    : use_api_item_owner($db, $item_id);
+  $owner = $caller->owner($query['user_id'] ?? null);
+  if ($owner === null && !isset($query['user_id'])) {
+    $owner = use_api_item_owner($db, $item_id);
+  }
   if ($owner === null) {
     return [400, ['message' => 'user_id or artifact_id parameter is required for API key authentication.']];
   }
@@ -59,15 +61,15 @@ function use_api_fields(array $use): array {
  * Returns [status, response fields]; on success the fields' use is the
  * recorded use.
  */
-function record_use_over_api(mysqli $db, object $authentication, $body): array {
-  $refusal = agent_key_write_refusal($authentication);
+function record_use_over_api(mysqli $db, ApiCaller $caller, $body): array {
+  $refusal = $caller->agentKeyRefusal();
   if ($refusal !== null) {
-    return [403, $refusal];
+    return $refusal;
   }
   if (!is_object($body)) {
     return [400, ['message' => 'Invalid or missing JSON request body.']];
   }
-  $owner = item_api_owner($db, $authentication, $body->user_id ?? null);
+  $owner = $caller->owner($body->user_id ?? null);
   if ($owner === null) {
     return [400, ['message' => 'Missing or invalid required field: user_id']];
   }
@@ -104,16 +106,16 @@ function record_use_over_api(mysqli $db, object $authentication, $body): array {
  * Returns [status, response fields]; on success the fields' use is the
  * deleted use.
  */
-function delete_use_over_api(mysqli $db, object $authentication, array $query): array {
-  $refusal = agent_key_write_refusal($authentication);
+function delete_use_over_api(mysqli $db, ApiCaller $caller, array $query): array {
+  $refusal = $caller->agentKeyRefusal();
   if ($refusal !== null) {
-    return [403, $refusal];
+    return $refusal;
   }
   $id = item_api_positive_int($query['id'] ?? null);
   if ($id === null) {
     return [400, ['message' => 'Missing or invalid required parameter: id']];
   }
-  $owner = item_api_owner($db, $authentication, $query['user_id'] ?? null);
+  $owner = $caller->owner($query['user_id'] ?? null);
   if ($owner === null) {
     return [400, ['message' => 'Missing or invalid required parameter: user_id']];
   }
@@ -126,6 +128,21 @@ function delete_use_over_api(mysqli $db, object $authentication, array $query): 
     return [404, ['message' => 'Use record not found.']];
   }
   return [200, ['message' => 'Use record deleted successfully.', 'use' => use_api_fields($use)]];
+}
+
+/**
+ * Logs the use a write over HTTP answered with under $method's action, and
+ * passes the [status, response fields] answer on.
+ */
+function log_use_write_over_api(string $method, array $answer): array {
+  $use = $answer[1]['use'] ?? null;
+  if ($use !== null) {
+    (new AppLogger())->logDataChange(USE_API_LOG_ACTIONS[$method], 'use', $use['id'], [
+      'artifact_id' => $use['artifact_id'],
+      'use_date' => $use['use_date'],
+    ]);
+  }
+  return $answer;
 }
 
 /** The owner of the item $item_id names, or null when there is no such item. */
