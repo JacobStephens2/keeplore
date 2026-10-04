@@ -1,6 +1,11 @@
 CREATE TABLE users (
     id INT PRIMARY KEY,
+    first_name VARCHAR(255) DEFAULT NULL,
+    last_name VARCHAR(255) DEFAULT NULL,
     email VARCHAR(255) DEFAULT NULL,
+    username VARCHAR(255) DEFAULT NULL,
+    hashed_password VARCHAR(255) DEFAULT NULL,
+    user_group INT DEFAULT 1,
     default_use_interval DECIMAL(8,2) DEFAULT 90,
     default_snooze_days INT NOT NULL DEFAULT 7,
     default_setting VARCHAR(255) DEFAULT NULL,
@@ -9,7 +14,18 @@ CREATE TABLE users (
     native_notify_enabled TINYINT(1) NOT NULL DEFAULT 1,
     native_notify_hour TINYINT UNSIGNED NOT NULL DEFAULT 9,
     native_notify_lead_days TINYINT UNSIGNED NOT NULL DEFAULT 3,
-    native_notify_past_due TINYINT(1) NOT NULL DEFAULT 1
+    native_notify_past_due TINYINT(1) NOT NULL DEFAULT 1,
+    UNIQUE KEY uq_users_username (username),
+    UNIQUE KEY uq_users_email (email)
+) ENGINE=InnoDB;
+CREATE TABLE password_reset_temp (
+    email VARCHAR(255) NOT NULL,
+    `key` VARCHAR(255) NOT NULL,
+    expDate DATETIME NOT NULL,
+    selector VARCHAR(16) DEFAULT NULL,
+    token VARCHAR(64) DEFAULT NULL,
+    expires BIGINT DEFAULT NULL,
+    KEY idx_password_reset_temp_email (email)
 ) ENGINE=InnoDB;
 CREATE TABLE types (id INT PRIMARY KEY, objectType VARCHAR(100)) ENGINE=InnoDB;
 CREATE TABLE games (

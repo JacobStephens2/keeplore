@@ -454,6 +454,25 @@ Tracks API and login request attempts for rate limiting. Rows are automatically 
 
 ---
 
+### `password_reset_temp`
+
+Password reset keys, written and checked only by the `Accounts` class. A
+reset needs an unexpired key for the email; a successful reset deletes every
+key for that email.
+
+| Column | Type (inferred) | Nullable | Description |
+|---|---|---|---|
+| `email` | VARCHAR(255) | NO | The account's email address |
+| `key` | VARCHAR(255) | NO | Random hex key sent in the reset link |
+| `expDate` | DATETIME | NO | When the key stops working (one day after the request) |
+| `selector` | VARCHAR(16) | YES | Unused |
+| `token` | VARCHAR(64) | YES | Unused |
+| `expires` | BIGINT | YES | Unused (the expiry as a Unix time) |
+
+**Index:** `idx_password_reset_temp_email` on (`email`) in the local schema
+
+---
+
 ## Entity Relationship Diagram
 
 ```

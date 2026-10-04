@@ -70,25 +70,6 @@
 
     return $errors;
   }
-  function reset_password($form_data) {
-    global $db;
-
-    $hashed_password = password_hash($form_data['password'], PASSWORD_BCRYPT);
-
-    $sql = "UPDATE users SET hashed_password = ? WHERE email = ?";
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, "ss", $hashed_password, $form_data['email']);
-    $result = mysqli_stmt_execute($stmt);
-    mysqli_stmt_close($stmt);
-    if($result) {
-      return true;
-    } else {
-      // INSERT failed
-      echo mysqli_error($db);
-      db_disconnect($db);
-      exit;
-    }
-  }
   function insert_user($user) {
     global $db;
 
