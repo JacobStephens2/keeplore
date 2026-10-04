@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/classes/ApiCaller.php';
 require_once __DIR__ . '/classes/Preferences.php';
+require_once __DIR__ . '/record_use.php';
 require_once __DIR__ . '/classes/UseByQueue.php';
 
 /** How many days ahead upcoming uses reach. */
@@ -50,7 +51,7 @@ function list_upcoming_uses_over_api(mysqli $db, ApiCaller $caller): array {
   return [200, [
     'authenticated' => true,
     'today' => $queue->today(),
-    'timezone' => 'America/New_York',
+    'timezone' => APP_TIME_ZONE,
     'horizon_days' => UPCOMING_USES_HORIZON_DAYS,
     'default_interval_days' => $default_interval,
     'notification_prefs' => [

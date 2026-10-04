@@ -111,6 +111,13 @@ final class KeptToggleApiTest extends TestCase
         $this->assertSame(1, $this->isKept(10));
     }
 
+    public function test_the_master_key_is_refused_before_its_body_is_read(): void
+    {
+        [$status] = set_kept_over_api($this->db, $this->masterKey(), (object) ['id' => 'ten', 'is_kept' => 2]);
+
+        $this->assertSame(403, $status);
+    }
+
     public function test_another_accounts_item_is_not_found(): void
     {
         [$status, $fields] = set_kept_over_api($this->db, $this->agentKey(), (object) ['id' => 20, 'is_kept' => 0]);
