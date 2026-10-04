@@ -141,9 +141,7 @@ final class Items
         $params = [$this->userId];
         foreach (self::FLAG_FILTERS as $filter => $column) {
             if (isset($filters[$filter])) {
-                $where .= $filters[$filter]
-                    ? " AND games.{$column} = 1"
-                    : " AND (games.{$column} IS NULL OR games.{$column} <> 1)";
+                $where .= ' AND ' . artifact_flag_sql("games.{$column}", $filters[$filter]);
             }
         }
         if ($typeIds !== null) {

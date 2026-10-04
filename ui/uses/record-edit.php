@@ -62,12 +62,12 @@ include(SHARED_PATH . '/header.php');
 
       <label for="Title">Item</label>      <select id="Title" name="artifact_id">
         <?php
-          foreach ((new Items($db, (int) $_SESSION['user_id']))->list() as $artifact) {
-            echo "<option value=\"" . h($artifact['id']) . "\"";
-            if($use['item_id'] == $artifact['id']) {
+          foreach ((new Items($db, (int) $_SESSION['user_id']))->list() as $item) {
+            echo "<option value=\"" . h($item['id']) . "\"";
+            if($use['item_id'] == $item['id']) {
               echo " selected";
             }
-            echo ">" . h($artifact['Title']) . "</option>";
+            echo ">" . h($item['Title']) . "</option>";
           }
         ?>
       </select>
