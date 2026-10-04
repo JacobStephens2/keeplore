@@ -111,7 +111,7 @@ final class People
         }
         $owned = array_map('intval', array_column($this->rows(
             'SELECT id FROM players WHERE user_id = ? AND id IN (' . implode(', ', array_fill(0, count($ids), '?')) . ')',
-            'i' . str_repeat('i', count($ids)), [$this->userId, ...$ids]
+            str_repeat('i', count($ids) + 1), [$this->userId, ...$ids]
         ), 'id'));
         return array_values(array_intersect($ids, $owned));
     }
