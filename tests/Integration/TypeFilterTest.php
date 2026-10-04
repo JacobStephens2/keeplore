@@ -77,7 +77,6 @@ final class TypeFilterTest extends TestCase
         $filter = type_filter($this->db, 2, 'GET', [], $session);
 
         $this->assertSame(['3'], $filter['selected']);
-        $this->assertSame(['3'], $session['type']);
     }
 
     public function test_a_get_drops_a_remembered_type_that_has_since_been_deleted(): void
@@ -116,7 +115,6 @@ final class TypeFilterTest extends TestCase
         $filter = type_filter($this->db, 2, 'GET', [], $session);
 
         $this->assertSame(['4', '3'], $filter['selected']);
-        $this->assertSame(['4', '3'], $session['type']);
     }
 
     public function test_a_get_with_nothing_remembered_selects_all_the_owners_types(): void
@@ -126,6 +124,18 @@ final class TypeFilterTest extends TestCase
         $filter = type_filter($this->db, 2, 'GET', [], $session);
 
         $this->assertSame(['4', '3'], $filter['selected']);
+    }
+
+    public function test_a_get_remembers_nothing_so_a_type_created_later_is_selected_too(): void
+    {
+        $session = [];
+        type_filter($this->db, 2, 'GET', [], $session);
+        $this->db->query("INSERT INTO types (id, objectType, user_id) VALUES (5, 'book', 2)");
+
+        $filter = type_filter($this->db, 2, 'GET', [], $session);
+
+        $this->assertSame([], $session);
+        $this->assertSame(['5', '4', '3'], $filter['selected']);
     }
 
     public function test_a_get_never_selects_another_owners_remembered_type(): void
@@ -142,12 +152,27 @@ final class TypeFilterTest extends TestCase
         $this->db->query("UPDATE games SET Candidate = 'Sam', type = 'stale name' WHERE id IN (10, 12, 20)");
 
         $titles = fn (array $typeIds) => array_column(
-            candidate_items($this->db, 1, $typeIds, [])->fetch_all(MYSQLI_ASSOC), 'Title'
+            candidate_items($this->db, 1, $typeIds)->fetch_all(MYSQLI_ASSOC), 'Title'
         );
 
         $this->assertSame(['Catan'], $titles(['1']));
         $this->assertSame(['Arrival', 'Catan'], $titles(['1', '2']));
         $this->assertSame([], $titles([]));
+    }
+
+    public function test_candidates_leave_out_online_and_excluded_names(): void
+    {
+        $this->db->query("UPDATE games SET Candidate = 'Sam' WHERE id = 10");
+        $this->db->query("UPDATE games SET Candidate = 'Jo online' WHERE id = 11");
+        $this->db->query("UPDATE games SET Candidate = 'Lee' WHERE id = 13");
+
+        $titles = fn (array $options) => array_column(
+            candidate_items($this->db, 1, ['1'], $options)->fetch_all(MYSQLI_ASSOC), 'Title'
+        );
+
+        $this->assertSame(['Azul'], $titles(['online' => 'only']));
+        $this->assertEqualsCanonicalizing(['Catan', 'Former possession'], $titles(['online' => 'hide']));
+        $this->assertSame(['Former possession'], $titles(['online' => 'hide', 'exclude_names' => ['sam', '']]));
     }
 
     public function test_choose_for_group_filtered_on_a_type_is_the_owners_items_of_that_type_id(): void

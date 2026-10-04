@@ -291,19 +291,10 @@
       >
 
       <?php
-        $all_type_ids = array_map('strval', array_values($type_ids_by_name));
-        $current_type_ids = [];
-        if (isset($type) && is_array($type)) {
-          foreach (array_values($type) as $type_id) {
-            if ($type_id !== '' && $type_id !== null) {
-              $current_type_ids[] = (string) $type_id;
-            }
-          }
-        }
+        // Both id lists are in the owner's Type order, so they compare as is.
+        $current_type_ids = type_filter_owned($type_ids_by_name, $type ?? []);
         $type_filter = ['types' => $type_ids_by_name, 'selected' => $current_type_ids];
-        sort($all_type_ids);
-        sort($current_type_ids);
-        $type_filter_active = !empty($current_type_ids) && $current_type_ids !== $all_type_ids;
+        $type_filter_active = !empty($current_type_ids) && $current_type_ids !== type_filter_owned($type_ids_by_name, $type_ids_by_name);
         $type_filter_shortcuts = 'trimmed';
       ?>
       <section id="artifactType" class="type-chip-group">

@@ -7,7 +7,10 @@
   require_login_or_guest();
 
   $type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
-  $resultObject = candidate_items($db, (int) $_SESSION['user_id'], $type_filter['selected'], $_POST);
+  $resultObject = candidate_items($db, (int) $_SESSION['user_id'], $type_filter['selected'], [
+    'online' => ['showOnlyOnline' => 'only', 'hideOnline' => 'hide'][$_POST['showOnline'] ?? ''] ?? null,
+    'exclude_names' => [(string) ($_POST['removeUserByName'] ?? ''), (string) ($_POST['removeUserByNameTwo'] ?? '')],
+  ]);
 
   include(SHARED_PATH . '/header.php');
   include(SHARED_PATH . '/dataTable.html'); 

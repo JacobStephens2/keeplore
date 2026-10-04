@@ -60,10 +60,10 @@ function find_artifacts_by_characteristic($kept, $type, $allArtifacts, $favCt) {
 
 /**
  * The owner's items with a Candidate, of the Types in $type_ids (none when
- * it is empty), narrowed by the Candidates form's showOnline,
- * removeUserByName and removeUserByNameTwo fields in $post.
+ * it is empty). $options may hold 'online' ('only' or 'hide'; anything
+ * else shows all) and 'exclude_names', names whose Candidates are left out.
  */
-function candidate_items(mysqli $db, int $user_id, array $type_ids, array $post): mysqli_result {
+function candidate_items(mysqli $db, int $user_id, array $type_ids, array $options = []): mysqli_result {
   $sql = "SELECT *
     FROM games
     WHERE Candidate IS NOT NULL
@@ -74,19 +74,19 @@ function candidate_items(mysqli $db, int $user_id, array $type_ids, array $post)
   $params = [$user_id];
   $types = "i";
 
-  switch ($post['showOnline'] ?? '') {
-    case 'showOnlyOnline':
+  switch ($options['online'] ?? '') {
+    case 'only':
       $sql .= " AND Candidate LIKE '%online%' ";
       break;
-    case 'hideOnline':
+    case 'hide':
       $sql .= " AND Candidate NOT LIKE '%online%' ";
       break;
   }
 
-  foreach (['removeUserByName', 'removeUserByNameTwo'] as $field) {
-    if (isset($post[$field]) && $post[$field] != '') {
+  foreach ($options['exclude_names'] ?? [] as $name) {
+    if ($name != '') {
       $sql .= " AND Candidate NOT LIKE ? ";
-      $params[] = '%' . $post[$field] . '%';
+      $params[] = '%' . $name . '%';
       $types .= "s";
     }
   }
