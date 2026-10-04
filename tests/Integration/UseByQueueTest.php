@@ -258,7 +258,7 @@ final class UseByQueueTest extends TestCase
         $this->assertSame([20], $this->ids((new UseByQueue($this->db, 2, '2026-06-01'))->entries()));
     }
 
-    public function test_today_defaults_to_the_record_use_day(): void
+    public function test_today_defaults_to_the_app_day(): void
     {
         $this->assertSame(app_today(), (new UseByQueue($this->db, 1))->today());
     }

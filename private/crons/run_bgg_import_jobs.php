@@ -7,5 +7,5 @@
     // promoted release tree is root-owned and not writable by www-data.
     $ran = BggImports::runQueued($db);
     if ($ran > 0) {
-        echo date('Y-m-d G:i:s') . " ran $ran BGG import job(s)\n";
+        echo app_now()->format('Y-m-d G:i:s') . " ran $ran BGG import job(s)\n";
     }
