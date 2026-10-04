@@ -2,8 +2,8 @@
 /**
  * Quick record popup: record a use without leaving the page.
  *
- * Expects $db and the owner's $user_id in scope. The owner's person is the
- * fixed first person. The Setting opens as the owner's last Setting,
+ * Expects $db and the owner's $user_id in scope. The owner's person, from
+ * $_SESSION['player_id'] and $_SESSION['FullName'], is the fixed first person. The Setting opens as the owner's last Setting,
  * otherwise their default Setting from Preferences.
  *
  * ui/shared/js/quick-record.js drives it; the page passes its toast and

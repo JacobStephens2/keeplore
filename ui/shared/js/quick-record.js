@@ -3,8 +3,8 @@
 // init(root, options) drives private/shared/quick_record_popup.php and
 // returns open(itemId, itemName, context). The page passes its toast and
 // onRecorded(data, context), which handles the page's own row; context is
-// whatever the page passed to open. Callers pass fetch and today so tests
-// can supply them.
+// whatever the page passed to open. Callers pass fetch, today (a function
+// returning YYYY-MM-DD) and document so tests can supply them.
 
 (function () {
   var RecordUseSubmit = typeof window !== 'undefined' && window.RecordUseSubmit
@@ -237,14 +237,19 @@
       });
     });
 
+    // A save reports the context it was submitted with, even if the popup
+    // was closed or reopened for another item while it was in flight.
+    var savingContext = null;
+    form.addEventListener('submit', function () { savingContext = context; });
     RecordUseSubmit.bind(form, {
       fetch: fetchFn,
       toast: toast,
       saveButton: saveBtn,
       saveLabel: 'Save',
       onSuccess: function (data) {
-        onRecorded(data, context);
-        close();
+        var saved = savingContext;
+        onRecorded(data, saved);
+        if (!root.hidden && context === saved) close();
       }
     });
 

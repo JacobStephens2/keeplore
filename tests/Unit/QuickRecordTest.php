@@ -183,6 +183,22 @@ JS);
         $this->assertTrue($result['hidden']);
     }
 
+    public function test_closing_while_saving_still_reports_the_saved_items_context(): void
+    {
+        $result = $this->run_popup(<<<'JS'
+popup.open('1', 'Catan', 'row-1');
+respondWith({ ok: true, message: 'Recorded', is_overdue: true });
+byId('record-modal-form').requestSubmit();
+byId('record-modal-cancel').click();
+popup.open('2', 'Azul', 'row-2');
+await flush();
+JS);
+
+        $this->assertSame('row-1', $result['recorded'][0][1]);
+        $this->assertFalse($result['hidden']);
+        $this->assertSame('2', $result['itemId']);
+    }
+
     public function test_failed_submit_keeps_the_popup_open(): void
     {
         $result = $this->run_popup(<<<'JS'
