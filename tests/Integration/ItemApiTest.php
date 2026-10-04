@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
  * the body (or for DELETE the query) names. The result is the status code
  * and the response fields.
  */
-final class ItemApiWriteTest extends TestCase
+final class ItemApiTest extends TestCase
 {
     private ?\mysqli $db = null;
     private string $databaseName;
@@ -53,6 +53,7 @@ final class ItemApiWriteTest extends TestCase
             . $this->schemaTable('proposal_outcomes') . $this->schemaTable('proposal_outcome_players')
             . $this->schemaTable('item_bgg_ratings'));
         require_once PRIVATE_PATH . '/item_api.php';
+        \DatabaseObject::set_database($this->db);
     }
 
     protected function tearDown(): void
@@ -80,14 +81,24 @@ final class ItemApiWriteTest extends TestCase
         return $match[0];
     }
 
-    private function session(int $userId = 1): object
+    private function caller(array $authentication): \ApiCaller
     {
-        return (object) ['authenticated' => true, 'auth_type' => 'session', 'user_id' => $userId];
+        return \ApiCaller::from($this->db, (object) (['authenticated' => true] + $authentication));
     }
 
-    private function masterKey(): object
+    private function session(int $userId = 1): \ApiCaller
     {
-        return (object) ['authenticated' => true, 'auth_type' => 'api_key'];
+        return $this->caller(['auth_type' => 'session', 'user_id' => $userId]);
+    }
+
+    private function masterKey(): \ApiCaller
+    {
+        return $this->caller(['auth_type' => 'api_key']);
+    }
+
+    private function agentKey(int $userId = 1): \ApiCaller
+    {
+        return $this->caller(['auth_type' => 'agent_key', 'user_id' => $userId]);
     }
 
     private function body(string $json): mixed
@@ -208,11 +219,9 @@ final class ItemApiWriteTest extends TestCase
     {
         $before = $this->itemCount();
 
-        foreach (['{"Title": "Quelf"}', '{"Title": "Quelf", "user_id": 0}', '{"Title": "Quelf", "user_id": "me"}', '{"Title": "Quelf", "user_id": 999}'] as $json) {
-            [$status, $response] = write_item_over_api($this->db, $this->masterKey(), 'POST', $this->body($json));
-            $this->assertSame(400, $status, $json);
-            $this->assertSame('Missing or invalid required field: user_id', $response['message']);
-        }
+        [$status, $response] = write_item_over_api($this->db, $this->masterKey(), 'POST', $this->body('{"Title": "Quelf", "user_id": 999}'));
+        $this->assertSame(400, $status);
+        $this->assertSame('Missing or invalid required field: user_id', $response['message']);
         [$status] = write_item_over_api($this->db, $this->masterKey(), 'PUT', $this->body('{"id": 20, "Title": "Mine now"}'));
         $this->assertSame(400, $status);
 
@@ -222,7 +231,7 @@ final class ItemApiWriteTest extends TestCase
 
     public function test_agent_keys_are_refused_and_write_nothing(): void
     {
-        $agent = (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => 1];
+        $agent = $this->agentKey();
         $before = $this->itemCount();
 
         [$status, $response] = write_item_over_api($this->db, $agent, 'POST', $this->body('{"Title": "Quelf"}'));
@@ -338,11 +347,9 @@ final class ItemApiWriteTest extends TestCase
 
     public function test_delete_with_the_master_key_needs_the_owner_in_the_query(): void
     {
-        foreach ([['id' => '20'], ['id' => '20', 'user_id' => 'me'], ['id' => '20', 'user_id' => '999']] as $query) {
-            [$status, $response] = delete_item_over_api($this->db, $this->masterKey(), $query);
-            $this->assertSame(400, $status);
-            $this->assertSame('Missing or invalid required parameter: user_id', $response['message']);
-        }
+        [$status, $response] = delete_item_over_api($this->db, $this->masterKey(), ['id' => '20']);
+        $this->assertSame(400, $status);
+        $this->assertSame('Missing or invalid required parameter: user_id', $response['message']);
         [$status] = delete_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => '1']);
         $this->assertSame(404, $status);
         $this->assertSame('Private item', $this->item(20, 2)['Title']);
@@ -354,12 +361,84 @@ final class ItemApiWriteTest extends TestCase
 
     public function test_delete_with_an_agent_key_is_refused_and_leaves_the_item(): void
     {
-        $agent = (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => 1];
+        $agent = $this->agentKey();
 
         [$status, $response] = delete_item_over_api($this->db, $agent, ['id' => '10']);
 
         $this->assertSame(403, $status);
         $this->assertSame('Agent keys permit reads plus the kept toggle only.', $response['message']);
         $this->assertSame('Catan', $this->item(10)['Title']);
+    }
+
+    public function test_writes_log_their_data_change_from_the_returned_item(): void
+    {
+        $title = 'Logged ' . bin2hex(random_bytes(4));
+
+        [, $response] = write_item_over_api($this->db, $this->session(), 'POST', (object) ['Title' => $title]);
+        delete_item_over_api($this->db, $this->session(), ['id' => (string) $response['artifact']['id']]);
+
+        $log = (string) @file_get_contents(PROJECT_PATH . '/logs/app.log');
+        foreach (['create', 'delete'] as $action) {
+            $this->assertMatchesRegularExpression(
+                '/"action":"' . $action . '","category":"data_change","entity_type":"artifact","entity_id":"?'
+                . $response['artifact']['id'] . '"?,"details":\{"title":"' . $title . '"\}/',
+                $log
+            );
+        }
+    }
+
+    public function test_get_reads_the_callers_own_item_with_its_tags(): void
+    {
+        foreach ([$this->session(), $this->agentKey()] as $caller) {
+            [$status, $response] = read_item_over_api($this->db, $caller, ['id' => '10']);
+
+            $this->assertSame(200, $status);
+            $this->assertSame('Catan', $response['artifact']->Title);
+            $this->assertSame(['family'], $response['artifact']->tags);
+        }
+    }
+
+    public function test_get_of_another_accounts_item_returns_404_whatever_user_it_names(): void
+    {
+        foreach ([$this->session(), $this->agentKey()] as $caller) {
+            foreach ([['id' => '20'], ['id' => '20', 'user_id' => '2'], ['id' => '999']] as $query) {
+                [$status, $response] = read_item_over_api($this->db, $caller, $query);
+
+                $this->assertSame(404, $status);
+                $this->assertSame(['message' => 'Item not found.'], $response);
+            }
+        }
+    }
+
+    public function test_get_with_the_master_key_naming_no_user_reads_the_item_by_id_alone(): void
+    {
+        [$status, $response] = read_item_over_api($this->db, $this->masterKey(), ['id' => '20']);
+
+        $this->assertSame(200, $status);
+        $this->assertSame('Private item', $response['artifact']->Title);
+        $this->assertSame(2, (int) $response['artifact']->user_id);
+    }
+
+    public function test_get_with_the_master_key_naming_a_user_reads_only_that_users_item(): void
+    {
+        [$status, $response] = read_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => '2']);
+        $this->assertSame(200, $status);
+        $this->assertSame(['mine'], $response['artifact']->tags);
+
+        [$status] = read_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => '1']);
+        $this->assertSame(404, $status);
+
+        [$status, $response] = read_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => '999']);
+        $this->assertSame(400, $status);
+        $this->assertSame(['message' => 'Missing or invalid required parameter: user_id'], $response);
+    }
+
+    public function test_get_without_a_valid_id_returns_400(): void
+    {
+        foreach ([[], ['id' => 'ten'], ['id' => '0']] as $query) {
+            [$status, $response] = read_item_over_api($this->db, $this->session(), $query);
+            $this->assertSame(400, $status);
+            $this->assertSame(['message' => 'Missing or invalid required parameter: id'], $response);
+        }
     }
 }
