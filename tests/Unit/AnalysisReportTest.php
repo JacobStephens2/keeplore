@@ -9,7 +9,8 @@ require_once PROJECT_PATH . '/private/analysis.php';
 
 /**
  * Seam: analysis_report() - every figure the /analysis page shows, computed
- * from one user's plain rows and an explicit "today". No database.
+ * from one owner's items, uses and people, in the row shapes Items::list(),
+ * Uses::all() and People::all() return, and an explicit "today". No database.
  */
 class AnalysisReportTest extends TestCase
 {
@@ -18,17 +19,26 @@ class AnalysisReportTest extends TestCase
         return array_replace([
             'id' => $id,
             'Title' => 'Item ' . $id,
-            'type' => 'table-game',
+            'type_name' => 'table-game',
             'is_kept' => 1,
             'to_get_rid_of' => 0,
             'Acq' => '2020-01-01',
+            'last_use' => null,
         ], $changes);
     }
 
-    private function useOf(int $item_id, string $date, ?int $id = null): array
+    private function useOf(int $item_id, string $date, ?int $id = null, array $changes = []): array
     {
         static $next = 1000;
-        return ['id' => $id ?? $next++, 'artifact_id' => $item_id, 'use_date' => $date];
+        return array_replace(
+            ['id' => $id ?? $next++, 'item_id' => $item_id, 'use_date' => $date, 'setting' => '', 'people' => []],
+            $changes
+        );
+    }
+
+    private function person(int $id, string $name, bool $is_me = false): array
+    {
+        return ['id' => $id, 'name' => $name, 'is_me' => $is_me];
     }
 
     private function report(array $data, string $today = '2026-09-21'): array
@@ -37,7 +47,6 @@ class AnalysisReportTest extends TestCase
             'uses' => [],
             'items' => [],
             'people' => [],
-            'participations' => [],
         ], $data), $today);
     }
 
@@ -50,10 +59,10 @@ class AnalysisReportTest extends TestCase
                 $this->item(3, ['to_get_rid_of' => 1]),
             ],
             'people' => [
-                ['id' => 7, 'FirstName' => 'Ada', 'LastName' => 'Lovelace'],
-                ['id' => 8, 'FirstName' => 'Alan', 'LastName' => 'Turing'],
-                // The player standing for the user is not a tracked person.
-                ['id' => 9, 'FirstName' => 'Me', 'LastName' => '', 'represents_user_id' => 1],
+                $this->person(7, 'Ada Lovelace'),
+                $this->person(8, 'Alan Turing'),
+                // The person marked as the owner is not a tracked person.
+                $this->person(9, 'Me', true),
             ],
             'uses' => [
                 $this->useOf(1, '2026-09-01'),
@@ -232,12 +241,15 @@ class AnalysisReportTest extends TestCase
     {
         $report = $this->report([
             'items' => [
-                $this->item(1, ['Title' => 'Azul']),
-                $this->item(2, ['Title' => 'Brass', 'type' => 'book']),
-                $this->item(3, ['Title' => 'Catan']),
+                $this->item(1, ['Title' => 'Azul', 'last_use' => '2026-09-01']),
+                $this->item(2, ['Title' => 'Brass', 'type_name' => 'book', 'last_use' => '2026-09-02']),
+                // A legacy play on 2026-07-01 is Catan's Last use.
+                $this->item(3, ['Title' => 'Catan', 'last_use' => '2026-07-01']),
+                $this->item(4, ['Title' => 'Dixit', 'type_name' => null, 'last_use' => '2026-09-04']),
             ],
             'uses' => [
                 $this->useOf(1, '2026-09-01'),
+                $this->useOf(4, '2026-09-04'),
                 $this->useOf(2, '2026-09-02'),
                 $this->useOf(3, '2026-06-24'), // 89 days ago: inside 90 days
                 $this->useOf(3, '2026-06-23'), // 90 days ago: outside
@@ -250,16 +262,18 @@ class AnalysisReportTest extends TestCase
             [
                 ['id' => 1, 'title' => 'Azul', 'type' => 'table-game', 'count' => 1, 'last_used' => '2026-09-01'],
                 ['id' => 2, 'title' => 'Brass', 'type' => 'book', 'count' => 1, 'last_used' => '2026-09-02'],
-                ['id' => 3, 'title' => 'Catan', 'type' => 'table-game', 'count' => 1, 'last_used' => '2026-06-24'],
+                ['id' => 3, 'title' => 'Catan', 'type' => 'table-game', 'count' => 1, 'last_used' => '2026-07-01'],
+                ['id' => 4, 'title' => 'Dixit', 'type' => '', 'count' => 1, 'last_used' => '2026-09-04'],
             ],
             $report['top_recent']
         );
         $this->assertSame(
-            ['id' => 3, 'title' => 'Catan', 'type' => 'table-game', 'count' => 3, 'last_used' => '2026-06-24'],
+            ['id' => 3, 'title' => 'Catan', 'type' => 'table-game', 'count' => 3, 'last_used' => '2026-07-01'],
             $report['top_all_time'][0]
         );
         $this->assertSame(
-            [['label' => 'table-game', 'count' => 2], ['label' => 'book', 'count' => 1]],
+            // An item with no Type shows under "-"; ties go by label.
+            [['label' => 'table-game', 'count' => 2], ['label' => '-', 'count' => 1], ['label' => 'book', 'count' => 1]],
             $report['types']
         );
     }
@@ -282,22 +296,13 @@ class AnalysisReportTest extends TestCase
     {
         $report = $this->report([
             'items' => [
-                $this->item(1), // used today
-                $this->item(2), // 29 days ago
-                $this->item(3), // 30 days ago
-                $this->item(4), // 364 days ago
-                $this->item(5), // 365 days ago
+                $this->item(1, ['last_use' => '2026-09-21']), // today
+                $this->item(2, ['last_use' => '2026-08-23']), // 29 days ago
+                $this->item(3, ['last_use' => '2026-08-22']), // 30 days ago
+                $this->item(4, ['last_use' => '2025-09-22']), // 364 days ago
+                $this->item(5, ['last_use' => '2025-09-21']), // 365 days ago
                 $this->item(6), // never
-                $this->item(7, ['is_kept' => 0]), // not kept: left out
-            ],
-            'uses' => [
-                $this->useOf(1, '2026-09-21'),
-                $this->useOf(1, '2019-01-01'),
-                $this->useOf(2, '2026-08-23'),
-                $this->useOf(3, '2026-08-22'),
-                $this->useOf(4, '2025-09-22'),
-                $this->useOf(5, '2025-09-21'),
-                $this->useOf(7, '2026-09-21'),
+                $this->item(7, ['is_kept' => 0, 'last_use' => '2026-09-21']), // not kept: left out
             ],
         ]);
 
@@ -320,16 +325,12 @@ class AnalysisReportTest extends TestCase
     {
         $report = $this->report([
             'items' => [
-                $this->item(1, ['Title' => 'Fresh']),
-                $this->item(2, ['Title' => 'Dusty']),
+                $this->item(1, ['Title' => 'Fresh', 'last_use' => '2026-09-20']),
+                $this->item(2, ['Title' => 'Dusty', 'last_use' => '2025-09-21']),
                 $this->item(3, ['Title' => 'Unopened', 'Acq' => '2024-09-21']),
                 $this->item(4, ['Title' => 'Leaving', 'to_get_rid_of' => 1]),
                 $this->item(5, ['Title' => 'Gone', 'is_kept' => 0]),
                 $this->item(6, ['Title' => 'Undated', 'Acq' => null]),
-            ],
-            'uses' => [
-                $this->useOf(1, '2026-09-20'),
-                $this->useOf(2, '2025-09-21'),
             ],
         ]);
 
@@ -365,25 +366,23 @@ class AnalysisReportTest extends TestCase
         $report = $this->report([
             'items' => [$this->item(1)],
             'people' => [
-                ['id' => 7, 'FirstName' => 'Ada', 'LastName' => 'Lovelace', 'represents_user_id' => null],
-                ['id' => 8, 'FirstName' => 'Alan', 'LastName' => '', 'represents_user_id' => null],
-                ['id' => 9, 'FirstName' => 'Me', 'LastName' => 'Myself', 'represents_user_id' => 1],
-                ['id' => 10, 'FirstName' => 'Never', 'LastName' => 'Joined', 'represents_user_id' => null],
+                $this->person(7, 'Ada Lovelace'),
+                $this->person(8, 'Alan'),
+                $this->person(9, 'Me Myself', true),
+                $this->person(10, 'Never Joined'),
             ],
             'uses' => [
-                $this->useOf(1, '2026-09-01', 501),
-                $this->useOf(1, '2026-09-05', 502),
-                $this->useOf(1, '2026-09-09', 503),
-            ],
-            'participations' => [
-                ['use_id' => 501, 'player_id' => 7],
-                ['use_id' => 501, 'player_id' => 7], // duplicate junction row
-                ['use_id' => 502, 'player_id' => 7],
-                ['use_id' => 502, 'player_id' => 8],
-                ['use_id' => 501, 'player_id' => 9], // the user: not company
-                ['use_id' => 502, 'player_id' => 9],
-                ['use_id' => 503, 'player_id' => 9],
-                ['use_id' => 999, 'player_id' => 8], // use since deleted
+                $this->useOf(1, '2026-09-01', 501, ['people' => [
+                    ['id' => 7, 'name' => 'Ada Lovelace'],
+                    ['id' => 7, 'name' => 'Ada Lovelace'], // duplicate junction row
+                    ['id' => 9, 'name' => 'Me Myself'], // the owner: not company
+                ]]),
+                $this->useOf(1, '2026-09-05', 502, ['people' => [
+                    ['id' => 7, 'name' => 'Ada Lovelace'],
+                    ['id' => 8, 'name' => 'Alan'],
+                    ['id' => 9, 'name' => 'Me Myself'],
+                ]]),
+                $this->useOf(1, '2026-09-09', 503, ['people' => [['id' => 9, 'name' => 'Me Myself']]]),
             ],
         ]);
 
@@ -403,7 +402,7 @@ class AnalysisReportTest extends TestCase
     public function test_settings_rank_by_uses_and_name_the_items_most_used_in_each(): void
     {
         $at = fn(int $item_id, string $setting) =>
-            $this->useOf($item_id, '2026-09-01') + ['note' => $setting];
+            $this->useOf($item_id, '2026-09-01', null, ['setting' => $setting]);
 
         $report = $this->report([
             'items' => [
@@ -451,8 +450,8 @@ class AnalysisReportTest extends TestCase
         $uses = [];
         for ($id = 1; $id <= 7; $id++) {
             $items[] = $this->item($id);
-            $uses[] = $this->useOf($id, '2026-09-01') + ['note' => 'Home'];
-            $uses[] = $this->useOf($id, '2026-09-02') + ['note' => 'Setting ' . $id];
+            $uses[] = $this->useOf($id, '2026-09-01', null, ['setting' => 'Home']);
+            $uses[] = $this->useOf($id, '2026-09-02', null, ['setting' => 'Setting ' . $id]);
         }
         $report = $this->report(['items' => $items, 'uses' => $uses]);
 
@@ -461,14 +460,40 @@ class AnalysisReportTest extends TestCase
         $this->assertCount(5, $report['settings'][0]['items']);
     }
 
+    public function test_a_setting_shows_as_spelled_on_the_use_recorded_first(): void
+    {
+        // Uses arrive newest first, as Uses::all() returns them.
+        $report = $this->report([
+            'items' => [$this->item(1)],
+            'uses' => [
+                $this->useOf(1, '2026-09-10', 3, ['setting' => 'HOME']),
+                $this->useOf(1, '2026-09-05', 2, ['setting' => 'home']),
+                $this->useOf(1, '2026-09-08', 1, ['setting' => 'Home']),
+            ],
+        ]);
+
+        $this->assertSame('Home', $report['settings'][0]['setting']);
+        $this->assertSame(3, $report['settings'][0]['count']);
+    }
+
+    public function test_a_future_dated_last_use_counts_as_used_in_the_last_30_days(): void
+    {
+        $report = $this->report([
+            'items' => [$this->item(1, ['last_use' => '2026-10-01'])],
+        ]);
+
+        $this->assertSame(1, array_column($report['recency']['buckets'], 'count', 'label')['Last 30 days']);
+        $this->assertSame(0, $report['neglected'][0]['days_idle']);
+    }
+
     public function test_uses_without_a_real_date_count_as_uses_but_stay_off_the_timeline(): void
     {
         $report = $this->report([
             'items' => [$this->item(1)],
             'uses' => [
                 $this->useOf(1, '2026-09-20'),
-                ['id' => 1, 'artifact_id' => 1, 'use_date' => null],
-                ['id' => 2, 'artifact_id' => 1, 'use_date' => '0000-00-00'],
+                $this->useOf(1, '', 1),
+                $this->useOf(1, '0000-00-00', 2),
             ],
         ]);
 
