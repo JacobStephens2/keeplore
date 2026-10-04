@@ -10,7 +10,7 @@ $page_title = 'Edit User Settings';
 $user_id = (int) $_SESSION['user_id'];
 $preferences = new Preferences($db, $user_id);
 $bgg_ratings = new BggRatings($db, $user_id);
-$types_module = new Types($db, $user_id);
+$owner_types = new Types($db, $user_id);
 
 if(is_post_request()) {
   // Saved apart from the rest, so a profile error costs only the profile.
@@ -47,9 +47,9 @@ if(is_post_request()) {
 
   // Saved apart from the rest, so a failure costs only this field.
   try {
-    $bgg_default_type_changed = $types_module->setBggDefault((string) ($_POST['bgg_default_type_id'] ?? ''));
+    $bgg_default_type_changed = $owner_types->setBggDefault((string) ($_POST['bgg_default_type_id'] ?? ''));
   } catch (InvalidArgumentException | OutOfBoundsException $e) {
-    $bgg_default_type_error = $e->getMessage() . ' Your type for BoardGameGeek items did not change.';
+    $bgg_default_type_error = $e->getMessage();
   } catch (mysqli_sql_exception) {
     $bgg_default_type_error = 'Your type for BoardGameGeek items could not be saved. Please try again.';
   }
@@ -58,8 +58,8 @@ if(is_post_request()) {
 // A refused profile keeps what was posted, so it can be fixed.
 $profile = isset($profile_errors) ? $posted_profile : ($account ?? accounts()->find($user_id));
 $userArray = $profile + $preferences->get();
-$bgg_default_type = $types_module->bggDefault();
-$types = $types_module->all();
+$bgg_default_type = $owner_types->bggDefault();
+$types = $owner_types->all();
 
 ?>
 
@@ -84,7 +84,7 @@ $types = $types_module->all();
         echo '<p id="bgg_message">' . h($bgg_message) . '</p>';
       }
       if (isset($bgg_default_type_error)) {
-        echo '<p class="errors">' . h($bgg_default_type_error) . '</p>';
+        echo '<p class="errors">' . h($bgg_default_type_error) . ' Your type for BoardGameGeek items did not change.</p>';
       } elseif (!empty($bgg_default_type_changed)) {
         $bgg_default_type_message = $bgg_default_type === null
           ? 'You no longer have a type for BoardGameGeek items.'

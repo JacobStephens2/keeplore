@@ -74,10 +74,10 @@ class BggDefaultTypeTest extends TestCase
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/settings/edit.php');
 
         $this->assertStringContainsString('name="bgg_default_type_id"', $source);
-        $this->assertStringContainsString('$types_module = new Types($db, $user_id);', $source);
-        $this->assertStringContainsString('$types_module->setBggDefault(', $source);
-        $this->assertStringContainsString('$bgg_default_type = $types_module->bggDefault();', $source);
-        $this->assertStringContainsString('$types = $types_module->all();', $source);
+        $this->assertStringContainsString('$owner_types = new Types($db, $user_id);', $source);
+        $this->assertStringContainsString('$owner_types->setBggDefault(', $source);
+        $this->assertStringContainsString('$bgg_default_type = $owner_types->bggDefault();', $source);
+        $this->assertStringContainsString('$types = $owner_types->all();', $source);
         $this->assertStringNotContainsString('artifact_type_array.php', $source);
         $this->assertSame(1, substr_count($source, '$user_id = '), 'Settings sets $user_id once');
     }
