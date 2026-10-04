@@ -49,8 +49,8 @@ final class Accounts
      */
     public function requestPasswordReset(string $email): void
     {
-        $email = $this->rows('SELECT email FROM users WHERE email = ?', 's', [trim($email)])[0]['email'] ?? null;
-        if ($email === null) {
+        $accountEmail = $this->rows('SELECT email FROM users WHERE email = ?', 's', [trim($email)])[0]['email'] ?? null;
+        if ($accountEmail === null) {
             return;
         }
 
@@ -59,28 +59,16 @@ final class Accounts
         // selector, token and expires are unused, but production's table has them.
         $this->statement(
             'INSERT INTO password_reset_temp (email, `key`, expDate, selector, token, expires) VALUES (?, ?, ?, ?, ?, ?)',
-            'sssssi', [$email, $key, date('Y-m-d H:i:s', $expires), bin2hex(random_bytes(8)), bin2hex(random_bytes(32)), $expires]
+            'sssssi', [$accountEmail, $key, date('Y-m-d H:i:s', $expires), bin2hex(random_bytes(8)), bin2hex(random_bytes(32)), $expires]
         )->close();
 
-        $this->mailer->send($email, 'Password Reset — ' . APP_NAME, self::resetEmail($email, $key));
+        $this->mailer->send($accountEmail, 'Password Reset — ' . APP_NAME, self::resetEmail($accountEmail, $key));
     }
 
     /** Whether $key is an unexpired reset key for $email. */
     public function resetLinkIsValid(string $email, string $key): bool
     {
-        if ($key === '') {
-            return false;
-        }
-        $keys = $this->rows(
-            'SELECT `key` FROM password_reset_temp WHERE email = ? AND expDate >= ?',
-            'ss', [$email, date('Y-m-d H:i:s', $this->now())]
-        );
-        foreach ($keys as $row) {
-            if (hash_equals($row['key'], $key)) {
-                return true;
-            }
-        }
-        return false;
+        return $this->keyIsValid($email, $key, '');
     }
 
     /**
@@ -91,14 +79,14 @@ final class Accounts
      */
     public function resetPassword(string $email, string $key, string $password, string $confirm): void
     {
-        $errors = $this->resetLinkIsValid($email, $key) ? [] : [self::INVALID_RESET_LINK];
-        $errors = [...$errors, ...self::passwordProblems($password, $confirm)];
-        if ($errors !== []) {
-            throw new AccountInvalid($errors);
-        }
-
         $this->db->begin_transaction();
         try {
+            // Locking the email's keys makes a second reset with the same key wait, then fail.
+            $errors = $this->keyIsValid($email, $key, ' FOR UPDATE') ? [] : [self::INVALID_RESET_LINK];
+            $errors = [...$errors, ...self::passwordProblems($password, $confirm)];
+            if ($errors !== []) {
+                throw new AccountInvalid($errors);
+            }
             $this->statement(
                 'UPDATE users SET hashed_password = ? WHERE email = ?',
                 'ss', [password_hash($password, PASSWORD_BCRYPT), $email]
@@ -109,6 +97,24 @@ final class Accounts
             $this->db->rollback();
             throw $failure;
         }
+    }
+
+    /** Whether $key is an unexpired reset key for $email, read with the $lock clause. */
+    private function keyIsValid(string $email, string $key, string $lock): bool
+    {
+        if ($key === '') {
+            return false;
+        }
+        $keys = $this->rows(
+            'SELECT `key` FROM password_reset_temp WHERE email = ? AND expDate >= ?' . $lock,
+            'ss', [$email, date('Y-m-d H:i:s', $this->now())]
+        );
+        foreach ($keys as $row) {
+            if (hash_equals($row['key'], $key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Every password rule $password and its confirmation break. */
@@ -125,7 +131,7 @@ final class Accounts
                 'Password must contain at least 1 number.' => preg_match('/[0-9]/', $password) === 1,
                 'Password must contain at least 1 symbol.' => preg_match('/[^A-Za-z0-9\s]/', $password) === 1,
             ];
-            $errors = array_keys(array_filter($rules, fn (bool $kept) => !$kept));
+            $errors = array_keys(array_filter($rules, fn (bool $met) => !$met));
         }
 
         if (trim($confirm) === '') {
