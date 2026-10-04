@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/classes/Items.php';
+require_once __DIR__ . '/validation_functions.php';
 
 /**
  * Explore pages: Candidates and Items by characteristic. Each answer is the
@@ -36,7 +37,7 @@ function candidate_items(mysqli $db, int $user_id, array $type_ids, array $optio
     (new Items($db, $user_id))->list(['type_ids' => $type_ids]),
     function (array $row) use ($online, $exclude_names) {
       $candidate = (string) ($row['Candidate'] ?? '');
-      if (explore_is_blank($candidate) || $candidate === '0') {
+      if (is_blank($candidate) || $candidate === '0') {
         return false;
       }
       $is_online = stripos($candidate, 'online') !== false;
@@ -67,7 +68,7 @@ function characteristic_items(mysqli $db, int $user_id, array $type_ids, array $
   }
   $rows = array_filter(
     (new Items($db, $user_id))->list($filters),
-    fn (array $row) => !explore_is_blank($row['SS'] ?? null)
+    fn (array $row) => !is_blank($row['SS'] ?? null)
   );
   $order = EXPLORE_CHARACTERISTIC_ORDER;
   if (($options['order'] ?? null) === 'fav_count') {
@@ -109,9 +110,4 @@ function explore_sort_value($value, string $kind): string|float|null
     return is_numeric($value) ? (float) $value : null;
   }
   return $value === null ? null : strtolower((string) $value);
-}
-
-function explore_is_blank($value): bool
-{
-  return trim((string) ($value ?? '')) === '';
 }

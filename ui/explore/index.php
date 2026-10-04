@@ -72,19 +72,19 @@ include(SHARED_PATH . '/header.php');
   	  </tr>
       </thead>
       <tbody>
-      <?php foreach ($items as $object) { ?>
+      <?php foreach ($items as $item) { ?>
         <tr>
-          <td><?php echo h($object['Title']); ?></td>
-          <td><?php echo artifact_is_kept($object) ? 'true' : 'false'; ?></td>
-    	    <td><?php echo h($object['type_name']); ?></td>
-    	    <td><?php echo h($object['MnP']); ?></td>
-    	    <td><?php echo h($object['MxP']); ?></td>
-    	    <td><?php echo h($object['SS']); ?></td>
-    	    <td><?php echo h($object['Yr']); ?></td>
-    	    <td><?php echo h($object['Wt']); ?></td>
-    	    <td><?php echo h($object['FavCt']); ?></td>
-    	    <td><?php echo h($object['Age']); ?></td>
-    	    <td><?php echo h($object['BGG_Rat']); ?></td>
+          <td><?php echo h($item['Title']); ?></td>
+          <td><?php echo artifact_is_kept($item) ? 'true' : 'false'; ?></td>
+    	    <td><?php echo h($item['type_name']); ?></td>
+    	    <td><?php echo h($item['MnP']); ?></td>
+    	    <td><?php echo h($item['MxP']); ?></td>
+    	    <td><?php echo h($item['SS']); ?></td>
+    	    <td><?php echo h($item['Yr']); ?></td>
+    	    <td><?php echo h($item['Wt']); ?></td>
+    	    <td><?php echo h($item['FavCt']); ?></td>
+    	    <td><?php echo h($item['Age']); ?></td>
+    	    <td><?php echo h($item['BGG_Rat']); ?></td>
     	  </tr>
       <?php } ?>
       </tbody>
