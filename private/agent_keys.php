@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/classes/ApiCaller.php';
+
 /**
  * Per-agent per-user API keys for remote agent HTTP access (spec #10,
  * ticket #18, ADR 0002).
@@ -93,6 +95,21 @@ function agent_key_write_refusal($authentication_response) {
     ];
   }
   return null;
+}
+
+/**
+ * For an endpoint script not yet answered through answer_api_request(),
+ * whose handlers ask ApiCaller instead: exits 403 when the caller
+ * authenticated with an agent key, which may read and flip kept, nothing
+ * else.
+ */
+function deny_agent_key_writes($authentication_response) {
+  if (($authentication_response->auth_type ?? null) === 'agent_key') {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode(ApiCaller::AGENT_KEY_REFUSAL);
+    exit;
+  }
 }
 
 ?>
