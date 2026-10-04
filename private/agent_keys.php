@@ -1,7 +1,5 @@
 <?php
 
-require_once __DIR__ . '/classes/ApiCaller.php';
-
 /**
  * Per-agent per-user API keys for remote agent HTTP access (spec #10,
  * ticket #18, ADR 0002).
@@ -79,37 +77,6 @@ function find_agent_key_by_token($conn, $token) {
   mysqli_stmt_execute($touch);
   mysqli_stmt_close($touch);
   return $row;
-}
-
-/**
- * Scope gate: agent keys may read and flip kept, nothing else. The 403
- * response body when the caller authenticated with an agent key, else null.
- */
-function agent_key_write_refusal($authentication_response) {
-  if (is_object($authentication_response)
-      && isset($authentication_response->auth_type)
-      && $authentication_response->auth_type === 'agent_key') {
-    return [
-      'authenticated' => true,
-      'message' => 'Agent keys permit reads plus the kept toggle only.',
-    ];
-  }
-  return null;
-}
-
-/**
- * For an endpoint script not yet answered through answer_api_request(),
- * whose handlers ask ApiCaller instead: exits 403 when the caller
- * authenticated with an agent key, which may read and flip kept, nothing
- * else.
- */
-function deny_agent_key_writes($authentication_response) {
-  if (($authentication_response->auth_type ?? null) === 'agent_key') {
-    http_response_code(403);
-    header('Content-Type: application/json');
-    echo json_encode(ApiCaller::AGENT_KEY_REFUSAL);
-    exit;
-  }
 }
 
 ?>

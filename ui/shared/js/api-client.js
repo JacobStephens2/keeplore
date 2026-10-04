@@ -52,15 +52,7 @@ const ApiClient = {
       throw new Error(error.message || `Request failed: ${response.status}`);
     }
 
-    const data = await response.json();
-
-    // An endpoint not yet answered through the API request module may still
-    // answer an expired session with 200 and { authenticated: false }.
-    if (data.authenticated === false) {
-      return this.redirectToLogin();
-    }
-
-    return data;
+    return response.json();
   },
 
   /**
