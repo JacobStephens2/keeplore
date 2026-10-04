@@ -26,7 +26,7 @@ final class AccountInvalid extends InvalidArgumentException
  *
  * A profile needs a first and last name of 2 to 255 characters, a valid
  * email of at most 255 characters and a username of 8 to 255 characters;
- * no two accounts share an email or a username. A password must have at
+ * no two accounts share an email or a username, so an account keeps its own. A password must have at
  * least 12 characters, with an uppercase letter, a lowercase letter, a
  * number and a symbol, and a matching confirmation. Invalid input throws
  * AccountInvalid with every problem, and nothing is written.
@@ -109,6 +109,39 @@ final class Accounts
             error_log('Failed to send the new-account notice: ' . $failure->getMessage());
         }
         return $account;
+    }
+
+    /**
+     * Replace the name, email and username of the account with this id from
+     * first_name, last_name, email and username, and return the account.
+     *
+     * @throws OutOfBoundsException when no account has this id.
+     * @throws AccountInvalid for a profile that breaks the rules.
+     */
+    public function updateProfile(int $id, array $input): array
+    {
+        if ($this->find($id) === null) {
+            throw new OutOfBoundsException('Account not found.');
+        }
+        $profile = self::profile($input);
+        $errors = $this->profileProblems($profile, $id);
+        if ($errors !== []) {
+            throw new AccountInvalid($errors);
+        }
+
+        try {
+            $this->statement(
+                'UPDATE users SET first_name = ?, last_name = ?, email = ?, username = ? WHERE id = ?',
+                'ssssi', [...array_values($profile), $id]
+            )->close();
+        } catch (mysqli_sql_exception $duplicate) {
+            // Another account took the email or username since the check.
+            if ($duplicate->getCode() !== self::DUPLICATE_KEY) {
+                throw $duplicate;
+            }
+            throw new AccountInvalid($this->profileProblems($profile, $id));
+        }
+        return $this->find($id);
     }
 
     /**
@@ -206,8 +239,8 @@ final class Accounts
         return $trim ? trim($value) : $value;
     }
 
-    /** Every profile rule $profile breaks. */
-    private function profileProblems(array $profile): array
+    /** Every profile rule $profile breaks, as the account $id's or a new account's when null. */
+    private function profileProblems(array $profile, ?int $id = null): array
     {
         $errors = [];
         foreach (['first_name' => 'First name', 'last_name' => 'Last name'] as $field => $label) {
@@ -226,8 +259,10 @@ final class Accounts
             $errors[] = 'Email must be at most 255 characters.';
         } elseif (preg_match('/\A[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\z/i', $email) !== 1) {
             $errors[] = 'Email must be a valid format.';
-        } elseif ($this->taken('email', $email)) {
-            $errors[] = 'That email already belongs to an account. Log in or reset your password.';
+        } elseif ($this->taken('email', $email, $id)) {
+            $errors[] = $id === null
+                ? 'That email already belongs to an account. Log in or reset your password.'
+                : 'That email already belongs to another account.';
         }
 
         $username = $profile['username'];
@@ -236,16 +271,16 @@ final class Accounts
             $errors[] = 'Username cannot be blank.';
         } elseif ($length < 8 || $length > 255) {
             $errors[] = 'Username must be between 8 and 255 characters.';
-        } elseif ($this->taken('username', $username)) {
+        } elseif ($this->taken('username', $username, $id)) {
             $errors[] = 'That username is taken. Try another.';
         }
         return $errors;
     }
 
-    /** Whether an account has $value in $column. */
-    private function taken(string $column, string $value): bool
+    /** Whether an account other than $id has $value in $column. */
+    private function taken(string $column, string $value, ?int $id): bool
     {
-        return (bool) $this->rows("SELECT id FROM users WHERE $column = ?", 's', [$value]);
+        return (bool) $this->rows("SELECT id FROM users WHERE $column = ? AND id <> ?", 'si', [$value, $id ?? 0]);
     }
 
     /** Every password rule $password and its confirmation break. */
