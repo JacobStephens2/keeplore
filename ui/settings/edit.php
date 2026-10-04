@@ -13,16 +13,16 @@ $preferences = new Preferences($db, $user_id);
 $bgg_ratings = new BggRatings($db, $user_id);
 
 if(is_post_request()) {
-  $stmt = mysqli_prepare($db, "UPDATE users SET first_name = ?, last_name = ?, email = ?, username = ? WHERE id = ? LIMIT 1");
-  mysqli_stmt_bind_param($stmt, "ssssi",
-    $_POST['first_name'],
-    $_POST['last_name'],
-    $_POST['email'],
-    $_POST['username'],
-    $user_id
-  );
-  $update_result = mysqli_stmt_execute($stmt);
-  mysqli_stmt_close($stmt);
+  // Saved apart from the rest, so a profile error costs only the profile.
+  $posted_profile = [];
+  foreach (['first_name', 'last_name', 'email', 'username'] as $field) {
+    $posted_profile[$field] = is_scalar($_POST[$field] ?? null) ? (string) $_POST[$field] : '';
+  }
+  try {
+    $account = accounts()->updateProfile($user_id, $posted_profile);
+  } catch (AccountInvalid $invalid) {
+    $profile_errors = $invalid->errors;
+  }
 
   // An unchecked box posts nothing; it means off.
   $preferences->save([
@@ -47,12 +47,9 @@ if(is_post_request()) {
   $bgg_default_type_result = user_bgg_default_type_set($db, $user_id, $_POST['bgg_default_type_id'] ?? '');
 }
 
-$stmt = mysqli_prepare($db, "SELECT first_name, last_name, email, username FROM users WHERE id = ?");
-mysqli_stmt_bind_param($stmt, "i", $user_id);
-mysqli_stmt_execute($stmt);
-$userResult = mysqli_stmt_get_result($stmt);
-$userArray = mysqli_fetch_assoc($userResult) + $preferences->get();
-mysqli_stmt_close($stmt);
+// A refused profile keeps what was posted, so it can be fixed.
+$profile = isset($profile_errors) ? $posted_profile : ($account ?? accounts()->find($user_id));
+$userArray = $profile + $preferences->get();
 $bgg_default_type = user_bgg_default_type($db, $user_id);
 $types = (new Types($db, $user_id))->all();
 
@@ -68,9 +65,9 @@ $types = (new Types($db, $user_id))->all();
   </header>
 
   <?php
-      if (isset($update_result) && $update_result === false) {
-        echo '<p class="errors">Update failed, please contact support</p>';
-      } elseif (isset($update_result) && $update_result === true) {
+      if (isset($profile_errors)) {
+        echo display_errors($profile_errors);
+      } elseif (isset($account)) {
         echo '<p id="message">Update successful</p>';
       }
       if (isset($bgg_error)) {

@@ -4,6 +4,7 @@ namespace Tests\Integration;
 
 use AccountInvalid;
 use Accounts;
+use OutOfBoundsException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -379,11 +380,13 @@ final class AccountsTest extends TestCase
             'long first name' => [['first_name' => str_repeat('a', 256)], ['First name must be between 2 and 255 characters.']],
             'blank last name' => [['last_name' => ''], ['Last name cannot be blank.']],
             'short last name' => [['last_name' => 'B'], ['Last name must be between 2 and 255 characters.']],
+            'long last name' => [['last_name' => str_repeat('b', 256)], ['Last name must be between 2 and 255 characters.']],
             'blank email' => [['email' => ''], ['Email cannot be blank.']],
             'long email' => [['email' => str_repeat('a', 244) . '@keeplore.app'], ['Email must be at most 255 characters.']],
             'malformed email' => [['email' => 'not-an-email'], ['Email must be a valid format.']],
             'blank username' => [['username' => ''], ['Username cannot be blank.']],
             'short username' => [['username' => 'short'], ['Username must be between 8 and 255 characters.']],
+            'long username' => [['username' => str_repeat('u', 256)], ['Username must be between 8 and 255 characters.']],
             'taken username' => [['username' => 'ownerusername'], ['That username is taken. Try another.']],
             'taken email' => [['email' => 'owner@keeplore.app'], ['That email already belongs to an account. Log in or reset your password.']],
         ];
@@ -433,5 +436,91 @@ final class AccountsTest extends TestCase
             'Password and confirm password must match.',
         ], $invalid->errors);
         $this->assertSame(2, $this->accountCount());
+    }
+
+    private static function profileChanges(array $changes = []): array
+    {
+        return $changes + [
+            'first_name' => 'Ada',
+            'last_name' => 'Byron',
+            'email' => 'ada@keeplore.app',
+            'username' => 'adabyron1815',
+        ];
+    }
+
+    public function test_update_profile_replaces_the_name_email_and_username(): void
+    {
+        $account = $this->accounts()->updateProfile(1, self::profileChanges(['first_name' => ' Ada ', 'email' => ' ada@keeplore.app ']));
+
+        $this->assertSame([
+            'id' => 1,
+            'first_name' => 'Ada',
+            'last_name' => 'Byron',
+            'name' => 'Ada Byron',
+            'email' => 'ada@keeplore.app',
+            'username' => 'adabyron1815',
+            'user_group' => 1,
+            'person_id' => null,
+        ], $account);
+        $this->assertSame($account, $this->accounts()->find(1));
+        $this->assertSame(1, $this->accounts()->logIn('adabyron1815', self::OLD_PASSWORD)['id']);
+        $this->assertSame('otherusername', $this->accounts()->find(2)['username']);
+    }
+
+    public function test_update_profile_keeps_the_accounts_own_username_and_email(): void
+    {
+        $account = $this->accounts()->updateProfile(1, self::profileChanges([
+            'email' => 'owner@keeplore.app',
+            'username' => 'ownerusername',
+        ]));
+
+        $this->assertSame('Ada Byron', $account['name']);
+        $this->assertSame('owner@keeplore.app', $account['email']);
+        $this->assertSame('ownerusername', $account['username']);
+        $this->assertSame($account, $this->accounts()->find(1));
+    }
+
+    public static function brokenProfileUpdates(): array
+    {
+        $taken = [
+            'taken username' => [['username' => 'otherusername'], ['That username is taken. Try another.']],
+            'taken email' => [['email' => 'other+tag@keeplore.app'], ['That email already belongs to another account.']],
+        ];
+        return array_diff_key(self::brokenProfiles(), $taken) + $taken;
+    }
+
+    /** @dataProvider brokenProfileUpdates */
+    public function test_update_profile_refuses_a_profile_that_breaks_the_rules(array $changes, array $errors): void
+    {
+        $before = $this->accounts()->find(1);
+
+        $invalid = $this->invalid(fn () => $this->accounts()->updateProfile(1, self::profileChanges($changes)));
+
+        $this->assertSame($errors, $invalid->errors);
+        $this->assertSame($before, $this->accounts()->find(1));
+    }
+
+    public function test_update_profile_lists_every_problem_at_once(): void
+    {
+        $invalid = $this->invalid(fn () => $this->accounts()->updateProfile(1, [
+            'first_name' => '',
+            'last_name' => 'B',
+            'email' => 'other+tag@keeplore.app',
+            'username' => 'otherusername',
+        ]));
+
+        $this->assertSame([
+            'First name cannot be blank.',
+            'Last name must be between 2 and 255 characters.',
+            'That email already belongs to another account.',
+            'That username is taken. Try another.',
+        ], $invalid->errors);
+        $this->assertSame('Sam Lee', $this->accounts()->find(1)['name']);
+    }
+
+    public function test_update_profile_of_no_account_throws_out_of_bounds(): void
+    {
+        $this->expectException(OutOfBoundsException::class);
+        $this->accounts()->updateProfile(99, self::profileChanges());
     }
 }
