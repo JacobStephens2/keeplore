@@ -10,7 +10,7 @@ require_once __DIR__ . '/AgentKeys.php';
  * data it may act for. A session or an agent key acts for its own user,
  * whatever the request names. The master key has no user of its own: it
  * acts for the existing user a request names, or for no one; naming no
- * user, a read of one Item acts for that Item's owner. An agent key
+ * user, a request about one Item acts for that Item's owner. An agent key
  * may only read and flip kept (ADR-0002); every other handler asks for its
  * refusal.
  */
