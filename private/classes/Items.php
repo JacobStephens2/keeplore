@@ -128,21 +128,22 @@ final class Items
             )->close();
             $id = (int) $this->db->insert_id;
             if (array_key_exists('tags', $input)) {
-                replace_item_tags($this->db, $id, $this->userId, $input['tags']);
+                $this->replaceTags($id, $input['tags']);
             }
             return $id;
         });
     }
 
-    /** The owner's Item row with its type name, or null. */
+    /** The owner's Item row with its type name and tags (a sorted list), or null. */
     public function find(int $id): ?array
     {
-        return $this->rows(
+        $row = $this->rows(
             'SELECT types.objectType AS type_name, games.*
              FROM games LEFT JOIN types ON types.id = games.type_id
              WHERE games.id = ? AND games.user_id = ?',
             'ii', [$id, $this->userId]
         )[0] ?? null;
+        return $row === null ? null : with_item_tags($this->db, [$row], $this->userId)[0];
     }
 
     /**
@@ -181,10 +182,10 @@ final class Items
             $types .= str_repeat('s', count($typeIds));
             array_push($params, ...array_map('strval', array_values($typeIds)));
         }
-        $tagFilter = item_tag_user_filter($filters['tag'] ?? '', $this->userId);
-        $where .= $tagFilter['sql'];
-        $types .= $tagFilter['types'];
-        array_push($params, ...$tagFilter['params']);
+        [$tagSql, $tagTypes, $tagParams] = $this->tagFilter($filters['tag'] ?? '');
+        $where .= $tagSql;
+        $types .= $tagTypes;
+        array_push($params, ...$tagParams);
         $title = trim((string) ($filters['title'] ?? ''));
         if ($title !== '') {
             $where .= ' AND games.Title LIKE ?';
@@ -236,7 +237,7 @@ final class Items
                 )->close();
             }
             if (array_key_exists('tags', $changes)) {
-                replace_item_tags($this->db, $id, $this->userId, $changes['tags']);
+                $this->replaceTags($id, $changes['tags']);
             }
         });
     }
@@ -344,6 +345,28 @@ final class Items
                 'sii', [$value, $id, $this->userId]
             )->close();
         });
+    }
+
+    /** Replace the Item's tags with the parsed $tags; the caller has written the owner's Item in this transaction. */
+    private function replaceTags(int $id, $tags): void
+    {
+        $this->statement('DELETE FROM item_tags WHERE artifact_id = ? AND user_id = ?', 'ii', [$id, $this->userId])->close();
+        foreach (parse_item_tags_input($tags) as $tag) {
+            $this->statement(
+                'INSERT INTO item_tags (user_id, artifact_id, tag) VALUES (?, ?, ?)',
+                'iis', [$this->userId, $id, $tag]
+            )->close();
+        }
+    }
+
+    /** The list's tag filter as [sql, types, params]: the owner's Items with the normalized tag, or no filter when it's blank. */
+    private function tagFilter($tag): array
+    {
+        $tag = normalize_item_tag($tag);
+        if ($tag === null) {
+            return ['', '', []];
+        }
+        return [' AND games.id IN (SELECT artifact_id FROM item_tags WHERE user_id = ? AND tag = ?)', 'is', [$this->userId, $tag]];
     }
 
     private function lockedItem(int $id): array

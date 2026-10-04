@@ -6,11 +6,11 @@ use Items;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Seams: write_item_over_api() and delete_item_over_api(), the HTTP API
- * item endpoint's POST, PUT and DELETE. All write through the Items module
- * for the owner: the session's user, or with the master key the user_id
- * the body (or for DELETE the query) names. The result is the status code
- * and the response fields.
+ * Seams: read_item_over_api(), write_item_over_api() and
+ * delete_item_over_api(), the HTTP API item endpoint's GET, POST, PUT and
+ * DELETE. All go through the Items module for the owner: the session's
+ * user, or with the master key the user_id the body (or for GET and DELETE
+ * the query) names. The result is the status code and the response fields.
  */
 final class ItemApiTest extends TestCase
 {
@@ -388,9 +388,19 @@ final class ItemApiTest extends TestCase
             [$status, $response] = read_item_over_api($this->db, $caller, ['id' => '10']);
 
             $this->assertSame(200, $status);
-            $this->assertSame('Catan', $response['artifact']->Title);
-            $this->assertSame(['family'], $response['artifact']->tags);
+            $this->assertSame('Catan', $response['artifact']['Title']);
+            $this->assertSame(['family'], $response['artifact']['tags']);
+            $this->assertSame('board-game', $response['artifact']['type_name']);
+            $this->assertSame(60, (int) $response['artifact']['MnT']);
         }
+    }
+
+    public function test_get_answers_with_the_same_item_put_does(): void
+    {
+        [, $written] = write_item_over_api($this->db, $this->session(), 'PUT', (object) ['id' => 10, 'tags' => 'family, beach-safe']);
+        [, $read] = read_item_over_api($this->db, $this->session(), ['id' => '10']);
+
+        $this->assertSame($written['artifact'], $read['artifact']);
     }
 
     public function test_get_of_another_accounts_item_returns_404_whatever_user_it_names(): void
@@ -418,7 +428,7 @@ final class ItemApiTest extends TestCase
     {
         [$status, $response] = read_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => '2']);
         $this->assertSame(200, $status);
-        $this->assertSame(['mine'], $response['artifact']->tags);
+        $this->assertSame(['mine'], $response['artifact']['tags']);
 
         [$status] = read_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => '1']);
         $this->assertSame(404, $status);

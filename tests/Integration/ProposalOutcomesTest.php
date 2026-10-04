@@ -304,6 +304,7 @@ final class ProposalOutcomesTest extends TestCase
 
     public function test_an_item_without_a_type_can_be_opened_to_view_its_proposal_history(): void
     {
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->db->query("INSERT INTO games (id, user_id, Title) VALUES (14, 1, 'Uncategorized item')");
         $this->proposals->save($this->proposal(['item_id' => 14]));
         require_once PRIVATE_PATH . '/classes/Items.php';

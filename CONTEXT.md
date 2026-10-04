@@ -12,6 +12,10 @@ _Avoid_: Game (when referring to all supported item types).
 One of the owner's own categories for items, such as table game, book or film. Each item has at most one. Deleting a type moves its items to another of the owner's types or leaves them without one.
 _Avoid_: Artifact type, ObjectType.
 
+**Item tag**:
+One of the owner's free-form labels on an item, such as portable or beach-safe, stored lowercase with spaces collapsed and at most 64 characters. Distinct from BoardGameGeek's own categories. Every read and write of them goes through the Items module, scoped to the owner.
+_Avoid_: Category.
+
 **Use**:
 A recorded occasion when an item was used, on a date, optionally with people, a Setting (where it was used) and notes. One Record Use submit can record several identical uses at once through its Number of uses. Every read of an owner's uses, their people and the Setting of their most recently recorded use goes through one module, scoped to the owner. Distinct from an item proposal, which is never a use.
 

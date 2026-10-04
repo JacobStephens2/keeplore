@@ -2,7 +2,6 @@
 
 require_once __DIR__ . '/app_logger.php';
 require_once __DIR__ . '/classes/ApiCaller.php';
-require_once __DIR__ . '/item_tags.php';
 require_once __DIR__ . '/classes/DatabaseObject.class.php';
 require_once __DIR__ . '/classes/Artifact.class.php';
 require_once __DIR__ . '/classes/Items.php';
@@ -17,10 +16,10 @@ const ITEM_API_WRITES = [
 const ITEM_API_LOG_ACTIONS = ['POST' => 'create', 'PUT' => 'update', 'DELETE' => 'delete'];
 
 /**
- * GET /artifact.php: the Item the query's id names, with its tags, from
- * the caller's own Items. The master key names the owner in the query's
- * user_id, or naming none reads any Item by id alone, without tags (the
- * legacy lookup).
+ * GET /artifact.php: the Item the query's id names, from the caller's own
+ * Items, as Items::find returns it. The master key names the owner in the
+ * query's user_id, or naming none reads any Item by id alone, with an
+ * empty tag list (the legacy lookup).
  *
  * Returns [status, response fields]; on success the fields' artifact is
  * the Item.
@@ -35,12 +34,9 @@ function read_item_over_api(mysqli $db, ApiCaller $caller, array $query): array 
     return [400, ['message' => 'Missing or invalid required parameter: user_id']];
   }
 
-  $artifact = $owner === null ? Artifact::find_by_id($id) : Artifact::find_by_id_and_user_id($id, $owner);
+  $artifact = $owner === null ? Artifact::find_by_id($id) : (new Items($db, $owner))->find($id);
   if (!$artifact) {
     return [404, ['message' => 'Item not found.']];
-  }
-  if ($owner !== null) {
-    $artifact = with_item_tags($db, [$artifact], $owner)[0];
   }
   return [200, ['artifact' => $artifact]];
 }
@@ -93,7 +89,7 @@ function write_item_over_api(mysqli $db, ApiCaller $caller, string $method, $bod
     return [404, ['message' => 'Item not found.']];
   }
 
-  $item = with_item_tags($db, [$items->find($id)], $owner)[0];
+  $item = $items->find($id);
   log_item_write_over_api($method, $item);
   return [$write['status'], ['message' => $write['succeeded'], 'artifact' => $item]];
 }

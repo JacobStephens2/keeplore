@@ -37,7 +37,6 @@ final class EventPlansTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-event-players.sql'));
         $this->runSql('ALTER TABLE players ADD COLUMN birth_year INT NULL');
         $this->runSql("UPDATE games SET mnp = 3, mxp = 4, ss = '3,4', Age = 10, mnt = 60, mxt = 120 WHERE id = 10");
-        require_once PRIVATE_PATH . '/item_tags.php';
         require_once PRIVATE_PATH . '/classes/EventPlans.php';
     }
 
@@ -109,7 +108,7 @@ final class EventPlansTest extends TestCase
 
     public function test_added_items_come_back_with_their_facts_and_tags(): void
     {
-        replace_item_tags($this->db, 10, 1, ['strategy']);
+        $this->db->query("INSERT INTO item_tags (user_id, artifact_id, tag) VALUES (1, 10, 'strategy')");
         $id = $this->plans()->save(['name' => 'Beach week']);
 
         $this->assertSame(2, $this->plans()->addItems($id, [10, 11]));

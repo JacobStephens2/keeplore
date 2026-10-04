@@ -107,6 +107,27 @@ final class ItemsTest extends TestCase
         $this->assertSame('board-game', $item['type_name']);
     }
 
+    public function test_find_returns_the_items_tags_sorted(): void
+    {
+        $this->assertSame(['beach-safe', 'family'], $this->items->find(10)['tags']);
+    }
+
+    public function test_find_returns_no_tags_for_an_untagged_item(): void
+    {
+        $id = $this->items->create(['Title' => 'Untagged']);
+
+        $this->assertSame([], $this->items->find($id)['tags']);
+    }
+
+    public function test_find_never_returns_another_owners_tags(): void
+    {
+        // Another owner's tag on the owner's Item, which no write makes.
+        $this->runSql("INSERT INTO item_tags (user_id, artifact_id, tag) VALUES (2, 11, 'theirs')");
+
+        $this->assertSame(['family'], $this->items->find(11)['tags']);
+        $this->assertSame(['mine'], (new Items($this->db, 2))->find(20)['tags']);
+    }
+
     public function test_find_returns_null_for_another_owners_item_or_a_missing_id(): void
     {
         $this->assertNull($this->items->find(20));

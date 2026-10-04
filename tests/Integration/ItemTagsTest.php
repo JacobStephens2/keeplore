@@ -5,8 +5,8 @@ namespace Tests\Integration;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Owner tags persist per user, round-trip on item reads, and never leak
- * across collections.
+ * Seam: Items. Owner tags persist per user through update, round-trip on
+ * find and list, filter the list, and never leak across collections.
  */
 final class ItemTagsTest extends TestCase
 {
@@ -32,7 +32,6 @@ final class ItemTagsTest extends TestCase
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
-        require_once PRIVATE_PATH . '/item_tags.php';
         require_once PRIVATE_PATH . '/database.php';
         require_once PRIVATE_PATH . '/classes/Items.php';
     }
@@ -55,66 +54,70 @@ final class ItemTagsTest extends TestCase
         } while ($this->db->more_results() && $this->db->next_result());
     }
 
-    private function tagsOn(int $artifactId, int $userId): array
+    private function items(int $userId): \Items
     {
-        $items = with_item_tags($this->db, [['id' => $artifactId]], $userId);
-        return $items[0]['tags'];
+        return new \Items($this->db, $userId);
     }
 
     public function test_owner_can_add_and_remove_tags_on_an_item(): void
     {
-        $this->assertTrue(replace_item_tags($this->db, 10, 1, ['portable', 'beach-safe']));
-        $this->assertSame(['beach-safe', 'portable'], $this->tagsOn(10, 1));
+        $this->items(1)->update(10, ['tags' => ['portable', 'beach-safe']]);
+        $this->assertSame(['beach-safe', 'portable'], $this->items(1)->find(10)['tags']);
 
-        $this->assertTrue(replace_item_tags($this->db, 10, 1, ['portable', 'party']));
-        $this->assertSame(['party', 'portable'], $this->tagsOn(10, 1));
+        $this->items(1)->update(10, ['tags' => 'Portable, party']);
+        $this->assertSame(['party', 'portable'], $this->items(1)->find(10)['tags']);
     }
 
     public function test_one_users_tags_never_appear_on_another_users_item(): void
     {
-        replace_item_tags($this->db, 10, 1, ['beach-safe']);
-        replace_item_tags($this->db, 20, 2, ['beach-safe', 'party']);
+        $this->items(1)->update(10, ['tags' => ['beach-safe']]);
+        $this->items(2)->update(20, ['tags' => ['beach-safe', 'party']]);
 
-        $this->assertSame(['beach-safe'], $this->tagsOn(10, 1));
-        $this->assertSame([], $this->tagsOn(10, 2));
-        $this->assertSame(['beach-safe', 'party'], $this->tagsOn(20, 2));
-        $this->assertSame([], $this->tagsOn(20, 1));
+        $this->assertSame(['beach-safe'], $this->items(1)->find(10)['tags']);
+        $this->assertSame(['beach-safe', 'party'], $this->items(2)->find(20)['tags']);
+        $this->assertSame([[]], array_column($this->items(1)->list(['title' => 'Azul']), 'tags'));
     }
 
-    public function test_replace_refuses_to_tag_another_users_item(): void
+    public function test_an_owner_cannot_tag_another_users_item(): void
     {
-        $this->assertFalse(replace_item_tags($this->db, 20, 1, ['party']));
-        $this->assertSame([], $this->tagsOn(20, 2));
+        try {
+            $this->items(1)->update(20, ['tags' => ['party']]);
+            $this->fail('Tagging another user\'s item must be refused.');
+        } catch (\OutOfBoundsException $notFound) {
+        }
+
+        $this->assertSame([], $this->items(2)->find(20)['tags']);
         $this->assertSame(0, (int) $this->db->query('SELECT COUNT(*) AS c FROM item_tags')->fetch_assoc()['c']);
     }
 
     public function test_items_can_be_filtered_by_tag_without_crossing_users(): void
     {
-        replace_item_tags($this->db, 10, 1, ['beach-safe']);
-        replace_item_tags($this->db, 11, 1, ['party']);
-        replace_item_tags($this->db, 20, 2, ['beach-safe']);
+        $this->items(1)->update(10, ['tags' => ['beach-safe']]);
+        $this->items(1)->update(11, ['tags' => ['party']]);
+        $this->items(2)->update(20, ['tags' => ['beach-safe']]);
 
-        $this->assertSame([10], artifact_ids_with_tag($this->db, 1, 'Beach-Safe'));
-        $this->assertSame([20], artifact_ids_with_tag($this->db, 2, 'beach-safe'));
-        $this->assertSame([], artifact_ids_with_tag($this->db, 1, 'two-player'));
+        $ids = fn (array $rows) => array_map(fn (array $row) => (int) $row['id'], $rows);
+        $this->assertSame([10], $ids($this->items(1)->list(['tag' => 'Beach-Safe'])));
+        $this->assertSame([20], $ids($this->items(2)->list(['tag' => 'beach-safe'])));
+        $this->assertSame([], $ids($this->items(1)->list(['tag' => 'two-player'])));
     }
 
     public function test_item_list_filters_by_tag_under_strict_group_by(): void
     {
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
-        replace_item_tags($this->db, 10, 1, ['beach-safe']);
-        replace_item_tags($this->db, 11, 1, ['party']);
-        replace_item_tags($this->db, 20, 2, ['beach-safe']);
+        $this->items(1)->update(10, ['tags' => ['beach-safe']]);
+        $this->items(1)->update(11, ['tags' => ['party']]);
+        $this->items(2)->update(20, ['tags' => ['beach-safe']]);
 
-        $rows = (new \Items($this->db, 1))->list(['kept' => true, 'tag' => 'beach-safe']);
+        $rows = $this->items(1)->list(['kept' => true, 'tag' => 'beach-safe']);
         $this->assertSame([10], array_map(fn (array $row) => (int) $row['id'], $rows));
     }
 
     public function test_user_item_list_filters_by_tag_and_attaches_tags(): void
     {
         require_once PRIVATE_PATH . '/collection_list.php';
-        replace_item_tags($this->db, 10, 1, ['beach-safe']);
-        replace_item_tags($this->db, 11, 1, ['party']);
+        $this->items(1)->update(10, ['tags' => ['beach-safe']]);
+        $this->items(1)->update(11, ['tags' => ['party']]);
 
         $listed = list_collection_items(
             $this->db,

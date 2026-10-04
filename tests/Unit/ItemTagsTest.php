@@ -60,16 +60,4 @@ class ItemTagsTest extends TestCase
         $this->assertSame([], $result[1]['tags']);
         $this->assertArrayNotHasKey('tags', $items[0]);
     }
-
-    public function test_attach_item_tags_sets_tags_on_objects_without_mutating_the_original(): void
-    {
-        $item = new \stdClass();
-        $item->id = 10;
-        $item->Title = 'Catan';
-
-        $result = attach_item_tags([$item], [10 => ['party']]);
-
-        $this->assertSame(['party'], $result[0]->tags);
-        $this->assertFalse(isset($item->tags));
-    }
 }

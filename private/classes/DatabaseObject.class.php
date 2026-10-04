@@ -74,27 +74,6 @@ class DatabaseObject {
     }
   }
 
-  static public function find_by_id_and_user_id($id, $user_id) {
-    $stmt = self::$database->prepare(
-      "SELECT * FROM " . static::$table_name . " WHERE id = ? AND user_id = ?"
-    );
-    $stmt->bind_param("ii", $id, $user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    $object_array = [];
-    while($record = $result->fetch_assoc()) {
-      $object_array[] = static::instantiate($record);
-    }
-    $stmt->close();
-
-    if(!empty($object_array)) {
-      return array_shift($object_array);
-    } else {
-      return false;
-    }
-  }
-
   static protected function instantiate($record) {
     $object = new static;
     // Could manually assign values to properties

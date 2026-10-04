@@ -47,12 +47,9 @@
     <dd><?php echo h($object['type']); ?></dd>
   </dl>
 
-  <?php
-    $item_tags = find_item_tags_for_artifacts($db, [(int) $object['id']], (int) $object['user_id'])[(int) $object['id']] ?? [];
-  ?>
   <dl>
     <dt>Tags</dt>
-    <dd><?php echo $item_tags === [] ? 'None' : h(implode(', ', $item_tags)); ?></dd>
+    <dd><?php echo $object['tags'] === [] ? 'None' : h(implode(', ', $object['tags'])); ?></dd>
   </dl>
 
   <?php if (!is_guest()) { ?>
