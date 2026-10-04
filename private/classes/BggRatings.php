@@ -302,8 +302,8 @@ final class BggRatings
             }
             $counts['checked'] += count($itemIds);
             try {
-                $average = bgg_overall_rating_from_dynamic_json(bgg_fetch(bgg_dynamic_info_url($thingId), $this->getJson));
-            } catch (Throwable $e) {
+                $average = bgg_overall_rating_from_dynamic_json($this->fetch(bgg_dynamic_info_url($thingId)));
+            } catch (BggUnreachable $e) {
                 $average = false;
             }
             if ($average === false) {
@@ -328,11 +328,7 @@ final class BggRatings
     private function findBggUser(string $username): array
     {
         $username = trim($username);
-        try {
-            $json = bgg_fetch(bgg_api_root() . '/users?username=' . rawurlencode($username), $this->getJson);
-        } catch (Throwable $e) {
-            throw new BggUnreachable();
-        }
+        $json = $this->fetch(bgg_api_root() . '/users?username=' . rawurlencode($username));
         return bgg_user_from_users_json($json, $username)
             ?? throw new InvalidArgumentException('No BoardGameGeek user named ' . $username . '.');
     }
@@ -347,8 +343,8 @@ final class BggRatings
     {
         $url = bgg_api_root() . '/collections?objectid=' . $thingId . '&objecttype=thing&userid=' . $bggUser['id'];
         try {
-            $json = bgg_fetch($url, $this->getJson);
-        } catch (Throwable $e) {
+            $json = $this->fetch($url);
+        } catch (BggUnreachable $e) {
             return false;
         }
         // Only a real {"items": [...]} answer may clear a rating. An empty or
@@ -364,6 +360,16 @@ final class BggRatings
         }
         $this->store($itemId, $bggUser['username'], $entry, false);
         return $entry;
+    }
+
+    /** BoardGameGeek's answer to one API URL; any failure to get one throws BggUnreachable. */
+    private function fetch(string $url): string
+    {
+        try {
+            return (string) bgg_fetch($url, $this->getJson);
+        } catch (Throwable $e) {
+            throw new BggUnreachable();
+        }
     }
 
     /** Stores one reviewer's ['rating', 'comment', 'rated_at'] for one item, replacing what it had. */
