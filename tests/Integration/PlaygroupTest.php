@@ -40,6 +40,7 @@ final class PlaygroupTest extends TestCase
             CREATE TABLE playgroup (ID INT PRIMARY KEY AUTO_INCREMENT, FullName INT NOT NULL, user_id INT NOT NULL) ENGINE=InnoDB;
             INSERT INTO playgroup (ID, FullName, user_id) VALUES (1, 100, 1), (2, 101, 1), (3, 200, 2);
         ");
+        require_once PRIVATE_PATH . '/classes/Aversions.php';
         require_once PRIVATE_PATH . '/classes/Playgroup.php';
         $this->playgroup = new Playgroup($this->db, 1);
     }
@@ -177,6 +178,18 @@ final class PlaygroupTest extends TestCase
             $rows
         ));
         $this->assertSame('Sam', $rows[0]['FirstName']);
+    }
+
+    public function test_choose_links_each_member_to_their_highest_aversion_id_of_the_item_or_to_nothing(): void
+    {
+        $this->db->query("INSERT INTO responses (id, Title, user_id, Player, PlayDate, AversionDate) VALUES
+            (1, 10, 1, 100, '2026-02-01', NULL), (2, 10, 1, 101, NULL, '2026-01-05'),
+            (3, 10, 1, 101, '2026-02-01', NULL), (4, 10, 1, 101, NULL, '2025-12-01'), (5, 10, 1, 101, '2026-03-01', NULL)");
+
+        $this->assertSame([[100, null], [101, 4]], array_map(
+            fn (array $row) => [(int) $row['PlayerID'], $row['AversionID']],
+            $this->playgroup->choose(['1'], false, false)
+        ));
     }
 
     public function test_choose_ignores_the_other_owners_slots_people_and_responses(): void

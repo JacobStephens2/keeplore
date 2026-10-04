@@ -59,6 +59,7 @@
   require_once('classes/Items.php');
   require_once('classes/BggRatings.php');
   require_once('classes/People.php');
+  require_once('classes/Aversions.php');
   require_once('classes/Playgroup.php');
   require_once('classes/Types.php');
   require_once('type_filter.php');

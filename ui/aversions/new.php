@@ -2,41 +2,20 @@
 require_once('../../private/initialize.php');
 require_login();
 $people = (new People($db, (int) $_SESSION['user_id']))->all();
+$playerCount = min(9, max(1, (int) ($_GET['playerCount'] ?? 1)));
 
 if(is_post_request()) {
-  $response = [];
-  $response['Title'] = $_POST['Title'] ?? '';
-  $response['AversionDate'] = $_POST['AversionDate'] ?? '';
-
-  $response['Player1'] = $_POST['Player1'] ?? '';
-  $response['Player2'] = $_POST['Player2'] ?? '';
-  $response['Player3'] = $_POST['Player3'] ?? '';
-  $response['Player4'] = $_POST['Player4'] ?? '';
-  $response['Player5'] = $_POST['Player5'] ?? '';
-  $response['Player6'] = $_POST['Player6'] ?? '';
-  $response['Player7'] = $_POST['Player7'] ?? '';
-  $response['Player8'] = $_POST['Player8'] ?? '';
-  $response['Player9'] = $_POST['Player9'] ?? '';
-
-  $playerCount = $_GET['playerCount'] ?? 1;
-
-  $result = insert_aversion($response, $playerCount);
-
-  if($result === true) {
-    $new_id = mysqli_insert_id($db);
-    $_SESSION['message'] = "The response was recorded successfully.";
-    redirect_to(url_for('/aversions/index.php'));
-  } else {
-    $errors = $result;
+  $person_ids = [];
+  for ($i = 1; $i <= $playerCount; $i++) {
+    $person_ids[] = $_POST['Player' . $i] ?? '';
   }
-
-} else {
-  // display the blank form
-  $response = [];
-  $response["Title"] = '';
-  $response["AversionDate"] = '';
-  $response["Player"] = '';
-  $playerCount = $_GET['playerCount'] ?? 1;
+  try {
+    (new Aversions($db, (int) $_SESSION['user_id']))->record((int) ($_POST['Title'] ?? 0), (string) ($_POST['AversionDate'] ?? ''), $person_ids);
+    $_SESSION['message'] = "The aversion was recorded successfully.";
+    redirect_to(url_for('/aversions/index.php'));
+  } catch (InvalidArgumentException $error) {
+    $errors[] = $error->getMessage();
+  }
 }
 
 $page_title = 'Record Aversion';
@@ -48,8 +27,10 @@ include(SHARED_PATH . '/header.php');
 
     <h1><?php echo $page_title; ?></h1>
 
+    <?php echo display_errors($errors); ?>
+
     <form 
-      action="<?php echo url_for('/aversions/create.php'); ?>"
+      action="<?php echo url_for('/aversions/new.php'); ?>"
       method="get"
     >
 			<label for="playerCount">User Count</label>
@@ -99,9 +80,7 @@ include(SHARED_PATH . '/header.php');
 
 			<!-- Choose players -->
 			<select id="Users" name="Player1">
-				<option value='141'>
-          Jacob Stephens
-        </option>
+				<option value="">Choose a person</option>
 				<?php
 					foreach ($people as $person) {
 						echo "<option value=\"" . h($person['id']) . "\">";
@@ -116,7 +95,7 @@ include(SHARED_PATH . '/header.php');
         $p = 2;
         while ($playerCount > $i) { ?>
           <select name="Player<?php echo $p; ?>">
-            <option value="">Choose a player</option>
+            <option value="">Choose a person</option>
             <?php
             foreach ($people as $person) {
               echo "<option value=\"" . h($person['id']) . "\">";
