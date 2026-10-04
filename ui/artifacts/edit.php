@@ -1,6 +1,7 @@
 <?php
   require_once('../../private/initialize.php');
   require_once(PRIVATE_PATH . '/items_list.php');
+  require_once(PRIVATE_PATH . '/item_form.php');
   require_login();
   if(!isset($_GET['id'])) {
     redirect_to(url_for('/artifacts/index.php'));
@@ -19,31 +20,21 @@
   $default_interval = (new Preferences($db, (int) $_SESSION['user_id']))->get()['default_use_interval'];
 
   if(is_post_request()) {
-    $input = item_input_from_form($_POST);
-    // An unchecked box posts nothing; it means no.
-    foreach (['is_kept', 'to_get_rid_of', 'is_in_secondary_collection'] as $box) {
-      $input[$box] = $_POST[$box] ?? 0;
-    }
+    $input = item_form_input($_POST);
     try {
       $items->update($id, $input);
       $_SESSION['message'] = 'The item was updated successfully.';
       redirect_to(url_for('/artifacts/edit.php?id=' . $id));
     } catch (ItemInvalid $invalid) {
       $errors = $invalid->errors;
-      $submitted = array_diff_key($input, ['id' => true, 'user_id' => true]);
     } catch (OutOfBoundsException $not_found) {
       error_404();
     }
   }
 
   // After a rejected save the form shows what was typed, to fix in one pass.
-  $artifact = array_replace($items->find($id), $submitted ?? []);
-  $item_tags = find_item_tags_for_artifacts($db, [$id], (int) $_SESSION['user_id'])[$id] ?? [];
-  if (is_post_request() && isset($_POST['tags'])) {
-    $item_tags = parse_item_tags_input($_POST['tags']);
-  }
-
-  $sweetSpotsResultObject = find_sweet_spots_by_artifact_id($id);
+  $artifact['tags'] = find_item_tags_for_artifacts($db, [$id], (int) $_SESSION['user_id'])[$id] ?? [];
+  $artifact = array_replace($artifact, $input ?? []);
 
   $page_title = h($artifact['Title']); 
   include(SHARED_PATH . '/header.php'); 
@@ -130,170 +121,7 @@
         <button type="submit">Save Edits <kbd>s</kbd></button>
       </div>
 
-      <div class="form-field form-field-span">
-        <label for="Title">Title</label>
-        <input type="text" name="Title" id="Title" value="<?php echo h($artifact['Title']); ?>" />
-      </div>
-
-      <div class="form-field form-field-check">
-        <input type="hidden" name="is_kept" value="0" />
-        <input type="checkbox" name="is_kept" id="is_kept" value="1"<?php if(artifact_is_kept($artifact)) { echo " checked"; } ?> />
-        <label for="is_kept">Kept? (Checked means yes)</label>
-      </div>
-
-      <div class="form-field form-field-check">
-        <input type="hidden" name="to_get_rid_of" value="0" />
-        <input type="checkbox" name="to_get_rid_of" id="to_get_rid_of" value="1"<?php if($artifact['to_get_rid_of'] == "1") { echo " checked"; } ?> />
-        <label for="to_get_rid_of">To Get Rid Of? (Checked means yes)</label>
-      </div>
-
-      <div class="form-field">
-        <?php
-          $type_id = $artifact['type_id'];
-          require SHARED_PATH . '/artifact_type_search.php';
-        ?>
-      </div>
-
-      <div class="form-field">
-        <label for="tags">Tags (comma-separated)</label>
-        <input type="text" name="tags" id="tags"
-          value="<?php echo h(implode(', ', $item_tags)); ?>"
-          placeholder="portable, beach-safe, two-player, party"
-        />
-      </div>
-
-      <div class="form-field">
-        <label for="Acq">Tracking Start Date</label>
-        <input type="date" name="Acq" id="Acq" value="<?php echo h($artifact['Acq']); ?>" />
-      </div>
-
-      <div class="form-field">
-        <label for="interaction_frequency_days">Interaction Frequency (Days)</label>
-        <input type="number" step="0.1" name="interaction_frequency_days" id="interaction_frequency_days"
-          onwheel="this.blur()"
-          value="<?php
-            if ($artifact['interaction_frequency_days'] === null) {
-              echo h($default_interval);
-            } else {
-              echo h($artifact['interaction_frequency_days']);
-            }
-            ?>"
-        >
-      </div>
-
-      <div class="form-field">
-        <label for="SS">Sweet Spot(s)</label>
-        <input type="text" name="SS" id="SS" aria-describedby="SS-bgg-basis" value="<?php echo $artifact['SS']; ?>">
-        <?php echo item_bgg_field_basis_html($artifact, 'sweet_spot', 'SS'); ?>
-      </div>
-
-      <div class="form-field">
-        <label for="age">Minimum Age</label>
-        <input type="number" name="age" id="age" aria-describedby="age-bgg-basis" value="<?php echo $artifact['Age']; ?>">
-        <?php echo item_bgg_field_basis_html($artifact, 'age', 'age'); ?>
-      </div>
-
-      <?php
-      if (SWEET_SPOT_BUTTONS_ON == true) {
-        ?>
-        <div class="form-field-span">
-          <section id="sweetSpots">
-            <?php
-            $i = 0;
-            foreach ($sweetSpotsResultObject as $row) {
-              ?>
-              <div>
-                <input
-                  class="sweetSpot"
-                  type="number"
-                  name="SwS[<?php echo $i; ?>]"
-                  id="SS<?php echo $row['id']; ?>"
-                  value="<?php echo $row['SwS']; ?>"
-                >
-                <button class="sweetSpot">-</button>
-              </div>
-              <?php
-              $i++;
-            }
-            ?>
-          </section>
-          <button
-            id="addSweetSpot"
-            class="sweetSpot"
-            style="display: block;"
-            >
-            +
-          </button>
-        </div>
-        <?php
-      }
-      ?>
-
-      <script defer src="edit.js?v=2"></script>
-
-      <div class="form-field">
-        <label for="MnP">Minimum User Count</label>
-        <input type="number" name="MnP" id="MnP" aria-describedby="MnP-bgg-basis" value="<?php echo $artifact['MnP']; ?>">
-        <?php echo item_bgg_field_basis_html($artifact, 'players', 'MnP'); ?>
-      </div>
-
-      <div class="form-field">
-        <label for="MxP">Maximum User Count</label>
-        <input type="number" name="MxP" id="MxP" aria-describedby="MxP-bgg-basis" value="<?php echo $artifact['MxP']; ?>">
-        <?php echo item_bgg_field_basis_html($artifact, 'players', 'MxP'); ?>
-      </div>
-
-      <div class="form-field">
-        <label for="MnT">Minimum Time</label>
-        <input type="number" name="MnT" id="MnT" value="<?php echo $artifact['MnT']; ?>">
-      </div>
-
-      <div class="form-field">
-        <label for="MxT">Maxiumum Time</label>
-        <input type="number" name="MxT" id="MxT" value="<?php echo $artifact['MxT']; ?>">
-      </div>
-
-      <div class="form-field">
-        <label for="Yr">Year</label>
-        <input type="number" name="Yr" id="Yr" min="1" max="9999" step="1"
-          value="<?php echo h($artifact['Yr'] ?? ''); ?>"
-        >
-      </div>
-
-      <div class="form-field form-field-span">
-        <?php $bgg_keep_title = true; include(SHARED_PATH . '/bgg_lookup_panel.php'); ?>
-        <input type="hidden" name="bgg_player_votes" id="bgg_player_votes" value="<?php echo h((string) ($artifact['bgg_player_votes'] ?? '')); ?>">
-        <input type="hidden" name="bgg_age_basis" id="bgg_age_basis" value="<?php echo h((string) ($artifact['bgg_age_basis'] ?? '')); ?>">
-        <input type="hidden" name="BGG_Rat" id="BGG_Rat" value="<?php echo h((string) (bgg_overall_rating_text($artifact['BGG_Rat'] ?? $artifact['bgg_rat'] ?? null) ?? '')); ?>">
-        <label for="bgg_url">BoardGameGeek Link</label>
-        <input type="url" name="bgg_url" id="bgg_url" maxlength="1024"
-          placeholder="https://boardgamegeek.com/boardgame/..."
-          value="<?php echo h(normalize_item_bgg_url($artifact['bgg_url'] ?? '')); ?>"
-        >
-      </div>
-
-      <div class="form-field form-field-check form-field-span">
-        <input type="checkbox" name="is_in_secondary_collection" id="is_in_secondary_collection" value="1"
-          <?php if(artifact_is_in_secondary_collection($artifact)) { echo " checked"; } ?>
-        />
-        <label for="is_in_secondary_collection">Kept in Secondary Collection? (Checked means yes)</label>
-      </div>
-
-      <?php
-      if (!isset($artifact['Notes'])) {
-        $artifact['Notes'] = '';
-      }
-      ?>
-
-      <div class="form-field form-field-span">
-        <label for="Notes">Notes</label>
-        <textarea
-          name="Notes"
-          id="Notes"
-          cols="30"
-          rows="10"
-          ><?php echo h($artifact['Notes']); ?></textarea>
-      </div>
+      <?php echo item_form_html('edit', $artifact, $default_interval); ?>
 
       <div class="form-field-span">
         <button type="submit">Save Edits <kbd>s</kbd></button>

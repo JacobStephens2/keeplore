@@ -6,58 +6,28 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Seams:
- * - ui/artifacts/new.php: Name autofocus, save shortcut, collection lookup
- *   markup (search outside the create form, Kept then Name)
+ * - ui/artifacts/new.php: submit above the Item form, save shortcut,
+ *   collection lookup markup (search outside the create form, Kept then
+ *   Name). The Item form's own fields: tests/Integration/ItemFormTest.php
  * - ui/shared/js/create-item-lookup.js: empty query matches nothing; name
  *   search; kept sort (node tests)
  * - ui/artifacts/set-tracked.php: return_to=new stays on Create Item
  */
 class CreateItemFormTest extends TestCase
 {
-    public function test_name_field_autofocuses_on_create_item(): void
+    public function test_create_item_submit_is_above_the_item_form(): void
     {
         $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/new.php');
         $this->assertNotFalse($source);
-        $this->assertMatchesRegularExpression(
-            '/id="Title"[^>\n]{0,80}autofocus/',
-            $source,
-            'The Name field (id Title) must autofocus so the cursor is ready on load.'
-        );
-    }
-
-    public function test_bgg_confirm_has_a_picture_slot(): void
-    {
-        $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/new.php');
-        $this->assertNotFalse($source);
-        $panel = file_get_contents(PRIVATE_PATH . '/shared/bgg_lookup_panel.php');
-        $this->assertNotFalse($panel);
-        $this->assertMatchesRegularExpression(
-            '/<img[^>]*id="bggMatchImage"/',
-            $panel,
-            'The BGG confirm panel must include img#bggMatchImage for the found game\'s cover.'
-        );
-        $this->assertStringContainsString('id="image_url"', $source);
-        $this->assertStringContainsString('name="image_url"', $source);
-        $this->assertMatchesRegularExpression(
-            '/<img[^>]*id="itemPicturePreview"/',
-            $source,
-            'Use this game must keep a visible cover preview on the create form.'
-        );
-    }
-
-    public function test_create_item_submit_is_above_the_name_field(): void
-    {
-        $source = file_get_contents(PROJECT_PATH . '/ui/artifacts/new.php');
-        $this->assertNotFalse($source);
-        $titlePos = strpos($source, 'id="Title"');
-        $this->assertNotFalse($titlePos);
-        $beforeTitle = substr($source, 0, $titlePos);
+        $formPos = strpos($source, "item_form_html('create'");
+        $this->assertNotFalse($formPos);
+        $beforeForm = substr($source, 0, $formPos);
         $this->assertMatchesRegularExpression(
             '/<(?:input|button)[^>]*type="submit"/',
-            $beforeTitle,
+            $beforeForm,
             'A Create Item submit must sit above Name so the form can be saved without scrolling.'
         );
-        $this->assertStringContainsString('Create Item', $beforeTitle);
+        $this->assertStringContainsString('Create Item', $beforeForm);
     }
 
     public function test_s_submits_create_item_when_not_in_a_text_field(): void

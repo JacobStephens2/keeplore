@@ -6,14 +6,6 @@ use PHPUnit\Framework\TestCase;
 
 class ItemYearTest extends TestCase
 {
-    public function test_create_form_has_a_year_input(): void
-    {
-        $form = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/new.php');
-        $this->assertStringContainsString('name="Yr"', $form);
-        $this->assertStringContainsString('id="Yr"', $form);
-        $this->assertMatchesRegularExpression('/<label for="Yr">Year<\/label>/', $form);
-    }
-
     public function test_blank_year_normalizes_to_null(): void
     {
         $this->assertNull(normalize_item_year(''));

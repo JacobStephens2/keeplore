@@ -28,7 +28,6 @@ define("DOMAIN", ARTIFACTS_DOMAIN);
 define("API_ORIGIN", "127.0.0.1:8788");
 define("REQUEST_ORIGIN", "127.0.0.1:8787");
 
-define("SWEET_SPOT_BUTTONS_ON", false);
 define("DEMO_USER_ID", 1);
 
 ?>

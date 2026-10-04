@@ -2,17 +2,16 @@
 require_once('../../private/initialize.php');
 require_login();
 
+require_once(PRIVATE_PATH . '/item_form.php');
+
 $default_interval = (new Preferences($db, (int) $_SESSION['user_id']))->get()['default_use_interval'];
 
-$artifact = [
-  'Title' => '', 'type_id' => '', 'Age' => '', 'Yr' => '', 'image_url' => '',
-  'bgg_url' => '', 'bgg_player_votes' => '', 'bgg_age_basis' => '', 'BGG_Rat' => '', 'tags' => '',
-] + Items::DEFAULTS;
+$artifact = item_form_create_values();
 
 if(is_post_request()) {
 
   $is_ajax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
-  $input = item_input_from_form($_POST);
+  $input = item_form_input($_POST);
 
   try {
     $new_id = (new Items($db, (int) $_SESSION['user_id']))->create($input);
@@ -86,119 +85,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
         <button type="submit">Create Item <kbd>s</kbd></button>
       </div>
 
-      <div class="form-field form-field-span">
-        <label for="Title">Name</label>
-        <input type="text" name="Title" id="Title" autofocus value="<?php echo h($artifact['Title']); ?>" />
-      </div>
-
-      <div class="form-field form-field-span">
-        <?php
-          require_once PRIVATE_PATH . '/item_types.php';
-          $bgg_default_type = user_bgg_default_type($db, (int) $_SESSION['user_id']);
-          $bgg_form_default_type_id = DEFAULT_TYPE;
-          include(SHARED_PATH . '/bgg_lookup_panel.php');
-        ?>
-        <?php $preview_url = normalize_item_image_url($artifact['image_url'] ?? ''); ?>
-        <input type="hidden" name="image_url" id="image_url" value="<?php echo h($preview_url); ?>">
-        <input type="hidden" name="bgg_url" id="bgg_url" value="<?php echo h(normalize_item_bgg_url($artifact['bgg_url'] ?? '')); ?>">
-        <input type="hidden" name="bgg_player_votes" id="bgg_player_votes" value="<?php echo h((string) ($artifact['bgg_player_votes'] ?? '')); ?>">
-        <input type="hidden" name="bgg_age_basis" id="bgg_age_basis" value="<?php echo h((string) ($artifact['bgg_age_basis'] ?? '')); ?>">
-        <input type="hidden" name="BGG_Rat" id="BGG_Rat" value="<?php echo h((string) ($artifact['BGG_Rat'] ?? '')); ?>">
-        <img id="itemPicturePreview" class="item-picture-preview"
-          alt="<?php echo $preview_url !== '' ? h($artifact['Title']) . ' cover' : ''; ?>"
-          <?php if ($preview_url !== '') { ?>src="<?php echo h($preview_url); ?>"<?php } else { ?>hidden<?php } ?>
-          referrerpolicy="no-referrer">
-      </div>
-
-      <div class="form-field">
-        <?php
-          $type_id = ($artifact['type_id'] !== '' && $artifact['type_id'] !== null)
-            ? $artifact['type_id']
-            : DEFAULT_TYPE;
-          require SHARED_PATH . '/artifact_type_search.php';
-        ?>
-      </div>
-
-      <div class="form-field">
-        <label for="Acq">Tracking Start Date</label>
-        <input type="date" name="Acq" id="Acq" value="<?php
-          $tz = 'America/New_York';
-          $timestamp = time();
-          $dt = new DateTime("now", new DateTimeZone($tz)); //first argument "must" be a string
-          $dt->setTimestamp($timestamp); //adjust the object to correct timestamp
-          echo $dt->format('Y') . '-' . $dt->format('m') . '-' . $dt->format('d');
-        ?>"/>
-      </div>
-
-      <div class="form-field">
-        <label for="interaction_frequency_days">Interaction Frequency (Days)</label>
-        <input type="number" step="0.1" name="interaction_frequency_days" id="interaction_frequency_days"
-          value="<?php echo h($default_interval); ?>"
-          onwheel="this.blur()"
-        >
-      </div>
-
-      <div class="form-field">
-        <label for="SS">Sweet Spot(s)</label>
-        <input type="text" name="SS" id="SS"
-          value="<?php echo h($artifact['SS']); ?>"
-          aria-describedby="ss-hint"
-        >
-        <p id="ss-hint" class="form-field-hint">Ideal player counts, comma-separated. Example: 2, 3, 4</p>
-      </div>
-
-      <div class="form-field form-field-check">
-        <input type="hidden" name="is_kept" value="0" />
-        <input type="checkbox" name="is_kept" id="is_kept" value="1" checked/>
-        <label for="is_kept">Kept? (Checked Means Yes)</label>
-      </div>
-
-      <div class="form-field">
-        <label for="MnP">Minimum User Count</label>
-        <input type="number" name="MnP" id="MnP"
-          value="<?php echo h($artifact['MnP']); ?>"
-        >
-      </div>
-
-      <div class="form-field">
-        <label for="MxP">Maximum User Count</label>
-        <input type="number" name="MxP" id="MxP" value="<?php echo h($artifact['MxP']); ?>">
-      </div>
-
-      <div class="form-field">
-        <label for="MnT">Minimum Time</label>
-        <input type="number" name="MnT" id="MnT" value="<?php echo h($artifact['MnT']); ?>">
-      </div>
-
-      <div class="form-field">
-        <label for="MxT">Maxiumum Time</label>
-        <input type="number" name="MxT" id="MxT" value="<?php echo h($artifact['MxT']); ?>">
-      </div>
-
-      <div class="form-field">
-        <label for="age">Minimum Age</label>
-        <input type="number" name="age" id="age" value="<?php echo h($artifact['Age']); ?>">
-      </div>
-
-      <div class="form-field">
-        <label for="Yr">Year</label>
-        <input type="number" name="Yr" id="Yr" min="1" max="9999" step="1"
-          value="<?php echo h($artifact['Yr']); ?>"
-        >
-      </div>
-
-      <div class="form-field form-field-span">
-        <label for="Notes">Notes</label>
-        <textarea name="Notes" id="Notes" cols="30" rows="5"></textarea>
-      </div>
-
-      <div class="form-field form-field-span">
-        <label for="tags">Tags (comma-separated)</label>
-        <input type="text" name="tags" id="tags"
-          value="<?php echo h($artifact['tags'] ?? ''); ?>"
-          placeholder="portable, beach-safe, two-player, party"
-        />
-      </div>
+      <?php echo item_form_html('create', $artifact, $default_interval); ?>
 
       <div id="operations" class="form-field-span create-item-submit">
         <button type="submit">Create Item <kbd>s</kbd></button>

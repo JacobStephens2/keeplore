@@ -61,13 +61,11 @@ class BggDefaultTypeTest extends TestCase
         $page = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/new.php');
         $panel = (string) file_get_contents(PROJECT_PATH . '/private/shared/bgg_lookup_panel.php');
 
-        $this->assertStringContainsString('$bgg_default_type = user_bgg_default_type(', $page);
-        $this->assertStringContainsString('$bgg_form_default_type_id = DEFAULT_TYPE;', $page);
+        // The Item form puts the type on the button: tests/Integration/ItemFormTest.php.
         $this->assertStringContainsString('bgg-default-type.js', $page);
         $this->assertStringContainsString('data-default-type-id=', $panel);
         $this->assertStringContainsString('data-form-default-type-id=', $panel);
         $this->assertStringNotContainsString('initialTypeId', (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/new-bgg.js'));
-        $this->assertStringNotContainsString('bgg_default_type', (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/edit.php'));
     }
 
     public function test_settings_offers_and_saves_the_type_for_bgg_items(): void
