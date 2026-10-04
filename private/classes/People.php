@@ -28,8 +28,8 @@ final class People
      * are unique across owners.
      *
      * Delete deletes each table's rows for the Person. An entry with
-     * 'deleted_where' deletes only the rows matching it; the rest keep their
-     * occasion and lose the Person and the 'cleared' columns. Merge moves
+     * 'on_delete' deletes only the rows matching its 'delete_only'; the rest
+     * keep their occasion and lose the Person and its 'clear' columns. Merge moves
      * the rows to the survivor, except that where the survivor already has
      * a row for the same 'occasion' (these columns equal, nulls counting as
      * equal), the merged Person's row is deleted.
@@ -44,8 +44,10 @@ final class People
         // the plays, a play that was also an Aversion losing its aversion date.
         [
             'table' => 'responses', 'column' => 'Player', 'occasion' => ['Title', 'PlayDate', 'AversionDate'],
-            'deleted_where' => Aversions::IS_AVERSION . ' AND (' . Uses::IS_PLAY . ') IS NOT TRUE',
-            'cleared' => ['AversionDate'],
+            'on_delete' => [
+                'delete_only' => Aversions::IS_AVERSION . ' AND (' . Uses::IS_PLAY . ') IS NOT TRUE',
+                'clear' => ['AversionDate'],
+            ],
         ],
     ];
 
@@ -173,12 +175,13 @@ final class People
             $this->requirePerson($id);
             foreach (self::POINTING_AT_PERSON as $reference) {
                 ['table' => $table, 'column' => $column] = $reference;
-                if (!isset($reference['deleted_where'])) {
+                if (!isset($reference['on_delete'])) {
                     $this->statement("DELETE FROM {$table} WHERE {$column} = ?", 'i', [$id])->close();
                     continue;
                 }
-                $this->statement("DELETE FROM {$table} WHERE {$column} = ? AND {$reference['deleted_where']}", 'i', [$id])->close();
-                $cleared = implode('', array_map(fn (string $cleared) => ", {$cleared} = NULL", $reference['cleared']));
+                ['delete_only' => $deleteOnly, 'clear' => $clear] = $reference['on_delete'];
+                $this->statement("DELETE FROM {$table} WHERE {$column} = ? AND {$deleteOnly}", 'i', [$id])->close();
+                $cleared = implode('', array_map(fn (string $name) => ", {$name} = NULL", $clear));
                 $this->statement("UPDATE {$table} SET {$column} = NULL{$cleared} WHERE {$column} = ?", 'i', [$id])->close();
             }
             $this->unlinkAccountFrom($id);

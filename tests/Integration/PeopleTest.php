@@ -536,8 +536,8 @@ final class PeopleTest extends TestCase
             'proposals' => $count('SELECT COUNT(*) FROM proposal_outcome_players WHERE player_id = '),
             'events' => $count('SELECT COUNT(*) FROM event_players WHERE player_id = '),
             'playgroup' => $count('SELECT COUNT(*) FROM playgroup WHERE FullName = '),
-            'plays' => $count('SELECT COUNT(*) FROM responses WHERE PlayDate > 0 AND Player = '),
-            'aversions' => $count('SELECT COUNT(*) FROM responses WHERE AversionDate > 0 AND Player = '),
+            'plays' => $count('SELECT COUNT(*) FROM responses WHERE ' . \Uses::IS_PLAY . ' AND Player = '),
+            'aversions' => $count('SELECT COUNT(*) FROM responses WHERE ' . \Aversions::IS_AVERSION . ' AND Player = '),
         ];
     }
 
