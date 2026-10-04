@@ -17,7 +17,10 @@ One of the owner's free-form labels on an item, such as portable or beach-safe, 
 _Avoid_: Category.
 
 **Use**:
-A recorded occasion when an item was used, on a date, optionally with people, a Setting (where it was used) and notes. One Record Use submit can record several identical uses at once through its Number of uses. Every read of an owner's uses, their people and the Setting of their most recently recorded use goes through one module, scoped to the owner. Distinct from an item proposal, which is never a use.
+A recorded occasion when an item was used, on a date, optionally with people, a Setting (where it was used) and notes. One Record Use submit can record several identical uses at once through its Number of uses. Every read of an owner's uses, their people, their use counts and the Setting of their most recently recorded use goes through one module, scoped to the owner. Distinct from an item proposal, which is never a use.
+
+**Use count**:
+The number of an item's uses in a period, or in all recorded history: the owner's uses of it plus the legacy plays their own person took part in. Explore's uses by item pages show it.
 
 **Last use**:
 The date of an item's most recent use, or none if it has never been used. The use-by date, the Items page, To get rid of and the agent collection list all read it from one rule.
