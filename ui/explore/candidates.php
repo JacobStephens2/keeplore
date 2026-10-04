@@ -7,10 +7,11 @@
   require_login_or_guest();
 
   $type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
-  $resultObject = candidate_items($db, (int) $_SESSION['user_id'], $type_filter['selected'], [
+  $candidates = candidate_items($db, (int) $_SESSION['user_id'], $type_filter['selected'], [
     'online' => ['showOnlyOnline' => 'only', 'hideOnline' => 'hide'][$_POST['showOnline'] ?? ''] ?? null,
     'exclude_names' => [(string) ($_POST['removeUserByName'] ?? ''), (string) ($_POST['removeUserByNameTwo'] ?? '')],
   ]);
+  $interval_time_ago = strtotime('now - ' . DEFAULT_USE_INTERVAL . ' days');
 
   include(SHARED_PATH . '/header.php');
   include(SHARED_PATH . '/dataTable.html'); 
@@ -23,7 +24,7 @@
 <main>
 
   <h1>
-    <?php echo $resultObject->num_rows . " " . $page_title; if ($_SERVER['REQUEST_METHOD'] == 'POST') { echo ' Match Search Results'; } ?>
+    <?php echo count($candidates) . " " . $page_title; if ($_SERVER['REQUEST_METHOD'] == 'POST') { echo ' Match Search Results'; } ?>
   </h1>
 
   <form action="candidates.php" method="POST">
@@ -84,7 +85,7 @@
         <th>Users</th>
         <th>Group and Setting</th>
         <th>Group Date</th>
-        <th>Item (<?php echo $resultObject->num_rows; ?>)</th>
+        <th>Item (<?php echo count($candidates); ?>)</th>
         <th>Recent Use</th>
         <th>SwS</th>
         <th>MnP</th>
@@ -93,24 +94,10 @@
       </tr>
     </thead>
     <tbody>
-      <?php foreach ($resultObject as $row) { 
-        // find most recent use
-          $artifact_id = (int) $row['id'];
-          $current_user_id = (int) $_SESSION['user_id'];
-
-          $stmt_uses = mysqli_prepare($db, "SELECT MAX(use_date) AS most_recent_use_date FROM uses WHERE artifact_id = ? AND user_id = ?");
-          mysqli_stmt_bind_param($stmt_uses, "ii", $artifact_id, $current_user_id);
-          mysqli_stmt_execute($stmt_uses);
-          $mostRecentUseDateArray = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt_uses));
-          mysqli_stmt_close($stmt_uses);
-
-          $mostRecentUseDate = $mostRecentUseDateArray['most_recent_use_date'] ?? null;
-          $interval_time_ago = strtotime('now - ' . DEFAULT_USE_INTERVAL . ' days');
-        //
-        ?>
+      <?php foreach ($candidates as $row) { ?>
         <tr>
           <td class="type">
-            <?php echo h($row['type']); ?>
+            <?php echo h($row['type_name']); ?>
           </td>
 
           <td class="users">
@@ -144,15 +131,8 @@
             </a>
           </td>
 
-          <td class="mostRecentUse date">
-            <?php if ($mostRecentUseDate) {
-              $mostRecentUseTime = strtotime($mostRecentUseDate);
-              $color = $mostRecentUseTime < $interval_time_ago ? ' style="color: red;"' : '';
-              ?>
-              <a href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($mostRecentUseDateArray['id']))); ?>"<?php echo $color; ?>>
-                <?php echo h(substr($mostRecentUseDate, 0, 10)); ?>
-              </a>
-            <?php } ?>
+          <td class="mostRecentUse date"<?php if ($row['last_use'] !== null && strtotime($row['last_use']) < $interval_time_ago) { echo ' style="color: red;"'; } ?>>
+            <?php echo h($row['last_use'] ?? ''); ?>
           </td>
 
           <td class="sweet_spot">
