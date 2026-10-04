@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/kept_status.php';
 require_once __DIR__ . '/item_types.php';
+require_once __DIR__ . '/item_facts.php';
 require_once __DIR__ . '/use_by_date.php';
 require_once __DIR__ . '/record_use.php';
 require_once __DIR__ . '/classes/Items.php';
@@ -292,7 +293,7 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
     $mnt = (float) ($artifact['mnt'] ?? $artifact['MnT'] ?? 0);
     $mxt = (float) ($artifact['mxt'] ?? $artifact['MxT'] ?? 0);
     $candidate_raw = $artifact['Candidate'] ?? '';
-    $min_age = items_list_min_age($artifact);
+    $min_age = item_min_age($artifact);
 
     return [
         'id' => (int) ($artifact['id'] ?? 0),
@@ -305,14 +306,10 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
         'use_by' => $use_by['use_by_date'] ?? '',
         'use_by_overdue' => $overdue,
         'ss' => (string) ($artifact['ss'] ?? $artifact['SS'] ?? ''),
-        'players' => items_list_players_label(
-            $artifact['mnp'] ?? $artifact['MnP'] ?? null,
-            $artifact['mxp'] ?? $artifact['MxP'] ?? null,
-            $artifact['ss'] ?? $artifact['SS'] ?? null
-        ),
+        'players' => item_players_label($artifact),
         'age' => $min_age === null ? '' : $min_age . '+',
-        'copy_text' => items_list_copy_text($artifact),
-        'time' => items_list_play_time($artifact['mnt'] ?? $artifact['MnT'] ?? null, $artifact['mxt'] ?? $artifact['MxT'] ?? null),
+        'copy_text' => item_copy_text($artifact),
+        'time' => item_play_time($artifact),
         'avg_time' => (int) ceil(($mnt + $mxt) / 2),
         'candidate' => ($candidate_raw != '' && $candidate_raw != 0),
         'bgg_average' => bgg_overall_rating_text($artifact['BGG_Rat'] ?? $artifact['bgg_rat'] ?? null) ?? '',
@@ -331,8 +328,12 @@ function items_list_payload($db, array $filters, $user_id, $today = null) {
     usort($artifacts, fn (array $a, array $b) =>
         [(string) ($b['Acq'] ?? ''), artifact_is_kept($b), (int) $a['id']]
         <=> [(string) ($a['Acq'] ?? ''), artifact_is_kept($a), (int) $b['id']]);
-    $artifacts = items_list_best_at($artifacts, $filters['players']);
-    $artifacts = items_list_suitable_for_age($artifacts, $filters['age'], $filters['ageUnknown']);
+    if ($filters['players'] !== null) {
+        $artifacts = array_filter($artifacts, fn (array $item) => item_plays_best_at($item, $filters['players']));
+    }
+    if ($filters['age'] !== null) {
+        $artifacts = array_filter($artifacts, fn (array $item) => item_suits_age($item, $filters['age'], $filters['ageUnknown']));
+    }
     $bgg_ratings = (new BggRatings($db, (int) $user_id))->forItems(array_column($artifacts, 'id'));
     $items = [];
     foreach ($artifacts as $artifact) {
@@ -363,135 +364,6 @@ function items_list_item_filters(array $filters) {
 }
 
 /**
- * The player counts a sweet spot names, ascending. Stored sweet spots come in
- * every spelling the field has had: BGG's zero-padded "03,04", hand-typed
- * "3, 4", and ranges such as "06-8".
- */
-function items_list_sweet_spot_counts($ss) {
-    $counts = [];
-    // Close up "3 - 6" to "3-6" first, so the split below keeps the range whole.
-    $ss = preg_replace('/\s*([-–])\s*/u', '$1', trim((string) $ss));
-    foreach (preg_split('/[,\s]+/', $ss, -1, PREG_SPLIT_NO_EMPTY) as $part) {
-        if (preg_match('/^(\d+)\s*[-–]\s*(\d+)$/u', $part, $range)) {
-            $min = (int) $range[1];
-            $max = (int) $range[2];
-        } elseif (preg_match('/^\d+$/', $part)) {
-            $min = $max = (int) $part;
-        } else {
-            continue;
-        }
-        // A mistyped range such as "1-2000000000" must not stall the list.
-        for ($n = max(1, $min); $n <= min($max, 99); $n++) {
-            $counts[$n] = true;
-        }
-    }
-    ksort($counts);
-    return array_keys($counts);
-}
-
-/**
- * The line Items' Copy button puts on the clipboard for sharing a game:
- * "Azul, 2–4 (2), 8 yrs", the name, the player range with its best counts,
- * and the minimum age. A part with nothing recorded is left out.
- */
-function items_list_copy_text(array $artifact) {
-    $parts = [(string) ($artifact['Title'] ?? '')];
-    $range = items_list_player_range($artifact['mnp'] ?? $artifact['MnP'] ?? null, $artifact['mxp'] ?? $artifact['MxP'] ?? null);
-    $best = items_list_best_counts_label($artifact['ss'] ?? $artifact['SS'] ?? '');
-    if ($range !== '') {
-        $parts[] = $best === '' ? $range : $range . ' (' . $best . ')';
-    } elseif ($best !== '') {
-        $parts[] = 'best ' . $best;
-    }
-    $min_age = items_list_min_age($artifact);
-    if ($min_age !== null) {
-        $parts[] = $min_age . ' yrs';
-    }
-    return implode(', ', $parts);
-}
-
-/**
- * The line under Edit Item's heading, so the facts people look up most sit
- * above the fold even in a half-width window: "2–4 players, best 3 ·
- * 30–60 min · Age 8+".
- * A part with nothing recorded is left out; '' when nothing is.
- */
-function items_list_play_facts(array $artifact) {
-    $min = $artifact['MnP'] ?? $artifact['mnp'] ?? null;
-    $max = $artifact['MxP'] ?? $artifact['mxp'] ?? null;
-    $range = items_list_player_range($min, $max);
-    $best = items_list_best_counts_label($artifact['SS'] ?? $artifact['ss'] ?? '');
-    $parts = [];
-    if ($range !== '') {
-        $players = $range . ($range === '1' ? ' player' : ' players');
-        $parts[] = $best === '' ? $players : $players . ', best ' . $best;
-    } elseif ($best !== '') {
-        $parts[] = 'Best at ' . $best;
-    }
-    $time = items_list_play_time($artifact['MnT'] ?? $artifact['mnt'] ?? null, $artifact['MxT'] ?? $artifact['mxt'] ?? null);
-    if ($time !== '') {
-        $parts[] = $time;
-    }
-    $min_age = items_list_min_age($artifact);
-    if ($min_age !== null) {
-        $parts[] = 'Age ' . $min_age . '+';
-    }
-    return implode(' · ', $parts);
-}
-
-/** The player range, as in "2–4", "3" or '' when none is recorded. */
-function items_list_player_range($min, $max) {
-    $min = (int) $min;
-    $max = (int) $max;
-    if ($min <= 0 && $max <= 0) {
-        return '';
-    }
-    if ($min <= 0 || $max <= 0 || $min === $max) {
-        return (string) max($min, $max);
-    }
-    return $min . '–' . $max;
-}
-
-/** The play time, as in "30–60 min", "45 min", or '' when none is recorded. */
-function items_list_play_time($min, $max) {
-    // A time range reads like a player range: "30–60", or "45" with one end.
-    $range = items_list_player_range($min, $max);
-    return $range === '' ? '' : $range . ' min';
-}
-
-/**
- * The sweet spot's counts, as in "3" or "3, 4". A run of three or more
- * consecutive counts reads as a range, so "3–5" but "3, 4".
- */
-function items_list_best_counts_label($ss) {
-    $runs = [];
-    foreach (items_list_sweet_spot_counts($ss) as $n) {
-        $last = count($runs) - 1;
-        if ($last >= 0 && $runs[$last][1] === $n - 1) {
-            $runs[$last][1] = $n;
-        } else {
-            $runs[] = [$n, $n];
-        }
-    }
-    return implode(', ', array_map(function ($run) {
-        if ($run[1] - $run[0] >= 2) {
-            return $run[0] . '–' . $run[1];
-        }
-        return implode(', ', range($run[0], $run[1]));
-    }, $runs));
-}
-
-/** The player range with the sweet spot, as in "2–4 (best 3)". */
-function items_list_players_label($min, $max, $ss) {
-    $range = items_list_player_range($min, $max);
-    $best = items_list_best_counts_label($ss);
-    if ($best === '') {
-        return $range;
-    }
-    return $range === '' ? 'best ' . $best : $range . ' (best ' . $best . ')';
-}
-
-/**
  * The title for a chosen count and youngest age, as in "Best at 3 players,
  * suitable for age 2", or null with neither.
  */
@@ -504,35 +376,4 @@ function items_list_heading($players, $age) {
         $parts[] = ($parts ? 'suitable' : 'Suitable') . ' for age ' . $age;
     }
     return $parts ? implode(', ', $parts) : null;
-}
-
-/** An item's recommended minimum age, or null when none is recorded. */
-function items_list_min_age(array $row) {
-    $age = (int) ($row['Age'] ?? $row['age'] ?? 0);
-    return $age > 0 ? $age : null;
-}
-
-/**
- * The rows recommended for the age or younger, or every row with no age. An
- * item with no recorded minimum age is left out, since nothing vouches for it,
- * unless the caller asks to include unknown ages.
- */
-function items_list_suitable_for_age(array $rows, $age, $include_unknown = false) {
-    if ($age === null) {
-        return $rows;
-    }
-    return array_values(array_filter($rows, function ($row) use ($age, $include_unknown) {
-        $min_age = items_list_min_age($row);
-        return $min_age === null ? $include_unknown : $min_age <= $age;
-    }));
-}
-
-/** The rows whose sweet spot includes the count, or every row with no count. */
-function items_list_best_at(array $rows, $players) {
-    if ($players === null) {
-        return $rows;
-    }
-    return array_values(array_filter($rows, function ($row) use ($players) {
-        return in_array($players, items_list_sweet_spot_counts($row['ss'] ?? $row['SS'] ?? ''), true);
-    }));
 }

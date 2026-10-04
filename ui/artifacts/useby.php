@@ -80,10 +80,10 @@
       </section>
 
       <label for="sweetSpot">Sweet Spot</label>
-      <input type="number" name="sweetSpot" id="sweetSpot" value="<?php echo $sweetSpot; ?>">
+      <input type="number" name="sweetSpot" id="sweetSpot" value="<?php echo h($sweetSpot); ?>">
 
       <label for="minimumAge">Minimum Age</label>
-      <input type="number" name="minimumAge" id="minimumAge" value="<?php echo $minimumAge; ?>">
+      <input type="number" name="minimumAge" id="minimumAge" value="<?php echo h($minimumAge); ?>">
       
       <label for="shelfSort">Shelf Sort (Instead of Interact By Sort)</label>
       <input type="hidden" name="shelfSort" value="no">

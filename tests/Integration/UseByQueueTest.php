@@ -200,6 +200,38 @@ final class UseByQueueTest extends TestCase
         $this->assertSame([12, 10], $this->ids($queue->entries($all + ['minimum_age' => '0', 'sweet_spot' => ''])));
     }
 
+    public function test_sweet_spot_filter_reads_every_sweet_spot_spelling(): void
+    {
+        $this->db->query("UPDATE games SET ss = '3, 4' WHERE id = 10");
+        $this->db->query("UPDATE games SET ss = '2-4' WHERE id = 12");
+        $this->db->query("INSERT INTO games (id, user_id, Title, type_id, Acq, ss) VALUES
+            (16, 1, 'Wavelength', 1, '2026-05-02', '06-8'),
+            (17, 1, 'Codenames', 1, '2026-05-02', '4-6'),
+            (18, 1, 'Patchwork', 1, '2026-05-02', '3,4')");
+        $queue = $this->queue();
+        $all = ['include_secondary_collection' => true];
+        $sorted = function (array $entries) {
+            $ids = $this->ids($entries);
+            sort($ids);
+            return $ids;
+        };
+
+        $this->assertSame([10, 12, 18], $sorted($queue->entries($all + ['sweet_spot' => '3'])));
+        $this->assertSame([16], $sorted($queue->entries($all + ['sweet_spot' => '7'])));
+        $this->assertSame([16, 17], $sorted($queue->entries($all + ['sweet_spot' => 6])));
+    }
+
+    public function test_a_blank_zero_negative_or_non_numeric_sweet_spot_is_no_filter(): void
+    {
+        $this->db->query("UPDATE games SET ss = '2, 3' WHERE id = 10");
+        $this->db->query("UPDATE games SET ss = '4' WHERE id = 12");
+        $queue = $this->queue();
+        $all = ['include_secondary_collection' => true];
+        foreach (['', '0', 0, '-3', 'three', '2.5', null] as $sweetSpot) {
+            $this->assertSame([12, 10], $this->ids($queue->entries($all + ['sweet_spot' => $sweetSpot])), var_export($sweetSpot, true));
+        }
+    }
+
     public function test_entry_returns_one_of_the_owners_items_whatever_its_kept_state(): void
     {
         $queue = $this->queue();

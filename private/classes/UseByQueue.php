@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__) . '/use_by_date.php';
 require_once dirname(__DIR__) . '/record_use.php';
+require_once dirname(__DIR__) . '/item_facts.php';
 require_once __DIR__ . '/Items.php';
 require_once __DIR__ . '/Preferences.php';
 
@@ -36,7 +37,10 @@ final class UseByQueue
      * last use (never used first). Filters:
      * default_interval (the owner's default use interval when absent),
      * type_ids (null for every type; an empty array returns nothing),
-     * sweet_spot, minimum_age, include_secondary_collection, hide_snoozed.
+     * sweet_spot (a player count: keeps the items whose Sweet spot includes
+     * it; anything but a whole number of 1 or more means no filter),
+     * minimum_age (keeps items whose own minimum age is at or above it),
+     * include_secondary_collection, hide_snoozed.
      */
     public function entries(array $filters = []): array
     {
@@ -60,22 +64,6 @@ final class UseByQueue
             $params[] = $this->today;
         }
 
-        $sweetSpot = (string) ($filters['sweet_spot'] ?? '');
-        if ($sweetSpot !== '') {
-            $patterns = [
-                $sweetSpot,
-                $sweetSpot . ' %',
-                '%0' . $sweetSpot . '%',
-                '%,' . $sweetSpot,
-                '%,' . $sweetSpot . ',%',
-                '%, ' . $sweetSpot,
-                '%, ' . $sweetSpot . ',%',
-            ];
-            $where[] = '(' . implode(' OR ', array_fill(0, count($patterns), 'games.ss LIKE ?')) . ')';
-            $types .= str_repeat('s', count($patterns));
-            array_push($params, ...$patterns);
-        }
-
         $minimumAge = $filters['minimum_age'] ?? '';
         if ($minimumAge !== '' && $minimumAge !== 0 && $minimumAge !== '0' && $minimumAge !== null) {
             $where[] = 'games.age >= ?';
@@ -89,11 +77,14 @@ final class UseByQueue
             array_push($params, ...array_map('strval', array_values($typeIds)));
         }
 
+        $rows = $this->rows(implode(' AND ', $where), $types, $params);
+        $sweetSpot = filter_var($filters['sweet_spot'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($sweetSpot !== false) {
+            $rows = array_filter($rows, fn (array $row) => item_plays_best_at($row, $sweetSpot));
+        }
+
         $interval = $filters['default_interval'] ?? $this->defaultUseInterval();
-        $entries = array_map(
-            fn (array $row) => $this->present($row, $interval),
-            $this->rows(implode(' AND ', $where), $types, $params)
-        );
+        $entries = array_map(fn (array $row) => $this->present($row, $interval), $rows);
         usort($entries, fn (array $a, array $b) =>
             [$a['use_by_date'] === null, $a['use_by_date'], $a['last_use'], (int) $a['id']]
             <=> [$b['use_by_date'] === null, $b['use_by_date'], $b['last_use'], (int) $b['id']]);

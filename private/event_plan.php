@@ -16,7 +16,7 @@
  * event's own setting, note and is_packed.
  */
 
-require_once __DIR__ . '/items_list.php';
+require_once __DIR__ . '/item_facts.php';
 
 /** The ways an event's games can be grouped, keyed by the value forms send. */
 function event_plan_dimensions() {
@@ -426,9 +426,9 @@ function event_plan_line(array $item) {
  */
 function event_plan_details(array $item) {
     $title = (string) ($item['Title'] ?? '');
-    // items_list_copy_text() leads with the title; keep what follows it.
-    $parts = [substr(items_list_copy_text($item), strlen($title))];
-    $time = items_list_play_time($item['MnT'] ?? $item['mnt'] ?? null, $item['MxT'] ?? $item['mxt'] ?? null);
+    // item_copy_text() leads with the title; keep what follows it.
+    $parts = [substr(item_copy_text($item), strlen($title))];
+    $time = item_play_time($item);
     if ($time !== '') {
         $parts[] = ', ' . $time;
     }
@@ -510,13 +510,13 @@ function event_plan_keys(array $item, $by, array $view) {
     ['tags' => $tags, 'ages' => $ages] = $view;
     if ($by === 'players') {
         $keys = [];
-        foreach (items_list_sweet_spot_counts($item['SS'] ?? $item['ss'] ?? '') as $n) {
+        foreach (item_sweet_spot_counts($item) as $n) {
             $keys[$n] = $n . ($n === 1 ? ' player' : ' players');
         }
         return $keys;
     }
     if ($by === 'player_age') {
-        $age = items_list_min_age($item);
+        $age = item_min_age($item);
         if ($age === null || $ages === []) {
             return [];
         }
@@ -529,7 +529,7 @@ function event_plan_keys(array $item, $by, array $view) {
         return [EVENT_ADULT_AGE + 1 => "Older than the players' known ages"];
     }
     if ($by === 'age') {
-        $age = items_list_min_age($item);
+        $age = item_min_age($item);
         return $age === null ? [] : [$age => 'Age ' . $age . '+'];
     }
     $values = $by === 'tag' ? (array) ($item['tags'] ?? []) : [$item['setting'] ?? ''];

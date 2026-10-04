@@ -1,6 +1,6 @@
 <?php
   require_once('../../private/initialize.php');
-  require_once(PRIVATE_PATH . '/items_list.php');
+  require_once(PRIVATE_PATH . '/item_facts.php');
   require_once(PRIVATE_PATH . '/item_form.php');
   require_login();
   if(!isset($_GET['id'])) {
@@ -44,7 +44,7 @@
 
   <div id="editArtifact" class="object edit">
     <h1>Edit <?php echo h($artifact['Title']); ?></h1>
-    <?php $play_facts = item_type_is_game($artifact['type'] ?? '') ? items_list_play_facts($artifact) : ''; ?>
+    <?php $play_facts = item_type_is_game($artifact['type'] ?? '') ? item_play_facts($artifact) : ''; ?>
     <?php if ($play_facts !== '') { ?>
       <p class="item-play-facts"><?php echo h($play_facts); ?></p>
     <?php } ?>

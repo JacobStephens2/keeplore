@@ -4,7 +4,6 @@ namespace Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-require_once PROJECT_PATH . '/private/items_list.php';
 require_once PROJECT_PATH . '/private/event_plan.php';
 
 /**
