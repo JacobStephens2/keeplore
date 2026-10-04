@@ -33,13 +33,18 @@ final class Items
      * A derived table of artifact_id and last_use, the only definition of an
      * Item's last use: the later of its latest recorded Use date and its
      * latest legacy play date, as Y-m-d. An Item with neither has no row.
-     * Join it on artifact_id = games.id; it isn't owner-scoped, so the
-     * query joining it must scope games to the owner.
+     * Only Uses recorded by the Item's owner count. Join it on
+     * artifact_id = games.id; it isn't owner-scoped, so the query joining it
+     * must scope games to the owner.
      */
     public const LAST_USE = "(SELECT artifact_id, DATE(MAX(used_on)) AS last_use
-        FROM (SELECT artifact_id, use_date AS used_on FROM uses
+        FROM (SELECT artifact_id, use_date AS used_on FROM " . self::OWNERS_USES . "
             UNION ALL SELECT Title, PlayDate FROM responses) item_dates
         GROUP BY artifact_id)";
+
+    /** Uses recorded by their Item's owner, the only Uses last use and use count read. */
+    private const OWNERS_USES = 'uses JOIN games owner_items
+        ON owner_items.id = uses.artifact_id AND owner_items.user_id = uses.user_id';
 
     /** What create gives a missing or blank field, besides today's date and the owner's interval. */
     public const DEFAULTS = ['MnT' => 30, 'MxT' => 60, 'MnP' => 1, 'MxP' => 1, 'SS' => '01', 'Age' => 0, 'is_kept' => 1];
@@ -166,7 +171,7 @@ final class Items
              FROM games
                 LEFT JOIN types ON types.id = games.type_id
                 LEFT JOIN ' . self::LAST_USE . ' item_last_use ON item_last_use.artifact_id = games.id
-                LEFT JOIN (SELECT artifact_id, COUNT(*) AS use_count FROM uses GROUP BY artifact_id) item_uses
+                LEFT JOIN (SELECT artifact_id, COUNT(*) AS use_count FROM ' . self::OWNERS_USES . ' GROUP BY artifact_id) item_uses
                     ON item_uses.artifact_id = games.id
              WHERE ' . $where . '
              ORDER BY games.Title, games.id',

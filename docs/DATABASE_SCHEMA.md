@@ -605,7 +605,7 @@ The application has two parallel interaction tracking systems:
 - The artifact is referenced by `uses.artifact_id` -> `games.id`
 - Supports `use_date`, `note`, and `notesTwo`
 
-Both systems feed an item's last use: `Items::LAST_USE` takes the later of its latest `uses.use_date` and its latest `responses.PlayDate`, and the Items page, To get rid of and the Use-by queue all read it.
+Both systems feed an item's last use: `Items::LAST_USE` takes the later of its latest `uses.use_date` (Uses recorded by the item's owner only) and its latest `responses.PlayDate`, and the Items page, To get rid of, the agent collection list and the Use-by queue all read it.
 
 ---
 

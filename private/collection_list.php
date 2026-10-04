@@ -12,13 +12,20 @@ require_once __DIR__ . '/classes/Items.php';
  *
  * - parse_collection_list_request(): pure; turns a JSON body into a
  *   normalized request and a list of validation errors.
- * - list_collection_items(): runs the request against one user's rows.
+ * - list_collection_items(): runs the request against one user's Items,
+ *   read through Items::list, and pages the result.
  */
 
 /** The request's flag filters, each named as the Items list filter it maps to. */
 const COLLECTION_LIST_FLAGS = ['kept', 'physical', 'digital', 'secondary_collection'];
 
 const COLLECTION_LIST_FIELDS = ['basic', 'collection'];
+
+/** The columns each row carries for each fields value, in output order. */
+const COLLECTION_LIST_COLUMNS = [
+  'basic' => ['id', 'Title', 'type', 'type_id', 'is_kept', 'is_physical', 'is_digital', 'is_in_secondary_collection'],
+  'collection' => ['MnP', 'MxP', 'SS', 'MnT', 'MxT', 'Wt', 'Yr', 'Acq'],
+];
 
 const COLLECTION_LIST_INCLUDES = ['uses_summary'];
 
@@ -119,12 +126,6 @@ function collection_list_has_filters(array $request) {
   return $request['query'] !== '' || $request['tag'] !== '' || $request['type_ids'] !== []
     || $request['fields'] !== 'basic' || $request['include_uses_summary'];
 }
-
-/** The columns each row carries for each fields value, in output order. */
-const COLLECTION_LIST_COLUMNS = [
-  'basic' => ['id', 'Title', 'type', 'type_id', 'is_kept', 'is_physical', 'is_digital', 'is_in_secondary_collection'],
-  'collection' => ['MnP', 'MxP', 'SS', 'MnT', 'MxT', 'Wt', 'Yr', 'Acq'],
-];
 
 /**
  * List one user's items for a parsed request, read through Items::list.

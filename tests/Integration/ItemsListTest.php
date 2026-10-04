@@ -222,6 +222,15 @@ final class ItemsListTest extends TestCase
         $this->assertSame(1, $theirs[0]['use_count']);
     }
 
+    public function test_a_use_another_owner_recorded_on_the_owners_item_never_counts(): void
+    {
+        $this->runSql("INSERT INTO uses (artifact_id, user_id, use_date) VALUES (10, 2, '2026-05-01'), (11, 2, '2026-05-01'), (11, 1, '2026-01-01')");
+        $this->assertNull($this->row(10)['last_use']);
+        $this->assertSame(0, $this->row(10)['use_count']);
+        $this->assertSame('2026-01-01', $this->row(11)['last_use']);
+        $this->assertSame(1, $this->row(11)['use_count']);
+    }
+
     public function test_list_runs_under_strict_group_by(): void
     {
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
