@@ -5,19 +5,7 @@
   include(SHARED_PATH . '/header.php');
   include(SHARED_PATH . '/dataTable.html');
 
-  if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['type'])) {
-      $type = $_POST['type'];
-    } else {
-      $type = [];
-    }
-  } else {
-    if (isset($_SESSION['type']) && count($_SESSION['type']) > 0) {
-      $type = $_SESSION['type'];
-    } else {
-      $type = array_column((new Types($db, (int) $_SESSION['user_id']))->all(), 'id', 'name');
-    }
-  }
+  $type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
 
   $minimumDate = $_POST['minimumDate'] ?? '';
   $showAttributes = $_POST['showAttributes'] ?? 'no';
@@ -28,7 +16,7 @@
   $uses_error = null;
   try {
     $uses_array = (new Uses($db, (int) $_SESSION['user_id']))->all([
-      'type_ids' => array_values((array) $type),
+      'type_ids' => $type_filter['selected'],
       'since' => (string) $minimumDate,
     ]);
   } catch (InvalidArgumentException $invalid) {

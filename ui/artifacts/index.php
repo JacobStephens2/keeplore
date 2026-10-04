@@ -300,6 +300,7 @@
             }
           }
         }
+        $type_filter = ['types' => $type_ids_by_name, 'selected' => $current_type_ids];
         sort($all_type_ids);
         sort($current_type_ids);
         $type_filter_active = !empty($current_type_ids) && $current_type_ids !== $all_type_ids;

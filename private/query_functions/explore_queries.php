@@ -58,4 +58,53 @@ function find_artifacts_by_characteristic($kept, $type, $allArtifacts, $favCt) {
   return $result;
 }
 
-?>
+/**
+ * The owner's items with a Candidate, of the Types in $type_ids (none when
+ * it is empty), narrowed by the Candidates form's showOnline,
+ * removeUserByName and removeUserByNameTwo fields in $post.
+ */
+function candidate_items(mysqli $db, int $user_id, array $type_ids, array $post): mysqli_result {
+  $sql = "SELECT *
+    FROM games
+    WHERE Candidate IS NOT NULL
+    AND Candidate != '0'
+    AND Candidate != ''
+    AND user_id = ?
+  ";
+  $params = [$user_id];
+  $types = "i";
+
+  switch ($post['showOnline'] ?? '') {
+    case 'showOnlyOnline':
+      $sql .= " AND Candidate LIKE '%online%' ";
+      break;
+    case 'hideOnline':
+      $sql .= " AND Candidate NOT LIKE '%online%' ";
+      break;
+  }
+
+  foreach (['removeUserByName', 'removeUserByNameTwo'] as $field) {
+    if (isset($post[$field]) && $post[$field] != '') {
+      $sql .= " AND Candidate NOT LIKE ? ";
+      $params[] = '%' . $post[$field] . '%';
+      $types .= "s";
+    }
+  }
+
+  if (count($type_ids) > 0) {
+    $sql .= " AND type_id IN (" . implode(',', array_fill(0, count($type_ids), '?')) . ") ";
+    foreach ($type_ids as $type_id) {
+      $params[] = (int) $type_id;
+      $types .= "i";
+    }
+  } else {
+    $sql .= " AND FALSE ";
+  }
+
+  $sql .= " ORDER BY type ASC, Candidate ASC, Title ASC";
+
+  $stmt = mysqli_prepare($db, $sql);
+  mysqli_stmt_bind_param($stmt, $types, ...$params);
+  mysqli_stmt_execute($stmt);
+  return mysqli_stmt_get_result($stmt);
+}

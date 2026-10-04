@@ -36,6 +36,7 @@ final class TypeListsTest extends TestCase
         $this->db->query("INSERT INTO types (id, objectType, user_id) VALUES (3, 'table game', 2)");
         require_once PRIVATE_PATH . '/classes/Types.php';
         require_once PRIVATE_PATH . '/items_list.php';
+        require_once PRIVATE_PATH . '/type_filter.php';
         $GLOBALS['db'] = $this->db;
         $_SESSION = ['user_id' => 2];
     }
@@ -59,12 +60,41 @@ final class TypeListsTest extends TestCase
 
     public function test_the_type_checkboxes_offer_only_the_session_owners_types(): void
     {
-        $html = $this->render('artifact_type_checkboxes.php', ['type' => []]);
+        $html = $this->render('artifact_type_checkboxes.php', ['type_filter' => type_filter($this->db, 2, 'GET', [], $_SESSION)]);
 
         $this->assertStringContainsString('value="3"', $html);
-        $this->assertStringContainsString('data-type-ids="[&quot;3&quot;]"', $html);
+        $this->assertMatchesRegularExpression('/value="3"\s+name="type\[3\]"\s+checked/', $html);
+        $this->assertStringContainsString('id="selectGames" data-type-ids="[&quot;3&quot;]"', $html);
         $this->assertStringNotContainsString('board-game', $html);
         $this->assertStringNotContainsString('film', $html);
+    }
+
+    public function test_the_type_checkboxes_tick_only_the_selected_types(): void
+    {
+        $html = $this->render('artifact_type_checkboxes.php', ['type_filter' => ['types' => ['table game' => 3], 'selected' => []]]);
+
+        $this->assertDoesNotMatchRegularExpression('/name="type\[3\]"\s+checked/', $html);
+    }
+
+    public function test_each_type_checkbox_shortcut_carries_the_owners_type_ids_and_skips_types_they_lack(): void
+    {
+        $html = $this->render('artifact_type_checkboxes.php', ['type_filter' => type_filter($this->db, 2, 'GET', [], $_SESSION)]);
+
+        $this->assertStringContainsString('id="selectAnalogGames" data-type-ids="[&quot;3&quot;]"', $html);
+        $this->assertStringContainsString('id="selectOnlineGames" data-type-ids="[]"', $html);
+        $this->assertStringContainsString('id="selectOutdoorGames" data-type-ids="[]"', $html);
+        $this->assertStringNotContainsString('#gambling-game', $html);
+    }
+
+    public function test_the_trimmed_type_checkboxes_keep_only_the_games_shortcut(): void
+    {
+        $html = $this->render('artifact_type_checkboxes.php', [
+            'type_filter' => ['types' => ['table game' => 3], 'selected' => ['3']],
+            'type_filter_shortcuts' => 'trimmed',
+        ]);
+
+        $this->assertStringContainsString('id="selectGames"', $html);
+        $this->assertStringNotContainsString('selectAnalogGames', $html);
     }
 
     public function test_the_type_options_offer_only_the_session_owners_types(): void
