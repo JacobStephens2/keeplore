@@ -78,9 +78,10 @@ final class UseByQueue
         }
 
         $rows = $this->rows(implode(' AND ', $where), $types, $params);
-        $sweetSpot = filter_var($filters['sweet_spot'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        if ($sweetSpot !== false) {
-            $rows = array_filter($rows, fn (array $row) => item_plays_best_at($row, $sweetSpot));
+        // A whole number of 1 or more, read as the Items page reads its count.
+        $sweetSpot = (string) ($filters['sweet_spot'] ?? '');
+        if (preg_match('/^\s*[1-9]\d*\s*$/', $sweetSpot)) {
+            $rows = array_filter($rows, fn (array $row) => item_plays_best_at($row, (int) $sweetSpot));
         }
 
         $interval = $filters['default_interval'] ?? $this->defaultUseInterval();

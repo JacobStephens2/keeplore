@@ -218,6 +218,7 @@ final class UseByQueueTest extends TestCase
 
         $this->assertSame([10, 12, 18], $sorted($queue->entries($all + ['sweet_spot' => '3'])));
         $this->assertSame([16], $sorted($queue->entries($all + ['sweet_spot' => '7'])));
+        $this->assertSame([10, 12, 18], $sorted($queue->entries($all + ['sweet_spot' => ' 3 '])));
         $this->assertSame([16, 17], $sorted($queue->entries($all + ['sweet_spot' => 6])));
     }
 
@@ -227,7 +228,7 @@ final class UseByQueueTest extends TestCase
         $this->db->query("UPDATE games SET ss = '4' WHERE id = 12");
         $queue = $this->queue();
         $all = ['include_secondary_collection' => true];
-        foreach (['', '0', 0, '-3', 'three', '2.5', null] as $sweetSpot) {
+        foreach (['', '0', 0, '-3', '+3', '03', 'three', '2.5', null] as $sweetSpot) {
             $this->assertSame([12, 10], $this->ids($queue->entries($all + ['sweet_spot' => $sweetSpot])), var_export($sweetSpot, true));
         }
     }
