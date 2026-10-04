@@ -9,14 +9,15 @@
   }
   $type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
   $range = $_SESSION['range'] ?? 'false';
-  $kept = $_SESSION['kept'] ?? [];
-  $artifact_set = choose_artifacts_for_group($range, $type_filter['selected'], $kept);
-  $usergroup = find_playgroup_by_user_id();
+  $kept = $_SESSION['kept'] ?? 0;
+  $playgroup = new Playgroup($db, (int) $_SESSION['user_id']);
+  $artifacts = $playgroup->choose($type_filter['selected'], $range == 'true', $kept == 1);
+  $group_size = count($playgroup->members());
 ?>
 
 <main>
   <div class="objects listing">
-    <h1>Choose Items for Group of <?php echo $usergroup->num_rows; ?> Users</h1>
+    <h1>Choose Items for Group of <?php echo $group_size; ?> Users</h1>
     <p>
       The dates represent the most recent instance of the type of response indicated by the column header. SS = sweet spot, Mnp = minimum player count, Mxp = maximum player count.
     </p>
@@ -44,7 +45,7 @@
         <input type="submit" value="Submit" />
     </form>
 
-    <p><?php echo $artifact_set->num_rows; ?> results</p>
+    <p><?php echo count($artifacts); ?> results</p>
 
   	<table class="list">
   	  <tr class="header-row">
@@ -59,7 +60,7 @@
   	    <th class="table-header">Type</th>
   	  </tr>
 
-      <?php while($artifact = mysqli_fetch_assoc($artifact_set)) { ?>
+      <?php foreach ($artifacts as $artifact) { ?>
         <tr>
           <td class="edit">
             <a class="table-action" href="<?php echo url_for('/artifacts/edit.php?id=' . h(u($artifact['id']))); ?>">
@@ -86,8 +87,6 @@
     	  </tr>
       <?php } ?>
   	</table>
-
-    <?php mysqli_free_result($artifact_set); ?>
   </div>
 
 </main>

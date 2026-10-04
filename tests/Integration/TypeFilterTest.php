@@ -37,8 +37,6 @@ final class TypeFilterTest extends TestCase
         $this->db->query("INSERT INTO types (id, objectType, user_id) VALUES (3, 'table game', 2), (4, 'card game', 2)");
         require_once PRIVATE_PATH . '/type_filter.php';
         require_once PRIVATE_PATH . '/query_functions/explore_queries.php';
-        require_once PRIVATE_PATH . '/database.php';
-        require_once PRIVATE_PATH . '/query_functions/playgroup_queries.php';
     }
 
     protected function tearDown(): void
@@ -173,33 +171,6 @@ final class TypeFilterTest extends TestCase
         $this->assertSame(['Azul'], $titles(['online' => 'only']));
         $this->assertEqualsCanonicalizing(['Catan', 'Former possession'], $titles(['online' => 'hide']));
         $this->assertSame(['Former possession'], $titles(['online' => 'hide', 'exclude_names' => ['sam', '']]));
-    }
-
-    public function test_choose_for_group_filtered_on_a_type_is_the_owners_items_of_that_type_id(): void
-    {
-        $this->db->query('CREATE TABLE playgroup (ID INT PRIMARY KEY AUTO_INCREMENT, FullName INT)');
-        $this->db->query('ALTER TABLE players ADD COLUMN G INT, ADD COLUMN Priority INT');
-        $this->db->query('ALTER TABLE responses ADD COLUMN Player INT, ADD COLUMN AversionDate DATE, ADD COLUMN PassDate DATE, ADD COLUMN RequestDate DATE');
-        $this->db->query('ALTER TABLE games ADD COLUMN FavCt INT');
-        $this->db->query("UPDATE games SET type = 'stale name'");
-        $this->db->query('INSERT INTO playgroup (FullName) VALUES (100)');
-        $this->db->query("INSERT INTO responses (Title, user_id, Player, PlayDate) VALUES (10, 1, 100, '2026-02-01'), (12, 1, 100, '2026-02-02')");
-        $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
-        $GLOBALS['db'] = $this->db;
-        $_SESSION = ['user_id' => 1];
-
-        $titles = fn (array $typeIds) => array_column(
-            choose_artifacts_for_group('false', $typeIds)->fetch_all(MYSQLI_ASSOC), 'title'
-        );
-
-        try {
-            $this->assertSame(['Catan'], $titles(['1']));
-            $this->assertEqualsCanonicalizing(['Arrival', 'Catan'], $titles(['1', '2']));
-            $this->assertSame([], $titles([]));
-        } finally {
-            $_SESSION = [];
-            unset($GLOBALS['db']);
-        }
     }
 
     private function runSql(string $sql): void

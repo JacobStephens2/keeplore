@@ -2,53 +2,20 @@
 require_once('../../private/initialize.php');
 require_login();
 $people = (new People($db, (int) $_SESSION['user_id']))->all();
-
-if(is_post_request()) {
-
-  $response = [];
-  $response['playerCount'] = $_POST['playerCount'] ?? '1';
-  $playerCount = $response['playerCount'];
-  
-  $i = 1;
-  while ($playerCount >= $i) {
-    $response['Player' . $i] = $_POST['Player' . $i] ?? '';
-    $i++;
-  }
-
-  $result = insert_playgroup($response);
-  if($result === true) {
-    $new_id = mysqli_insert_id($db);
-    $_SESSION['message'] = 'The playgroup was successfully expanded.';
-    redirect_to(url_for('/playgroup/index.php'));
-  } else {
-    $errors = $result;
-  }
-
-} else {
-  // display the blank form
-  $response = [];
-  $response["FullName"] = '';
-  $playerCount = $_GET['playerCount'] ?? '1';
-
+$playerCount = max(1, min(9, (int) ($_POST['playerCount'] ?? $_GET['playerCount'] ?? 1)));
+$chosen = [];
+for ($i = 1; $i <= $playerCount; $i++) {
+  $chosen[$i] = is_scalar($_POST['Player' . $i] ?? null) ? (string) $_POST['Player' . $i] : '';
 }
 
 if(is_post_request()) {
-
-  $object = [];
-  $object['FullName'] = $_POST['FullName'] ?? '';
-
-  $result = insert_playgroup($object);
-  if($result === true) {
-    $_SESSION['message'] = 'The play group was created successfully.';
+  try {
+    (new Playgroup($db, (int) $_SESSION['user_id']))->add($chosen);
+    $_SESSION['message'] = 'The playgroup was successfully expanded.';
     redirect_to(url_for('/playgroup/index.php'));
-  } else {
-    $errors = $result;
+  } catch (InvalidArgumentException $error) {
+    $errors[] = $error->getMessage();
   }
-
-} else {
-  // display the blank form
-  $object = [];
-  $object["FullName"] = '';
 }
 
 $page_title = 'Add User to Group';
@@ -84,32 +51,22 @@ include(SHARED_PATH . '/header.php');
     <form action="<?php echo url_for('/playgroup/new.php'); ?>" method="post">
       <?php echo csrf_input(); ?>
       <dl>
+        <?php foreach ($chosen as $i => $choice) { ?>
         <dd>
-        <select name="Player1">
-            <option value='141'>Jacob Stephens</option>
+          <select name="Player<?php echo $i; ?>">
+            <option value="">Choose a person</option>
           <?php
             foreach ($people as $person) {
               echo "<option value=\"" . h($person['id']) . "\"";
+              if ($choice === (string) $person['id']) {
+                echo " selected";
+              }
               echo ">" . h($person['name']) . "</option>";
             }
           ?>
           </select>
         </dd>
-
-        <?php
-          $i = 1;
-          $p = 2;
-          while ($playerCount > $i) {
-            echo '<dd><select name="Player' . $p . '"><option value="">Choose a player</option>'; 
-            foreach ($people as $person) {
-              echo "<option value=\"" . h($person['id']) . "\"";
-              echo ">" . h($person['name']) . "</option>";
-            }
-            echo '</select></dd>';
-            $i++;
-            $p++;
-          }
-        ?>
+        <?php } ?>
       </dl>
       <input type="hidden" name="playerCount" value="<?php echo $playerCount; ?>">
       <div id="operations">

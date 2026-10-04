@@ -1,30 +1,23 @@
 <?php
 require_once('../../private/initialize.php');
 require_login();
-if(!isset($_GET['ID'])) {
-  redirect_to(url_for('/playgroup/index.php'));
+$playgroup = new Playgroup($db, (int) $_SESSION['user_id']);
+$ID = (int) ($_GET['ID'] ?? 0);
+$member = $playgroup->member($ID);
+if ($member === null) {
+  error_404();
 }
-$ID = $_GET['ID'];
 if(is_post_request()) {
-  // Handle form values sent by new.php
-
-  $playgroupplayer = [];
-  $playgroupplayer['ID'] = $ID ?? '';
-  $playgroupplayer['FullName'] = $_POST['FullName'] ?? '';
-
-  $result = update_playgroup_player($playgroupplayer);
-  if($result === true) {
+  $member['person_id'] = (int) ($_POST['FullName'] ?? 0);
+  try {
+    $playgroup->replace($ID, $member['person_id']);
     $_SESSION['message'] = 'The playgroup player was updated successfully.';
-    redirect_to(url_for('/playgroup/index.php?'));
-  } else {
-    $errors = $result;
-    //var_dump($errors);
+    redirect_to(url_for('/playgroup/index.php'));
+  } catch (InvalidArgumentException $error) {
+    $errors[] = $error->getMessage();
+  } catch (OutOfBoundsException) {
+    error_404();
   }
-
-} else {
-
-  $playgroupplayer = find_playgroup_player_by_id($ID);
-
 }
 
 ?>
@@ -45,11 +38,11 @@ if(is_post_request()) {
         <dt>User</dt>
         <dd>
           <select name="FullName">
-            <option value='Invalid'>Choose a player</option>
+            <option value="">Choose a person</option>
           <?php
             foreach ((new People($db, (int) $_SESSION['user_id']))->all() as $person) {
               echo "<option value=\"" . h($person['id']) . "\"";
-              if($playgroupplayer['FullName'] == $person['id']) {
+              if($member['person_id'] === $person['id']) {
                 echo " selected";
               }
               echo ">" . h($person['name']) . "</option>";

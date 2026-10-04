@@ -30,6 +30,10 @@ _Avoid_: API key (the master key).
 Someone on the owner's people list who can be recorded on uses, item proposals and events. One person can be marked as the owner themself.
 _Avoid_: User (the Keeplore account the list belongs to), Player (except for an event's players).
 
+**Playgroup**:
+The people from the owner's people list whom the owner is choosing items for on Choose for group. Its size is the number of distinct people in it.
+_Avoid_: User group (the page's label), Group (alone).
+
 **Item proposal**:
 A suggestion to a group to use a particular item, as observed by the Keeplore user. Its recorded outcome describes the proposal as a whole, with optional participants and a note identifying individual objections.
 
