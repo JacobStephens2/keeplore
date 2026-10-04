@@ -19,7 +19,8 @@ const ApiClient = {
    * @param {string} endpoint - The PHP endpoint path (e.g. 'artifacts.php')
    * @param {object} options  - Standard fetch options (method, body, etc.)
    * @returns {Promise<object>} Parsed JSON response body
-   * @throws {Error} On rate-limit (429), auth failure, or any non-ok response
+   * @throws {Error} On rate-limit (429) or any other non-ok response. A 401
+   *   is an expired session: it redirects to the login page and never settles.
    */
   async request(endpoint, options = {}) {
     const url = `${this.baseUrl}/${endpoint}`;
@@ -36,6 +37,12 @@ const ApiClient = {
 
     const response = await fetch(url, config);
 
+    // An expired or missing session answers 401.
+    // Redirect to the login page automatically so callers don't have to check.
+    if (response.status === 401) {
+      return this.redirectToLogin();
+    }
+
     if (response.status === 429) {
       throw new Error('Rate limit exceeded. Please try again later.');
     }
@@ -47,15 +54,22 @@ const ApiClient = {
 
     const data = await response.json();
 
-    // The existing API returns { authenticated: false } on session expiry.
-    // Redirect to the login page automatically so callers don't have to check.
+    // An endpoint not yet answered through the API request module may still
+    // answer an expired session with 200 and { authenticated: false }.
     if (data.authenticated === false) {
-      location.href = '/login.php';
-      // Return a never-resolving promise so the caller doesn't continue.
-      return new Promise(() => {});
+      return this.redirectToLogin();
     }
 
     return data;
+  },
+
+  /**
+   * Sends the visitor to the login page. Returns a never-resolving promise
+   * so the caller doesn't continue.
+   */
+  redirectToLogin() {
+    location.href = '/login.php';
+    return new Promise(() => {});
   },
 
   // ---------------------------------------------------------------------------

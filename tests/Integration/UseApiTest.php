@@ -63,19 +63,19 @@ final class UseApiTest extends TestCase
         } while ($this->db->more_results() && $this->db->next_result());
     }
 
-    private function session(int $userId = 1): object
+    private function session(int $userId = 1): \ApiCaller
     {
-        return (object) ['authenticated' => true, 'auth_type' => 'session', 'user_id' => $userId];
+        return \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'session', 'user_id' => $userId]);
     }
 
-    private function agentKey(int $userId = 1): object
+    private function agentKey(int $userId = 1): \ApiCaller
     {
-        return (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => $userId];
+        return \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => $userId]);
     }
 
-    private function masterKey(): object
+    private function masterKey(): \ApiCaller
     {
-        return (object) ['authenticated' => true, 'auth_type' => 'api_key'];
+        return \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']);
     }
 
     private function useCount(): int
@@ -157,8 +157,8 @@ final class UseApiTest extends TestCase
 
     public function test_post_of_another_owners_item_is_refused_with_the_modules_message(): void
     {
-        foreach ([[$this->session(), 1], [$this->masterKey(), 1]] as [$authentication, $owner]) {
-            [$status, $fields] = record_use_over_api($this->db, $authentication, json_decode(
+        foreach ([[$this->session(), 1], [$this->masterKey(), 1]] as [$caller, $owner]) {
+            [$status, $fields] = record_use_over_api($this->db, $caller, json_decode(
                 '{"artifact_id": 20, "use_date": "2026-09-12", "user_id": ' . $owner . '}'
             ));
 
@@ -200,8 +200,8 @@ final class UseApiTest extends TestCase
     {
         [$theirs] = (new Uses($this->db, 2))->record(['item_id' => 20, 'use_date' => '2026-09-12', 'player_ids' => [200]]);
 
-        foreach ([[$this->session(), []], [$this->masterKey(), ['user_id' => '1']]] as [$authentication, $query]) {
-            [$status, $fields] = delete_use_over_api($this->db, $authentication, ['id' => (string) $theirs] + $query);
+        foreach ([[$this->session(), []], [$this->masterKey(), ['user_id' => '1']]] as [$caller, $query]) {
+            [$status, $fields] = delete_use_over_api($this->db, $caller, ['id' => (string) $theirs] + $query);
 
             $this->assertSame(404, $status);
             $this->assertSame(['message' => 'Use record not found.'], $fields);
