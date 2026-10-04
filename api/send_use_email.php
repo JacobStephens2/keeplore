@@ -29,7 +29,7 @@
   }
 
   $response->userID = $authenticated_user_id;
-  $response->count_to_notify_about = email_artifact_use_notice($authenticated_user_id);
+  $response->count_to_notify_about = (new DailyEmail($db, $authenticated_user_id, SmtpMailer::fromEnvironment()))->send();
 
   echo json_encode($response);
 

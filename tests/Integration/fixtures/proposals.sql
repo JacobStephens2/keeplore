@@ -1,5 +1,6 @@
 CREATE TABLE users (
     id INT PRIMARY KEY,
+    email VARCHAR(255) DEFAULT NULL,
     default_use_interval DECIMAL(8,2) DEFAULT 90,
     default_snooze_days INT NOT NULL DEFAULT 7,
     default_setting VARCHAR(255) DEFAULT NULL,

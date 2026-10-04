@@ -8,11 +8,13 @@
     // promoted release tree is root-owned and not writable by www-data.
     echo __FILE__ . " began running at " . date('Y-m-d G:i:s') . " (hour: $current_hour)\n";
 
+    $mailer = SmtpMailer::fromEnvironment();
+
     foreach (Preferences::ownersDueDailyEmailAt($db, $current_hour) as $user_id) {
 
         echo "user id $user_id \n";
 
-        $count_to_notify_about = email_artifact_use_notice($user_id);
+        $count_to_notify_about = (new DailyEmail($db, (int) $user_id, $mailer))->send();
 
         echo "count to notify about $count_to_notify_about \n";
 

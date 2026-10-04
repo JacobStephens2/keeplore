@@ -60,6 +60,8 @@
   require_once('classes/People.php');
   require_once('classes/Types.php');
   require_once('classes/Preferences.php');
+  require_once('classes/DailyEmail.php');
+  require_once('classes/SmtpMailer.php');
   require_once('database.php');
   require_once('kept_status.php');
   require_once('item_tags.php');

@@ -54,6 +54,9 @@ _Avoid_: Play by.
 The kept items not flagged to get rid of, plus the secondary collection when asked for, each with its last use, use-by date and whether it is overdue, due today or upcoming. The dashboard, Interact By, the daily email and notifications show it.
 _Avoid_: Interaction queue.
 
+**Daily email**:
+The email listing the owner's overdue items, items due today and items due in the coming week from the Use-by queue, sent at the hour set in their Preferences while it is on. Nothing is sent when nothing is due.
+
 **Interaction frequency**:
 An item's own interval in days, used for its use-by date in place of the default use interval, one of the owner's Preferences. A page's interval setting changes only the default, never an item's own frequency.
 
