@@ -1,5 +1,8 @@
 <?php
 
+require_once __DIR__ . '/Aversions.php';
+require_once __DIR__ . '/Uses.php';
+
 /**
  * The owner's people list: everyone who can be recorded on uses, item
  * proposals and events, one of whom can be marked as the owner themself.
@@ -17,6 +20,36 @@
 final class People
 {
     private const COLUMNS = 'id, FirstName, LastName, G, birth_year, represents_user_id';
+
+    /**
+     * Everything that points at a Person, the one list delete and merge both
+     * read: a new table with a Person column belongs here. Rows are matched
+     * by Person id alone once the owner holds the Person's lock; Person ids
+     * are unique across owners.
+     *
+     * Delete deletes each table's rows for the Person. An entry with
+     * 'on_delete' deletes only the rows matching its 'delete_only'; the rest
+     * keep their occasion and lose the Person and its 'clear' columns. Merge moves
+     * the rows to the survivor, except that where the survivor already has
+     * a row for the same 'occasion' (these columns equal, nulls counting as
+     * equal), the merged Person's row is deleted.
+     */
+    private const POINTING_AT_PERSON = [
+        ['table' => 'uses_players', 'column' => 'player_id', 'occasion' => ['use_id']],
+        ['table' => 'proposal_outcome_players', 'column' => 'player_id', 'occasion' => ['proposal_id']],
+        ['table' => 'event_players', 'column' => 'player_id', 'occasion' => ['event_id']],
+        // Every Playgroup slot is the owner's, so any survivor slot collides.
+        ['table' => 'playgroup', 'column' => 'FullName', 'occasion' => ['user_id']],
+        // Legacy plays and Aversions: delete deletes the Aversions and keeps
+        // the plays, a play that was also an Aversion losing its aversion date.
+        [
+            'table' => 'responses', 'column' => 'Player', 'occasion' => ['Title', 'PlayDate', 'AversionDate'],
+            'on_delete' => [
+                'delete_only' => Aversions::IS_AVERSION . ' AND (' . Uses::IS_PLAY . ') IS NOT TRUE',
+                'clear' => ['AversionDate'],
+            ],
+        ],
+    ];
 
     public function __construct(private mysqli $db, private int $userId)
     {
@@ -131,25 +164,26 @@ final class People
         });
     }
 
-    /** Remove the person from every use, proposal, event and playgroup slot, then delete them. */
+    /**
+     * Remove the person from every use, proposal, event and playgroup slot,
+     * delete their Aversions and keep their legacy plays without them, then
+     * delete them.
+     */
     public function delete(int $id): void
     {
         $this->transaction(function () use ($id) {
             $this->requirePerson($id);
-            $this->statement('DELETE FROM uses_players WHERE player_id = ? AND user_id = ?', 'ii', [$id, $this->userId])->close();
-            $this->statement(
-                'DELETE pop FROM proposal_outcome_players AS pop
-                 JOIN proposal_outcomes AS po ON po.id = pop.proposal_id AND po.user_id = ?
-                 WHERE pop.player_id = ?',
-                'ii', [$this->userId, $id]
-            )->close();
-            $this->statement(
-                'DELETE ep FROM event_players AS ep
-                 JOIN events AS e ON e.id = ep.event_id AND e.user_id = ?
-                 WHERE ep.player_id = ?',
-                'ii', [$this->userId, $id]
-            )->close();
-            $this->statement('DELETE FROM playgroup WHERE FullName = ? AND user_id = ?', 'ii', [$id, $this->userId])->close();
+            foreach (self::POINTING_AT_PERSON as $reference) {
+                ['table' => $table, 'column' => $column] = $reference;
+                if (!isset($reference['on_delete'])) {
+                    $this->statement("DELETE FROM {$table} WHERE {$column} = ?", 'i', [$id])->close();
+                    continue;
+                }
+                ['delete_only' => $deleteOnly, 'clear' => $clear] = $reference['on_delete'];
+                $this->statement("DELETE FROM {$table} WHERE {$column} = ? AND {$deleteOnly}", 'i', [$id])->close();
+                $cleared = implode('', array_map(fn (string $name) => ", {$name} = NULL", $clear));
+                $this->statement("UPDATE {$table} SET {$column} = NULL{$cleared} WHERE {$column} = ?", 'i', [$id])->close();
+            }
             $this->unlinkAccountFrom($id);
             $this->statement('DELETE FROM players WHERE id = ? AND user_id = ?', 'ii', [$id, $this->userId])->close();
         });
@@ -157,8 +191,10 @@ final class People
 
     /**
      * Move everything recorded with the loser to the survivor, then delete
-     * the loser. Where both were on the same use, proposal or event, the
-     * loser's link is dropped. The person who is the owner can only survive.
+     * the loser. Where the survivor already has a record for the same
+     * occasion (the same use, proposal or event, any playgroup slot, or a
+     * legacy play or Aversion of the same item on the same dates), the
+     * loser's is dropped. The person who is the owner can only survive.
      */
     public function merge(int $survivorId, int $loserId): void
     {
@@ -181,46 +217,16 @@ final class People
                 throw new InvalidArgumentException('The surviving player must be the one marked as you.');
             }
 
-            $this->statement(
-                'DELETE loser FROM uses_players AS loser
-                 JOIN uses_players AS survivor ON survivor.use_id = loser.use_id AND survivor.player_id = ?
-                 WHERE loser.player_id = ? AND loser.user_id = ?',
-                'iii', [$survivorId, $loserId, $this->userId]
-            )->close();
-            $this->statement(
-                'UPDATE uses_players SET player_id = ? WHERE player_id = ? AND user_id = ?',
-                'iii', [$survivorId, $loserId, $this->userId]
-            )->close();
-            $this->statement(
-                'DELETE loser FROM proposal_outcome_players AS loser
-                 JOIN proposal_outcome_players AS survivor ON survivor.proposal_id = loser.proposal_id AND survivor.player_id = ?
-                 JOIN proposal_outcomes AS po ON po.id = loser.proposal_id AND po.user_id = ?
-                 WHERE loser.player_id = ?',
-                'iii', [$survivorId, $this->userId, $loserId]
-            )->close();
-            $this->statement(
-                'UPDATE proposal_outcome_players AS pop
-                 JOIN proposal_outcomes AS po ON po.id = pop.proposal_id AND po.user_id = ?
-                 SET pop.player_id = ? WHERE pop.player_id = ?',
-                'iii', [$this->userId, $survivorId, $loserId]
-            )->close();
-            $this->statement(
-                'DELETE loser FROM event_players AS loser
-                 JOIN event_players AS survivor ON survivor.event_id = loser.event_id AND survivor.player_id = ?
-                 JOIN events AS e ON e.id = loser.event_id AND e.user_id = ?
-                 WHERE loser.player_id = ?',
-                'iii', [$survivorId, $this->userId, $loserId]
-            )->close();
-            $this->statement(
-                'UPDATE event_players AS ep
-                 JOIN events AS e ON e.id = ep.event_id AND e.user_id = ?
-                 SET ep.player_id = ? WHERE ep.player_id = ?',
-                'iii', [$this->userId, $survivorId, $loserId]
-            )->close();
-            $this->statement(
-                'UPDATE playgroup SET FullName = ? WHERE FullName = ? AND user_id = ?',
-                'iii', [$survivorId, $loserId, $this->userId]
-            )->close();
+            foreach (self::POINTING_AT_PERSON as ['table' => $table, 'column' => $column, 'occasion' => $occasion]) {
+                $sameOccasion = implode(' AND ', array_map(fn (string $match) => "survivor.{$match} <=> loser.{$match}", $occasion));
+                $this->statement(
+                    "DELETE loser FROM {$table} AS loser
+                     JOIN {$table} AS survivor ON survivor.{$column} = ? AND {$sameOccasion}
+                     WHERE loser.{$column} = ?",
+                    'ii', [$survivorId, $loserId]
+                )->close();
+                $this->statement("UPDATE {$table} SET {$column} = ? WHERE {$column} = ?", 'ii', [$survivorId, $loserId])->close();
+            }
             $this->statement('DELETE FROM players WHERE id = ? AND user_id = ?', 'ii', [$loserId, $this->userId])->close();
         });
     }

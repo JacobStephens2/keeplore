@@ -7,6 +7,10 @@ use PHPUnit\Framework\TestCase;
 
 final class PeopleTest extends TestCase
 {
+    /** What seedLinks gives each person: one of everything that points at a person. */
+    private const ONE_OF_EACH = ['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1, 'plays' => 1, 'aversions' => 1];
+    private const NONE = ['uses' => 0, 'proposals' => 0, 'events' => 0, 'playgroup' => 0, 'plays' => 0, 'aversions' => 0];
+
     private ?\mysqli $db = null;
     private string $databaseName;
     private People $people;
@@ -42,6 +46,9 @@ final class PeopleTest extends TestCase
             user_id INT NOT NULL,
             UNIQUE KEY use_player (use_id, player_id)
         ) ENGINE=InnoDB');
+        $this->runSql('ALTER TABLE responses
+            ADD COLUMN Player INT DEFAULT NULL,
+            ADD COLUMN AversionDate DATE DEFAULT NULL');
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-proposal-outcomes.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-events.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-event-players.sql'));
@@ -51,6 +58,7 @@ final class PeopleTest extends TestCase
             user_id INT NOT NULL
         ) ENGINE=InnoDB');
         require_once PRIVATE_PATH . '/classes/People.php';
+        require_once PRIVATE_PATH . '/classes/Uses.php';
         $this->people = new People($this->db, 1);
     }
 
@@ -295,9 +303,29 @@ final class PeopleTest extends TestCase
         $this->people->delete(101);
 
         $this->assertNull($this->people->find(101));
-        $this->assertSame(['uses' => 0, 'proposals' => 0, 'events' => 0, 'playgroup' => 0], $this->links(101));
-        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(100));
-        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(200));
+        $this->assertSame(self::NONE, $this->links(101));
+        $this->assertSame(self::ONE_OF_EACH, $this->links(100));
+        $this->assertSame(self::ONE_OF_EACH, $this->links(200));
+    }
+
+    public function test_delete_deletes_the_persons_aversions_and_keeps_their_legacy_plays_without_them(): void
+    {
+        $this->seedLinks();
+        $this->runSql("INSERT INTO responses (Title, Player, PlayDate, AversionDate, user_id) VALUES
+            (10, 101, '2026-03-05', NULL, 1), (12, 101, '2025-04-01', '2025-04-01', 1)");
+        $this->assertSame('2026-03-05', $this->lastUse(10));
+
+        $this->people->delete(101);
+
+        $this->assertSame([
+            ['10', '100', '2025-01-01', null],
+            ['11', '100', null, '2025-02-01'],
+            ['10', null, '2025-01-01', null],
+            ['10', null, '2026-03-05', null],
+            ['12', null, '2025-04-01', null],
+        ], $this->legacyRecords(1));
+        $this->assertSame('2026-03-05', $this->lastUse(10));
+        $this->assertSame([['20', '200', '2025-01-01', null], ['21', '200', null, '2025-02-01']], $this->legacyRecords(2));
     }
 
     public function test_deleting_the_person_who_is_me_clears_the_account_link(): void
@@ -323,7 +351,7 @@ final class PeopleTest extends TestCase
         }
 
         $this->assertSame(1, (int) $this->db->query('SELECT COUNT(*) FROM players WHERE id = 200')->fetch_row()[0]);
-        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(200));
+        $this->assertSame(self::ONE_OF_EACH, $this->links(200));
         $this->assertSame(200, $this->accountLink(2));
     }
 
@@ -340,7 +368,7 @@ final class PeopleTest extends TestCase
         $this->db->query('RENAME TABLE playgroup_away TO playgroup');
 
         $this->assertSame('Jo Smith', $this->people->find(101)['name']);
-        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(101));
+        $this->assertSame(self::ONE_OF_EACH, $this->links(101));
     }
 
     public function test_merge_drops_shared_links_repoints_the_rest_and_deletes_the_merged_person(): void
@@ -351,16 +379,25 @@ final class PeopleTest extends TestCase
             INSERT INTO proposal_outcomes (id, user_id, item_id, proposal_date, outcome, note) VALUES
                 (3, 1, 10, '2026-03-02', 'explicit_decline', '');
             INSERT INTO proposal_outcome_players VALUES (3, 101);
-            INSERT INTO event_players VALUES (2, 101);
+            INSERT INTO events (id, user_id, name) VALUES (3, 1, 'Game night');
+            INSERT INTO event_players VALUES (3, 101);
+            INSERT INTO responses (Title, Player, PlayDate, AversionDate, user_id) VALUES
+                (10, 101, '2025-06-01', NULL, 1), (11, 101, NULL, '2025-07-01', 1);
         ");
 
         $this->people->merge(100, 101);
 
         $this->assertNull($this->people->find(101));
         $this->assertSame('Sam Lee', $this->people->find(100)['name']);
-        $this->assertSame(['uses' => 0, 'proposals' => 0, 'events' => 1, 'playgroup' => 0], $this->links(101));
-        $this->assertSame(['uses' => 2, 'proposals' => 2, 'events' => 1, 'playgroup' => 2], $this->links(100));
-        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(200));
+        $this->assertSame(self::NONE, $this->links(101));
+        $this->assertSame(['uses' => 2, 'proposals' => 2, 'events' => 2, 'playgroup' => 1, 'plays' => 2, 'aversions' => 2], $this->links(100));
+        $this->assertSame([
+            ['10', '100', '2025-01-01', null],
+            ['11', '100', null, '2025-02-01'],
+            ['10', '100', '2025-06-01', null],
+            ['11', '100', null, '2025-07-01'],
+        ], $this->legacyRecords(1));
+        $this->assertSame(self::ONE_OF_EACH, $this->links(200));
     }
 
     public function test_merge_moves_the_merged_persons_events_to_the_survivor(): void
@@ -372,6 +409,28 @@ final class PeopleTest extends TestCase
 
         $rows = $this->db->query('SELECT event_id, player_id FROM event_players ORDER BY event_id')->fetch_all();
         $this->assertSame([['1', '100'], ['2', '100']], $rows);
+    }
+
+    public function test_merging_a_duplicate_into_the_owners_person_adds_its_legacy_plays_to_the_use_count(): void
+    {
+        $this->seedLinks();
+        $this->runSql("INSERT INTO responses (Title, Player, PlayDate, user_id) VALUES (10, 101, '2025-06-01', 1)");
+        $this->people->update(100, ['first_name' => 'Sam', 'last_name' => 'Lee', 'is_me' => true]);
+        $uses = new \Uses($this->db, 1);
+        $this->assertSame(2, $uses->useCounts()[0]['use_count']);
+
+        $this->people->merge(100, 101);
+
+        $this->assertSame([['item_id' => 10, 'item_title' => 'Catan', 'item_type' => 'board-game', 'use_count' => 3]], $uses->useCounts());
+    }
+
+    public function test_merging_two_people_in_the_playgroup_leaves_the_survivor_in_it_once(): void
+    {
+        $this->runSql('INSERT INTO playgroup (FullName, user_id) VALUES (100, 1), (101, 1), (101, 1)');
+
+        $this->people->merge(100, 101);
+
+        $this->assertSame([['100']], $this->db->query('SELECT FullName FROM playgroup')->fetch_all());
     }
 
     public static function refusedMerges(): array
@@ -393,7 +452,7 @@ final class PeopleTest extends TestCase
 
         $this->assertSame(1, (int) $this->db->query('SELECT COUNT(*) FROM players WHERE id = 200')->fetch_row()[0]);
         foreach ([100, 101, 200] as $playerId) {
-            $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links($playerId));
+            $this->assertSame(self::ONE_OF_EACH, $this->links($playerId));
         }
     }
 
@@ -430,8 +489,8 @@ final class PeopleTest extends TestCase
         $this->db->query('RENAME TABLE event_players_away TO event_players');
 
         $this->assertSame('Jo Smith', $this->people->find(101)['name']);
-        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(101));
-        $this->assertSame(['uses' => 1, 'proposals' => 1, 'events' => 1, 'playgroup' => 1], $this->links(100));
+        $this->assertSame(self::ONE_OF_EACH, $this->links(101));
+        $this->assertSame(self::ONE_OF_EACH, $this->links(100));
     }
 
     private function assertMergeRefused(int $survivorId, int $loserId, string $message): void
@@ -446,7 +505,11 @@ final class PeopleTest extends TestCase
         $this->assertSame($people, array_column($this->people->all(), 'id'));
     }
 
-    /** Link 100 and 101 to one of owner 1's uses, proposals, events and playgroup slots, and 200 to owner 2's. */
+    /**
+     * Link 100 and 101 to one of owner 1's uses, proposals, events and
+     * playgroup slots, and give them the same legacy play and Aversion;
+     * likewise 200 with owner 2's.
+     */
     private function seedLinks(): void
     {
         $this->runSql("
@@ -458,6 +521,10 @@ final class PeopleTest extends TestCase
             INSERT INTO events (id, user_id, name) VALUES (1, 1, 'Beach week'), (2, 2, 'Their week');
             INSERT INTO event_players VALUES (1, 100), (1, 101), (2, 200);
             INSERT INTO playgroup (FullName, user_id) VALUES (100, 1), (101, 1), (200, 2);
+            INSERT INTO responses (Title, Player, PlayDate, AversionDate, user_id) VALUES
+                (10, 100, '2025-01-01', NULL, 1), (11, 100, NULL, '2025-02-01', 1),
+                (10, 101, '2025-01-01', NULL, 1), (11, 101, NULL, '2025-02-01', 1),
+                (20, 200, '2025-01-01', NULL, 2), (21, 200, NULL, '2025-02-01', 2);
         ");
     }
 
@@ -469,7 +536,20 @@ final class PeopleTest extends TestCase
             'proposals' => $count('SELECT COUNT(*) FROM proposal_outcome_players WHERE player_id = '),
             'events' => $count('SELECT COUNT(*) FROM event_players WHERE player_id = '),
             'playgroup' => $count('SELECT COUNT(*) FROM playgroup WHERE FullName = '),
+            'plays' => $count('SELECT COUNT(*) FROM responses WHERE ' . \Uses::IS_PLAY . ' AND Player = '),
+            'aversions' => $count('SELECT COUNT(*) FROM responses WHERE ' . \Aversions::IS_AVERSION . ' AND Player = '),
         ];
+    }
+
+    /** The owner's legacy records as [item, person, play date, aversion date], in the order they were recorded. */
+    private function legacyRecords(int $userId): array
+    {
+        return $this->db->query('SELECT Title, Player, PlayDate, AversionDate FROM responses WHERE user_id = ' . $userId . ' ORDER BY id')->fetch_all();
+    }
+
+    private function lastUse(int $itemId): ?string
+    {
+        return $this->db->query('SELECT last_use FROM ' . \Items::LAST_USE . ' item_last_use WHERE artifact_id = ' . $itemId)->fetch_row()[0] ?? null;
     }
 
     private function accountLink(int $userId = 1): ?int

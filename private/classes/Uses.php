@@ -13,7 +13,7 @@ final class Uses
     public const MAX_COUNT = 20;
 
     /** The rule that makes a legacy response a play: a play date set. */
-    private const IS_PLAY = 'responses.PlayDate > 0';
+    public const IS_PLAY = 'responses.PlayDate > 0';
 
     public function __construct(private mysqli $db, private int $userId)
     {
