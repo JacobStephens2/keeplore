@@ -8,9 +8,10 @@ $searched = $filters['best'] !== null || $filters['age'] !== null;
 $games = $searched ? bgg_poll_search($db, $filters, BGG_POLL_SEARCH_LIMIT + 1) : [];
 $more = count($games) > BGG_POLL_SEARCH_LIMIT;
 $games = array_slice($games, 0, BGG_POLL_SEARCH_LIMIT);
-$kept = $searched ? bgg_poll_kept_things($db, (int) $_SESSION['user_id']) : [];
-$reviewers = $searched ? item_bgg_reviewers($db, (int) $_SESSION['user_id']) : [];
-$reviews = $reviewers !== [] ? bgg_reviews_by_thing($db, (int) $_SESSION['user_id']) : [];
+$bgg_ratings = new BggRatings($db, (int) $_SESSION['user_id']);
+$kept = $searched ? bgg_poll_kept_things($bgg_ratings) : [];
+$reviewers = $searched ? $bgg_ratings->reviewers() : [];
+$reviews = $reviewers !== [] ? $bgg_ratings->byThing() : [];
 $summary = bgg_poll_index_summary($db);
 
 $page_title = 'Search BGG';

@@ -57,6 +57,7 @@
   require_once('use_by_date.php');
   require_once('classes/UseByQueue.php');
   require_once('classes/Items.php');
+  require_once('classes/BggRatings.php');
   require_once('classes/People.php');
   require_once('classes/Types.php');
   require_once('classes/Preferences.php');

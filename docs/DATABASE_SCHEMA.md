@@ -109,7 +109,7 @@ A full import of an owner's `users.bgg_username` into `item_bgg_ratings`, queued
 | `bgg_username` | VARCHAR(64) | NO | BGG reviewer imported, as Settings named them when queued |
 | `status` | VARCHAR(16) | NO | `queued`, `running`, `done` or `failed` |
 | `total` | INT UNSIGNED | YES | Items the import will check; NULL until it starts checking |
-| `checked`, `imported`, `removed`, `failed` | INT UNSIGNED | NO | Running counts, as `bgg_ratings_import()` reports them |
+| `checked`, `imported`, `removed`, `failed` | INT UNSIGNED | NO | Running counts, as `BggRatings::import()` reports them |
 | `error` | VARCHAR(255) | YES | Why a failed import stopped |
 | `created_at`, `started_at`, `finished_at` | DATETIME | `started_at`, `finished_at` YES | When it was queued, claimed by the worker, and ended |
 | `updated_at` | DATETIME | NO | Last progress; how an abandoned import is spotted |

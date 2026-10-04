@@ -23,7 +23,7 @@
   $tagFilter = $filters['tagFilter'];
 
   $filter_heading = items_list_heading($players, $age);
-  $bgg_reviewers = item_bgg_reviewers($db, $_SESSION['user_id']);
+  $bgg_reviewers = (new BggRatings($db, (int) $_SESSION['user_id']))->reviewers();
   $columns = items_list_columns($filters, $bgg_reviewers);
 
   $page_title = $filter_heading ?? 'Items';

@@ -10,6 +10,7 @@ require_login();
 $page_title = 'Edit User Settings';
 $user_id = (int) $_SESSION['user_id'];
 $preferences = new Preferences($db, $user_id);
+$bgg_ratings = new BggRatings($db, $user_id);
 
 if(is_post_request()) {
   $stmt = mysqli_prepare($db, "UPDATE users SET first_name = ?, last_name = ?, email = ?, username = ? WHERE id = ? LIMIT 1");
@@ -38,11 +39,15 @@ if(is_post_request()) {
 
   // Checked against BGG apart from the rest, so a typo or a BGG outage costs
   // only this field.
-  $bgg_result = user_bgg_username_set($db, $user_id, (string) ($_POST['bgg_username'] ?? ''));
+  try {
+    $bgg_message = $bgg_ratings->setOwnReviewer((string) ($_POST['bgg_username'] ?? ''));
+  } catch (InvalidArgumentException | BggUnreachable $e) {
+    $bgg_error = $e->getMessage();
+  }
   $bgg_default_type_result = user_bgg_default_type_set($db, $user_id, $_POST['bgg_default_type_id'] ?? '');
 }
 
-$stmt = mysqli_prepare($db, "SELECT first_name, last_name, email, username, bgg_username FROM users WHERE id = ?");
+$stmt = mysqli_prepare($db, "SELECT first_name, last_name, email, username FROM users WHERE id = ?");
 mysqli_stmt_bind_param($stmt, "i", $user_id);
 mysqli_stmt_execute($stmt);
 $userResult = mysqli_stmt_get_result($stmt);
@@ -68,10 +73,10 @@ $types = (new Types($db, $user_id))->all();
       } elseif (isset($update_result) && $update_result === true) {
         echo '<p id="message">Update successful</p>';
       }
-      if (isset($bgg_result) && !$bgg_result['ok']) {
-        echo '<p class="errors">' . h($bgg_result['error']) . ' Your BoardGameGeek reviewer did not change.</p>';
-      } elseif (isset($bgg_result) && $bgg_result['message'] !== null) {
-        echo '<p id="bgg_message">' . h($bgg_result['message']) . '</p>';
+      if (isset($bgg_error)) {
+        echo '<p class="errors">' . h($bgg_error) . ' Your BoardGameGeek reviewer did not change.</p>';
+      } elseif (isset($bgg_message)) {
+        echo '<p id="bgg_message">' . h($bgg_message) . '</p>';
       }
       if (isset($bgg_default_type_result) && !$bgg_default_type_result['ok']) {
         echo '<p class="errors">' . h($bgg_default_type_result['error']) . ' Your type for BoardGameGeek items did not change.</p>';
@@ -198,7 +203,7 @@ $types = (new Types($db, $user_id))->all();
         type="text"
         name="bgg_username"
         id="bgg_username"
-        value="<?php echo h(isset($bgg_result) && !$bgg_result['ok'] ? (string) ($_POST['bgg_username'] ?? '') : (string) $userArray['bgg_username']); ?>"
+        value="<?php echo h(isset($bgg_error) ? (string) ($_POST['bgg_username'] ?? '') : (string) $bgg_ratings->ownReviewer()); ?>"
         maxlength="64"
         autocomplete="off"
         aria-describedby="bgg_username_help"
@@ -286,7 +291,7 @@ $types = (new Types($db, $user_id))->all();
       data-active="<?php echo $bgg_import['active'] ? '1' : '0'; ?>"><?php echo h($bgg_import['text']); ?></p>
     <form method="post" action="<?php echo url_for('/settings/bgg-import.php'); ?>">
       <?php echo csrf_input(); ?>
-      <?php $bgg_reviewer = user_bgg_username($db, $user_id); ?>
+      <?php $bgg_reviewer = $bgg_ratings->ownReviewer(); ?>
       <button type="submit" id="bgg_import_start"<?php if (!$bgg_import['can_queue']) echo ' disabled'; ?>>
         <?php echo $bgg_reviewer === null ? 'Name a reviewer above to import' : 'Import all ' . h($bgg_reviewer) . ' ratings'; ?>
       </button>

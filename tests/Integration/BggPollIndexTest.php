@@ -36,6 +36,7 @@ final class BggPollIndexTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-url.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings-manual.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-user-bgg-username.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-bgg-poll-index.sql'));
         // Rerunning the migration must be harmless.
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-bgg-poll-index.sql'));
@@ -229,7 +230,7 @@ final class BggPollIndexTest extends TestCase
         $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/13', is_kept = 0 WHERE id = 11");
         $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/13' WHERE id = 20");
 
-        $this->assertSame([2223 => 10], bgg_poll_kept_things($this->db, 1));
+        $this->assertSame([2223 => 10], bgg_poll_kept_things(new \BggRatings($this->db, 1)));
     }
 
     public function test_reviewer_ratings_map_the_owners_linked_items_by_bgg_id(): void
@@ -239,11 +240,16 @@ final class BggPollIndexTest extends TestCase
         $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/2223/uno' WHERE id = 10");
         $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/13', is_kept = 0 WHERE id = 11");
         $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/13' WHERE id = 20");
-        bgg_ratings_store_item($this->db, 1, 10, 'Gyges', ['rating' => 6.5, 'comment' => null, 'rated_at' => null]);
-        bgg_ratings_store_item($this->db, 1, 11, 'Gyges', ['rating' => null, 'comment' => 'Too long.', 'rated_at' => null]);
-        bgg_ratings_store_item($this->db, 2, 20, 'Gyges', ['rating' => 9.0, 'comment' => 'Not user 1s.', 'rated_at' => null]);
+        $gyges = fn (string $url) => '[{"userid":63428,"username":"Gyges"}]';
+        foreach ([1 => [[10, '6.5', ''], [11, '', 'Too long.']], 2 => [[20, '9', 'Not user 1s.']]] as $owner => $entries) {
+            $owners_ratings = new \BggRatings($this->db, $owner, $gyges);
+            $owners_ratings->setOwnReviewer('Gyges');
+            foreach ($entries as [$item_id, $rating, $comment]) {
+                $owners_ratings->save($item_id, 'Gyges', $rating, $comment);
+            }
+        }
 
-        $ratings = bgg_reviews_by_thing($this->db, 1);
+        $ratings = (new \BggRatings($this->db, 1))->byThing();
 
         $this->assertSame([2223, 13], array_keys($ratings));
         $this->assertSame(6.5, $ratings[2223]['Gyges']['rating']);

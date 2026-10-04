@@ -132,7 +132,7 @@ final class BggImportJobsTest extends TestCase
         $this->assertStringStartsWith('Imported Gyges on ', bgg_import_job_status_text($job));
         $this->assertStringEndsWith(': checked 2 items, 1 rated or commented, 0 removed, 0 failed.', bgg_import_job_status_text($job));
         $this->assertTrue(bgg_import_job_view($this->db, 1)['can_queue']);
-        $this->assertSame(9.5, find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['rating']);
+        $this->assertSame(9.5, (new \BggRatings($this->db, 1))->forItems([10])[10]['Gyges']['rating']);
         $this->assertSame(0, bgg_import_jobs_run_queued($this->db, $this->fakeBgg(), 0));
     }
 

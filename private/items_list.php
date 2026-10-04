@@ -6,10 +6,10 @@
  */
 
 require_once __DIR__ . '/kept_status.php';
-require_once __DIR__ . '/bgg_ratings.php';
 require_once __DIR__ . '/item_types.php';
 require_once __DIR__ . '/use_by_date.php';
 require_once __DIR__ . '/classes/Items.php';
+require_once __DIR__ . '/classes/BggRatings.php';
 require_once __DIR__ . '/classes/Preferences.php';
 
 function items_list_load_filter_defaults($user_id) {
@@ -287,9 +287,10 @@ function items_list_payload($db, array $filters, $user_id, $today = null) {
         <=> [(string) ($a['Acq'] ?? ''), artifact_is_kept($a), (int) $b['id']]);
     $artifacts = items_list_best_at($artifacts, $filters['players']);
     $artifacts = items_list_suitable_for_age($artifacts, $filters['age'], $filters['ageUnknown']);
-    $artifacts = with_item_bgg_ratings($db, $artifacts, (int) $user_id);
+    $bgg_ratings = (new BggRatings($db, (int) $user_id))->forItems(array_column($artifacts, 'id'));
     $items = [];
     foreach ($artifacts as $artifact) {
+        $artifact['bgg_ratings'] = $bgg_ratings[(int) $artifact['id']] ?? [];
         $items[] = items_list_present_row($artifact, $filters['interval'], $today);
     }
     return $items;

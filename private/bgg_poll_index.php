@@ -9,7 +9,7 @@
  */
 
 require_once __DIR__ . '/bgg_lookup.php';
-require_once __DIR__ . '/bgg_ratings.php';
+require_once __DIR__ . '/classes/BggRatings.php';
 
 // An open-ended Best such as "9+" counts as Best at every count up to this.
 const BGG_POLL_OPEN_BEST_UP_TO = 20;
@@ -365,9 +365,9 @@ function bgg_poll_index_summary($conn) {
 
 // [thing_id => item id] for the items the owner keeps that link to a BGG
 // thing, so the search can say which games they already have.
-function bgg_poll_kept_things($conn, $user_id) {
+function bgg_poll_kept_things(BggRatings $bgg_ratings) {
   $kept = [];
-  foreach (item_bgg_thing_ids($conn, $user_id, true) as $artifact_id => $thing_id) {
+  foreach ($bgg_ratings->thingsByItem(true) as $artifact_id => $thing_id) {
     $kept[$thing_id] = $kept[$thing_id] ?? $artifact_id;
   }
   return $kept;

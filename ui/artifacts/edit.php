@@ -1,6 +1,5 @@
 <?php
   require_once('../../private/initialize.php');
-  require_once(PRIVATE_PATH . '/bgg_ratings.php');
   require_once(PRIVATE_PATH . '/items_list.php');
   require_login();
   if(!isset($_GET['id'])) {
@@ -70,9 +69,10 @@
     <?php } ?>
 
     <?php echo item_bgg_link_html($artifact['bgg_url'] ?? ''); ?>
-    <?php $item_bgg_ratings = find_item_bgg_ratings($db, [$id], (int) $_SESSION['user_id'])[$id] ?? []; ?>
+    <?php $bgg_ratings = new BggRatings($db, (int) $_SESSION['user_id']); ?>
+    <?php $item_bgg_ratings = $bgg_ratings->forItems([$id])[$id] ?? []; ?>
     <?php echo item_bgg_ratings_html($item_bgg_ratings); ?>
-    <?php foreach (item_bgg_reviewers($db, (int) $_SESSION['user_id']) as $bgg_reviewer) {
+    <?php foreach ($bgg_ratings->reviewers() as $bgg_reviewer) {
       $bgg_rating = $item_bgg_ratings[$bgg_reviewer] ?? ['rating' => null, 'comment' => null]; ?>
       <details class="bgg-rating-edit">
         <summary>Edit <?php echo h($bgg_reviewer); ?> rating and comment</summary>
