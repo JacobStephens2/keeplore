@@ -48,6 +48,10 @@ final class ItemApiWriteTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-events.sql'));
         $this->runSql("INSERT INTO events (id, user_id, name) VALUES (1, 1, 'Beach week'), (2, 2, 'Game night')");
         $this->runSql('INSERT INTO event_items (event_id, artifact_id) VALUES (1, 10), (2, 20)');
+        // Delete reaches every table that points at an Item.
+        $this->runSql($this->schemaTable('uses_players') . $this->schemaTable('sweetspots')
+            . $this->schemaTable('proposal_outcomes') . $this->schemaTable('proposal_outcome_players')
+            . $this->schemaTable('item_bgg_ratings'));
         require_once PRIVATE_PATH . '/item_api.php';
     }
 

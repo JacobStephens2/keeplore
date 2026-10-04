@@ -89,7 +89,7 @@ function item_api_owner(mysqli $db, object $authentication, $requested_user_id):
 
 /**
  * The HTTP API item endpoint's DELETE: removes the Item the query's id
- * names, with its tags and Event plan entries, through the Items module.
+ * names, with everything that points at it, through the Items module.
  * The master key names the owner in the query's user_id. Agent keys are
  * refused (ADR-0002). Returns [status, response fields]; on success the
  * fields' artifact is the deleted Item.

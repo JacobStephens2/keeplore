@@ -341,7 +341,7 @@
 
   <?php
     require_once PRIVATE_PATH . '/item_merge.php';
-    $merge_candidates = item_merge_candidates(find_items_for_merge($db, (int) $_SESSION['user_id']), $artifact);
+    $merge_candidates = item_merge_candidates($items->list(), $artifact);
   ?>
   <?php if ($merge_candidates !== []) { ?>
   <section class="item-merge">

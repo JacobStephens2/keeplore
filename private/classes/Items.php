@@ -73,6 +73,32 @@ final class Items
         'to_get_rid_of' => 'to_get_rid_of',
     ];
 
+    /**
+     * Everything that points at an Item, the one list delete and merge both
+     * read: a new table with an Item column belongs here. Rows are matched
+     * by Item id alone once the owner holds the Item's lock, which covers
+     * legacy rows written before user_id was recorded.
+     *
+     * Delete deletes each table's rows for the Item, first the rows that
+     * belong to them ('with': a table and its column holding their id).
+     * Merge moves them to the survivor; where 'collides', the survivor's own
+     * row wins and the loser's is deleted. A column with 'link_from' is a
+     * second link, beside the row's own Item in the 'link_from' column:
+     * delete clears it, and merge clears it where it now points at the row's
+     * own Item.
+     */
+    private const POINTING_AT_ITEM = [
+        ['table' => 'uses', 'column' => 'artifact_id', 'with' => ['uses_players', 'use_id']],
+        ['table' => 'responses', 'column' => 'Title'],
+        ['table' => 'sweetspots', 'column' => 'Title'],
+        // Participants follow a proposal by cascade.
+        ['table' => 'proposal_outcomes', 'column' => 'item_id'],
+        ['table' => 'proposal_outcomes', 'column' => 'chosen_item_id', 'link_from' => 'item_id'],
+        ['table' => 'item_tags', 'column' => 'artifact_id', 'collides' => true],
+        ['table' => 'item_bgg_ratings', 'column' => 'artifact_id', 'collides' => true],
+        ['table' => 'event_items', 'column' => 'artifact_id', 'collides' => true],
+    ];
+
     private Types $types;
 
     public function __construct(private mysqli $db, private int $userId)
@@ -214,19 +240,73 @@ final class Items
         });
     }
 
-    /** Delete the Item with its tags and its Event plan entries. */
+    /**
+     * Delete the Item with everything that points at it: its Uses with
+     * their people, item proposals with their participants, BGG ratings,
+     * legacy plays, sweet spots, tags and Event plan entries. A proposal
+     * that chose it instead keeps the name and loses only the link.
+     */
     public function delete(int $id): void
     {
         $this->transaction(function () use ($id) {
             $this->lockedItem($id);
-            $this->statement('DELETE FROM item_tags WHERE artifact_id = ? AND user_id = ?', 'ii', [$id, $this->userId])->close();
-            $this->statement(
-                'DELETE event_items FROM event_items
-                 JOIN games ON games.id = event_items.artifact_id AND games.user_id = ?
-                 WHERE event_items.artifact_id = ?',
-                'ii', [$this->userId, $id]
-            )->close();
+            foreach (self::POINTING_AT_ITEM as $reference) {
+                ['table' => $table, 'column' => $column] = $reference;
+                if (isset($reference['link_from'])) {
+                    $this->statement("UPDATE {$table} SET {$column} = NULL WHERE {$column} = ?", 'i', [$id])->close();
+                    continue;
+                }
+                if (isset($reference['with'])) {
+                    [$rowsTable, $rowsColumn] = $reference['with'];
+                    $this->statement(
+                        "DELETE {$rowsTable} FROM {$rowsTable} JOIN {$table} ON {$table}.id = {$rowsTable}.{$rowsColumn}
+                         WHERE {$table}.{$column} = ?",
+                        'i', [$id]
+                    )->close();
+                }
+                $this->statement("DELETE FROM {$table} WHERE {$column} = ?", 'i', [$id])->close();
+            }
             $this->statement('DELETE FROM games WHERE id = ? AND user_id = ?', 'ii', [$id, $this->userId])->close();
+        });
+    }
+
+    /**
+     * Merge the loser into the survivor, for duplicate records: everything
+     * that points at the loser moves to the survivor, which keeps its own
+     * fields, and the loser is deleted. Where the survivor already has a
+     * tag, BGG rating or Event plan entry, the survivor's wins. A proposal
+     * where the loser was chosen instead of the survivor loses that link.
+     *
+     * Both Items must be the owner's (OutOfBoundsException) and differ
+     * (InvalidArgumentException).
+     */
+    public function merge(int $survivorId, int $loserId): void
+    {
+        if ($survivorId === $loserId) {
+            throw new InvalidArgumentException('Cannot merge an item into itself.');
+        }
+        $this->transaction(function () use ($survivorId, $loserId) {
+            // Lower id first, so two crossed merges can't deadlock.
+            $this->lockedItem(min($survivorId, $loserId));
+            $this->lockedItem(max($survivorId, $loserId));
+            foreach (self::POINTING_AT_ITEM as $reference) {
+                ['table' => $table, 'column' => $column] = $reference;
+                $collides = $reference['collides'] ?? false;
+                $this->statement(
+                    'UPDATE ' . ($collides ? 'IGNORE ' : '') . "{$table} SET {$column} = ? WHERE {$column} = ?",
+                    'ii', [$survivorId, $loserId]
+                )->close();
+                if ($collides) {
+                    $this->statement("DELETE FROM {$table} WHERE {$column} = ?", 'i', [$loserId])->close();
+                }
+                if (isset($reference['link_from'])) {
+                    $this->statement(
+                        "UPDATE {$table} SET {$column} = NULL WHERE {$column} = ? AND {$column} = {$reference['link_from']}",
+                        'i', [$survivorId]
+                    )->close();
+                }
+            }
+            $this->statement('DELETE FROM games WHERE id = ? AND user_id = ?', 'ii', [$loserId, $this->userId])->close();
         });
     }
 
