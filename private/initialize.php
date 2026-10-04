@@ -82,11 +82,6 @@
   $db = db_connect();
   $errors = [];
 
-  // Load OOP data access layer (shared with API)
-  require_once('classes/DatabaseObject.class.php');
-  DatabaseObject::set_database($db);
-  require_once('classes/Artifact.class.php');
-
   $logger = new AppLogger();
   $cache = new Cache();
 

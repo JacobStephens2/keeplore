@@ -127,10 +127,7 @@ private/                    Backend logic (not web-accessible)
 ├── rate_limiter.php        Rate limiting
 ├── cache.php               File-based caching
 ├── app_logger.php          Structured logging
-├── classes/                OOP data access layer
-│   ├── DatabaseObject.class.php
-│   ├── Artifact.class.php
-│   └── …                   Owner-scoped modules (Items, People, Uses, …)
+├── classes/                Owner-scoped modules (Items, People, Uses, …)
 ├── query_functions/        Domain-specific query modules
 ├── crons/                  Scheduled tasks
 └── oneTimeScripts/         Migration scripts

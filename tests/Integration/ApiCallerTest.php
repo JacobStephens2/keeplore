@@ -12,8 +12,9 @@ use PHPUnit\Framework\TestCase;
  * carries, and whose data it may act for. A session cookie wins, then a
  * Bearer agent key, then the master key, with no fall-through after a
  * failed check. A session and an agent key act for their own user; the
- * master key acts for the existing user it names. Only an agent key is
- * refused outside reads and the kept toggle (ADR-0002).
+ * master key acts for the existing user it names, or naming none, for the
+ * owner of the Item the request names. Only an agent key is refused
+ * outside reads and the kept toggle (ADR-0002).
  */
 final class ApiCallerTest extends TestCase
 {
@@ -38,6 +39,8 @@ final class ApiCallerTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->query('CREATE TABLE users (id INT PRIMARY KEY)');
         $this->db->query('INSERT INTO users (id) VALUES (1), (2)');
+        $this->db->query('CREATE TABLE games (id INT PRIMARY KEY, user_id INT NOT NULL)');
+        $this->db->query('INSERT INTO games (id, user_id) VALUES (10, 1), (20, 2)');
         $this->db->query('CREATE TABLE agent_api_keys (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -165,6 +168,44 @@ final class ApiCallerTest extends TestCase
         foreach ([null, '', '0', '-1', '1.5', 'two', [2], '9'] as $requested) {
             $this->assertNull($master->owner($requested), var_export($requested, true));
         }
+    }
+
+    public function test_a_session_and_an_agent_key_act_for_their_own_user_whatever_item_is_named(): void
+    {
+        foreach ([ApiCaller::session($this->db, 1), ApiCaller::agentKey($this->db, 1)] as $caller) {
+            $this->assertSame(1, $caller->itemOwner(null, 20));
+            $this->assertSame(1, $caller->itemOwner('2', 20));
+            $this->assertSame(1, $caller->itemOwner('nope', 999));
+            $this->assertSame(1, $caller->itemOwner(null, null));
+        }
+    }
+
+    public function test_the_master_key_naming_an_existing_user_acts_for_them_whoever_owns_the_item(): void
+    {
+        $master = ApiCaller::masterKey($this->db);
+
+        $this->assertSame(2, $master->itemOwner('2', 10));
+        $this->assertSame(1, $master->itemOwner(1, 999));
+        $this->assertSame(2, $master->itemOwner('2', null));
+    }
+
+    public function test_the_master_key_naming_a_malformed_or_unknown_user_acts_for_no_one(): void
+    {
+        $master = ApiCaller::masterKey($this->db);
+
+        foreach (['', '0', '-1', 'two', [2], '9'] as $requested) {
+            $this->assertNull($master->itemOwner($requested, 10), var_export($requested, true));
+        }
+    }
+
+    public function test_the_master_key_naming_no_user_acts_for_the_owner_of_the_named_item(): void
+    {
+        $master = ApiCaller::masterKey($this->db);
+
+        $this->assertSame(1, $master->itemOwner(null, 10));
+        $this->assertSame(2, $master->itemOwner(null, 20));
+        $this->assertNull($master->itemOwner(null, 999));
+        $this->assertNull($master->itemOwner(null, null));
     }
 
     public function test_only_an_agent_key_is_refused(): void

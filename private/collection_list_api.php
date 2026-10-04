@@ -1,8 +1,6 @@
 <?php
 
 require_once __DIR__ . '/classes/ApiCaller.php';
-require_once __DIR__ . '/classes/DatabaseObject.class.php';
-require_once __DIR__ . '/classes/Artifact.class.php';
 require_once __DIR__ . '/collection_list.php';
 
 /**
@@ -35,13 +33,45 @@ function list_collection_over_api(mysqli $db, ApiCaller $caller, $body): array {
     $result = list_collection_items($db, $owner, $request);
     $fields += ['artifacts' => $result['items'], 'has_more' => $result['has_more']];
     $fields += $request['use_cursor'] ? ['next_cursor' => $result['next_cursor']] : ['page' => $request['page']];
-  } elseif ($request['use_cursor']) {
-    $result = Artifact::list_artifacts_paginated($request['per_page'], $request['cursor']);
-    $fields += ['artifacts' => $result['data'], 'next_cursor' => $result['next_cursor'], 'has_more' => $result['has_more']];
   } else {
-    $fields += ['artifacts' => Artifact::list_artifacts($request['page'], $request['per_page']), 'page' => $request['page']];
+    $fields += list_all_accounts_titles($db, $request);
   }
   return [200, $fields];
+}
+
+/**
+ * The legacy all-accounts listing: every account's Items as id and Title,
+ * paged as $request, a parsed list request, asks. Cursor mode orders by
+ * id and resumes after the cursor; otherwise the page is ordered by
+ * Title, then id.
+ *
+ * Returns the response fields: artifacts, then next_cursor and has_more
+ * in cursor mode, or page.
+ */
+function list_all_accounts_titles(mysqli $db, array $request): array {
+  $per_page = $request['per_page'];
+  if ($request['use_cursor']) {
+    $after = $request['cursor'] ?? 0;
+    $limit = $per_page + 1;
+    $stmt = $db->prepare('SELECT id, Title FROM games WHERE id > ? ORDER BY id LIMIT ?');
+    $stmt->bind_param('ii', $after, $limit);
+  } else {
+    $offset = ($request['page'] - 1) * $per_page;
+    $stmt = $db->prepare('SELECT id, Title FROM games ORDER BY Title, id LIMIT ? OFFSET ?');
+    $stmt->bind_param('ii', $per_page, $offset);
+  }
+  $stmt->execute();
+  $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+  $stmt->close();
+
+  if (!$request['use_cursor']) {
+    return ['artifacts' => $rows, 'page' => $request['page']];
+  }
+  $has_more = count($rows) > $per_page;
+  if ($has_more) {
+    array_pop($rows);
+  }
+  return ['artifacts' => $rows, 'next_cursor' => $has_more ? end($rows)['id'] : null, 'has_more' => $has_more];
 }
 
 ?>
