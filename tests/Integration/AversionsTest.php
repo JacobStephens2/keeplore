@@ -34,6 +34,7 @@ final class AversionsTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->runSql("
             ALTER TABLE responses ADD COLUMN Player INT, ADD COLUMN AversionDate DATE, ADD COLUMN Note TEXT;
             INSERT INTO responses (id, Title, user_id, Player, PlayDate, AversionDate, Note) VALUES
@@ -111,6 +112,25 @@ final class AversionsTest extends TestCase
         }
 
         $this->assertSame([], $this->responses('id > 5'));
+    }
+
+    public function test_another_owners_item_or_person_is_refused_in_the_owners_words(): void
+    {
+        foreach ([
+            'Choose an item from your own items.' => [fn () => $this->aversions->record(20, '2026-04-01', ['100']),
+                fn () => $this->aversions->update(1, 20, 100, '2026-05-01')],
+            'Choose people from your own people list.' => [fn () => $this->aversions->record(10, '2026-04-01', ['100', '200']),
+                fn () => $this->aversions->update(1, 10, 200, '2026-05-01')],
+        ] as $message => $writes) {
+            foreach ($writes as $write) {
+                try {
+                    $write();
+                    $this->fail('The write was not refused.');
+                } catch (\InvalidArgumentException $error) {
+                    $this->assertSame($message, $error->getMessage());
+                }
+            }
+        }
     }
 
     public function test_update_writes_the_item_person_and_date_and_keeps_the_play_date_and_note(): void

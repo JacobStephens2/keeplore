@@ -35,6 +35,7 @@ final class UseApiTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->db->query('CREATE TABLE uses_players (
             id INT PRIMARY KEY AUTO_INCREMENT,
             use_id INT NOT NULL,

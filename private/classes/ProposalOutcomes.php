@@ -1,5 +1,8 @@
 <?php
 
+require_once __DIR__ . '/Items.php';
+require_once __DIR__ . '/People.php';
+
 /** Account-owned proposal records. This module never writes uses or legacy responses. */
 final class ProposalOutcomes
 {
@@ -17,13 +20,8 @@ final class ProposalOutcomes
         $input = $this->validate($input);
         $this->requireItem($input['item_id']);
         $participantIds = $input['participant_ids'];
-        if ($participantIds) {
-            $placeholders = implode(',', array_fill(0, count($participantIds), '?'));
-            $owned = $this->rows("SELECT id FROM players WHERE user_id = ? AND id IN ($placeholders)",
-                str_repeat('i', count($participantIds) + 1), array_merge([$this->userId], $participantIds));
-            if (count($owned) !== count($participantIds)) {
-                throw new InvalidArgumentException('Choose participants from your own people list.');
-            }
+        if (count((new People($this->db, $this->userId))->own($participantIds)) !== count($participantIds)) {
+            throw new InvalidArgumentException('Choose participants from your own people list.');
         }
         $chosenId = $input['chosen_item_id'];
         $chosenName = $input['chosen_item_name'];
@@ -214,7 +212,7 @@ final class ProposalOutcomes
 
     private function requireItem(int $id): array
     {
-        $item = $this->rows('SELECT id, Title FROM games WHERE id = ? AND user_id = ?', 'ii', [$id, $this->userId])[0] ?? null;
+        $item = (new Items($this->db, $this->userId))->find($id);
         if ($item === null) {
             throw new InvalidArgumentException('Choose an item from your own items.');
         }

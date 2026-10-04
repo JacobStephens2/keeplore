@@ -1,5 +1,8 @@
 <?php
 
+require_once __DIR__ . '/Items.php';
+require_once __DIR__ . '/People.php';
+
 /**
  * The owner's Aversions: legacy records, from before item proposals, that a
  * person was averse to an item on a date. An Aversion is a row of the legacy
@@ -106,7 +109,7 @@ final class Aversions
 
     private function ownItem(int $itemId): int
     {
-        if (!$this->rows('SELECT id FROM games WHERE id = ? AND user_id = ?', 'ii', [$itemId, $this->userId])) {
+        if ((new Items($this->db, $this->userId))->find($itemId) === null) {
             throw new InvalidArgumentException('Choose an item from your own items.');
         }
         return $itemId;
@@ -116,7 +119,7 @@ final class Aversions
     private function ownPerson(mixed $choice): int
     {
         $id = is_scalar($choice) ? filter_var(trim((string) $choice), FILTER_VALIDATE_INT) : false;
-        if ($id === false || !$this->rows('SELECT id FROM players WHERE id = ? AND user_id = ?', 'ii', [$id, $this->userId])) {
+        if ($id === false || (new People($this->db, $this->userId))->own([$id]) === []) {
             throw new InvalidArgumentException('Choose people from your own people list.');
         }
         return $id;

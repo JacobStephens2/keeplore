@@ -29,6 +29,7 @@ final class UsesTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->db->query('CREATE TABLE uses_players (
             id INT PRIMARY KEY AUTO_INCREMENT,
             use_id INT NOT NULL,
@@ -145,6 +146,21 @@ final class UsesTest extends TestCase
             $this->fail('The input must be rejected.');
         } catch (\InvalidArgumentException $expected) {
             $this->assertSame($before, $this->rowCounts());
+        }
+    }
+
+    public function test_another_users_item_or_person_is_refused_in_the_owners_words(): void
+    {
+        foreach ([
+            'Choose an item from your own items.' => ['item_id' => 20],
+            'Choose people from your own people list.' => ['player_ids' => [100, 200]],
+        ] as $message => $changes) {
+            try {
+                $this->uses->record($this->use($changes));
+                $this->fail('The input must be rejected.');
+            } catch (\InvalidArgumentException $error) {
+                $this->assertSame($message, $error->getMessage());
+            }
         }
     }
 

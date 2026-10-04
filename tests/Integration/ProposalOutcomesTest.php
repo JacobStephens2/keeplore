@@ -29,6 +29,7 @@ final class ProposalOutcomesTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $migration = PROJECT_PATH . '/database/migrations/add-proposal-outcomes.sql';
         if (is_file($migration)) {
             $this->runSql(file_get_contents($migration));
@@ -99,19 +100,20 @@ final class ProposalOutcomesTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('foreignReferences')]
-    public function test_recording_rejects_references_to_another_accounts_data(array $changes): void
+    public function test_recording_rejects_references_to_another_accounts_data(array $changes, string $message): void
     {
         $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
         $this->proposals->save($this->proposal($changes));
     }
 
     public static function foreignReferences(): array
     {
         return [
-            'proposed item' => [['item_id' => 20]],
-            'chosen item' => [['chosen_item_id' => 20]],
-            'participant' => [['participant_ids' => [100, 200]]],
-            'missing item' => [['item_id' => 999]],
+            'proposed item' => [['item_id' => 20], 'Choose an item from your own items.'],
+            'chosen item' => [['chosen_item_id' => 20], 'Choose an item from your own items.'],
+            'participant' => [['participant_ids' => [100, 200]], 'Choose participants from your own people list.'],
+            'missing item' => [['item_id' => 999], 'Choose an item from your own items.'],
         ];
     }
 
@@ -304,7 +306,6 @@ final class ProposalOutcomesTest extends TestCase
 
     public function test_an_item_without_a_type_can_be_opened_to_view_its_proposal_history(): void
     {
-        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->db->query("INSERT INTO games (id, user_id, Title) VALUES (14, 1, 'Uncategorized item')");
         $this->proposals->save($this->proposal(['item_id' => 14]));
         require_once PRIVATE_PATH . '/classes/Items.php';

@@ -282,6 +282,7 @@ final class EventPlansTest extends TestCase
         $id = $this->plans()->save(['name' => 'Beach week']);
 
         $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Choose players from your own people list.');
         $this->plans()->addPlayers($id, [100, 200]);
     }
 

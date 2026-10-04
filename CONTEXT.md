@@ -34,7 +34,7 @@ A key the owner issues on Settings so a remote agent can read their items, uses 
 _Avoid_: API key (the master key).
 
 **Person**:
-Someone on the owner's people list who can be recorded on uses, item proposals and events. One person can be marked as the owner themself. Deleting a person removes them from uses, item proposals, events and the Playgroup, deletes their Aversions, and keeps their legacy plays without them. Merging one person into another moves everything to the survivor, dropping the merged person's record where the survivor already has one for the same occasion.
+Someone on the owner's people list who can be recorded on uses, item proposals and events. One person can be marked as the owner themself. Whether a chosen person is on the owner's people list is answered by the People module, scoped to the owner, for every module that records people. Deleting a person removes them from uses, item proposals, events and the Playgroup, deletes their Aversions, and keeps their legacy plays without them. Merging one person into another moves everything to the survivor, dropping the merged person's record where the survivor already has one for the same occasion.
 _Avoid_: User (the Keeplore account the list belongs to), Player (except for an event's players).
 
 **Playgroup**:

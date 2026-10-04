@@ -241,8 +241,7 @@ final class Uses
             throw new InvalidArgumentException('Please choose an item.');
         }
         $itemId = filter_var($input['item_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        if ($itemId === false
-            || !$this->rows('SELECT id FROM games WHERE id = ? AND user_id = ?', 'ii', [$itemId, $this->userId])) {
+        if ($itemId === false || (new Items($this->db, $this->userId))->find($itemId) === null) {
             throw new InvalidArgumentException('Choose an item from your own items.');
         }
 
@@ -262,13 +261,8 @@ final class Uses
             throw new InvalidArgumentException('Choose people from your own people list.');
         }
         $playerIds = array_values(array_unique(array_filter(array_map('intval', $playerIds))));
-        if ($playerIds) {
-            $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
-            $owned = $this->rows("SELECT id FROM players WHERE user_id = ? AND id IN ($placeholders)",
-                str_repeat('i', count($playerIds) + 1), array_merge([$this->userId], $playerIds));
-            if (count($owned) !== count($playerIds)) {
-                throw new InvalidArgumentException('Choose people from your own people list.');
-            }
+        if (count((new People($this->db, $this->userId))->own($playerIds)) !== count($playerIds)) {
+            throw new InvalidArgumentException('Choose people from your own people list.');
         }
 
         return [
