@@ -3,7 +3,7 @@
 /**
  * Interact By page: its filters, the Use-by queue options they select, its
  * rows and its table's layout. The page reads the queue with
- * interact_by_queue_filters() and renders each entry through
+ * interact_by_queue_options() and renders each entry through
  * interact_by_present_row(); every rule it shares with another page is read
  * from Item facts or the Use-by date module.
  */
@@ -40,7 +40,7 @@ function interact_by_filters_from_request(string $method, array $post, array &$s
 }
 
 /** UseByQueue::entries' options for the page's filters and the Type filter's selected ids. */
-function interact_by_queue_filters(array $filters, array $type_ids) {
+function interact_by_queue_options(array $filters, array $type_ids) {
     return [
         'default_interval' => $filters['interval'],
         'type_ids' => $type_ids,

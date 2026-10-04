@@ -9,7 +9,7 @@ require_once PROJECT_PATH . '/private/interact_by.php';
 /**
  * Seams, the Interact By page module's interface:
  * - interact_by_filters_from_request(): the page's filters, remembering hide snoozed
- * - interact_by_queue_filters(): those filters as UseByQueue::entries options
+ * - interact_by_queue_options(): those filters as UseByQueue::entries options
  * - interact_by_present_row(): one Use-by queue entry as a table row
  * - interact_by_table(): the table's column keys and DataTable order
  */
@@ -93,7 +93,7 @@ class InteractByTest extends TestCase
         $this->assertSame(14, interact_by_filters_from_request('POST', ['interval' => '14'], $session, 90)['interval']);
     }
 
-    public function test_queue_filters_map_the_page_filters_onto_the_use_by_queue(): void
+    public function test_queue_options_map_the_page_filters_onto_the_use_by_queue(): void
     {
         $session = [];
         $filters = interact_by_filters_from_request('POST', [
@@ -111,14 +111,14 @@ class InteractByTest extends TestCase
             'minimum_age' => '10',
             'include_secondary_collection' => true,
             'hide_snoozed' => true,
-        ], interact_by_queue_filters($filters, ['2', '5']));
+        ], interact_by_queue_options($filters, ['2', '5']));
     }
 
-    public function test_queue_filters_leave_out_the_secondary_collection_and_show_snoozed_items_when_asked(): void
+    public function test_queue_options_leave_out_the_secondary_collection_and_show_snoozed_items_when_asked(): void
     {
         $session = [];
         $filters = interact_by_filters_from_request('POST', [], $session, 90);
-        $queue = interact_by_queue_filters($filters, []);
+        $queue = interact_by_queue_options($filters, []);
 
         $this->assertFalse($queue['include_secondary_collection']);
         $this->assertFalse($queue['hide_snoozed']);

@@ -1,5 +1,6 @@
 <?php
   require_once('../../private/initialize.php');
+  require_once(PRIVATE_PATH . '/item_facts.php');
   require_login_or_guest();
   $page_title = 'Item Interactions';
   include(SHARED_PATH . '/header.php');
