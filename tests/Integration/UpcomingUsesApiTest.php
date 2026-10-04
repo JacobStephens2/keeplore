@@ -58,12 +58,12 @@ final class UpcomingUsesApiTest extends TestCase
 
     private function session(int $userId = 1): ApiCaller
     {
-        return ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'session', 'user_id' => $userId]);
+        return ApiCaller::session($this->db, $userId);
     }
 
     private function masterKey(): ApiCaller
     {
-        return ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']);
+        return ApiCaller::masterKey($this->db);
     }
 
     /** A kept item of the owner's with its own frequency, last used $daysAgo days before today. */
@@ -121,7 +121,8 @@ final class UpcomingUsesApiTest extends TestCase
             'method' => 'POST',
             'query' => [],
             'body' => null,
-            'authentication' => (object) ['authenticated' => true, 'auth_type' => 'api_key'],
+            'access_token' => null,
+            'authorization' => ARTIFACTS_API_KEY,
         ]);
 
         $this->assertSame(405, $status);

@@ -2,7 +2,9 @@
 
 namespace Tests\Integration;
 
+use AgentKeys;
 use ApiCaller;
+use Firebase\JWT\JWT;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -34,6 +36,15 @@ final class ApiRequestTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->query('CREATE TABLE users (id INT PRIMARY KEY)');
         $this->db->query('INSERT INTO users (id) VALUES (1), (2)');
+        $this->db->query('CREATE TABLE agent_api_keys (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            agent_name VARCHAR(100) NOT NULL,
+            key_hash VARCHAR(255) NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_used_at DATETIME NULL DEFAULT NULL,
+            revoked_at DATETIME NULL DEFAULT NULL
+        )');
         require_once PRIVATE_PATH . '/api_request.php';
     }
 
@@ -45,13 +56,29 @@ final class ApiRequestTest extends TestCase
         }
     }
 
-    private function request(string $method = 'GET', ?object $authentication = null, array $query = [], $body = null): array
+    /** [access token, Authorization header] for a session of $userId's, signed as logging in signs it. */
+    private function session(int $userId = 1, int $expiresIn = 3600): array
     {
+        $now = time();
+        return [JWT::encode(['iat' => $now, 'nbf' => $now, 'exp' => $now + $expiresIn, 'user_id' => $userId], JWT_SECRET, 'HS256'), null];
+    }
+
+    /** [access token, Authorization header] for a newly issued agent key of $userId's. */
+    private function agentKey(int $userId = 1): array
+    {
+        return [null, 'Bearer ' . (new AgentKeys($this->db, $userId))->issue('test agent')['token']];
+    }
+
+    /** A request carrying $credentials ([access token, Authorization header]), a session of user 1's by default. */
+    private function request(string $method = 'GET', ?array $credentials = null, array $query = [], $body = null): array
+    {
+        [$accessToken, $authorization] = $credentials ?? $this->session();
         return [
             'method' => $method,
             'query' => $query,
             'body' => $body,
-            'authentication' => $authentication ?? (object) ['authenticated' => true, 'auth_type' => 'session', 'user_id' => 1],
+            'access_token' => $accessToken,
+            'authorization' => $authorization,
         ];
     }
 
@@ -87,6 +114,20 @@ final class ApiRequestTest extends TestCase
         $this->assertSame([1, null, ['id' => '7']], $seen);
     }
 
+    public function test_an_agent_key_or_the_master_key_reaches_the_handler_as_its_caller(): void
+    {
+        $seen = [];
+        $handlers = ['GET' => function (ApiCaller $caller) use (&$seen) {
+            $seen[] = [$caller->owner(2), $caller->agentKeyRefusal() !== null];
+            return [200, []];
+        }];
+
+        answer_api_request($this->db, 'test', $handlers, $this->request('GET', $this->agentKey(1)));
+        answer_api_request($this->db, 'test', $handlers, $this->request('GET', [null, ARTIFACTS_API_KEY]));
+
+        $this->assertSame([[1, true], [2, false]], $seen);
+    }
+
     public function test_the_body_is_always_an_object(): void
     {
         [$status, $body] = answer_api_request($this->db, 'test', ['DELETE' => fn () => [200, []]], $this->request('DELETE'));
@@ -99,11 +140,14 @@ final class ApiRequestTest extends TestCase
     {
         $runs = 0;
         $credentials = [
-            (object) ['message' => 'You have not been authenticated', 'authenticated' => false],
-            (object) ['message' => 'You have not been authenticated'],
+            $this->session(1, -60),
+            ['not-a-token', ARTIFACTS_API_KEY],
+            [null, 'Bearer ak_unknown'],
+            [null, ARTIFACTS_API_KEY . 'x'],
+            [null, null],
         ];
-        foreach ($credentials as $authentication) {
-            [$status, $body] = answer_api_request($this->db, 'test', $this->counted($runs), $this->request('GET', $authentication));
+        foreach ($credentials as $credential) {
+            [$status, $body] = answer_api_request($this->db, 'test', $this->counted($runs), $this->request('GET', $credential));
 
             $this->assertSame(401, $status);
             $this->assertEquals((object) ['authenticated' => false, 'message' => 'You have not been authenticated'], $body);
@@ -123,7 +167,7 @@ final class ApiRequestTest extends TestCase
 
     public function test_the_credential_is_checked_before_the_method(): void
     {
-        [$status] = answer_api_request($this->db, 'test', ['GET' => fn () => [200, []]], $this->request('PUT', (object) []));
+        [$status] = answer_api_request($this->db, 'test', ['GET' => fn () => [200, []]], $this->request('PUT', [null, null]));
 
         $this->assertSame(401, $status);
     }
@@ -134,7 +178,7 @@ final class ApiRequestTest extends TestCase
         $this->fillTheWindow();
 
         [$status, $body] = answer_api_request($this->db, 'test', $this->counted($runs), $this->request());
-        [$unauthenticated] = answer_api_request($this->db, 'test', $this->counted($runs), $this->request('GET', (object) []));
+        [$unauthenticated] = answer_api_request($this->db, 'test', $this->counted($runs), $this->request('GET', [null, null]));
 
         $this->assertSame(429, $status);
         $this->assertEquals((object) ['message' => 'Rate limit exceeded. Please try again later.'], $body);
@@ -182,7 +226,7 @@ final class ApiRequestTest extends TestCase
     {
         $handlers = ['POST' => fn () => [200, []]];
 
-        $this->assertSame(401, answer_api_request($this->db, 'test', $handlers, $this->request('POST', (object) []), metered: false)[0]);
+        $this->assertSame(401, answer_api_request($this->db, 'test', $handlers, $this->request('POST', [null, null]), metered: false)[0]);
         $this->assertSame(405, answer_api_request($this->db, 'test', $handlers, $this->request('GET'), metered: false)[0]);
     }
 }

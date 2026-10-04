@@ -12,8 +12,9 @@ require_once __DIR__ . '/classes/ApiCaller.php';
  * [status, response fields].
  *
  * $request is api_request_from_globals()'s shape: method, query, body (the
- * decoded JSON) and authentication (authenticate()'s result). The request
- * is logged under $endpoint. An endpoint that isn't $metered skips the
+ * decoded JSON), access_token (the session cookie's, or null) and
+ * authorization (the Authorization header, or null). The request is logged
+ * under $endpoint. An endpoint that isn't $metered skips the
  * rate limit and the log.
  *
  * Returns [status, body], with the body always an object.
@@ -32,12 +33,9 @@ function api_request_status_and_fields(mysqli $db, string $endpoint, array $hand
     }
   }
 
-  $caller = ApiCaller::from($db, $request['authentication']);
+  $caller = ApiCaller::fromCredentials($db, $request['access_token'], $request['authorization']);
   if ($caller === null) {
-    return [401, [
-      'authenticated' => false,
-      'message' => $request['authentication']->message ?? 'You have not been authenticated',
-    ]];
+    return [401, ['authenticated' => false, 'message' => 'You have not been authenticated']];
   }
 
   $handler = $handlers[$request['method']] ?? null;
@@ -48,13 +46,26 @@ function api_request_status_and_fields(mysqli $db, string $endpoint, array $hand
   return $handler($caller, $request);
 }
 
-/** The request PHP's globals describe, in answer_api_request()'s shape. */
+/**
+ * The request PHP's globals describe, in answer_api_request()'s shape. The
+ * only place that reads the request's credentials.
+ */
 function api_request_from_globals(): array {
+  $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+  if ($authorization === '' && function_exists('apache_request_headers')) {
+    $authorization = apache_request_headers()['Authorization'] ?? '';
+  }
+  // A cookie sent as an array is present but can't be a valid token.
+  $access_token = $_COOKIE['access_token'] ?? null;
+  if ($access_token !== null && !is_string($access_token)) {
+    $access_token = '';
+  }
   return [
     'method' => $_SERVER['REQUEST_METHOD'] ?? 'GET',
     'query' => $_GET,
     'body' => json_decode(file_get_contents('php://input')),
-    'authentication' => authenticate(),
+    'access_token' => $access_token,
+    'authorization' => $authorization === '' ? null : $authorization,
   ];
 }
 

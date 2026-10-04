@@ -33,10 +33,9 @@ require_once('../private/auth_functions.php');
 include_once('database_functions.php');
 $database = db_connect();
 
-// Kept-status seam and agent-key helpers (shared with the UI bootstrap)
+// Kept-status seam (shared with the UI bootstrap)
 require_once('../private/kept_status.php');
 require_once('../private/item_tags.php');
-require_once('../private/agent_keys.php');
 require_once('../private/agent_api_docs.php');
 require_once('../private/collection_list.php');
 

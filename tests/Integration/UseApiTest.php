@@ -65,17 +65,17 @@ final class UseApiTest extends TestCase
 
     private function session(int $userId = 1): \ApiCaller
     {
-        return \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'session', 'user_id' => $userId]);
+        return \ApiCaller::session($this->db, $userId);
     }
 
     private function agentKey(int $userId = 1): \ApiCaller
     {
-        return \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => $userId]);
+        return \ApiCaller::agentKey($this->db, $userId);
     }
 
     private function masterKey(): \ApiCaller
     {
-        return \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']);
+        return \ApiCaller::masterKey($this->db);
     }
 
     private function useCount(): int
