@@ -117,12 +117,7 @@ function items_list_type_switch(array $all_types, array $current_type_ids) {
         $options['other'] = ['label' => 'Other', 'type_ids' => $other_ids];
     }
 
-    $current = [];
-    foreach ($current_type_ids as $id) {
-        if ($id !== '' && $id !== null) {
-            $current[] = (string) $id;
-        }
-    }
+    $current = items_list_type_ids($current_type_ids);
     $current = $current === [] ? $all_ids : $current;
     sort($current);
     $active = null;
@@ -187,41 +182,95 @@ function items_list_positive_int($value) {
     return is_string($value) && preg_match('/^\s*[1-9]\d*\s*$/', $value) ? (int) $value : null;
 }
 
-function items_list_query_params(array $filters, array $all_types = []) {
-    $params = [
-        'kept' => $filters['kept'],
-        'interval' => $filters['interval'],
-    ];
-    $type_ids = [];
-    if (isset($filters['type']) && is_array($filters['type'])) {
-        foreach (array_values($filters['type']) as $type_id) {
-            if ($type_id !== '' && $type_id !== null) {
-                $type_ids[] = (string) $type_id;
+/**
+ * The changes the filter panel makes: it shows kept, Type, tag and item
+ * attributes, so it sets them itself and carries every other filter.
+ */
+const ITEMS_LIST_FILTER_PANEL_CHANGES = [
+    'kept' => null,
+    'type' => null,
+    'tagFilter' => null,
+    'showAttributes' => null,
+];
+
+/**
+ * The Items page's GET query for the filters with $changes applied, keyed by
+ * filter name, where null puts a filter back to its default. A default is
+ * left out, since the request parser reads its absence as the default: kept
+ * for all items, a Type list that is empty or every Type, the default
+ * interval, no players or age, attributes off and a blank tag. Every link,
+ * carried field and the list's data URL on the page comes from this.
+ */
+function items_list_filter_query(array $filters, array $all_types, $default_interval, array $changes = []) {
+    $filters = array_replace($filters, $changes);
+    $query = [];
+
+    $kept = $filters['kept'] ?? 'allkeptandnot';
+    if (in_array($kept, ['yes', 'no', 'secondary_only'], true)) {
+        $query['kept'] = $kept;
+    }
+
+    $type_ids = items_list_type_ids($filters['type'] ?? []);
+    $sorted_ids = $type_ids;
+    $all_type_ids = array_map('strval', array_values($all_types));
+    sort($sorted_ids);
+    sort($all_type_ids);
+    if ($type_ids !== [] && $sorted_ids !== $all_type_ids) {
+        $query['type'] = $type_ids;
+    }
+
+    $interval = $filters['interval'] ?? $default_interval;
+    if ((string) $interval !== (string) $default_interval) {
+        $query['interval'] = $interval;
+    }
+    if (($filters['players'] ?? null) !== null) {
+        $query['players'] = $filters['players'];
+    }
+    if (($filters['age'] ?? null) !== null) {
+        $query['age'] = $filters['age'];
+        if ($filters['ageUnknown'] ?? false) {
+            $query['age_unknown'] = 'yes';
+        }
+    }
+    if (($filters['showAttributes'] ?? 'no') === 'yes') {
+        $query['showAttributes'] = 'yes';
+    }
+    $tag = (string) ($filters['tagFilter'] ?? '');
+    if (trim($tag) !== '') {
+        $query['tag'] = $tag;
+    }
+    return $query;
+}
+
+/**
+ * A query as hidden-field [name, value] pairs, so a form carries it: a list
+ * becomes type[0], type[1] and so on.
+ */
+function items_list_hidden_fields(array $query) {
+    $flatten = function (array $values, $prefix) use (&$flatten) {
+        $fields = [];
+        foreach ($values as $key => $value) {
+            $name = $prefix === null ? (string) $key : $prefix . '[' . $key . ']';
+            if (is_array($value)) {
+                array_push($fields, ...$flatten($value, $name));
+            } else {
+                $fields[] = [$name, (string) $value];
             }
         }
-    }
-    $all_type_ids = array_map('strval', array_values($all_types));
-    sort($type_ids);
-    sort($all_type_ids);
-    if ($type_ids !== [] && $type_ids !== $all_type_ids) {
-        $params['type'] = $type_ids;
-    }
-    if ($filters['players'] !== null) {
-        $params['players'] = $filters['players'];
-    }
-    if ($filters['age'] !== null) {
-        $params['age'] = $filters['age'];
-        if ($filters['ageUnknown']) {
-            $params['age_unknown'] = 'yes';
+        return $fields;
+    };
+    return $flatten($query, null);
+}
+
+/** The non-blank ids in a Type selection, as strings in their given order. */
+function items_list_type_ids($type) {
+    $ids = [];
+    foreach ((array) $type as $id) {
+        if ($id !== '' && $id !== null) {
+            $ids[] = (string) $id;
         }
     }
-    if ($filters['showAttributes'] === 'yes') {
-        $params['showAttributes'] = 'yes';
-    }
-    if ($filters['tagFilter'] !== '') {
-        $params['tag'] = $filters['tagFilter'];
-    }
-    return $params;
+    return $ids;
 }
 
 /**
@@ -310,7 +359,7 @@ function items_list_item_filters(array $filters) {
     };
     $type = (array) ($filters['type'] ?? []);
     if ($type !== []) {
-        $item_filters['type_ids'] = array_values(array_filter($type, fn ($id) => $id !== '' && $id !== null));
+        $item_filters['type_ids'] = items_list_type_ids($type);
     }
     $item_filters['tag'] = $filters['tagFilter'];
     return $item_filters;

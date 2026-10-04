@@ -11,6 +11,8 @@ require_once PROJECT_PATH . '/private/items_list.php';
  * Seams:
  * - items_list_present_row(): display record for one item on /artifacts/
  * - items_list_filters_from_request(): kept/type/interval/tag state for the page
+ * - items_list_filter_query(): the page's filters, with changes, as a GET query
+ * - items_list_hidden_fields(): a query as hidden-field name/value pairs
  * - ui/artifacts/index.php source: search is in the first HTML, independent
  *   of the items query and of DataTables; column order is Kept then Name
  */
@@ -401,10 +403,10 @@ class ItemsListTest extends TestCase
         $this->assertNull(items_list_filters_from_request(['players' => 'three'], [], 'GET', 90, $types)['players']);
     }
 
-    public function test_query_params_carry_the_players_count(): void
+    public function test_filter_query_carries_the_players_count(): void
     {
         $filters = items_list_filters_from_request(['players' => '3'], [], 'GET', 90, ['table-game' => '4']);
-        $params = items_list_query_params($filters, ['table-game' => '4']);
+        $params = items_list_filter_query($filters, ['table-game' => '4'], 90);
 
         $this->assertSame(3, $params['players']);
         $this->assertArrayNotHasKey('sweetSpotFilter', $params);
@@ -452,14 +454,196 @@ class ItemsListTest extends TestCase
         $this->assertNull(items_list_filters_from_request(['age' => 'seven'], [], 'GET', 90, $types)['age']);
     }
 
-    public function test_query_params_carry_the_age_only_when_chosen(): void
+    public function test_filter_query_carries_the_age_only_when_chosen(): void
     {
         $types = ['table-game' => '4'];
-        $with = items_list_query_params(items_list_filters_from_request(['age' => '7'], [], 'GET', 90, $types), $types);
-        $without = items_list_query_params(items_list_filters_from_request([], [], 'GET', 90, $types), $types);
+        $with = items_list_filter_query(items_list_filters_from_request(['age' => '7'], [], 'GET', 90, $types), $types, 90);
+        $without = items_list_filter_query(items_list_filters_from_request([], [], 'GET', 90, $types), $types, 90);
 
         $this->assertSame(7, $with['age']);
         $this->assertArrayNotHasKey('age', $without);
+    }
+
+    private const QUERY_TYPES = ['book' => '4', 'card game' => '81', 'other' => '44', 'table game' => '26'];
+
+    /** The filters a GET query string gives, as the browser would send it. */
+    private function filtersFromQuery(array $query): array
+    {
+        parse_str(http_build_query($query), $get);
+        return items_list_filters_from_request($get, [], 'GET', 90, self::QUERY_TYPES);
+    }
+
+    /**
+     * What the page lists for the filters, with an empty Type list read as
+     * every Type and the ids sorted, beside the filters Items::list does not see.
+     */
+    private function listed(array $filters): array
+    {
+        $item_filters = items_list_item_filters($filters);
+        $type_ids = $item_filters['type_ids'] ?? [];
+        $type_ids = $type_ids === [] && !isset($item_filters['type_ids'])
+            ? array_values(self::QUERY_TYPES)
+            : array_map('strval', $type_ids);
+        sort($type_ids);
+        $item_filters['type_ids'] = $type_ids;
+        unset($filters['type']);
+        return ['items' => $item_filters] + $filters;
+    }
+
+    public static function getFilterQueries(): array
+    {
+        return [
+            'nothing' => [[]],
+            'kept all alias' => [['kept' => 'all']],
+            'kept' => [['kept' => 'yes']],
+            'not kept' => [['kept' => 'no']],
+            'secondary' => [['kept' => 'secondary_only']],
+            'games as a list' => [['type' => ['81', '26']]],
+            'legacy type map' => [['type' => ['81' => '81', '26' => '26']]],
+            'every type' => [['type' => ['4', '81', '44', '26']]],
+            'interval' => [['interval' => '30']],
+            'default interval' => [['interval' => '90']],
+            'legacy sweet spot' => [['sweetSpotFilter' => '3']],
+            'players' => [['players' => '2']],
+            'age' => [['age' => '5']],
+            'age with unknown ages' => [['age' => '5', 'age_unknown' => 'yes']],
+            'attributes' => [['showAttributes' => 'yes']],
+            'tag' => [['tag' => 'beach-safe']],
+            'everything' => [[
+                'kept' => 'no',
+                'type' => ['44'],
+                'interval' => '14',
+                'players' => '4',
+                'age' => '6',
+                'age_unknown' => 'yes',
+                'showAttributes' => 'yes',
+                'tag' => 'beach-safe',
+            ]],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('getFilterQueries')]
+    public function test_filter_query_round_trips_get_filters(array $get): void
+    {
+        $filters = $this->filtersFromQuery($get);
+
+        $query = items_list_filter_query($filters, self::QUERY_TYPES, 90);
+
+        $this->assertSame($this->listed($filters), $this->listed($this->filtersFromQuery($query)));
+    }
+
+    public function test_filter_query_is_canonical(): void
+    {
+        $filters = $this->filtersFromQuery([
+            'kept' => 'all',
+            'type' => ['81' => '81', '' => '', '26' => '26'],
+            'interval' => '90',
+            'age_unknown' => 'yes',
+            'showAttributes' => 'no',
+            'tag' => '  ',
+        ]);
+
+        $this->assertSame(['type' => ['81', '26']], items_list_filter_query($filters, self::QUERY_TYPES, 90));
+        $this->assertSame([], items_list_filter_query($this->filtersFromQuery([]), self::QUERY_TYPES, 90));
+    }
+
+    public function test_filter_query_leaves_out_the_default_interval_and_carries_any_other(): void
+    {
+        $default = items_list_filter_query($this->filtersFromQuery(['interval' => '90']), self::QUERY_TYPES, 90);
+        $other = items_list_filter_query($this->filtersFromQuery(['interval' => '30']), self::QUERY_TYPES, 90);
+
+        $this->assertArrayNotHasKey('interval', $default);
+        $this->assertSame(30, $other['interval']);
+    }
+
+    public function test_each_switch_and_clear_keeps_every_other_filter(): void
+    {
+        $filters = $this->filtersFromQuery([
+            'kept' => 'secondary_only',
+            'type' => ['44'],
+            'interval' => '14',
+            'players' => '4',
+            'age' => '6',
+            'age_unknown' => 'yes',
+            'showAttributes' => 'yes',
+            'tag' => 'beach-safe',
+        ]);
+        $changes = [
+            'kept: All' => ['kept' => null],
+            'kept: Kept' => ['kept' => 'yes'],
+            'kept: Not kept' => ['kept' => 'no'],
+            'type: All types' => ['type' => null],
+            'type: Games' => ['type' => ['81', '26']],
+            'type: Other' => ['type' => ['44']],
+            'picker: Clear' => ['players' => null, 'age' => null, 'ageUnknown' => null],
+        ];
+        $defaults = [
+            'kept' => 'allkeptandnot',
+            'type' => self::QUERY_TYPES,
+            'players' => null,
+            'age' => null,
+            'ageUnknown' => false,
+        ];
+
+        $secondary = $filters;
+        $filters['kept'] = 'no';
+        foreach (['kept: Kept from secondary' => ['kept' => 'yes'], 'kept: All from secondary' => ['kept' => null]] as $control => $change) {
+            $changed = $this->filtersFromQuery(items_list_filter_query($secondary, self::QUERY_TYPES, 90, $change));
+            $expected = array_replace($secondary, ['kept' => $change['kept'] ?? 'allkeptandnot']);
+            $this->assertEquals($this->listed($expected), $this->listed($changed), $control);
+        }
+
+        foreach ($changes as $control => $change) {
+            $changed = $this->filtersFromQuery(items_list_filter_query($filters, self::QUERY_TYPES, 90, $change));
+
+            $expected = $filters;
+            foreach ($change as $name => $value) {
+                $expected[$name] = $value ?? $defaults[$name];
+            }
+            $this->assertEquals($this->listed($expected), $this->listed($changed), $control);
+        }
+    }
+
+    public function test_hidden_fields_flatten_a_query_into_name_value_pairs(): void
+    {
+        $this->assertSame(
+            [['kept', 'no'], ['type[0]', '81'], ['type[1]', '26'], ['players', '3']],
+            items_list_hidden_fields(['kept' => 'no', 'type' => ['81', '26'], 'players' => 3])
+        );
+        $this->assertSame([], items_list_hidden_fields([]));
+    }
+
+    public function test_filter_panel_hidden_fields_carry_the_interval_and_not_what_the_panel_shows(): void
+    {
+        $filters = $this->filtersFromQuery([
+            'kept' => 'no',
+            'type' => ['44'],
+            'interval' => '14',
+            'players' => '4',
+            'age' => '6',
+            'age_unknown' => 'yes',
+            'showAttributes' => 'yes',
+            'tag' => 'beach-safe',
+        ]);
+
+        $fields = items_list_hidden_fields(items_list_filter_query(
+            $filters,
+            self::QUERY_TYPES,
+            90,
+            ITEMS_LIST_FILTER_PANEL_CHANGES
+        ));
+
+        $this->assertSame([['interval', '14'], ['players', '4'], ['age', '6'], ['age_unknown', 'yes']], $fields);
+    }
+
+    public function test_items_page_builds_every_filter_query_through_the_filter_query(): void
+    {
+        $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');
+
+        $this->assertStringContainsString('items_list_filter_query(', $source);
+        $this->assertStringContainsString('items_list_hidden_fields(', $source);
+        $this->assertStringNotContainsString('items_list_query_params(', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$\w+\[\'(kept|type|players|age|age_unknown|interval|tag|showAttributes)\'\]\s*=/', $source);
     }
 
     public function test_suitable_for_age_keeps_items_whose_minimum_age_is_known_and_at_most_the_age(): void
@@ -488,12 +672,12 @@ class ItemsListTest extends TestCase
         $this->assertFalse(items_list_filters_from_request(['age' => '2'], [], 'GET', 90, $types)['ageUnknown']);
     }
 
-    public function test_query_params_carry_include_unknown_ages_only_with_an_age(): void
+    public function test_filter_query_carries_include_unknown_ages_only_with_an_age(): void
     {
         $types = ['table-game' => '4'];
-        $with = items_list_query_params(items_list_filters_from_request(['age' => '2', 'age_unknown' => 'yes'], [], 'GET', 90, $types), $types);
-        $no_age = items_list_query_params(items_list_filters_from_request(['age_unknown' => 'yes'], [], 'GET', 90, $types), $types);
-        $off = items_list_query_params(items_list_filters_from_request(['age' => '2'], [], 'GET', 90, $types), $types);
+        $with = items_list_filter_query(items_list_filters_from_request(['age' => '2', 'age_unknown' => 'yes'], [], 'GET', 90, $types), $types, 90);
+        $no_age = items_list_filter_query(items_list_filters_from_request(['age_unknown' => 'yes'], [], 'GET', 90, $types), $types, 90);
+        $off = items_list_filter_query(items_list_filters_from_request(['age' => '2'], [], 'GET', 90, $types), $types, 90);
 
         $this->assertSame('yes', $with['age_unknown']);
         $this->assertArrayNotHasKey('age_unknown', $no_age);
