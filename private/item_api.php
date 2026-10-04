@@ -2,8 +2,6 @@
 
 require_once __DIR__ . '/app_logger.php';
 require_once __DIR__ . '/classes/ApiCaller.php';
-require_once __DIR__ . '/classes/DatabaseObject.class.php';
-require_once __DIR__ . '/classes/Artifact.class.php';
 require_once __DIR__ . '/classes/Items.php';
 
 /** What each item write over HTTP answers with. */
@@ -16,10 +14,10 @@ const ITEM_API_WRITES = [
 const ITEM_API_LOG_ACTIONS = ['POST' => 'create', 'PUT' => 'update', 'DELETE' => 'delete'];
 
 /**
- * GET /artifact.php: the Item the query's id names, from the caller's own
- * Items, as Items::find returns it. The master key names the owner in the
- * query's user_id, or naming none reads any Item by id alone, with an
- * empty tag list (the legacy lookup).
+ * GET /artifact.php: the Item the query's id names, from the owner's
+ * Items, as Items::find returns it. The owner is the caller's, with the
+ * query's user_id as the master key's choice; naming none, the master key
+ * reads the Item for whoever owns it.
  *
  * Returns [status, response fields]; on success the fields' artifact is
  * the Item.
@@ -29,16 +27,16 @@ function read_item_over_api(mysqli $db, ApiCaller $caller, array $query): array 
   if ($id === null) {
     return [400, ['message' => 'Missing or invalid required parameter: id']];
   }
-  $owner = $caller->owner($query['user_id'] ?? null);
+  $owner = $caller->itemOwner($query['user_id'] ?? null, $id);
   if ($owner === null && isset($query['user_id'])) {
     return [400, ['message' => 'Missing or invalid required parameter: user_id']];
   }
 
-  $artifact = $owner === null ? Artifact::find_by_id($id) : (new Items($db, $owner))->find($id);
-  if (!$artifact) {
+  $item = $owner === null ? null : (new Items($db, $owner))->find($id);
+  if ($item === null) {
     return [404, ['message' => 'Item not found.']];
   }
-  return [200, ['artifact' => $artifact]];
+  return [200, ['artifact' => $item]];
 }
 
 /**

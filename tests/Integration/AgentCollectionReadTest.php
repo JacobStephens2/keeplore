@@ -56,7 +56,6 @@ final class AgentCollectionReadTest extends TestCase
         require_once PRIVATE_PATH . '/collection_list_api.php';
         require_once PRIVATE_PATH . '/use_api.php';
         require_once PRIVATE_PATH . '/people_api.php';
-        \DatabaseObject::set_database($this->db);
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
     }
 

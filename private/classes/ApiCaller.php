@@ -9,7 +9,8 @@ require_once __DIR__ . '/AgentKeys.php';
  * Who an HTTP API request is, from the credentials it carries, and whose
  * data it may act for. A session or an agent key acts for its own user,
  * whatever the request names. The master key has no user of its own: it
- * acts for the existing user a request names, or for no one. An agent key
+ * acts for the existing user a request names, or for no one; naming no
+ * user, a request about one Item acts for that Item's owner. An agent key
  * may only read and flip kept (ADR-0002); every other handler asks for its
  * refusal.
  */
@@ -96,6 +97,28 @@ final class ApiCaller
         $exists = $stmt->get_result()->num_rows > 0;
         $stmt->close();
         return $exists ? $user_id : null;
+    }
+
+    /**
+     * Whose data a request about the Item $item_id names acts for: as
+     * owner() does, except that the master key naming no user
+     * ($requested_user_id null) acts for the owner of that Item, or for no
+     * one when there is no such Item or $item_id is null.
+     */
+    public function itemOwner($requested_user_id, ?int $item_id): ?int
+    {
+        if ($this->userId !== null || $requested_user_id !== null) {
+            return $this->owner($requested_user_id);
+        }
+        if ($item_id === null) {
+            return null;
+        }
+        $stmt = $this->db->prepare('SELECT user_id FROM games WHERE id = ?');
+        $stmt->bind_param('i', $item_id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        return $row === null ? null : (int) $row['user_id'];
     }
 
     /** [403, response fields] for an agent key, which may only read and flip kept; null otherwise. */

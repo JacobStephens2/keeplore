@@ -53,7 +53,6 @@ final class ItemApiTest extends TestCase
             . $this->schemaTable('proposal_outcomes') . $this->schemaTable('proposal_outcome_players')
             . $this->schemaTable('item_bgg_ratings'));
         require_once PRIVATE_PATH . '/item_api.php';
-        \DatabaseObject::set_database($this->db);
     }
 
     protected function tearDown(): void
@@ -420,8 +419,14 @@ final class ItemApiTest extends TestCase
         [$status, $response] = read_item_over_api($this->db, $this->masterKey(), ['id' => '20']);
 
         $this->assertSame(200, $status);
-        $this->assertSame('Private item', $response['artifact']->Title);
-        $this->assertSame(2, (int) $response['artifact']->user_id);
+        $this->assertSame('Private item', $response['artifact']['Title']);
+        $this->assertSame(2, (int) $response['artifact']['user_id']);
+        $this->assertSame(['mine'], $response['artifact']['tags']);
+        $this->assertSame((new Items($this->db, 2))->find(20), $response['artifact']);
+
+        [$status, $response] = read_item_over_api($this->db, $this->masterKey(), ['id' => '999']);
+        $this->assertSame(404, $status);
+        $this->assertSame(['message' => 'Item not found.'], $response);
     }
 
     public function test_get_with_the_master_key_naming_a_user_reads_only_that_users_item(): void
@@ -433,9 +438,11 @@ final class ItemApiTest extends TestCase
         [$status] = read_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => '1']);
         $this->assertSame(404, $status);
 
-        [$status, $response] = read_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => '999']);
-        $this->assertSame(400, $status);
-        $this->assertSame(['message' => 'Missing or invalid required parameter: user_id'], $response);
+        foreach (['999', ''] as $user_id) {
+            [$status, $response] = read_item_over_api($this->db, $this->masterKey(), ['id' => '20', 'user_id' => $user_id]);
+            $this->assertSame(400, $status, $user_id);
+            $this->assertSame(['message' => 'Missing or invalid required parameter: user_id'], $response);
+        }
     }
 
     public function test_get_without_a_valid_id_returns_400(): void

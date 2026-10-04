@@ -20,10 +20,7 @@ const USE_API_LOG_ACTIONS = ['POST' => 'create', 'DELETE' => 'delete'];
 function list_uses_over_api(mysqli $db, ApiCaller $caller, array $query): array {
   $item_id = item_api_positive_int($query['artifact_id'] ?? null);
   $person_id = item_api_positive_int($query['player_id'] ?? null);
-  $owner = $caller->owner($query['user_id'] ?? null);
-  if ($owner === null && !isset($query['user_id'])) {
-    $owner = use_api_item_owner($db, $item_id);
-  }
+  $owner = $caller->itemOwner($query['user_id'] ?? null, $item_id);
   if ($owner === null) {
     return [400, ['message' => 'user_id or artifact_id parameter is required for API key authentication.']];
   }
@@ -139,19 +136,6 @@ function log_use_write_over_api(string $method, array $use): void {
     'artifact_id' => $use['artifact_id'],
     'use_date' => $use['use_date'],
   ]);
-}
-
-/** The owner of the item $item_id names, or null when there is no such item. */
-function use_api_item_owner(mysqli $db, ?int $item_id): ?int {
-  if ($item_id === null) {
-    return null;
-  }
-  $stmt = $db->prepare('SELECT user_id FROM games WHERE id = ?');
-  $stmt->bind_param('i', $item_id);
-  $stmt->execute();
-  $row = $stmt->get_result()->fetch_assoc();
-  $stmt->close();
-  return $row === null ? null : (int) $row['user_id'];
 }
 
 ?>
