@@ -6,11 +6,11 @@ require_once __DIR__ . '/classes/Artifact.class.php';
 require_once __DIR__ . '/collection_list.php';
 
 /**
- * POST /artifacts.php: the owner's collection list (issue #58), shaped by
- * the body as parse_collection_list_request() reads it. The master key
- * names the owner in the body's userid, or naming none gets the legacy
- * all-users id and Title listing, which takes no filters. A session or an
- * agent key ignores userid.
+ * POST (or GET) /artifacts.php: the owner's collection list (issue #58),
+ * shaped by the body as parse_collection_list_request() reads it. The
+ * master key names the owner in the body's userid, or naming none gets the
+ * legacy all-users id and Title listing, which takes no filters. A session
+ * or an agent key ignores userid.
  *
  * Returns [status, response fields]: per_page, artifacts and, for a
  * collection, has_more; then next_cursor in cursor mode, or page.

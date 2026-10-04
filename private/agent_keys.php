@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/classes/ApiCaller.php';
+
 /**
  * Per-agent per-user API keys for remote agent HTTP access (spec #10,
  * ticket #18, ADR 0002).
@@ -89,10 +91,7 @@ function deny_agent_key_writes($authentication_response) {
   if (($authentication_response->auth_type ?? null) === 'agent_key') {
     http_response_code(403);
     header('Content-Type: application/json');
-    echo json_encode([
-      'authenticated' => true,
-      'message' => 'Agent keys permit reads plus the kept toggle only.',
-    ]);
+    echo json_encode(ApiCaller::AGENT_KEY_REFUSAL);
     exit;
   }
 }
