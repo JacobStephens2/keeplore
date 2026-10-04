@@ -35,8 +35,9 @@ final class TypeFilterTest extends TestCase
         $this->db->query('ALTER TABLE types MODIFY id INT AUTO_INCREMENT, ADD COLUMN user_id INT NULL');
         $this->db->query('UPDATE types SET user_id = 1');
         $this->db->query("INSERT INTO types (id, objectType, user_id) VALUES (3, 'table game', 2), (4, 'card game', 2)");
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         require_once PRIVATE_PATH . '/type_filter.php';
-        require_once PRIVATE_PATH . '/query_functions/explore_queries.php';
+        require_once PRIVATE_PATH . '/explore.php';
     }
 
     protected function tearDown(): void
@@ -150,11 +151,12 @@ final class TypeFilterTest extends TestCase
         $this->db->query("UPDATE games SET Candidate = 'Sam', type = 'stale name' WHERE id IN (10, 12, 20)");
 
         $titles = fn (array $typeIds) => array_column(
-            candidate_items($this->db, 1, $typeIds)->fetch_all(MYSQLI_ASSOC), 'Title'
+            candidate_items($this->db, 1, $typeIds), 'Title'
         );
 
         $this->assertSame(['Catan'], $titles(['1']));
-        $this->assertSame(['Arrival', 'Catan'], $titles(['1', '2']));
+        // Ordered by the Type's name, not the stale cached one.
+        $this->assertSame(['Catan', 'Arrival'], $titles(['1', '2']));
         $this->assertSame([], $titles([]));
     }
 
@@ -165,7 +167,7 @@ final class TypeFilterTest extends TestCase
         $this->db->query("UPDATE games SET Candidate = 'Lee' WHERE id = 13");
 
         $titles = fn (array $options) => array_column(
-            candidate_items($this->db, 1, ['1'], $options)->fetch_all(MYSQLI_ASSOC), 'Title'
+            candidate_items($this->db, 1, ['1'], $options), 'Title'
         );
 
         $this->assertSame(['Azul'], $titles(['online' => 'only']));

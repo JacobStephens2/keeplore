@@ -76,13 +76,7 @@
   $artifact_id = null;
   $artifact_name = null;
   if (isset($_GET['artifact_id'])) {
-    $stmt = mysqli_prepare($db, "SELECT id, Title FROM games WHERE id = ? AND user_id = ?");
-    $requested_id = (int) $_GET['artifact_id'];
-    $owner_id = (int) $_SESSION['user_id'];
-    mysqli_stmt_bind_param($stmt, 'ii', $requested_id, $owner_id);
-    mysqli_stmt_execute($stmt);
-    $prefill = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-    mysqli_stmt_close($stmt);
+    $prefill = (new Items($db, (int) $_SESSION['user_id']))->find((int) $_GET['artifact_id']);
     if ($prefill !== null) {
       $artifact_id = $prefill['id'];
       $artifact_name = $prefill['Title'];

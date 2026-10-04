@@ -15,8 +15,8 @@ const TYPE_FILTER_SHORTCUT_SLUGS = [
 
 /**
  * Type filter: which of the owner's Types a page shows, shared by Interact
- * By, Item Interactions, Candidates and Choose for group through the
- * session's `type` key.
+ * By, Item Interactions, Candidates, Items by characteristic and Choose for
+ * group through the session's `type` key.
  *
  * Returns ['types' => [name => id], 'selected' => [id strings]], both in the
  * owner's Type order; the answer the page queries with and hands to the

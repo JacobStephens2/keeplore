@@ -5,10 +5,12 @@ require_once('../../private/initialize.php');
 require_login_or_guest();
 
 $kept = $_POST['kept'] ?? '';
-$type = $_POST['type'] ?? '1';
-$allGames = $_POST['allGames'] ?? '';
 $favCt = $_POST['favCt'] ?? '';
-$object_set = find_artifacts_by_characteristic($kept, $type, $allGames, $favCt);
+$type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
+$items = characteristic_items($db, (int) $_SESSION['user_id'], $type_filter['selected'], [
+  'kept' => $kept == 'true',
+  'order' => $favCt == 'true' ? 'fav_count' : null,
+]);
 
 $page_title = 'Explore Items';
 
@@ -34,18 +36,9 @@ include(SHARED_PATH . '/header.php');
       <?php echo csrf_input(); ?>
       <dl>
         <dt>Item Type</dt>
-          <select name="type">
-            <option value="1" <?php if ($type == '1') { echo 'selected'; } ?>>All types</option>
-            <option value="board-game" <?php if ($type == 'board-game') { echo 'selected'; } ?>>Board Game</option>
-            <option value="role-playing-game" <?php if ($type == 'role-playing-game') { echo 'selected'; } ?>>Role Playing Game</option>
-            <option value="video-game" <?php if ($type == 'video-game') { echo 'selected'; } ?>>Video Game</option>
-            <option value="sport" <?php if ($type == 'sport') { echo 'selected'; } ?>>Sport</option>
-            <option value="game" <?php if ($type == 'game') { echo 'selected'; } ?>>Game</option>
-          </select>
-        <dt>Include items from Jacob
-          <input type="hidden" name="allGames" value="1" />
-          <input type="checkbox" name="allGames" value="true"<?php if($allGames == 'true') { echo " checked"; } ?> />
-        </dt>
+        <dd id="type">
+          <?php require_once SHARED_PATH . '/artifact_type_checkboxes.php'; ?>
+        </dd>
         <dt>Show only kept artifacts
           <input type="hidden" name="kept" value="" />
           <input type="checkbox" name="kept" value="true"<?php if($kept == 'true') { echo " checked"; } ?> />
@@ -79,26 +72,24 @@ include(SHARED_PATH . '/header.php');
   	  </tr>
       </thead>
       <tbody>
-      <?php while($object = mysqli_fetch_assoc($object_set)) { ?>
+      <?php foreach ($items as $item) { ?>
         <tr>
-          <td><?php echo h($object['Title']); ?></td>
-          <td><?php echo artifact_is_kept($object) ? 'true' : 'false'; ?></td>
-    	    <td><?php echo h($object['type']); ?></td>
-    	    <td><?php echo h($object['mnp']); ?></td>
-    	    <td><?php echo h($object['mxp']); ?></td>
-    	    <td><?php echo h($object['ss']); ?></td>
-    	    <td><?php echo h($object['yr']); ?></td>
-    	    <td><?php echo h($object['wt']); ?></td>
-    	    <td><?php echo h($object['favct']); ?></td>
-    	    <td><?php echo h($object['age']); ?></td>
-    	    <td><?php echo h($object['bgg_rat']); ?></td>
+          <td><?php echo h($item['Title']); ?></td>
+          <td><?php echo artifact_is_kept($item) ? 'true' : 'false'; ?></td>
+    	    <td><?php echo h($item['type_name']); ?></td>
+    	    <td><?php echo h($item['MnP']); ?></td>
+    	    <td><?php echo h($item['MxP']); ?></td>
+    	    <td><?php echo h($item['SS']); ?></td>
+    	    <td><?php echo h($item['Yr']); ?></td>
+    	    <td><?php echo h($item['Wt']); ?></td>
+    	    <td><?php echo h($item['FavCt']); ?></td>
+    	    <td><?php echo h($item['Age']); ?></td>
+    	    <td><?php echo h($item['BGG_Rat']); ?></td>
     	  </tr>
       <?php } ?>
       </tbody>
   	</table>
     </div>
-
-    <?php mysqli_free_result($object_set); ?>
   </div>
 
 </main>

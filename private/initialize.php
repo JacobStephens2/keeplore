@@ -73,6 +73,7 @@
   require_once('item_tags.php');
   require_once('agent_api_docs.php');
   require_once('query_functions.php');
+  require_once('explore.php');
   require_once('validation_functions.php');
   require_once('auth_functions.php');
   require_once('app_logger.php');
