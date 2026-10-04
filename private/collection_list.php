@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/classes/Items.php';
+
 /**
  * Collection list seam behind POST /artifacts.php (issue #58).
  *
@@ -13,12 +15,8 @@
  * - list_collection_items(): runs the request against one user's rows.
  */
 
-const COLLECTION_LIST_FLAG_FILTERS = [
-  'kept' => 'games.is_kept',
-  'physical' => 'games.is_physical',
-  'digital' => 'games.is_digital',
-  'secondary_collection' => 'games.is_in_secondary_collection',
-];
+/** The request's flag filters, each named as the Items list filter it maps to. */
+const COLLECTION_LIST_FLAGS = ['kept', 'physical', 'digital', 'secondary_collection'];
 
 const COLLECTION_LIST_FIELDS = ['basic', 'collection'];
 
@@ -61,7 +59,7 @@ function parse_collection_list_request($body) {
     }
   }
 
-  foreach (array_keys(COLLECTION_LIST_FLAG_FILTERS) as $flag) {
+  foreach (COLLECTION_LIST_FLAGS as $flag) {
     $request[$flag] = null;
     if (!isset($body[$flag])) {
       continue;
@@ -113,7 +111,7 @@ function parse_collection_list_request($body) {
  * page, which only a user-scoped list can honour.
  */
 function collection_list_has_filters(array $request) {
-  foreach (array_keys(COLLECTION_LIST_FLAG_FILTERS) as $flag) {
+  foreach (COLLECTION_LIST_FLAGS as $flag) {
     if ($request[$flag] !== null) {
       return true;
     }
@@ -122,110 +120,79 @@ function collection_list_has_filters(array $request) {
     || $request['fields'] !== 'basic' || $request['include_uses_summary'];
 }
 
+/** The columns each row carries for each fields value, in output order. */
+const COLLECTION_LIST_COLUMNS = [
+  'basic' => ['id', 'Title', 'type', 'type_id', 'is_kept', 'is_physical', 'is_digital', 'is_in_secondary_collection'],
+  'collection' => ['MnP', 'MxP', 'SS', 'MnT', 'MxT', 'Wt', 'Yr', 'Acq'],
+];
+
 /**
- * List one user's items for a parsed request. Offset mode orders by Title;
- * cursor mode orders by id and resumes after the cursor id. Every row
- * carries its tags. Returns items, has_more, and next_cursor (cursor mode).
+ * List one user's items for a parsed request, read through Items::list.
+ * Offset mode slices the Title-ordered list; cursor mode orders by id and
+ * resumes after the cursor id. Every row carries its tags; uses_summary
+ * adds plays (recorded Uses) and last_use (the Items last-use rule).
+ * Returns items, has_more, and next_cursor (cursor mode).
  */
 function list_collection_items($conn, $user_id, array $request) {
-  $user_id = (int) $user_id;
-
-  $columns = [
-    'games.id', 'games.Title', 'COALESCE(types.objectType, games.type) AS type', 'games.type_id',
-    'games.is_kept', 'games.is_physical', 'games.is_digital', 'games.is_in_secondary_collection',
+  $filters = [
+    'title' => $request['query'],
+    'tag' => $request['tag'],
+    'type_ids' => $request['type_ids'] === [] ? null : $request['type_ids'],
   ];
-  if ($request['fields'] === 'collection') {
-    array_push(
-      $columns,
-      'games.MnP', 'games.MxP', 'games.SS', 'games.MnT', 'games.MxT', 'games.Wt', 'games.Yr', 'games.Acq'
-    );
+  foreach (COLLECTION_LIST_FLAGS as $flag) {
+    $filters[$flag] = $request[$flag];
   }
-
-  $joins = ' LEFT JOIN types ON types.id = games.type_id';
-  $types = '';
-  $params = [];
-  if ($request['include_uses_summary']) {
-    $columns[] = 'COALESCE(use_summary.plays, 0) AS plays';
-    $columns[] = 'use_summary.last_use';
-    $joins .= ' LEFT JOIN (
-        SELECT artifact_id, COUNT(*) AS plays, MAX(use_date) AS last_use
-        FROM uses WHERE user_id = ? GROUP BY artifact_id
-      ) AS use_summary ON use_summary.artifact_id = games.id';
-    $types .= 'i';
-    $params[] = $user_id;
-  }
-
-  $where = ' WHERE games.user_id = ?';
-  $types .= 'i';
-  $params[] = $user_id;
-
-  foreach (COLLECTION_LIST_FLAG_FILTERS as $flag => $column) {
-    if ($request[$flag] !== null) {
-      $where .= ' AND ' . artifact_flag_sql($column, $request[$flag]);
-    }
-  }
-
-  if ($request['type_ids'] !== []) {
-    $where .= ' AND games.type_id IN (' . implode(',', array_fill(0, count($request['type_ids']), '?')) . ')';
-    $types .= str_repeat('i', count($request['type_ids']));
-    array_push($params, ...$request['type_ids']);
-  }
-
-  if ($request['query'] !== '') {
-    $where .= ' AND games.Title LIKE ?';
-    $types .= 's';
-    $params[] = '%' . $request['query'] . '%';
-  }
-
-  $tag_filter = item_tag_user_filter($request['tag'], $user_id);
-  $where .= $tag_filter['sql'];
-  $types .= $tag_filter['types'];
-  array_push($params, ...$tag_filter['params']);
+  $items = (new Items($conn, (int) $user_id))->list($filters);
 
   $per_page = $request['per_page'];
   if ($request['use_cursor']) {
+    usort($items, fn (array $a, array $b) => $a['id'] <=> $b['id']);
     if ($request['cursor'] !== null) {
-      $where .= ' AND games.id > ?';
-      $types .= 'i';
-      $params[] = $request['cursor'];
+      $items = array_filter($items, fn (array $item) => $item['id'] > $request['cursor']);
     }
-    $tail = ' ORDER BY games.id ASC LIMIT ?';
-    $types .= 'i';
-    $params[] = $per_page + 1;
+    $page = array_slice($items, 0, $per_page + 1);
   } else {
-    $tail = ' ORDER BY games.Title ASC, games.id ASC LIMIT ? OFFSET ?';
-    $types .= 'ii';
-    $params[] = $per_page + 1;
-    $params[] = ($request['page'] - 1) * $per_page;
+    $page = array_slice($items, ($request['page'] - 1) * $per_page, $per_page + 1);
   }
 
-  $stmt = mysqli_prepare($conn, 'SELECT ' . implode(', ', $columns) . ' FROM games' . $joins . $where . $tail);
-  mysqli_stmt_bind_param($stmt, $types, ...$params);
-  mysqli_stmt_execute($stmt);
-  $result = mysqli_stmt_get_result($stmt);
-  $items = [];
-  while ($row = mysqli_fetch_assoc($result)) {
-    if (isset($row['plays'])) {
-      $row['plays'] = (int) $row['plays'];
-    }
-    $items[] = $row;
-  }
-  mysqli_stmt_close($stmt);
-
-  $has_more = count($items) > $per_page;
+  $has_more = count($page) > $per_page;
   if ($has_more) {
-    array_pop($items);
+    array_pop($page);
   }
   $next_cursor = null;
   if ($request['use_cursor'] && $has_more) {
-    $next_cursor = (int) end($items)['id'];
+    $next_cursor = (int) end($page)['id'];
   }
 
   return [
-    'items' => with_item_tags($conn, $items, $user_id),
+    'items' => array_map(fn (array $item) => collection_list_row($item, $request), $page),
     'has_more' => $has_more,
     'next_cursor' => $next_cursor,
   ];
+}
+
+/**
+ * One listed Item as the request's fields and includes shape it. Column
+ * names are matched case-insensitively, since older schemas spell them in
+ * lower case.
+ */
+function collection_list_row(array $item, array $request) {
+  $columns = COLLECTION_LIST_COLUMNS['basic'];
+  if ($request['fields'] === 'collection') {
+    array_push($columns, ...COLLECTION_LIST_COLUMNS['collection']);
+  }
+  $by_lower_name = array_change_key_case($item);
+  $row = [];
+  foreach ($columns as $column) {
+    $row[$column] = $by_lower_name[strtolower($column)] ?? null;
+  }
+  $row['type'] = $item['type_name'] ?? $row['type'];
+  if ($request['include_uses_summary']) {
+    $row['plays'] = $item['use_count'];
+    $row['last_use'] = $item['last_use'];
+  }
+  $row['tags'] = $item['tags'];
+  return $row;
 }
 
 ?>
