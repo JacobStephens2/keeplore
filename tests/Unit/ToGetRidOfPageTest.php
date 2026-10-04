@@ -5,9 +5,8 @@ namespace Tests\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Seams:
- * - ui/artifacts/to-get-rid-of.php: in-place kept toggle, not a trip to delete.php
- * - ui/artifacts/set-tracked.php: no-JS POST returns to the same page
+ * Seam: ui/artifacts/to-get-rid-of.php: in-place kept toggle, not a trip to
+ * delete.php. Where Mark kept returns to: tests/Integration/QuickItemActionsTest.php
  *
  * /artifacts/to-get-rid-of unkeeps through the same set-tracked.php seam as
  * /artifacts/, stays on the page, and confirms before removing from kept.
@@ -50,12 +49,5 @@ class ToGetRidOfPageTest extends TestCase
         $page = $this->page();
         $this->assertStringContainsString('confirm(', $page);
         $this->assertStringContainsString('from kept', $page);
-    }
-
-    public function test_set_tracked_returns_to_to_get_rid_of(): void
-    {
-        $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/set-tracked.php');
-        $this->assertStringContainsString("\$return_to === 'to-get-rid-of'", $source);
-        $this->assertStringContainsString('/artifacts/to-get-rid-of.php', $source);
     }
 }

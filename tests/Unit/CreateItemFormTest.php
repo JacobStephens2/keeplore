@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  *   Name). The Item form's own fields: tests/Integration/ItemFormTest.php
  * - ui/shared/js/create-item-lookup.js: empty query matches nothing; name
  *   search; kept sort (node tests)
- * - ui/artifacts/set-tracked.php: return_to=new stays on Create Item
+ * Where Mark kept returns to: tests/Integration/QuickItemActionsTest.php
  */
 class CreateItemFormTest extends TestCase
 {
@@ -80,13 +80,6 @@ class CreateItemFormTest extends TestCase
         $this->assertStringContainsString('/shared/js/create-item-lookup.js', $source);
         $this->assertStringContainsString('return_to', $source);
         $this->assertStringContainsString("'new'", $source);
-    }
-
-    public function test_set_tracked_returns_to_create_item(): void
-    {
-        $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/set-tracked.php');
-        $this->assertStringContainsString("\$return_to === 'new'", $source);
-        $this->assertStringContainsString('/artifacts/new', $source);
     }
 
     public function test_create_item_lookup_search_and_sort_behavior(): void
