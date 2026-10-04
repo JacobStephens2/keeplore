@@ -109,6 +109,15 @@ final class ItemsListTest extends TestCase
         $this->assertSame([], $this->row(13)['tags']);
     }
 
+    public function test_another_owners_tag_on_the_owners_item_never_appears(): void
+    {
+        // Another owner's tag on the owner's Item, which no write makes.
+        $this->runSql("INSERT INTO item_tags (user_id, artifact_id, tag) VALUES (2, 11, 'theirs'), (2, 10, 'theirs')");
+
+        $this->assertSame([], $this->row(11)['tags']);
+        $this->assertSame(['beach-safe', 'family'], $this->row(10)['tags']);
+    }
+
     public function test_use_count_counts_recorded_uses_but_not_legacy_plays(): void
     {
         $this->runSql("INSERT INTO uses (artifact_id, user_id, use_date) VALUES
@@ -164,7 +173,7 @@ final class ItemsListTest extends TestCase
         $all = $this->ids();
         $this->assertSame($all, $this->ids([
             'kept' => null, 'secondary_collection' => null, 'physical' => null, 'digital' => null,
-            'to_get_rid_of' => null, 'type_ids' => null, 'tag' => null, 'title' => null,
+            'to_get_rid_of' => null, 'type_ids' => null, 'ids' => null, 'tag' => null, 'title' => null,
         ]));
         $this->assertSame($all, $this->ids(['tag' => '  ', 'title' => '']));
     }
@@ -176,6 +185,14 @@ final class ItemsListTest extends TestCase
         $this->assertSame([11, 10], $this->ids(['type_ids' => [1]]));
         $this->assertSame([12, 11, 10], $this->ids(['type_ids' => ['1', 2]]));
         $this->assertSame([], $this->ids(['type_ids' => [3]]));
+    }
+
+    public function test_ids_lists_only_the_owners_items_among_them_and_empty_lists_nothing(): void
+    {
+        $this->assertSame([], $this->ids(['ids' => []]));
+        $this->assertSame([11, 10], $this->ids(['ids' => [10, '11']]));
+        $this->assertSame([], $this->ids(['ids' => [20]]));
+        $this->assertSame([13, 10], $this->ids(['ids' => [20, 10, 13, 999]]));
     }
 
     public function test_tag_filter_is_normalized(): void
@@ -197,6 +214,7 @@ final class ItemsListTest extends TestCase
         $this->assertSame([10], $this->ids(['kept' => true, 'to_get_rid_of' => false]));
         $this->assertSame([12], $this->ids(['tag' => 'family', 'kept' => false]));
         $this->assertSame([11], $this->ids(['type_ids' => [1], 'digital' => true, 'title' => 'z']));
+        $this->assertSame([10], $this->ids(['ids' => [10, 12, 20], 'type_ids' => [1]]));
     }
 
     public function test_an_unknown_filter_key_throws(): void
