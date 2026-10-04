@@ -34,18 +34,14 @@
   $artifact_record = find_owned_item_or_exit($artifact_id, $is_ajax);
   $artifact_name = $artifact_record['Title'];
 
-  $snooze_until = snooze_artifact($artifact_id, $days);
+  $snooze_until = (new Items($db, $user_id))->snooze($artifact_id, $days);
 
-  if ($snooze_until !== false) {
-    $message = $artifact_name . ' snoozed until ' . $snooze_until . '.';
-  } else {
-    $message = 'Failed to snooze item.';
-  }
+  $message = $artifact_name . ' snoozed until ' . $snooze_until . '.';
 
   if ($is_ajax) {
     header('Content-Type: application/json');
     echo json_encode([
-      'ok' => $snooze_until !== false,
+      'ok' => true,
       'artifact_id' => (int) $artifact_id,
       'artifact_name' => $artifact_name,
       'snoozed_until' => $snooze_until,

@@ -19,7 +19,7 @@ if (is_post_request()) {
     $_SESSION['message'] = 'Proposal outcome deleted.';
     redirect_to($back);
 }
-$item = find_artifact_by_id($record['item_id']);
+$item = (new Items($db, (int) $_SESSION['user_id']))->find($record['item_id']);
 $page_title = 'Delete proposal outcome';
 include(SHARED_PATH . '/header.php');
 ?>

@@ -301,9 +301,8 @@ final class ProposalOutcomesTest extends TestCase
     {
         $this->db->query("INSERT INTO games (id, user_id, Title) VALUES (14, 1, 'Uncategorized item')");
         $this->proposals->save($this->proposal(['item_id' => 14]));
-        require_once PRIVATE_PATH . '/query_functions/artifact_queries.php';
-        $GLOBALS['db'] = $this->db;
-        $item = find_artifact_by_id(14);
+        require_once PRIVATE_PATH . '/classes/Items.php';
+        $item = (new \Items($this->db, 1))->find(14);
         $this->assertNotNull($item, 'The item page must be able to load items without a type.');
         $this->assertSame('Uncategorized item', $item['Title']);
         $this->assertCount(1, $this->proposals->history($item['id']));

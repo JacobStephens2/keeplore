@@ -20,8 +20,9 @@ final class ItemInvalid extends InvalidArgumentException
  *
  * Input keys are the item's column names, with type_id for the type and
  * tags (a comma-separated string or a list) for the tags. Unknown keys are
- * ignored. Every write applies the same validation and normalizers, and
- * writes the Item with its tags in one transaction.
+ * ignored. Create and update apply the same validation and normalizers,
+ * and write the Item with its tags in one transaction. The kept, to get
+ * rid of and snooze writes each change only their own field.
  *
  * Invalid input throws ItemInvalid with every problem; an id the owner
  * doesn't have throws OutOfBoundsException.
@@ -135,6 +136,41 @@ final class Items
                 'ii', [$this->userId, $id]
             )->close();
             $this->statement('DELETE FROM games WHERE id = ? AND user_id = ?', 'ii', [$id, $this->userId])->close();
+        });
+    }
+
+    /** Mark the Item kept or not. Unlike update, the rest of the Item isn't checked against the item rules. */
+    public function setKept(int $id, bool $kept): void
+    {
+        $this->setColumn($id, 'is_kept', normalize_kept_value($kept));
+    }
+
+    /** Mark the Item to get rid of or not. Unlike update, the rest of the Item isn't checked against the item rules. */
+    public function setToGetRidOf(int $id, bool $toGetRidOf): void
+    {
+        $this->setColumn($id, 'to_get_rid_of', normalize_kept_value($toGetRidOf));
+    }
+
+    /**
+     * Hide the Item from the dashboard's priority queue until today plus
+     * $days (below 1 counts as 1) and return that date as Y-m-d.
+     */
+    public function snooze(int $id, int $days): string
+    {
+        $until = (new DateTime('today'))->modify('+' . max(1, $days) . ' days')->format('Y-m-d');
+        $this->setColumn($id, 'snoozed_until', $until);
+        return $until;
+    }
+
+    /** $column must be a trusted column name, never input. */
+    private function setColumn(int $id, string $column, int|string $value): void
+    {
+        $this->transaction(function () use ($id, $column, $value) {
+            $this->lockedItem($id);
+            $this->statement(
+                "UPDATE games SET `{$column}` = ? WHERE id = ? AND user_id = ?",
+                'sii', [$value, $id, $this->userId]
+            )->close();
         });
     }
 

@@ -11,7 +11,8 @@ use PHPUnit\Framework\TestCase;
  * changed or deleted. Create and update share one set of defaults,
  * validation and normalizers, and write the Item with its tags in one
  * transaction. Deleting an Item removes its tags and its Event plan entries
- * with it.
+ * with it. The kept, to get rid of and snooze writes change only their own
+ * field, whatever the rest of the Item holds.
  */
 final class ItemsTest extends TestCase
 {
@@ -503,5 +504,99 @@ final class ItemsTest extends TestCase
 
         $this->assertSame('Catan', $this->items->find(10)['Title']);
         $this->assertSame(['beach-safe', 'family'], $this->tagsOf(10));
+    }
+
+    public function test_set_kept_writes_the_owners_kept_flag(): void
+    {
+        $this->items->setKept(10, false);
+        $this->assertSame(0, (int) $this->items->find(10)['is_kept']);
+
+        $this->items->setKept(10, true);
+        $this->assertSame(1, (int) $this->items->find(10)['is_kept']);
+    }
+
+    public function test_set_to_get_rid_of_writes_the_owners_flag(): void
+    {
+        $this->items->setToGetRidOf(10, true);
+        $this->assertSame(1, (int) $this->items->find(10)['to_get_rid_of']);
+
+        $this->items->setToGetRidOf(10, false);
+        $this->assertSame(0, (int) $this->items->find(10)['to_get_rid_of']);
+    }
+
+    public function test_snooze_sets_and_returns_today_plus_the_days(): void
+    {
+        $until = (new \DateTime('today'))->modify('+5 days')->format('Y-m-d');
+
+        $this->assertSame($until, $this->items->snooze(10, 5));
+        $this->assertSame($until, $this->items->find(10)['snoozed_until']);
+    }
+
+    public function test_a_snooze_below_one_day_counts_as_one(): void
+    {
+        $tomorrow = (new \DateTime('today'))->modify('+1 day')->format('Y-m-d');
+
+        $this->assertSame($tomorrow, $this->items->snooze(10, 0));
+        $this->assertSame($tomorrow, $this->items->find(10)['snoozed_until']);
+    }
+
+    public function test_a_flag_write_changes_only_its_own_field(): void
+    {
+        $before = $this->items->find(10);
+
+        $this->items->setKept(10, false);
+        $this->items->setToGetRidOf(10, true);
+        $until = $this->items->snooze(10, 3);
+
+        $after = $this->items->find(10);
+        $this->assertSame(
+            array_replace($before, ['is_kept' => 0, 'to_get_rid_of' => 1, 'snoozed_until' => $until]),
+            $after
+        );
+    }
+
+    public function test_flag_writes_succeed_on_an_item_that_breaks_an_item_rule(): void
+    {
+        $this->runSql("UPDATE games SET Title = 'C', MnT = 500 WHERE id = 10");
+
+        $this->items->setKept(10, false);
+        $this->items->setToGetRidOf(10, true);
+        $this->items->snooze(10, 2);
+
+        $item = $this->items->find(10);
+        $this->assertSame(0, (int) $item['is_kept']);
+        $this->assertSame(1, (int) $item['to_get_rid_of']);
+        $this->assertNotNull($item['snoozed_until']);
+        $this->assertSame('C', $item['Title']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('flagWrites')]
+    public function test_a_flag_write_on_another_owners_item_is_not_found_and_changes_nothing(callable $write): void
+    {
+        $before = (new Items($this->db, 2))->find(20);
+
+        try {
+            $write($this->items, 20);
+            $this->fail('Another owner\'s Item must not be changed.');
+        } catch (\OutOfBoundsException $expected) {
+        }
+
+        $this->assertSame($before, (new Items($this->db, 2))->find(20));
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('flagWrites')]
+    public function test_a_flag_write_on_a_missing_item_is_not_found(callable $write): void
+    {
+        $this->expectException(\OutOfBoundsException::class);
+        $write($this->items, 999);
+    }
+
+    public static function flagWrites(): array
+    {
+        return [
+            'kept' => [fn (Items $items, int $id) => $items->setKept($id, false)],
+            'to get rid of' => [fn (Items $items, int $id) => $items->setToGetRidOf($id, true)],
+            'snooze' => [fn (Items $items, int $id) => $items->snooze($id, 7)],
+        ];
     }
 }
