@@ -37,7 +37,7 @@ if (!$object) {
 
   <div class="object delete">
     <h1>Delete item</h1>
-    <p>Are you sure you want to delete this item?</p>
+    <p>Are you sure you want to delete this item? Its uses and proposals will be deleted with it.</p>
     <p class="item"><?php echo h($object['Title']); ?></p>
 
     <form action="<?php echo url_for('/artifacts/delete.php?id=' . h(u($object['id']))); ?>" method="post">

@@ -5,7 +5,7 @@ Keeplore helps people understand which possessions earn their place through use.
 ## Language
 
 **Item**:
-A tracked entity or object for which an interaction or use can be recorded, including games and other item types. Any such item can also have proposal outcomes recorded.
+A tracked entity or object for which an interaction or use can be recorded, including games and other item types. Any such item can also have proposal outcomes recorded. Deleting an item deletes its uses and item proposals; a proposal where it was the item chosen instead keeps the name.
 _Avoid_: Game (when referring to all supported item types).
 
 **Type**:
