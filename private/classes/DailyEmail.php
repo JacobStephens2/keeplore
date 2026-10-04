@@ -15,16 +15,16 @@ final class DailyEmail
 {
     private const SUBJECT = 'Interactions Due';
     private const FAILURE_SUBJECT = 'Error with Keeplore Uses Due Today Email';
-    private const DAYS_IN_COMING_WEEK = 7;
 
     /**
-     * Each section in order: its heading, its summary label and style, and
-     * whether its items offer Get Rid Of and show their use-by date.
+     * Each section in order: the queue status it lists and how many days out
+     * it reaches, its heading, its summary label and style, and whether its
+     * items offer Get Rid Of and show their use-by date.
      */
     private const SECTIONS = [
-        'overdue' => ['heading' => 'Interactions overdue', 'label' => 'Overdue', 'label_style' => 'font-weight:bold;color:#b63d2f;', 'get_rid_of' => true, 'use_by' => true],
-        'due_today' => ['heading' => 'Interactions due today', 'label' => 'Due today', 'label_style' => 'font-weight:bold;', 'get_rid_of' => false, 'use_by' => false],
-        'coming_week' => ['heading' => 'Interactions due in coming week', 'label' => 'Due in the coming week', 'label_style' => 'font-weight:bold;', 'get_rid_of' => false, 'use_by' => true],
+        'overdue' => ['status' => 'overdue', 'within_days' => null, 'heading' => 'Interactions overdue', 'label' => 'Overdue', 'label_style' => 'font-weight:bold;color:#b63d2f;', 'get_rid_of' => true, 'use_by' => true],
+        'due_today' => ['status' => 'due_today', 'within_days' => null, 'heading' => 'Interactions due today', 'label' => 'Due today', 'label_style' => 'font-weight:bold;', 'get_rid_of' => false, 'use_by' => false],
+        'coming_week' => ['status' => 'upcoming', 'within_days' => 7, 'heading' => 'Interactions due in coming week', 'label' => 'Due in the coming week', 'label_style' => 'font-weight:bold;', 'get_rid_of' => false, 'use_by' => true],
     ];
 
     /** $today is a Y-m-d day; the app's America/New_York day when omitted. */
@@ -39,15 +39,15 @@ final class DailyEmail
      */
     public function send(): int
     {
-        $sections = $this->sections();
-        $count = array_sum(array_map('count', $sections));
+        $entriesBySection = $this->entriesBySection();
+        $count = self::count($entriesBySection);
         $address = $count > 0 ? $this->address() : null;
         if ($address === null) {
             return 0;
         }
 
         try {
-            $this->mailer->send($address, self::SUBJECT, $this->body($sections, $count));
+            $this->mailer->send($address, self::SUBJECT, $this->body($entriesBySection));
         } catch (RuntimeException $failure) {
             $this->reportFailure($failure);
         }
@@ -58,25 +58,27 @@ final class DailyEmail
      * The queue's entries in each section, by last use with never used
      * first, each with the `interval` its use-by date was counted from.
      */
-    private function sections(): array
+    private function entriesBySection(): array
     {
         $defaultInterval = (new Preferences($this->db, $this->userId))->get()['default_use_interval'];
         $entries = (new UseByQueue($this->db, $this->userId, $this->today))->entries(['default_interval' => $defaultInterval]);
         usort($entries, fn (array $a, array $b) => $a['last_use'] <=> $b['last_use']);
 
-        $sections = array_fill_keys(array_keys(self::SECTIONS), []);
+        $entriesBySection = array_fill_keys(array_keys(self::SECTIONS), []);
         foreach ($entries as $entry) {
-            $section = match (true) {
-                $entry['status'] === 'overdue' => 'overdue',
-                $entry['status'] === 'due_today' => 'due_today',
-                $entry['status'] === 'upcoming' && $entry['days_until'] <= self::DAYS_IN_COMING_WEEK => 'coming_week',
-                default => null,
-            };
-            if ($section !== null) {
-                $sections[$section][] = $entry + ['interval' => $entry['interaction_frequency_days'] ?? $defaultInterval];
+            foreach (self::SECTIONS as $key => $section) {
+                if ($entry['status'] === $section['status']
+                    && ($section['within_days'] === null || $entry['days_until'] <= $section['within_days'])) {
+                    $entriesBySection[$key][] = $entry + ['interval' => $entry['interaction_frequency_days'] ?? $defaultInterval];
+                }
             }
         }
-        return $sections;
+        return $entriesBySection;
+    }
+
+    private static function count(array $entriesBySection): int
+    {
+        return array_sum(array_map('count', $entriesBySection));
     }
 
     /**
@@ -97,14 +99,15 @@ final class DailyEmail
         return $address;
     }
 
-    private function body(array $sections, int $count): string
+    private function body(array $entriesBySection): string
     {
+        $count = self::count($entriesBySection);
         $summaryRows = '';
         foreach (self::SECTIONS as $key => $section) {
             $summaryRows .= '
                 <tr>
                   <td style="' . $section['label_style'] . '">' . $section['label'] . '</td>
-                  <td style="font-weight:bold;">' . count($sections[$key]) . '</td>
+                  <td style="font-weight:bold;">' . count($entriesBySection[$key]) . '</td>
                 </tr>';
         }
 
@@ -114,7 +117,7 @@ final class DailyEmail
                 <strong>' . $count . '</strong> ' . ($count === 1 ? 'item needs' : 'items need') . ' attention.
             </p>
             <p style="margin:0 0 0.75rem;">
-                <a href="https://' . DOMAIN . '/artifacts/useby.php">View interact by list</a>
+                <a href="' . self::url('/artifacts/useby.php') . '">View interact by list</a>
             </p>
             <table cellpadding="6" cellspacing="0" style="border-collapse:collapse;margin-bottom:1.25rem;">' . $summaryRows . '
             </table>
@@ -122,21 +125,21 @@ final class DailyEmail
         ';
 
         foreach (self::SECTIONS as $key => $section) {
-            $body .= $this->section($section, $sections[$key]);
+            $body .= $this->renderSection($section, $entriesBySection[$key]);
         }
 
         return $body . '
-            <p>Record uses at <a href="https://' . DOMAIN . '/uses/record-new.php">' . DOMAIN . '</a></p>
+            <p>Record uses at <a href="' . self::url('/uses/record-new.php') . '">' . DOMAIN . '</a></p>
         ';
     }
 
     /** One section's heading and list, or nothing when it has no items. */
-    private function section(array $section, array $entries): string
+    private function renderSection(array $section, array $entries): string
     {
         if (!$entries) {
             return '';
         }
-        $site = 'https://' . DOMAIN;
+        $site = self::url('');
 
         $items = '';
         foreach ($entries as $entry) {
@@ -165,6 +168,11 @@ final class DailyEmail
             <h1>{$section['heading']}</h1>
             <ul>$items</ul>
         ";
+    }
+
+    private static function url(string $path): string
+    {
+        return 'https://' . DOMAIN . $path;
     }
 
     /**

@@ -124,6 +124,16 @@ final class DailyEmailTest extends TestCase
         $this->assertStringNotContainsString('artifact_name', $html);
     }
 
+    public function test_a_used_overdue_item_shows_its_last_use_and_use_by_date(): void
+    {
+        $this->addItem(30, 'Ticket to Ride', '2026-01-01');
+        $this->addUse(30, '2026-05-01');
+
+        $this->assertSame(1, $this->send());
+        $overdue = $this->section($this->onlyEmail()[2], 'Interactions overdue');
+        $this->assertStringContainsString('last interacted 2026-05-01, interact by 2026-05-21 (Thursday, interval: 10 days)', $overdue);
+    }
+
     public function test_an_item_due_today_is_listed_with_its_last_use(): void
     {
         $this->addItem(30, 'Ticket to Ride', '2026-01-01');

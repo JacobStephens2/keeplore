@@ -7,7 +7,7 @@ require_once __DIR__ . '/Mailer.php';
 
 /**
  * Mailer over SMTP with STARTTLS, from the app and with replies to the
- * developer. The only mail code that knows PHPMailer.
+ * developer, in UTF-8. The daily email reaches PHPMailer only through here.
  */
 final class SmtpMailer implements Mailer
 {
@@ -43,6 +43,7 @@ final class SmtpMailer implements Mailer
             $mail->setFrom($this->fromAddress, $this->fromName);
             $mail->addAddress($to);
             $mail->addReplyTo($this->replyToAddress, $this->replyToName);
+            $mail->CharSet = PHPMailer::CHARSET_UTF8;
             $mail->isHTML(true);
             $mail->Subject = $subject;
             $mail->Body = $html;
