@@ -1,7 +1,7 @@
 <?php
 require_once('../../private/initialize.php');
 require_login();
-$object_set = find_playgroup_by_user_id();
+$members = (new Playgroup($db, (int) $_SESSION['user_id']))->members();
 $page_title = 'User Group';
 include(SHARED_PATH . '/header.php');
 ?>
@@ -17,36 +17,34 @@ include(SHARED_PATH . '/header.php');
 
   	<table class="list">
   	  <tr>
-        <th>Name (<?php echo $object_set->num_rows; ?>)</th>
+        <th>Name (<?php echo count($members); ?>)</th>
         <th>User Group ID&ensp;</th>
         <th></th>
   	  </tr>
 
-      <?php while($object = mysqli_fetch_assoc($object_set)) { ?>
+      <?php foreach ($members as $member) { ?>
         <tr>
           <td>
             <a 
               class="table-action" 
-              href="<?php echo url_for('/users/edit.php?id=' . h(u($object['playerID']))); ?>"
+              href="<?php echo url_for('/users/edit.php?id=' . h(u($member['person_id']))); ?>"
               >
-              <?php echo h($object['FirstName']) . ' ' . h($object['LastName']); ?>
+              <?php echo h($member['name']); ?>
             </a>
           </td>
           <td>
-            <a class="table-action" href="<?php echo url_for('/playgroup/edit.php?ID=' . h(u($object['ID']))); ?>">
-              <?php echo h($object['ID']); ?>
+            <a class="table-action" href="<?php echo url_for('/playgroup/edit.php?ID=' . h(u($member['id']))); ?>">
+              <?php echo h($member['id']); ?>
             </a>
           </td>
           <td>    
-            <a class="table-action" href="<?php echo url_for('/playgroup/delete.php?ID=' . h(u($object['ID']))); ?>">
+            <a class="table-action" href="<?php echo url_for('/playgroup/delete.php?ID=' . h(u($member['id']))); ?>">
               Remove
             </a>
           </td>
     	  </tr>
       <?php } ?>
   	</table>
-
-    <?php mysqli_free_result($object_set); ?>
   </div>
 </main>
 
