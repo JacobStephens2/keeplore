@@ -1,11 +1,16 @@
 <?php
 
 /**
- * An event's games grouped for planning: by sweet spot, age, the ages of the
- * players coming, setting or tag,
- * then optionally by a second of those, and written out as a packing
- * checklist. A game belongs to every group its values name, so one best at
- * 6 and 8 shows under both "8 players" and "6 players".
+ * The Event plan: an event's games as its page shows them under the chosen
+ * grouping. They are grouped by sweet spot, age, the ages of the players
+ * coming, setting or tag, then optionally by a second of those, and written
+ * out as a packing checklist. A game belongs to every group its values name,
+ * so one best at 6 and 8 shows under both "8 players" and "6 players".
+ *
+ * The interface is event_plan(), event_plan_grouping(),
+ * event_plan_dimensions(), event_plan_details() and event_dates_label().
+ * Every other function here is internal to the module and trusts that
+ * event_plan() has already normalized the grouping.
  *
  * Items are rows with Title, MnP, MxP, SS, Age, MnT, MxT, tags, is_kept, and the
  * event's own setting, note and is_packed.
@@ -26,32 +31,91 @@ function event_plan_dimensions() {
 }
 
 /**
- * The items grouped by $by, each group's items grouped again by $then. Each
- * group is ['label' => ..., 'items' => [...], 'groups' => [...]], where
- * 'groups' is empty without a second grouping. Unknown dimensions, and $then
- * repeating $by, mean no grouping at that level. Items with nothing to group
- * by collect in a last group such as "No sweet spot"; within a group they
- * come first and unlabelled, the way a hand-written list leaves them.
+ * The Event plan for $event, as EventPlans::find() returns it (items with
+ * tags, players with age), under $grouping, a saved or hand-built grouping
+ * in event_plan_grouping()'s shape. Returns:
  *
- * $tags, when given, are the only tags that make groups, in that order, so
- * "casual, main" splits each player count in two and ignores "beach-safe".
+ * - 'groups': each ['label' => ..., 'items' => [...], 'groups' => [...]],
+ *   'groups' empty without a second grouping (see event_plan_groups());
+ * - 'text': those groups as a plain-text checklist;
+ * - 'packed': how many planned games are packed;
+ * - 'shopping': ['items' => ..., 'text' => ...], the games not kept;
+ * - 'spare': ['needed' => items, 'spare' => items, 'short' => [...], 'text'
+ *   => the needed games' checklist, or '' when nothing can stay home] (see
+ *   event_plan_spare());
+ * - 'player_ages': the players' ages line;
+ * - 'settings': the event's distinct settings, in natural order.
  *
- * $player_ages are the ages of the players coming (null when unknown). By
- * 'player_age', each distinct child age and "Adults" make a group, and a
+ * Every item row carries 'can_stay_home', true for a game the smaller list
+ * leaves out.
+ */
+function event_plan(array $event, array $grouping) {
+    $grouping = event_plan_grouping([], $grouping);
+    // The grouping keeps a repeated choice so the form shows what was picked;
+    // the plan treats it as no second grouping.
+    $view = [
+        'by' => $grouping['by'],
+        'then' => $grouping['then'] === $grouping['by'] ? 'none' : $grouping['then'],
+        'tags' => event_plan_chosen_tags($grouping['tags']),
+        'ages' => event_plan_age_groups(array_column($event['players'], 'age')),
+    ];
+
+    $spare = event_plan_spare(event_plan_sorted_by_title($event['items']), $view,
+        $grouping['at_least'], event_plan_chosen_tags($grouping['count_tags']));
+    $items = $spare['items'];
+    $needed = [];
+    $can_stay_home = [];
+    foreach ($items as $item) {
+        if ($item['can_stay_home']) {
+            $can_stay_home[] = $item;
+        } else {
+            $needed[] = $item;
+        }
+    }
+    $groups = event_plan_groups($items, $view);
+
+    // Read in the event's own order, so settings differing only in case keep their order.
+    $settings = array_values(array_unique(array_filter(array_map('trim', array_column($event['items'], 'setting')))));
+    sort($settings, SORT_NATURAL | SORT_FLAG_CASE);
+
+    return [
+        'groups' => $groups,
+        'text' => event_plan_text($groups),
+        'packed' => count(array_filter(array_column($items, 'is_packed'))),
+        'shopping' => event_plan_shopping_list($items),
+        'spare' => [
+            'needed' => $needed,
+            'spare' => $can_stay_home,
+            'short' => $spare['short'],
+            'text' => $can_stay_home === [] ? '' : event_plan_text(event_plan_groups($needed, $view)),
+        ],
+        'player_ages' => event_player_ages($event['players']),
+        'settings' => $settings,
+    ];
+}
+
+/**
+ * Internal. The items, in title order, grouped by $view's 'by', each
+ * group's items grouped again by its 'then'. Each group is ['label' => ...,
+ * 'items' => [...], 'groups' => [...]], where 'groups' is empty without a
+ * second grouping. Items with nothing to group by collect in a last group
+ * such as "No sweet spot"; within a group they come first and unlabelled,
+ * the way a hand-written list leaves them.
+ *
+ * $view's 'tags', when given, are the only tags that make groups, in that
+ * order, so "casual, main" splits each player count in two and ignores
+ * "beach-safe".
+ *
+ * $view's 'ages' are the players' age groups (see event_plan_age_groups()).
+ * By 'player_age', each distinct child age and "Adults" make a group, and a
  * game shows once, under the youngest of them old enough for it.
  */
-function event_plan_groups(array $items, $by, $then = 'none', array $tags = [], array $player_ages = []) {
-    $by = isset(event_plan_dimensions()[$by]) ? $by : 'none';
-    $then = isset(event_plan_dimensions()[$then]) && $then !== $by ? $then : 'none';
-    $items = event_plan_sorted_by_title($items);
-
+function event_plan_groups(array $items, array $view) {
     $groups = [];
-    $tags = event_plan_chosen_tags($tags);
-    $ages = event_plan_age_groups($player_ages);
-    foreach (event_plan_split($items, $by, $tags, $ages, false) as $group) {
-        $group['groups'] = $then === 'none' ? [] : array_map(function ($sub) {
+    foreach (event_plan_split($items, $view['by'], $view, false) as $group) {
+        $group['groups'] = $view['then'] === 'none' ? [] : array_map(function ($sub) {
             return $sub + ['groups' => []];
-        }, event_plan_split($group['items'], $then, $tags, $ages, true));
+        }, event_plan_split($group['items'], $view['then'], $view, true));
         $groups[] = $group;
     }
     return $groups;
@@ -96,7 +160,7 @@ function event_plan_grouping(array $request, array $saved) {
 }
 
 /**
- * Which planned games a smaller plan can leave home and still have
+ * Internal. Which planned games a smaller plan can leave home and still have
  * $at_least games in every group the grouping makes: each labelled
  * sub-group, such as "6 players · casual", or each group without a second
  * grouping. A game outside every group, such as one with none of the chosen
@@ -111,21 +175,21 @@ function event_plan_grouping(array $request, array $saved) {
  * one of them would leave a group short: a small set, though not always the
  * smallest possible.
  *
- * Returns ['needed' => items, 'spare' => items, 'short' => [['label' =>
- * '8 players · casual', 'count' => 1], ...]], items in title order and short
- * groups in the plan's order.
+ * $items come in title order. Returns ['items' => the items, each with
+ * 'can_stay_home', 'short' => [['label' => '8 players · casual', 'count' =>
+ * 1], ...]], short groups in the plan's order.
  */
-function event_plan_spare(array $items, $by, $then, array $tags = [], array $player_ages = [], $at_least = 0, array $count_tags = []) {
-    $at_least = (int) $at_least;
-    $items = event_plan_sorted_by_title($items);
+function event_plan_spare(array $items, array $view, $at_least, array $count_tags) {
+    $with_can_stay_home = function (array $chosen) use ($items) {
+        foreach (array_keys($items) as $i) {
+            $items[$i]['can_stay_home'] = !isset($chosen[$i]);
+        }
+        return $items;
+    };
     if ($at_least <= 0) {
-        return ['needed' => $items, 'spare' => [], 'short' => []];
+        return ['items' => $with_can_stay_home(array_fill_keys(array_keys($items), true)), 'short' => []];
     }
-    $by = isset(event_plan_dimensions()[$by]) ? $by : 'none';
-    $then = isset(event_plan_dimensions()[$then]) && $then !== $by ? $then : 'none';
-    $tags = event_plan_chosen_tags($tags);
-    $count_tags = event_plan_chosen_tags($count_tags);
-    $ages = event_plan_age_groups($player_ages);
+    ['by' => $by, 'then' => $then] = $view;
 
     // Reading the groups off event_plan_groups() keeps them, and their
     // order, the same as the page shows.
@@ -134,9 +198,9 @@ function event_plan_spare(array $items, $by, $then, array $tags = [], array $pla
         $position[$item['id']] = $i;
     }
     $cells = [];
-    foreach (event_plan_groups($items, $by, $then, $tags, $player_ages) as $group) {
+    foreach (event_plan_groups($items, $view) as $group) {
         // The last group, such as "No sweet spot", gathers games without a value.
-        if ($by !== 'none' && event_plan_keys($group['items'][0], $by, $tags, $ages) === []) {
+        if ($by !== 'none' && event_plan_keys($group['items'][0], $by, $view) === []) {
             continue;
         }
         foreach ($group['groups'] ?: [['label' => '', 'items' => $group['items']]] as $sub) {
@@ -212,16 +276,13 @@ function event_plan_spare(array $items, $by, $then, array $tags = [], array $pla
         }
     }
 
-    $result = ['needed' => [], 'spare' => [], 'short' => []];
-    foreach ($items as $i => $item) {
-        $result[isset($chosen[$i]) ? 'needed' : 'spare'][] = $item;
-    }
+    $short = [];
     foreach ($cells as $cell) {
         if (count($cell['members']) < $at_least) {
-            $result['short'][] = ['label' => $cell['label'], 'count' => count($cell['members'])];
+            $short[] = ['label' => $cell['label'], 'count' => count($cell['members'])];
         }
     }
-    return $result;
+    return ['items' => $with_can_stay_home($chosen), 'short' => $short];
 }
 
 /** An event's dates as "Jul 3 – Jul 10, 2027", or '' with neither. */
@@ -243,7 +304,7 @@ function event_dates_label($starts_on, $ends_on) {
 const EVENT_ADULT_AGE = 18;
 
 /**
- * How old an event's players are, as "2 adults (18+) · 3 children: 1 age
+ * Internal. How old an event's players are, as "2 adults (18+) · 3 children: 1 age
  * 12, 2 age 8 · 1 age unknown", children oldest first, or '' with no
  * players. Players are rows with an 'age', null without a birth year.
  */
@@ -282,7 +343,7 @@ function event_player_ages(array $players) {
 }
 
 /**
- * The age groups the players make, youngest first: each distinct child age,
+ * Internal. The age groups the players make, youngest first: each distinct child age,
  * then EVENT_ADULT_AGE standing for every adult. Unknown ages are left out.
  */
 function event_plan_age_groups(array $player_ages) {
@@ -299,12 +360,12 @@ function event_plan_age_groups(array $player_ages) {
 }
 
 /**
- * The planned items not kept, such as games to buy before the event, in
- * title order: 'items' with the event's setting and packed mark left out
+ * Internal. The planned items not kept, such as games to buy before the
+ * event, in the order given (title order): 'items' with the event's setting and packed mark left out
  * (a note such as "requested by mom" stays), and 'text' as an unticked checklist, "- [ ] Wavelength, 2–12".
  */
 function event_plan_shopping_list(array $items) {
-    $to_buy = event_plan_sorted_by_title(array_filter($items, 'event_plan_is_to_buy'));
+    $to_buy = array_values(array_filter($items, 'event_plan_is_to_buy'));
     $to_buy = array_map(function ($item) {
         return array_diff_key($item, array_flip(['is_kept', 'setting', 'is_packed']));
     }, $to_buy);
@@ -314,12 +375,12 @@ function event_plan_shopping_list(array $items) {
     return ['items' => $to_buy, 'text' => $text];
 }
 
-/** Whether a row says its item is not kept, so it would have to be bought. */
+/** Internal. Whether a row says its item is not kept, so it would have to be bought. */
 function event_plan_is_to_buy(array $item) {
     return array_key_exists('is_kept', $item) && !$item['is_kept'];
 }
 
-/** The items in title order, ties by id. */
+/** Internal. The items in title order, ties by id. */
 function event_plan_sorted_by_title(array $items) {
     usort($items, function ($a, $b) {
         return strcasecmp((string) $a['Title'], (string) $b['Title']) ?: ((int) ($a['id'] ?? 0) <=> (int) ($b['id'] ?? 0));
@@ -327,7 +388,7 @@ function event_plan_sorted_by_title(array $items) {
     return $items;
 }
 
-/** The items as a checklist: "# group", "## sub-group", "- [ ] line". */
+/** Internal. The groups as a checklist: "# group", "## sub-group", "- [ ] line". */
 function event_plan_text(array $groups) {
     $blocks = [];
     foreach ($groups as $group) {
@@ -350,7 +411,7 @@ function event_plan_text(array $groups) {
 }
 
 /**
- * One game as the checklist names it: "Hanabi, 2–5 (4), 10 yrs, 25 min,
+ * Internal. One game as the checklist names it: "Hanabi, 2–5 (4), 10 yrs, 25 min,
  * beach, requested by mom", the Items copy line plus the play time, the
  * event's setting and note,
  * and "not kept" for a game planned before it is bought.
@@ -384,13 +445,14 @@ function event_plan_details(array $item) {
     return implode('', $parts);
 }
 
+/** Internal. The items as checklist lines, ticked when packed. */
 function event_plan_checklist(array $items) {
     return array_map(function ($item) {
         return '- [' . (empty($item['is_packed']) ? ' ' : 'x') . '] ' . event_plan_line($item);
     }, $items);
 }
 
-/** Chosen tags, as typed ("casual, main") or a list, normalized and in order. */
+/** Internal. Chosen tags, as typed ("casual, main") or a list, normalized and in order. */
 function event_plan_chosen_tags($tags) {
     $chosen = [];
     foreach (is_array($tags) ? $tags : explode(',', (string) $tags) as $tag) {
@@ -403,18 +465,18 @@ function event_plan_chosen_tags($tags) {
 }
 
 /**
- * Items (already in title order) split into ordered groups by one
- * dimension. Items lacking a value form a last, labelled group, or with
- * $is_sub a first, unlabelled one.
+ * Internal. Items (already in title order) split into ordered groups by one
+ * dimension, $by, with $view's tags and ages. Items lacking a value form a
+ * last, labelled group, or with $is_sub a first, unlabelled one.
  */
-function event_plan_split(array $items, $by, array $tags, array $ages, $is_sub) {
+function event_plan_split(array $items, $by, array $view, $is_sub) {
     if ($by === 'none') {
         return [['label' => '', 'items' => $items]];
     }
     $groups = [];
     $missing = [];
     foreach ($items as $item) {
-        $keys = event_plan_keys($item, $by, $tags, $ages);
+        $keys = event_plan_keys($item, $by, $view);
         if ($keys === []) {
             $missing[] = $item;
         }
@@ -437,14 +499,15 @@ function event_plan_split(array $items, $by, array $tags, array $ages, $is_sub) 
         array_unshift($groups, ['label' => '', 'items' => $missing]);
     } elseif ($missing !== []) {
         $none = ['players' => 'No sweet spot', 'age' => 'No age recorded', 'setting' => 'No setting', 'tag' => 'Untagged',
-            'player_age' => $ages === [] ? 'No player ages recorded' : 'No age recorded'];
+            'player_age' => $view['ages'] === [] ? 'No player ages recorded' : 'No age recorded'];
         $groups[] = ['label' => $none[$by], 'items' => $missing];
     }
     return $groups;
 }
 
-/** The groups one item belongs to, as sort key => label. */
-function event_plan_keys(array $item, $by, array $tags, array $ages) {
+/** Internal. The groups one item belongs to by $by, as sort key => label. */
+function event_plan_keys(array $item, $by, array $view) {
+    ['tags' => $tags, 'ages' => $ages] = $view;
     if ($by === 'players') {
         $keys = [];
         foreach (items_list_sweet_spot_counts($item['SS'] ?? $item['ss'] ?? '') as $n) {

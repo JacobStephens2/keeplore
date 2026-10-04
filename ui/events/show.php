@@ -20,19 +20,11 @@ $by_tag = $by === 'tag' || $then === 'tag';
 
 $items = $event['items'];
 $players = $event['players'];
-$chosen_tags = event_plan_chosen_tags($tags);
-$player_ages = array_column($players, 'age');
-$groups = event_plan_groups($items, $by, $then, $chosen_tags, $player_ages);
-$spare = event_plan_spare($items, $by, $then, $chosen_tags, $player_ages, $at_least, event_plan_chosen_tags($count_tags));
-$spare_ids = array_flip(array_column($spare['spare'], 'id'));
-$packed = count(array_filter(array_column($items, 'is_packed')));
-$shopping = event_plan_shopping_list($items);
+['groups' => $groups, 'text' => $text, 'packed' => $packed, 'shopping' => $shopping, 'spare' => $spare,
+    'player_ages' => $player_ages_label, 'settings' => $settings] = event_plan($event, $grouping);
 $not_kept = count($shopping['items']);
 $to_add = $plans->itemsToAdd($id);
 $players_to_add = $plans->playersToAdd($id);
-$player_ages_label = event_player_ages($players);
-$settings = array_values(array_unique(array_filter(array_map('trim', array_column($items, 'setting')))));
-sort($settings, SORT_NATURAL | SORT_FLAG_CASE);
 $dates = event_dates_label($event['starts_on'], $event['ends_on']);
 
 $page_title = $event['name'];
@@ -110,7 +102,7 @@ include(SHARED_PATH . '/header.php');
             <p class="menu-support">The planned games you don't keep yet, to buy or borrow before the event.</p>
             <ul class="event-shopping-list">
                 <?php foreach ($shopping['items'] as $item) { ?>
-                    <li><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?><?php if (isset($spare_ids[$item['id']])) { ?> <span class="event-not-kept event-can-stay-home">Can stay home</span><?php } ?>
+                    <li><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?><?php if ($item['can_stay_home']) { ?> <span class="event-not-kept event-can-stay-home">Can stay home</span><?php } ?>
                         <?php if ($item['tags']) { ?><small class="menu-support"><?php echo h(implode(', ', $item['tags'])); ?></small><?php } ?></li>
                 <?php } ?>
             </ul>
@@ -207,7 +199,7 @@ include(SHARED_PATH . '/header.php');
                     <?php if ($spare['spare']) { ?>
                         <details class="event-text" data-fold="smaller-list">
                             <summary>Smaller list <small class="menu-support"><?php echo count($spare['needed']); ?> games</small></summary>
-                            <textarea id="event-smaller-text" rows="12" readonly><?php echo h(event_plan_text(event_plan_groups($spare['needed'], $by, $then, $chosen_tags, $player_ages))); ?></textarea>
+                            <textarea id="event-smaller-text" rows="12" readonly><?php echo h($spare['text']); ?></textarea>
                             <button type="button" class="event-copy" data-copy="event-smaller-text">Copy smaller list</button>
                             <span class="menu-support" aria-live="polite"></span>
                         </details>
@@ -229,7 +221,7 @@ include(SHARED_PATH . '/header.php');
                                     <li>
                                         <div class="event-line">
                                             <input type="checkbox" class="event-packed" data-item-id="<?php echo $item['id']; ?>" aria-label="Packed: <?php echo h($item['Title']); ?>" <?php echo $item['is_packed'] ? 'checked' : ''; ?>>
-                                            <span><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?><?php if (isset($spare_ids[$item['id']])) { ?> <span class="event-not-kept event-can-stay-home">Can stay home</span><?php } ?></span>
+                                            <span><a href="<?php echo url_for('/artifacts/edit.php?id=' . $item['id']); ?>" target="_blank" rel="noopener"><?php echo h($item['Title']); ?></a><?php echo h(event_plan_details($item)); ?><?php if ($item['can_stay_home']) { ?> <span class="event-not-kept event-can-stay-home">Can stay home</span><?php } ?></span>
                                             <form class="event-line-remove event-keep-scroll" method="post" action="<?php echo url_for('/events/item.php'); ?>">
                                                 <?php echo csrf_input(); ?>
                                                 <input type="hidden" name="event_id" value="<?php echo $id; ?>">
@@ -249,7 +241,7 @@ include(SHARED_PATH . '/header.php');
 
         <details class="event-text" data-fold="plain-text">
             <summary>Plain-text list</summary>
-            <textarea id="event-text" rows="12" readonly><?php echo h(event_plan_text($groups)); ?></textarea>
+            <textarea id="event-text" rows="12" readonly><?php echo h($text); ?></textarea>
             <button type="button" class="event-copy" data-copy="event-text">Copy list</button>
             <span class="menu-support" aria-live="polite"></span>
         </details>
