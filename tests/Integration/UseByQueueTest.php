@@ -80,6 +80,15 @@ final class UseByQueueTest extends TestCase
         $this->assertSame([10], $this->ids($this->queue('2026-06-05')->entries(['hide_snoozed' => true])));
     }
 
+    public function test_hide_snoozed_hides_exactly_the_entries_that_are_snoozed(): void
+    {
+        $this->db->query("UPDATE games SET snoozed_until = '2026-06-05' WHERE id = 10");
+        foreach (['2026-06-04', '2026-06-05', '2026-06-06'] as $today) {
+            $notSnoozed = array_filter($this->queue($today)->entries(), fn (array $entry) => !$entry['is_snoozed']);
+            $this->assertSame($this->ids(array_values($notSnoozed)), $this->ids($this->queue($today)->entries(['hide_snoozed' => true])), $today);
+        }
+    }
+
     public function test_an_entry_is_snoozed_until_its_snoozed_until_day(): void
     {
         $this->assertFalse($this->queue()->entries()[0]['is_snoozed']);

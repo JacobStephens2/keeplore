@@ -21,8 +21,9 @@
  *   applies the same rule in SQL.
  */
 function use_by_status(array $item, $default_interval, string $today): array {
-    $interval = use_by_interval($item['interaction_frequency_days'] ?? null, $default_interval);
-    $use_by = use_by_date($item['Acq'] ?? null, $item['last_use'] ?? null, null, $interval);
+    $frequency = $item['interaction_frequency_days'] ?? null;
+    $interval = $frequency !== null && $frequency !== '' ? (float) $frequency : (float) $default_interval;
+    $use_by = use_by_date($item['Acq'] ?? null, $item['last_use'] ?? null, $interval);
     $days_until = $use_by === null ? null : (int) (new DateTimeImmutable($today, new DateTimeZone('UTC')))
         ->diff(new DateTimeImmutable($use_by, new DateTimeZone('UTC')))->format('%r%a');
     $snoozed_until = $item['snoozed_until'] ?? null;
@@ -41,31 +42,24 @@ function use_by_status(array $item, $default_interval, string $today): array {
     ];
 }
 
-/** The item's own interaction frequency when set, otherwise $default_interval, in days. */
-function use_by_interval($frequency, $default_interval): float {
-    return $frequency !== null && $frequency !== '' ? (float) $frequency : (float) $default_interval;
-}
-
 /**
- * The use-by date as Y-m-d, or null when there is no basis for one (no valid
- * acquisition date and no use).
+ * use_by_status()'s use-by date as Y-m-d, or null when there is no basis for
+ * one (no valid acquisition date and no use).
  *
- * The item's own interaction frequency is its interval when set; otherwise
- * $default_interval applies. Never used, or last used before acquisition:
- * acquisition + interval. Otherwise: last use + 2 × interval. Intervals are
- * days and keep their fraction, rounded to the nearest hour.
+ * Never used, or last used before acquisition: acquisition + $interval.
+ * Otherwise: last use + 2 × $interval. Intervals are days and keep their
+ * fraction, rounded to the nearest hour.
  *
  * Dates are read and added to in UTC so a daylight-saving change cannot move
- * the result a day. Whether it is overdue is the caller's call.
+ * the result a day.
  */
-function use_by_date($acquired, $last_use, $frequency, $default_interval) {
+function use_by_date($acquired, $last_use, float $interval) {
     // Midnight UTC on the date that starts $value, or null if it holds no valid date.
     $parse = static function ($value) {
         $date = substr((string) $value, 0, 10);
         $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $date, new DateTimeZone('UTC'));
         return $parsed !== false && $parsed->format('Y-m-d') === $date ? $parsed : null;
     };
-    $interval = use_by_interval($frequency, $default_interval);
     $acquired = $parse($acquired);
     $last_use = $parse($last_use);
 

@@ -9,7 +9,7 @@ require_once PROJECT_PATH . '/private/use_by_date.php';
 
 /**
  * The use-by date ("Interact by" in the UI): every page that shows when an
- * item should next be used gets it from use_by_date().
+ * item should next be used gets it from use_by_status().
  */
 class UseByDateTest extends TestCase
 {
@@ -41,7 +41,8 @@ class UseByDateTest extends TestCase
     #[DataProvider('cases')]
     public function test_use_by_date($acquired, $last_use, $frequency, $default_interval, $expected): void
     {
-        $this->assertSame($expected, use_by_date($acquired, $last_use, $frequency, $default_interval));
+        $item = ['Acq' => $acquired, 'last_use' => $last_use, 'interaction_frequency_days' => $frequency];
+        $this->assertSame($expected, use_by_status($item, $default_interval, '2024-01-01')['use_by_date']);
     }
 
     public function test_the_date_does_not_depend_on_the_server_time_zone(): void
@@ -50,7 +51,7 @@ class UseByDateTest extends TestCase
         try {
             foreach (['America/New_York', 'Pacific/Auckland', 'UTC'] as $tz) {
                 date_default_timezone_set($tz);
-                $this->assertSame('2024-11-04', use_by_date('2024-11-02', null, null, 2), $tz);
+                $this->assertSame('2024-11-04', use_by_status(['Acq' => '2024-11-02'], 2, '2024-01-01')['use_by_date'], $tz);
             }
         } finally {
             date_default_timezone_set($zone);
