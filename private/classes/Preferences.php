@@ -5,24 +5,26 @@
  * Settings page. Each preference has one default and one allowed range,
  * defined here and nowhere else. A value that is missing, empty or out of
  * range reads and saves as the default. Every read and write is scoped to
- * the owner.
+ * the owner; only ownersDueDailyEmailAt(), for the cron, looks across all
+ * owners.
  */
 final class Preferences
 {
     /**
-     * Each preference: its kind, default, and allowed range. Kinds are
-     * decimal (float), int, string and bool; bools have no range.
+     * Each preference's kind, default and allowed range. Kinds are float,
+     * int, string and bool; only float and int have a range. The float's top
+     * is the most its DECIMAL(8,2) column holds.
      */
     private const RULES = [
-        'default_use_interval' => ['decimal', 90.0, 1, 999999.99],
-        'default_snooze_days' => ['int', 7, 1, 365],
-        'default_setting' => ['string', '', null, null],
-        'daily_email' => ['bool', true, null, null],
-        'daily_email_hour' => ['int', 8, 0, 23],
-        'native_notify_enabled' => ['bool', true, null, null],
-        'native_notify_hour' => ['int', 9, 0, 23],
-        'native_notify_lead_days' => ['int', 3, 0, 14],
-        'native_notify_past_due' => ['bool', true, null, null],
+        'default_use_interval' => ['kind' => 'float', 'default' => 90.0, 'min' => 1, 'max' => 999999.99],
+        'default_snooze_days' => ['kind' => 'int', 'default' => 7, 'min' => 1, 'max' => 365],
+        'default_setting' => ['kind' => 'string', 'default' => ''],
+        'daily_email' => ['kind' => 'bool', 'default' => true],
+        'daily_email_hour' => ['kind' => 'int', 'default' => 8, 'min' => 0, 'max' => 23],
+        'native_notify_enabled' => ['kind' => 'bool', 'default' => true],
+        'native_notify_hour' => ['kind' => 'int', 'default' => 9, 'min' => 0, 'max' => 23],
+        'native_notify_lead_days' => ['kind' => 'int', 'default' => 3, 'min' => 0, 'max' => 14],
+        'native_notify_past_due' => ['kind' => 'bool', 'default' => true],
     ];
 
     public function __construct(private mysqli $db, private int $userId)
@@ -30,17 +32,18 @@ final class Preferences
     }
 
     /**
-     * All of the owner's preferences, each with its default applied:
+     * All of the owner's preferences, typed and each with its default
+     * applied (see RULES):
      *
-     * - default_use_interval (float, days, 1 or more; 90): an item's
-     *   interaction frequency when it has none of its own
-     * - default_snooze_days (int, 1–365; 7): how long Snooze hides an item
-     * - default_setting (string; ''): the Setting a new use opens with when
-     *   the owner has no earlier use
-     * - daily_email (bool; on), daily_email_hour (int, 0–23 Eastern; 8)
-     * - native_notify_enabled (bool; on), native_notify_hour (int, 0–23
-     *   device-local; 9), native_notify_lead_days (int, 0–14; 3),
-     *   native_notify_past_due (bool; on)
+     * - default_use_interval: days; an item's interaction frequency when it
+     *   has none of its own
+     * - default_snooze_days: how long Snooze hides an item
+     * - default_setting: the Setting a new use opens with when the owner has
+     *   no earlier use
+     * - daily_email, daily_email_hour: whether the daily email goes out, and
+     *   at which Eastern hour
+     * - native_notify_enabled, native_notify_hour (device-local),
+     *   native_notify_lead_days (days before due), native_notify_past_due
      */
     public function get(): array
     {
@@ -51,7 +54,7 @@ final class Preferences
         $stmt->close();
         $preferences = [];
         foreach (self::RULES as $name => $rule) {
-            $preferences[$name] = self::valid($rule, $row[$name] ?? null);
+            $preferences[$name] = self::orDefault($rule, $row[$name] ?? null);
         }
         return $preferences;
     }
@@ -72,7 +75,7 @@ final class Preferences
             $values = [];
             foreach ($changes as $name => $value) {
                 $assignments[] = "{$name} = ?";
-                $value = self::valid(self::RULES[$name], $value);
+                $value = self::orDefault(self::RULES[$name], $value);
                 $values[] = is_bool($value) ? (int) $value : $value;
             }
             $values[] = $this->userId;
@@ -89,8 +92,8 @@ final class Preferences
     {
         $owners = [];
         foreach ($db->query('SELECT id, daily_email, daily_email_hour FROM users ORDER BY id') as $row) {
-            if (self::valid(self::RULES['daily_email'], $row['daily_email'])
-                && self::valid(self::RULES['daily_email_hour'], $row['daily_email_hour']) === $hour) {
+            if (self::orDefault(self::RULES['daily_email'], $row['daily_email'])
+                && self::orDefault(self::RULES['daily_email_hour'], $row['daily_email_hour']) === $hour) {
                 $owners[] = (int) $row['id'];
             }
         }
@@ -98,19 +101,18 @@ final class Preferences
     }
 
     /** $value as the rule's kind, or the rule's default when missing, empty or out of range. */
-    private static function valid(array $rule, $value): float|int|string|bool
+    private static function orDefault(array $rule, $value): float|int|string|bool
     {
-        [$kind, $default, $min, $max] = $rule;
-        if ($value === null || (is_string($value) && trim($value) === '')) {
-            return $default;
+        if ($value === null || $value === '') {
+            return $rule['default'];
         }
-        $range = ['options' => ['min_range' => $min, 'max_range' => $max]];
-        $valid = match ($kind) {
-            'decimal' => filter_var($value, FILTER_VALIDATE_FLOAT, $range + ['flags' => FILTER_NULL_ON_FAILURE]),
+        $range = ['options' => ['min_range' => $rule['min'] ?? null, 'max_range' => $rule['max'] ?? null]];
+        $valid = match ($rule['kind']) {
+            'float' => filter_var($value, FILTER_VALIDATE_FLOAT, $range + ['flags' => FILTER_NULL_ON_FAILURE]),
             'int' => filter_var($value, FILTER_VALIDATE_INT, $range + ['flags' => FILTER_NULL_ON_FAILURE]),
             'string' => is_scalar($value) ? (string) $value : null,
             'bool' => filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE),
         };
-        return $valid ?? $default;
+        return $valid ?? $rule['default'];
     }
 }
