@@ -43,6 +43,14 @@ function use_by_status(array $item, $default_interval, string $today): array {
 }
 
 /**
+ * The interval a page views the queue with, from the $value it was given: a
+ * numeric value as the number it is, anything else $default_interval.
+ */
+function use_by_view_interval($value, $default_interval) {
+    return is_numeric($value) ? 0 + $value : $default_interval;
+}
+
+/**
  * use_by_status()'s use-by date as Y-m-d, or null when there is no basis for
  * one (no valid acquisition date and no use).
  *

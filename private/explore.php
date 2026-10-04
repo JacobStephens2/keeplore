@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/classes/Items.php';
+require_once __DIR__ . '/item_facts.php';
 require_once __DIR__ . '/validation_functions.php';
 
 /**
@@ -21,7 +22,7 @@ const EXPLORE_CHARACTERISTIC_ORDER = [
 ];
 
 /**
- * The owner's items with a Candidate (not blank and not '0'), ordered by
+ * The owner's items that are a Candidate (by item_is_candidate()), ordered by
  * type name, Candidate and Title, ignoring case. $options may hold 'online'
  * ('only' or 'hide'; anything else shows all) and 'exclude_names', names
  * whose Candidates are left out. Both match a substring, ignoring case.
@@ -36,10 +37,10 @@ function candidate_items(mysqli $db, int $user_id, array $type_ids, array $optio
   $rows = array_filter(
     (new Items($db, $user_id))->list(['type_ids' => $type_ids]),
     function (array $row) use ($online, $exclude_names) {
-      $candidate = (string) ($row['Candidate'] ?? '');
-      if (is_blank($candidate) || $candidate === '0') {
+      if (!item_is_candidate($row)) {
         return false;
       }
+      $candidate = (string) ($row['Candidate'] ?? '');
       $is_online = stripos($candidate, 'online') !== false;
       if (($online === 'only' && !$is_online) || ($online === 'hide' && $is_online)) {
         return false;

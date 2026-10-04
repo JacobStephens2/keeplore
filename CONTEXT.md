@@ -74,7 +74,7 @@ The date by which an item should next be used, shown as "Interact by". With no r
 _Avoid_: Play by.
 
 **Use-by queue**:
-The kept items not flagged to get rid of, plus the secondary collection when asked for, each with its last use, the interval its use-by date was counted from, its use-by date, whether it is overdue, due today or upcoming, and whether it is Snoozed. The dashboard, Interact By, the daily email and notifications show it.
+The kept items not flagged to get rid of, plus the secondary collection when asked for, each with its last use, the interval its use-by date was counted from, its use-by date, whether it is overdue, due today or upcoming, and whether it is Snoozed. The dashboard, Interact By, the daily email and notifications show it. The Interact By page reads it through the Interact By page module, which turns the page's filters into the queue's options and presents each entry as a row.
 _Avoid_: Interaction queue.
 
 **Daily email**:
@@ -115,6 +115,9 @@ A player count BoardGameGeek's community voted Best for a game. An open-ended vo
 
 **Sweet spot**:
 The player counts an item plays best at, recorded on the item from BoardGameGeek's Best votes or by hand, in any spelling such as "03,04", "3, 4" or "06-8". Every page that filters or labels items by it reads it from one rule. Distinct from Best player count, BoardGameGeek's own community vote for a game.
+
+**Candidate**:
+An item's free-text note of the group and setting it is earmarked for, as in '03: Ann, Ben at home'. Blank or '0' means the item is not a candidate. Explore's Candidates page lists them, and every page that marks an item as a Candidate reads it from one rule.
 
 **BGG reviewer**:
 A BoardGameGeek user, such as Gyges, whose ratings and comments on the owner's items are imported or entered by hand. The owner names their own reviewer on Settings, whether their own BGG account or someone else's, and may have older ones from earlier imports. Settings imports all of their ratings in the background as a **BGG import**. Items and Search BGG show one column per reviewer; Search BGG fills it from the owner's items that link to the game, kept or not.

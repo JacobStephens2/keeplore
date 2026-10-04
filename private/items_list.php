@@ -68,12 +68,7 @@ function items_list_filters_from_request(
     ];
     $kept = $kept_aliases[$kept] ?? 'allkeptandnot';
 
-    $interval = $post['interval'] ?? $get['interval'] ?? $default_interval;
-    if (!is_numeric($interval)) {
-        $interval = $default_interval;
-    } else {
-        $interval = 0 + $interval;
-    }
+    $interval = use_by_view_interval($post['interval'] ?? $get['interval'] ?? $default_interval, $default_interval);
 
     // sweetSpotFilter is the old name for the count, kept so bookmarks still work.
     $players = $post['players'] ?? $get['players']
@@ -290,9 +285,6 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
     $is_kept = artifact_is_kept($artifact);
     $overdue = $is_kept && $use_by['status'] === 'overdue';
 
-    $mnt = (float) ($artifact['mnt'] ?? $artifact['MnT'] ?? 0);
-    $mxt = (float) ($artifact['mxt'] ?? $artifact['MxT'] ?? 0);
-    $candidate_raw = $artifact['Candidate'] ?? '';
     $min_age = item_min_age($artifact);
 
     return [
@@ -310,8 +302,8 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
         'age' => $min_age === null ? '' : $min_age . '+',
         'copy_text' => item_copy_text($artifact),
         'time' => item_play_time($artifact),
-        'avg_time' => (int) ceil(($mnt + $mxt) / 2),
-        'candidate' => ($candidate_raw != '' && $candidate_raw != 0),
+        'avg_time' => item_average_play_time($artifact),
+        'candidate' => item_is_candidate($artifact),
         'bgg_average' => bgg_overall_rating_text($artifact['BGG_Rat'] ?? $artifact['bgg_rat'] ?? null) ?? '',
         // Keyed by BGG username; an object even when empty so the JSON is {}.
         'bgg_ratings' => empty($artifact['bgg_ratings']) ? new stdClass() : $artifact['bgg_ratings'],

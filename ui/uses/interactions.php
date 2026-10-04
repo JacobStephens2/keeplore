@@ -223,7 +223,7 @@
                   ?>
                   <td class="candidate">
                     <?php
-                      if (h($item['Candidate'] ?? '') != '' && h($item['Candidate'] ?? '') != 0) {
+                      if (item_is_candidate($item)) {
                         echo 'Yes';
                       }
                     ?>
