@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/agent_keys.php';
+require_once __DIR__ . '/classes/ApiCaller.php';
 require_once __DIR__ . '/classes/People.php';
 
 /**
@@ -12,12 +12,12 @@ require_once __DIR__ . '/classes/People.php';
  *
  * Returns [status, response fields].
  */
-function search_people_over_api(mysqli $db, object $authentication, $body): array {
-  $refusal = agent_key_write_refusal($authentication);
+function search_people_over_api(mysqli $db, ApiCaller $caller, $body): array {
+  $refusal = $caller->agentKeyRefusal();
   if ($refusal !== null) {
-    return [403, $refusal];
+    return $refusal;
   }
-  $owner = people_api_owner($authentication);
+  $owner = $caller->owner();
   if ($owner === null) {
     return [400, ['message' => 'users.php requires a user-scoped key.']];
   }
@@ -39,8 +39,8 @@ function search_people_over_api(mysqli $db, object $authentication, $body): arra
  *
  * Returns [status, response fields].
  */
-function list_people_over_api(mysqli $db, object $authentication): array {
-  $owner = people_api_owner($authentication);
+function list_people_over_api(mysqli $db, ApiCaller $caller): array {
+  $owner = $caller->owner();
   if ($owner === null) {
     return [400, ['message' => 'players.php requires a user-scoped key.']];
   }
@@ -53,14 +53,6 @@ function list_people_over_api(mysqli $db, object $authentication): array {
     'birth_year' => $person['birth_year'],
     'represents_user_id' => $person['is_me'] ? $owner : null,
   ], (new People($db, $owner))->all())]];
-}
-
-/**
- * Whose people a request reads: the signed-in user's. Null for the master
- * key, which has no people of its own.
- */
-function people_api_owner(object $authentication): ?int {
-  return isset($authentication->user_id) ? (int) $authentication->user_id : null;
 }
 
 ?>

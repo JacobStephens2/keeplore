@@ -54,9 +54,10 @@ final class AgentCollectionReadTest extends TestCase
         );
         require_once PRIVATE_PATH . '/item_tags.php';
         require_once PRIVATE_PATH . '/kept_status.php';
-        require_once PRIVATE_PATH . '/collection_list.php';
+        require_once PRIVATE_PATH . '/collection_list_api.php';
         require_once PRIVATE_PATH . '/use_api.php';
         require_once PRIVATE_PATH . '/people_api.php';
+        \DatabaseObject::set_database($this->db);
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
     }
 
@@ -232,9 +233,9 @@ final class AgentCollectionReadTest extends TestCase
         $this->assertSame([], list_uses_over_api($this->db, $this->agentKey(1), ['player_id' => '200'])[1]['uses']);
     }
 
-    private function agentKey(int $userId): object
+    private function agentKey(int $userId): \ApiCaller
     {
-        return (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => $userId];
+        return \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => $userId]);
     }
 
     public function test_players_list_is_scoped_to_the_user_with_the_published_fields(): void
@@ -251,9 +252,86 @@ final class AgentCollectionReadTest extends TestCase
 
     public function test_players_list_refuses_the_master_key(): void
     {
-        [$status, $fields] = list_people_over_api($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']);
+        [$status, $fields] = list_people_over_api($this->db, \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']));
 
         $this->assertSame(400, $status);
         $this->assertSame(['message' => 'players.php requires a user-scoped key.'], $fields);
+    }
+
+    private function caller(array $authentication): \ApiCaller
+    {
+        return \ApiCaller::from($this->db, (object) (['authenticated' => true] + $authentication));
+    }
+
+    private function masterKey(): \ApiCaller
+    {
+        return $this->caller(['auth_type' => 'api_key']);
+    }
+
+    public function test_the_list_api_reads_an_agent_key_or_sessions_own_collection_whatever_userid_names(): void
+    {
+        foreach (['agent_key', 'session'] as $type) {
+            [$status, $response] = list_collection_over_api($this->db, $this->caller(['auth_type' => $type, 'user_id' => 1]), (object) ['userid' => 2]);
+
+            $this->assertSame(200, $status, $type);
+            $this->assertSame([12, 11, 10, 13], $this->ids($response['artifacts']));
+            $this->assertSame(['per_page' => 50, 'artifacts' => $response['artifacts'], 'has_more' => false, 'page' => 1], $response);
+        }
+    }
+
+    public function test_the_list_api_reads_the_existing_user_the_master_key_names(): void
+    {
+        [$status, $response] = list_collection_over_api($this->db, $this->masterKey(), (object) ['userid' => '2', 'cursor' => null, 'kept' => true]);
+
+        $this->assertSame(200, $status);
+        $this->assertSame([20], $this->ids($response['artifacts']));
+        $this->assertSame(['per_page' => 50, 'artifacts' => $response['artifacts'], 'has_more' => false, 'next_cursor' => null], $response);
+    }
+
+    public function test_the_list_api_refuses_the_master_key_naming_no_existing_user(): void
+    {
+        foreach ([999, 'me', 0] as $userid) {
+            [$status, $response] = list_collection_over_api($this->db, $this->masterKey(), (object) ['userid' => $userid]);
+
+            $this->assertSame(400, $status, (string) $userid);
+            $this->assertSame(['message' => 'Invalid field: userid must name an existing user.'], $response);
+        }
+    }
+
+    public function test_the_list_api_gives_the_master_key_naming_no_user_the_legacy_all_users_listing(): void
+    {
+        [$status, $response] = list_collection_over_api($this->db, $this->masterKey(), (object) ['per_page' => 2, 'page' => 2]);
+        $this->assertSame(200, $status);
+        $this->assertSame([
+            'per_page' => 2,
+            'artifacts' => [['id' => 10, 'Title' => 'Catan'], ['id' => 13, 'Title' => 'Former possession']],
+            'page' => 2,
+        ], $response);
+
+        foreach ([null, (object) ['userid' => '']] as $body) {
+            [$status, $response] = list_collection_over_api($this->db, $this->masterKey(), $body);
+            $this->assertSame(200, $status);
+            $this->assertSame([12, 11, 10, 13, 20], $this->ids($response['artifacts']));
+        }
+
+        [$status, $response] = list_collection_over_api($this->db, $this->masterKey(), (object) ['cursor' => 11, 'per_page' => 2]);
+        $this->assertSame(200, $status);
+        $this->assertSame([
+            'per_page' => 2,
+            'artifacts' => [['id' => 12, 'Title' => 'Arrival'], ['id' => 13, 'Title' => 'Former possession']],
+            'next_cursor' => 13,
+            'has_more' => true,
+        ], $response);
+    }
+
+    public function test_the_list_api_refuses_filters_without_a_collection_and_an_invalid_request(): void
+    {
+        [$status, $response] = list_collection_over_api($this->db, $this->masterKey(), (object) ['kept' => true]);
+        $this->assertSame(400, $status);
+        $this->assertSame(['message' => 'Filters and extra fields need a collection: send userid.'], $response);
+
+        [$status, $response] = list_collection_over_api($this->db, $this->agentKey(1), (object) ['kept' => 'sometimes']);
+        $this->assertSame(400, $status);
+        $this->assertSame(['message' => 'Invalid list request.', 'errors' => ['kept must be true or false.']], $response);
     }
 }

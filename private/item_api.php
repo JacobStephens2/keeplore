@@ -1,7 +1,10 @@
 <?php
 
-require_once __DIR__ . '/agent_keys.php';
+require_once __DIR__ . '/app_logger.php';
+require_once __DIR__ . '/classes/ApiCaller.php';
 require_once __DIR__ . '/item_tags.php';
+require_once __DIR__ . '/classes/DatabaseObject.class.php';
+require_once __DIR__ . '/classes/Artifact.class.php';
 require_once __DIR__ . '/classes/Items.php';
 
 /** What each item write over HTTP answers with. */
@@ -14,27 +17,57 @@ const ITEM_API_WRITES = [
 const ITEM_API_LOG_ACTIONS = ['POST' => 'create', 'PUT' => 'update', 'DELETE' => 'delete'];
 
 /**
+ * GET /artifact.php: the Item the query's id names, with its tags, from
+ * the caller's own Items. The master key names the owner in the query's
+ * user_id, or naming none reads any Item by id alone, without tags (the
+ * legacy lookup).
+ *
+ * Returns [status, response fields]; on success the fields' artifact is
+ * the Item.
+ */
+function read_item_over_api(mysqli $db, ApiCaller $caller, array $query): array {
+  $id = item_api_positive_int($query['id'] ?? null);
+  if ($id === null) {
+    return [400, ['message' => 'Missing or invalid required parameter: id']];
+  }
+  $owner = $caller->owner($query['user_id'] ?? null);
+  if ($owner === null && isset($query['user_id'])) {
+    return [400, ['message' => 'Missing or invalid required parameter: user_id']];
+  }
+
+  $artifact = $owner === null ? Artifact::find_by_id($id) : Artifact::find_by_id_and_user_id($id, $owner);
+  if (!$artifact) {
+    return [404, ['message' => 'Item not found.']];
+  }
+  if ($owner !== null) {
+    $artifact = with_item_tags($db, [$artifact], $owner)[0];
+  }
+  return [200, ['artifact' => $artifact]];
+}
+
+/**
  * The HTTP API item endpoint's writes: POST creates an Item, PUT patches
  * the Item the body's id names. Both go through the Items module, so an
  * Item written over HTTP follows the Create Item page's rules. Agent keys
  * are refused (ADR-0002).
  *
- * $body is the decoded JSON object; the owner is item_api_owner()'s, with
- * the body's user_id as the master key's choice. Returns [status, response
- * fields]; on success the fields' artifact is the found Item with its tags.
+ * $body is the decoded JSON object; the owner is the caller's, with the
+ * body's user_id as the master key's choice. Returns [status, response
+ * fields]; on success the fields' artifact is the found Item with its
+ * tags, and the write is logged.
  */
-function write_item_over_api(mysqli $db, object $authentication, string $method, $body): array {
+function write_item_over_api(mysqli $db, ApiCaller $caller, string $method, $body): array {
   $write = ITEM_API_WRITES[$method];
-  $refusal = agent_key_write_refusal($authentication);
+  $refusal = $caller->agentKeyRefusal();
   if ($refusal !== null) {
-    return [403, $refusal];
+    return $refusal;
   }
   if (!is_object($body)) {
     return [400, ['message' => 'Invalid or missing JSON request body.']];
   }
   $input = item_api_input($body);
 
-  $owner = item_api_owner($db, $authentication, $input['user_id'] ?? null);
+  $owner = $caller->owner($input['user_id'] ?? null);
   if ($owner === null) {
     return [400, ['message' => 'Missing or invalid required field: user_id']];
   }
@@ -60,31 +93,9 @@ function write_item_over_api(mysqli $db, object $authentication, string $method,
     return [404, ['message' => 'Item not found.']];
   }
 
-  return [$write['status'], [
-    'message' => $write['succeeded'],
-    'artifact' => with_item_tags($db, [$items->find($id)], $owner)[0],
-  ]];
-}
-
-/**
- * Whose Items an item request acts on: the session's user, or with the
- * master key, which has no user of its own, the existing user it names.
- * Null when the master key names no such user.
- */
-function item_api_owner(mysqli $db, object $authentication, $requested_user_id): ?int {
-  if (isset($authentication->user_id)) {
-    return (int) $authentication->user_id;
-  }
-  $user_id = item_api_positive_int($requested_user_id);
-  if ($user_id === null) {
-    return null;
-  }
-  $stmt = $db->prepare('SELECT id FROM users WHERE id = ?');
-  $stmt->bind_param('i', $user_id);
-  $stmt->execute();
-  $exists = $stmt->get_result()->num_rows > 0;
-  $stmt->close();
-  return $exists ? $user_id : null;
+  $item = with_item_tags($db, [$items->find($id)], $owner)[0];
+  log_item_write_over_api($method, $item);
+  return [$write['status'], ['message' => $write['succeeded'], 'artifact' => $item]];
 }
 
 /**
@@ -92,18 +103,18 @@ function item_api_owner(mysqli $db, object $authentication, $requested_user_id):
  * names, with everything that points at it, through the Items module.
  * The master key names the owner in the query's user_id. Agent keys are
  * refused (ADR-0002). Returns [status, response fields]; on success the
- * fields' artifact is the deleted Item.
+ * fields' artifact is the deleted Item, and the write is logged.
  */
-function delete_item_over_api(mysqli $db, object $authentication, array $query): array {
-  $refusal = agent_key_write_refusal($authentication);
+function delete_item_over_api(mysqli $db, ApiCaller $caller, array $query): array {
+  $refusal = $caller->agentKeyRefusal();
   if ($refusal !== null) {
-    return [403, $refusal];
+    return $refusal;
   }
   $id = item_api_positive_int($query['id'] ?? null);
   if ($id === null) {
     return [400, ['message' => 'Missing or invalid required parameter: id']];
   }
-  $owner = item_api_owner($db, $authentication, $query['user_id'] ?? null);
+  $owner = $caller->owner($query['user_id'] ?? null);
   if ($owner === null) {
     return [400, ['message' => 'Missing or invalid required parameter: user_id']];
   }
@@ -115,7 +126,13 @@ function delete_item_over_api(mysqli $db, object $authentication, array $query):
   } catch (OutOfBoundsException $not_found) {
     return [404, ['message' => 'Item not found.']];
   }
+  log_item_write_over_api('DELETE', $item);
   return [200, ['message' => 'Item deleted successfully.', 'artifact' => $item]];
+}
+
+/** Logs an item write over HTTP under $method's action. */
+function log_item_write_over_api(string $method, array $item): void {
+  (new AppLogger())->logDataChange(ITEM_API_LOG_ACTIONS[$method], 'artifact', $item['id'], ['title' => $item['Title']]);
 }
 
 /** A request's id as a positive whole number, or null. */
