@@ -8,7 +8,7 @@
  * import.
  */
 
-require_once __DIR__ . '/bgg_ratings.php';
+require_once __DIR__ . '/classes/BggRatings.php';
 
 // A job the worker has not touched for this long is dead: a running one
 // stopped mid-import, and a queued one was never picked up.
@@ -56,7 +56,7 @@ function bgg_import_job_view($conn, $user_id) {
   $active = bgg_import_job_is_active($job);
   return [
     'active' => $active,
-    'can_queue' => !$active && user_bgg_username($conn, $user_id) !== null,
+    'can_queue' => !$active && (new BggRatings($conn, (int) $user_id))->ownReviewer() !== null,
     'text' => bgg_import_job_status_text($job),
   ];
 }
@@ -68,7 +68,7 @@ function bgg_import_job_view($conn, $user_id) {
  */
 function bgg_import_job_queue($conn, $user_id) {
   $user_id = (int) $user_id;
-  $username = user_bgg_username($conn, $user_id);
+  $username = (new BggRatings($conn, $user_id))->ownReviewer();
   if ($username === null) {
     return ['ok' => false, 'error' => 'Name a BoardGameGeek reviewer above first.'];
   }
@@ -175,19 +175,19 @@ function bgg_import_job_run($conn, array $job, $get_json, $pause_ms) {
   $total = null;
   $last = [];
   try {
-    $result = bgg_ratings_import($conn, (int) $job['user_id'], $job['bgg_username'], $get_json, $pause_ms,
+    $result = (new BggRatings($conn, (int) $job['user_id'], $get_json))->import($job['bgg_username'], $pause_ms,
       function (array $progress, $count) use ($conn, $job_id, &$total, &$last) {
         $total = $count;
         $last = $progress;
         bgg_import_job_record($conn, $job_id, 'running', $progress, $total);
       });
+  } catch (InvalidArgumentException | OutOfBoundsException | BggUnreachable $e) {
+    bgg_import_job_record($conn, $job_id, 'failed', $last, $total, $e->getMessage());
+    return;
   } catch (Throwable $e) {
+    // A database error's text is not for the owner.
     error_log('BGG import job ' . $job_id . ' failed: ' . $e->getMessage());
     bgg_import_job_record($conn, $job_id, 'failed', $last, $total, 'The import hit an unexpected error.');
-    return;
-  }
-  if (!$result['ok']) {
-    bgg_import_job_record($conn, $job_id, 'failed', $last, $total, $result['error']);
     return;
   }
   bgg_import_job_record($conn, $job_id, 'done', $result, $total);

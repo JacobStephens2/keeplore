@@ -14,7 +14,6 @@ if ($argc !== 2 && $argc !== 3) {
 }
 
 require_once dirname(__DIR__) . '/private/initialize.php';
-require_once PRIVATE_PATH . '/bgg_ratings.php';
 ob_end_flush();
 
 $stmt = mysqli_prepare($db, 'SELECT id FROM users WHERE email = ?');
@@ -26,18 +25,20 @@ if (!$owner) {
   exit(1);
 }
 
+$bgg_ratings = new BggRatings($db, (int) $owner['id']);
 $bgg_username = trim($argv[2] ?? '');
 if ($bgg_username === '') {
-  $bgg_username = user_bgg_username($db, (int) $owner['id']);
+  $bgg_username = $bgg_ratings->ownReviewer();
 }
 if ($bgg_username === null) {
   fwrite(STDERR, "{$argv[1]} has no BoardGameGeek reviewer on Settings. Name one: bin/import-bgg-ratings <keeplore-email> <bgg-username>\n");
   exit(2);
 }
 
-$result = bgg_ratings_import($db, (int) $owner['id'], $bgg_username);
-if (!$result['ok']) {
-  fwrite(STDERR, $result['error'] . "\n");
+try {
+  $result = $bgg_ratings->import($bgg_username);
+} catch (InvalidArgumentException | BggUnreachable $e) {
+  fwrite(STDERR, $e->getMessage() . "\n");
   exit(1);
 }
 printf(

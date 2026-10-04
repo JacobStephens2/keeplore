@@ -170,7 +170,8 @@ class BggRatingsTest extends TestCase
         foreach (['artifact_id', 'bgg_username', 'rating', 'comment'] as $field) {
             $this->assertMatchesRegularExpression('/name="' . $field . '"/', $edit);
         }
-        $this->assertStringContainsString('bgg_ratings_save_item(', $save);
+        $this->assertStringContainsString('new BggRatings(', $save);
+        $this->assertStringContainsString('->save(', $save);
         $this->assertStringContainsString('require_login()', $save);
     }
 
@@ -180,8 +181,10 @@ class BggRatingsTest extends TestCase
         $cli = (string) file_get_contents(PROJECT_PATH . '/bin/import-bgg-ratings');
 
         $this->assertMatchesRegularExpression('/name="bgg_username"/', $settings);
-        $this->assertStringContainsString('user_bgg_username_set(', $settings);
-        $this->assertStringContainsString('user_bgg_username(', $cli);
+        $this->assertStringContainsString('new BggRatings(', $settings);
+        $this->assertStringContainsString('->setOwnReviewer(', $settings);
+        $this->assertStringContainsString('new BggRatings(', $cli);
+        $this->assertStringContainsString('->ownReviewer(', $cli);
     }
 
     public function test_item_page_marks_a_hand_entry_as_not_from_bgg(): void

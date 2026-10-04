@@ -12,7 +12,6 @@ if ($argc !== 2) {
 }
 
 require_once dirname(__DIR__) . '/private/initialize.php';
-require_once PRIVATE_PATH . '/bgg_ratings.php';
 ob_end_flush();
 
 $stmt = mysqli_prepare($db, 'SELECT id FROM users WHERE email = ?');
@@ -24,7 +23,7 @@ if (!$owner) {
   exit(1);
 }
 
-$result = bgg_overall_ratings_import($db, (int) $owner['id']);
+$result = (new BggRatings($db, (int) $owner['id']))->importAverages();
 printf(
   "Checked %d linked items, stored %d averages, cleared %d, failed %d.\n",
   $result['checked'],

@@ -41,7 +41,7 @@ final class BggRatingsImportTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings-manual.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-user-bgg-username.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-user-bgg-username.sql'));
-        require_once PRIVATE_PATH . '/bgg_ratings.php';
+        require_once PRIVATE_PATH . '/classes/BggRatings.php';
 
         // Fixture items 10-13 belong to user 1, item 20 to user 2.
         $this->db->query("UPDATE games SET bgg_url = 'https://boardgamegeek.com/boardgame/147154/blue-moon-legends' WHERE id = 10");
@@ -94,13 +94,37 @@ final class BggRatingsImportTest extends TestCase
         ];
     }
 
+    /** The owner's BGG ratings module, asking $bgg instead of BoardGameGeek. */
+    private function ratings(?callable $bgg = null, int $owner = 1): \BggRatings
+    {
+        return new \BggRatings($this->db, $owner, $bgg ?? function (string $url) {
+            throw new \RuntimeException('BGG must not be asked: ' . $url);
+        });
+    }
+
+    /** What $act threw; fails when it throws nothing. */
+    private function refusal(callable $act): \Throwable
+    {
+        try {
+            $act();
+        } catch (\Throwable $e) {
+            return $e;
+        }
+        $this->fail('Expected a refusal.');
+    }
+
+    private function assertRefused(string $class, string $message, \Throwable $refusal): void
+    {
+        $this->assertInstanceOf($class, $refusal);
+        $this->assertSame($message, $refusal->getMessage());
+    }
+
     public function test_import_stores_ratings_for_the_owners_linked_items(): void
     {
-        $result = bgg_ratings_import($this->db, 1, 'gyges', $this->fakeBgg([
+        $result = $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'The best card game ever.'),
-        ]), 0);
+        ]))->import('gyges', 0);
 
-        $this->assertTrue($result['ok']);
         $this->assertSame('Gyges', $result['username']);
         $this->assertSame(2, $result['checked']);
         $this->assertSame(1, $result['imported']);
@@ -109,7 +133,7 @@ final class BggRatingsImportTest extends TestCase
             $this->assertStringNotContainsString('objectid=421', $url, "user 2's item must not be looked up");
         }
 
-        $ratings = find_item_bgg_ratings($this->db, [10, 11, 12, 13, 20], 1);
+        $ratings = $this->ratings()->forItems([10, 11, 12, 13, 20]);
         $this->assertSame([
             10 => ['Gyges' => [
                 'rating' => 9.5,
@@ -118,24 +142,24 @@ final class BggRatingsImportTest extends TestCase
                 'manual' => false,
             ]],
         ], $ratings);
-        $this->assertSame(['Gyges'], item_bgg_reviewers($this->db, 1));
-        $this->assertSame([], item_bgg_reviewers($this->db, 2));
+        $this->assertSame(['Gyges'], $this->ratings()->reviewers());
+        $this->assertSame([], $this->ratings(null, 2)->reviewers());
     }
 
     public function test_rerun_updates_changed_ratings_and_drops_withdrawn_ones(): void
     {
-        bgg_ratings_import($this->db, 1, 'Gyges', $this->fakeBgg([
+        $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'First take.'),
             29107 => $this->blueMoonEntry(6.0, 'Meh.'),
-        ]), 0);
+        ]))->import('Gyges', 0);
 
-        $result = bgg_ratings_import($this->db, 1, 'Gyges', $this->fakeBgg([
+        $result = $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(10.0, 'Second take.'),
-        ]), 0);
+        ]))->import('Gyges', 0);
 
         $this->assertSame(1, $result['imported']);
         $this->assertSame(1, $result['removed']);
-        $ratings = find_item_bgg_ratings($this->db, [10, 11], 1);
+        $ratings = $this->ratings()->forItems([10, 11]);
         $this->assertSame([10], array_keys($ratings));
         $this->assertSame(10.0, $ratings[10]['Gyges']['rating']);
         $this->assertSame('Second take.', $ratings[10]['Gyges']['comment']);
@@ -143,32 +167,32 @@ final class BggRatingsImportTest extends TestCase
 
     public function test_rerun_drops_the_rating_of_an_item_whose_link_was_removed(): void
     {
-        bgg_ratings_import($this->db, 1, 'Gyges', $this->fakeBgg([
+        $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'Linked.'),
-        ]), 0);
+        ]))->import('Gyges', 0);
         $this->db->query('UPDATE games SET bgg_url = NULL WHERE id = 10');
 
-        $result = bgg_ratings_import($this->db, 1, 'Gyges', $this->fakeBgg([]), 0);
+        $result = $this->ratings($this->fakeBgg([]))->import('Gyges', 0);
 
         $this->assertSame(1, $result['removed']);
-        $this->assertSame([], find_item_bgg_ratings($this->db, [10, 11], 1));
+        $this->assertSame([], $this->ratings()->forItems([10, 11]));
     }
 
     public function test_deleting_the_only_rated_item_drops_the_reviewer_column(): void
     {
-        bgg_ratings_import($this->db, 1, 'Gyges', $this->fakeBgg([
+        $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'Soon deleted.'),
-        ]), 0);
+        ]))->import('Gyges', 0);
         $this->db->query('DELETE FROM games WHERE id = 10');
 
-        $this->assertSame([], item_bgg_reviewers($this->db, 1));
+        $this->assertSame([], $this->ratings()->reviewers());
     }
 
     public function test_a_failed_lookup_keeps_that_items_earlier_rating(): void
     {
-        bgg_ratings_import($this->db, 1, 'Gyges', $this->fakeBgg([
+        $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'Kept through an outage.'),
-        ]), 0);
+        ]))->import('Gyges', 0);
 
         $flaky = function (string $url) {
             if (str_contains($url, '/users?')) {
@@ -176,105 +200,99 @@ final class BggRatingsImportTest extends TestCase
             }
             throw new \RuntimeException('BoardGameGeek HTTP 503');
         };
-        $result = bgg_ratings_import($this->db, 1, 'Gyges', $flaky, 0);
+        $result = $this->ratings($flaky)->import('Gyges', 0);
 
         $this->assertSame(2, $result['failed']);
         $this->assertSame(0, $result['removed']);
-        $this->assertSame('Kept through an outage.', find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['comment']);
+        $this->assertSame('Kept through an outage.', $this->ratings()->forItems([10])[10]['Gyges']['comment']);
     }
 
     public function test_one_item_import_stores_that_items_rating_only(): void
     {
-        $result = bgg_ratings_import_item($this->db, 1, 10, 'gyges', $this->fakeBgg([
+        $message = $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'Imported alone.'),
             29107 => $this->blueMoonEntry(6.0, 'Not asked for.'),
-        ]));
+        ]))->request(10, 'gyges');
 
-        $this->assertTrue($result['ok']);
-        $this->assertSame('Gyges rated it 9.5 out of 10.', $result['message']);
-        $this->assertSame([10], array_keys(find_item_bgg_ratings($this->db, [10, 11], 1)));
-        $this->assertSame('Imported alone.', find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['comment']);
+        $this->assertSame('Gyges rated it 9.5 out of 10.', $message);
+        $this->assertSame([10], array_keys($this->ratings()->forItems([10, 11])));
+        $this->assertSame('Imported alone.', $this->ratings()->forItems([10])[10]['Gyges']['comment']);
     }
 
     public function test_one_item_import_with_no_bgg_entry_clears_the_old_one(): void
     {
-        bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $this->fakeBgg([
+        $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'Withdrawn later.'),
-        ]));
+        ]))->request(10, 'Gyges');
 
-        $result = bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $this->fakeBgg([]));
+        $message = $this->ratings($this->fakeBgg([]))->request(10, 'Gyges');
 
-        $this->assertTrue($result['ok']);
-        $this->assertSame('Gyges has not rated or commented on this item on BoardGameGeek.', $result['message']);
-        $this->assertSame([], find_item_bgg_ratings($this->db, [10], 1));
+        $this->assertSame('Gyges has not rated or commented on this item on BoardGameGeek.', $message);
+        $this->assertSame([], $this->ratings()->forItems([10]));
     }
 
     public function test_one_item_import_refuses_unlinked_and_other_owners_items(): void
     {
-        $bgg = $this->fakeBgg([421 => $this->blueMoonEntry(7.0, 'Private.')]);
+        $ratings = $this->ratings($this->fakeBgg([421 => $this->blueMoonEntry(7.0, 'Private.')]));
 
-        $unlinked = bgg_ratings_import_item($this->db, 1, 12, 'Gyges', $bgg);
-        $not_owned = bgg_ratings_import_item($this->db, 1, 20, 'Gyges', $bgg);
-
-        $this->assertFalse($unlinked['ok']);
-        $this->assertSame('Add a BoardGameGeek link to this item first.', $unlinked['error']);
-        $this->assertFalse($not_owned['ok']);
-        $this->assertSame('Item not found.', $not_owned['error']);
-        $this->assertSame([], find_item_bgg_ratings($this->db, [20], 2));
+        $this->assertRefused(\InvalidArgumentException::class, 'Add a BoardGameGeek link to this item first.',
+            $this->refusal(fn () => $ratings->request(12, 'Gyges')));
+        $this->assertRefused(\OutOfBoundsException::class, 'Item not found.',
+            $this->refusal(fn () => $ratings->request(20, 'Gyges')));
+        $this->assertSame([], $this->ratings(null, 2)->forItems([20]));
     }
 
     public function test_one_item_import_keeps_the_old_rating_when_bgg_fails(): void
     {
-        bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $this->fakeBgg([
+        $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'Survives.'),
-        ]));
+        ]))->request(10, 'Gyges');
 
-        $result = bgg_ratings_import_item($this->db, 1, 10, 'Gyges', function (string $url) {
+        $refusal = $this->refusal(fn () => $this->ratings(function (string $url) {
             if (str_contains($url, '/users?')) {
                 return '[{"userid":63428,"username":"Gyges"}]';
             }
             throw new \RuntimeException('BoardGameGeek HTTP 503');
-        });
+        })->request(10, 'Gyges'));
 
-        $this->assertFalse($result['ok']);
-        $this->assertSame('Could not reach BoardGameGeek.', $result['error']);
-        $this->assertSame('Survives.', find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['comment']);
+        $this->assertRefused(\BggUnreachable::class, 'Could not reach BoardGameGeek.', $refusal);
+        $this->assertInstanceOf(\RuntimeException::class, $refusal);
+        $this->assertSame('Survives.', $this->ratings()->forItems([10])[10]['Gyges']['comment']);
     }
 
     public function test_an_empty_or_garbled_bgg_answer_keeps_the_old_rating(): void
     {
-        bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $this->fakeBgg([
+        $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'Not wiped by a queued reply.'),
-        ]));
+        ]))->request(10, 'Gyges');
 
-        $queued = function (string $url) {
+        $queued = $this->ratings(function (string $url) {
             return str_contains($url, '/users?') ? '[{"userid":63428,"username":"Gyges"}]' : '';
-        };
-        $result = bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $queued);
-        $bulk = bgg_ratings_import($this->db, 1, 'Gyges', $queued, 0);
+        });
+        $refusal = $this->refusal(fn () => $queued->request(10, 'Gyges'));
+        $bulk = $queued->import('Gyges', 0);
 
-        $this->assertFalse($result['ok']);
+        $this->assertInstanceOf(\BggUnreachable::class, $refusal);
         $this->assertSame(2, $bulk['failed']);
         $this->assertSame(0, $bulk['removed']);
-        $this->assertSame('Not wiped by a queued reply.', find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['comment']);
+        $this->assertSame('Not wiped by a queued reply.', $this->ratings()->forItems([10])[10]['Gyges']['comment']);
     }
 
     private function importGygesOnBlueMoon(): void
     {
-        bgg_ratings_import_item($this->db, 1, 10, 'Gyges', $this->fakeBgg([
+        $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'The best card game ever.'),
-        ]));
+        ]))->request(10, 'Gyges');
     }
 
     public function test_owner_edits_an_imported_rating_and_comment(): void
     {
         $this->importGygesOnBlueMoon();
 
-        $result = bgg_ratings_save_item($this->db, 1, 10, 'gyges', ' 8.5 ', "  Still great.\nJust not the best.  ");
+        $message = $this->ratings()->save(10, 'gyges', ' 8.5 ', "  Still great.\nJust not the best.  ");
 
-        $this->assertTrue($result['ok']);
-        $this->assertSame("Saved Gyges' rating and comment.", $result['message']);
-        $saved = find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges'];
+        $this->assertSame("Saved Gyges' rating and comment.", $message);
+        $saved = $this->ratings()->forItems([10])[10]['Gyges'];
         $this->assertSame(8.5, $saved['rating']);
         $this->assertSame("Still great.\nJust not the best.", $saved['comment']);
         $rated_at = $this->db->query('SELECT rated_at FROM item_bgg_ratings WHERE artifact_id = 10')->fetch_row()[0];
@@ -285,37 +303,34 @@ final class BggRatingsImportTest extends TestCase
     {
         $this->importGygesOnBlueMoon();
 
-        $result = bgg_ratings_save_item($this->db, 1, 11, 'Gyges', '', 'Comment only.');
+        $this->ratings()->save(11, 'Gyges', '', 'Comment only.');
 
-        $this->assertTrue($result['ok']);
         $this->assertSame(['Gyges' => [
             'rating' => null,
             'comment' => 'Comment only.',
             'url' => 'https://boardgamegeek.com/boardgame/29107',
             'manual' => true,
-        ]], find_item_bgg_ratings($this->db, [11], 1)[11]);
+        ]], $this->ratings()->forItems([11])[11]);
     }
 
     public function test_clearing_both_fields_removes_the_rating(): void
     {
         $this->importGygesOnBlueMoon();
 
-        $result = bgg_ratings_save_item($this->db, 1, 10, 'Gyges', ' ', '');
+        $message = $this->ratings()->save(10, 'Gyges', ' ', '');
 
-        $this->assertTrue($result['ok']);
-        $this->assertSame("Removed Gyges' rating and comment.", $result['message']);
-        $this->assertSame([], find_item_bgg_ratings($this->db, [10], 1));
+        $this->assertSame("Removed Gyges' rating and comment.", $message);
+        $this->assertSame([], $this->ratings()->forItems([10]));
     }
 
     public function test_a_rating_outside_one_to_ten_changes_nothing(): void
     {
         $this->importGygesOnBlueMoon();
 
-        $result = bgg_ratings_save_item($this->db, 1, 10, 'Gyges', '10.5', 'Overwritten?');
+        $refusal = $this->refusal(fn () => $this->ratings()->save(10, 'Gyges', '10.5', 'Overwritten?'));
 
-        $this->assertFalse($result['ok']);
-        $this->assertSame('A rating is a number from 1 to 10.', $result['error']);
-        $this->assertSame(9.5, find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges']['rating']);
+        $this->assertRefused(\InvalidArgumentException::class, 'A rating is a number from 1 to 10.', $refusal);
+        $this->assertSame(9.5, $this->ratings()->forItems([10])[10]['Gyges']['rating']);
     }
 
     public function test_owner_adds_a_rating_to_an_item_with_no_bgg_link(): void
@@ -323,28 +338,27 @@ final class BggRatingsImportTest extends TestCase
         $this->importGygesOnBlueMoon();
 
         // Item 12 has no BGG link and no Gyges row.
-        $result = bgg_ratings_save_item($this->db, 1, 12, 'Gyges', '7', 'Fun with kids.');
+        $this->ratings()->save(12, 'Gyges', '7', 'Fun with kids.');
 
-        $this->assertTrue($result['ok']);
         $this->assertSame(
             ['rating' => 7.0, 'comment' => 'Fun with kids.', 'url' => '', 'manual' => true],
-            find_item_bgg_ratings($this->db, [12], 1)[12]['Gyges']
+            $this->ratings()->forItems([12])[12]['Gyges']
         );
     }
 
     public function test_bulk_import_leaves_hand_entries_alone(): void
     {
         $this->importGygesOnBlueMoon();
-        bgg_ratings_save_item($this->db, 1, 10, 'Gyges', '4', 'My own take.');
-        bgg_ratings_save_item($this->db, 1, 11, 'Gyges', '5', 'BGG has nothing.');
-        bgg_ratings_save_item($this->db, 1, 12, 'Gyges', '6', 'No link at all.');
+        $this->ratings()->save(10, 'Gyges', '4', 'My own take.');
+        $this->ratings()->save(11, 'Gyges', '5', 'BGG has nothing.');
+        $this->ratings()->save(12, 'Gyges', '6', 'No link at all.');
 
-        $result = bgg_ratings_import($this->db, 1, 'Gyges', $this->fakeBgg([
+        $result = $this->ratings($this->fakeBgg([
             147154 => $this->blueMoonEntry(9.5, 'From BGG.'),
-        ]), 0);
+        ]))->import('Gyges', 0);
 
         $this->assertSame(0, $result['removed']);
-        $ratings = find_item_bgg_ratings($this->db, [10, 11, 12], 1);
+        $ratings = $this->ratings()->forItems([10, 11, 12]);
         $this->assertSame('My own take.', $ratings[10]['Gyges']['comment']);
         $this->assertSame('BGG has nothing.', $ratings[11]['Gyges']['comment']);
         $this->assertSame('No link at all.', $ratings[12]['Gyges']['comment']);
@@ -353,23 +367,22 @@ final class BggRatingsImportTest extends TestCase
     public function test_requesting_one_item_keeps_a_hand_entry_bgg_has_nothing_for(): void
     {
         $this->importGygesOnBlueMoon();
-        bgg_ratings_save_item($this->db, 1, 11, 'Gyges', '5', 'Mine.');
+        $this->ratings()->save(11, 'Gyges', '5', 'Mine.');
 
-        $result = bgg_ratings_import_item($this->db, 1, 11, 'Gyges', $this->fakeBgg([]));
+        $message = $this->ratings($this->fakeBgg([]))->request(11, 'Gyges');
 
-        $this->assertTrue($result['ok']);
-        $this->assertSame('Gyges has not rated or commented on this item on BoardGameGeek, so your entry stays.', $result['message']);
-        $this->assertSame('Mine.', find_item_bgg_ratings($this->db, [11], 1)[11]['Gyges']['comment']);
+        $this->assertSame('Gyges has not rated or commented on this item on BoardGameGeek, so your entry stays.', $message);
+        $this->assertSame('Mine.', $this->ratings()->forItems([11])[11]['Gyges']['comment']);
     }
 
     public function test_requesting_one_item_replaces_a_hand_entry_with_bgg_data(): void
     {
         $this->importGygesOnBlueMoon();
-        bgg_ratings_save_item($this->db, 1, 10, 'Gyges', '5', 'Mine.');
+        $this->ratings()->save(10, 'Gyges', '5', 'Mine.');
 
         $this->importGygesOnBlueMoon();
 
-        $rating = find_item_bgg_ratings($this->db, [10], 1)[10]['Gyges'];
+        $rating = $this->ratings()->forItems([10])[10]['Gyges'];
         $this->assertSame('The best card game ever.', $rating['comment']);
         $this->assertFalse($rating['manual']);
     }
@@ -378,25 +391,40 @@ final class BggRatingsImportTest extends TestCase
     {
         $this->importGygesOnBlueMoon();
 
-        $stranger = bgg_ratings_save_item($this->db, 1, 10, 'Someone', '7', '');
-        $not_owned = bgg_ratings_save_item($this->db, 1, 20, 'Gyges', '7', '');
-        $other_owner = bgg_ratings_save_item($this->db, 2, 20, 'Gyges', '7', '');
+        $this->assertRefused(\InvalidArgumentException::class, 'Someone is not one of your BoardGameGeek reviewers.',
+            $this->refusal(fn () => $this->ratings()->save(10, 'Someone', '7', '')));
+        $this->assertRefused(\OutOfBoundsException::class, 'Item not found.',
+            $this->refusal(fn () => $this->ratings()->save(20, 'Gyges', '7', '')));
+        $this->assertRefused(\InvalidArgumentException::class, 'Gyges is not one of your BoardGameGeek reviewers.',
+            $this->refusal(fn () => $this->ratings(null, 2)->save(20, 'Gyges', '7', '')));
+        $this->assertSame([], $this->ratings(null, 2)->forItems([20]));
+    }
 
-        $this->assertSame('Someone is not one of your BoardGameGeek reviewers.', $stranger['error']);
-        $this->assertSame('Item not found.', $not_owned['error']);
-        $this->assertSame('Gyges is not one of your BoardGameGeek reviewers.', $other_owner['error']);
-        $this->assertSame([], find_item_bgg_ratings($this->db, [20], 2));
+    public function test_another_owners_item_is_not_found_by_save_or_request(): void
+    {
+        $this->importGygesOnBlueMoon();
+        $bgg = $this->fakeBgg([421 => $this->blueMoonEntry(7.0, 'Not yours.')]);
+
+        foreach ([
+            fn () => $this->ratings($bgg)->save(20, 'Gyges', '7', 'Not yours.'),
+            fn () => $this->ratings($bgg)->request(20, 'Gyges'),
+        ] as $act) {
+            $this->assertRefused(\OutOfBoundsException::class, 'Item not found.', $this->refusal($act));
+        }
+        $this->assertSame(0, (int) $this->db->query('SELECT COUNT(*) FROM item_bgg_ratings WHERE artifact_id = 20')->fetch_row()[0]);
+        foreach ($this->requested as $url) {
+            $this->assertStringNotContainsString('objectid=421', $url, "user 2's item must not be looked up");
+        }
     }
 
     public function test_unknown_username_imports_nothing(): void
     {
-        $result = bgg_ratings_import($this->db, 1, 'nosuchuser', function () {
+        $refusal = $this->refusal(fn () => $this->ratings(function () {
             return '[]';
-        }, 0);
+        })->import('nosuchuser', 0));
 
-        $this->assertFalse($result['ok']);
-        $this->assertSame('No BoardGameGeek user named nosuchuser.', $result['error']);
-        $this->assertSame([], item_bgg_reviewers($this->db, 1));
+        $this->assertRefused(\InvalidArgumentException::class, 'No BoardGameGeek user named nosuchuser.', $refusal);
+        $this->assertSame([], $this->ratings()->reviewers());
     }
 
     public function test_overall_rating_import_stores_the_average_and_keeps_it_through_an_outage(): void
@@ -406,7 +434,7 @@ final class BggRatingsImportTest extends TestCase
         $this->db->query("UPDATE games SET BGG_Rat = '9.00' WHERE id = 20");
 
         $calls = 0;
-        $result = bgg_overall_ratings_import($this->db, 1, function (string $url) use (&$calls) {
+        $result = $this->ratings(function (string $url) use (&$calls) {
             $calls++;
             if (str_contains($url, 'objectid=147154')) {
                 return json_encode(['item' => ['stats' => ['average' => '7.654', 'baverage' => '6.1']]]);
@@ -415,22 +443,22 @@ final class BggRatingsImportTest extends TestCase
                 throw new \RuntimeException('down');
             }
             throw new \RuntimeException('unexpected ' . $url);
-        }, 0);
+        })->importAverages(0);
 
         $this->assertSame(2, $calls);
-        $this->assertSame(['ok' => true, 'checked' => 3, 'imported' => 2, 'cleared' => 0, 'failed' => 1], $result);
+        $this->assertSame(['checked' => 3, 'imported' => 2, 'cleared' => 0, 'failed' => 1], $result);
         $this->assertSame('7.65', $this->rating(10));
         $this->assertSame('7.65', $this->rating(13));
         $this->assertSame('5.50', $this->rating(11));
         $this->assertNull($this->rating(12));
         $this->assertSame('9.00', $this->rating(20));
 
-        $cleared = bgg_overall_ratings_import($this->db, 1, function (string $url) {
+        $cleared = $this->ratings(function (string $url) {
             if (str_contains($url, 'objectid=147154')) {
                 return json_encode(['item' => ['stats' => ['average' => '']]]);
             }
             return '{"queued":true}';
-        }, 0);
+        })->importAverages(0);
         $this->assertSame(2, $cleared['cleared']);
         $this->assertSame(1, $cleared['failed']);
         $this->assertNull($this->rating(10));
@@ -440,78 +468,92 @@ final class BggRatingsImportTest extends TestCase
 
     public function test_profile_reviewer_is_stored_as_bgg_spells_it(): void
     {
-        $this->assertNull(user_bgg_username($this->db, 1));
+        $this->assertNull($this->ratings()->ownReviewer());
 
-        $result = user_bgg_username_set($this->db, 1, '  gyges ', $this->fakeBgg([]));
+        $message = $this->ratings($this->fakeBgg([]))->setOwnReviewer('  gyges ');
 
-        $this->assertSame(['ok' => true, 'username' => 'Gyges', 'message' => 'Your BoardGameGeek reviewer is now Gyges.'], $result);
-        $this->assertSame('Gyges', user_bgg_username($this->db, 1));
-        $this->assertNull(user_bgg_username($this->db, 2));
+        $this->assertSame('Your BoardGameGeek reviewer is now Gyges.', $message);
+        $this->assertSame('Gyges', $this->ratings()->ownReviewer());
+        $this->assertNull($this->ratings(null, 2)->ownReviewer());
     }
 
     public function test_profile_reviewer_left_as_is_does_not_ask_bgg(): void
     {
-        user_bgg_username_set($this->db, 1, 'Gyges', $this->fakeBgg([]));
+        $this->ratings($this->fakeBgg([]))->setOwnReviewer('Gyges');
 
-        $result = user_bgg_username_set($this->db, 1, 'GYGES', function () {
-            throw new \RuntimeException('BGG must not be asked again');
-        });
+        $message = $this->ratings()->setOwnReviewer('GYGES');
 
-        $this->assertSame(['ok' => true, 'username' => 'Gyges', 'message' => null], $result);
+        $this->assertNull($message);
+        $this->assertSame('Gyges', $this->ratings()->ownReviewer());
     }
 
     public function test_profile_reviewer_left_blank_says_nothing(): void
     {
-        $result = user_bgg_username_set($this->db, 1, '', function () {
-            throw new \RuntimeException('BGG must not be asked');
-        });
-
-        $this->assertSame(['ok' => true, 'username' => null, 'message' => null], $result);
+        $this->assertNull($this->ratings()->setOwnReviewer(''));
+        $this->assertNull($this->ratings()->ownReviewer());
     }
 
     public function test_profile_reviewer_clears_when_blank_and_keeps_the_ratings(): void
     {
-        user_bgg_username_set($this->db, 1, 'Gyges', $this->fakeBgg([]));
+        $this->ratings($this->fakeBgg([]))->setOwnReviewer('Gyges');
         $this->importGygesOnBlueMoon();
 
-        $result = user_bgg_username_set($this->db, 1, ' ', $this->fakeBgg([]));
+        $message = $this->ratings()->setOwnReviewer(' ');
 
-        $this->assertSame(['ok' => true, 'username' => null, 'message' => 'You no longer have a BoardGameGeek reviewer.'], $result);
-        $this->assertNull(user_bgg_username($this->db, 1));
-        $this->assertSame(['Gyges'], item_bgg_reviewers($this->db, 1));
+        $this->assertSame('You no longer have a BoardGameGeek reviewer.', $message);
+        $this->assertNull($this->ratings()->ownReviewer());
+        $this->assertSame(['Gyges'], $this->ratings()->reviewers());
     }
 
     public function test_profile_reviewer_must_be_a_bgg_user(): void
     {
-        user_bgg_username_set($this->db, 1, 'Gyges', $this->fakeBgg([]));
+        $this->ratings($this->fakeBgg([]))->setOwnReviewer('Gyges');
 
-        $unknown = user_bgg_username_set($this->db, 1, 'nosuchuser', function () {
+        $unknown = $this->refusal(fn () => $this->ratings(function () {
             return '[]';
-        });
-        $offline = user_bgg_username_set($this->db, 1, 'Someone', function () {
+        })->setOwnReviewer('nosuchuser'));
+        $offline = $this->refusal(fn () => $this->ratings(function () {
             throw new \RuntimeException('offline');
-        });
-        $too_long = user_bgg_username_set($this->db, 1, str_repeat('x', 65), $this->fakeBgg([]));
+        })->setOwnReviewer('Someone'));
+        $too_long = $this->refusal(fn () => $this->ratings($this->fakeBgg([]))->setOwnReviewer(str_repeat('x', 65)));
 
-        $this->assertSame('No BoardGameGeek user named nosuchuser.', $unknown['error']);
-        $this->assertSame('Could not reach BoardGameGeek.', $offline['error']);
-        $this->assertSame('A BoardGameGeek username is at most 64 characters.', $too_long['error']);
-        $this->assertSame('Gyges', user_bgg_username($this->db, 1));
+        $this->assertRefused(\InvalidArgumentException::class, 'No BoardGameGeek user named nosuchuser.', $unknown);
+        $this->assertRefused(\BggUnreachable::class, 'Could not reach BoardGameGeek.', $offline);
+        $this->assertRefused(\InvalidArgumentException::class, 'A BoardGameGeek username is at most 64 characters.', $too_long);
+        $this->assertSame('Gyges', $this->ratings()->ownReviewer());
+    }
+
+    public function test_a_bgg_outage_leaves_the_profile_reviewer_unchanged(): void
+    {
+        $this->ratings($this->fakeBgg([]))->setOwnReviewer('Gyges');
+
+        $refusal = $this->refusal(fn () => $this->ratings(function () {
+            throw new \RuntimeException('BoardGameGeek HTTP 503');
+        })->setOwnReviewer('Someone'));
+
+        $this->assertRefused(\BggUnreachable::class, 'Could not reach BoardGameGeek.', $refusal);
+        $this->assertSame('Gyges', $this->ratings()->ownReviewer());
+        $this->assertSame('Gyges', $this->db->query('SELECT bgg_username FROM users WHERE id = 1')->fetch_row()[0]);
     }
 
     public function test_profile_reviewer_gets_a_column_and_hand_entry_before_any_import(): void
     {
-        user_bgg_username_set($this->db, 1, 'Gyges', $this->fakeBgg([]));
-        bgg_ratings_store_item($this->db, 1, 11, 'Other', ['rating' => 7.0, 'comment' => null, 'rated_at' => null]);
+        $this->ratings($this->fakeBgg([]))->setOwnReviewer('Gyges');
+        // Other, an earlier reviewer, rated item 11 (thing 29107) on BGG.
+        $this->ratings(function (string $url) {
+            if (str_contains($url, '/users?')) {
+                return '[{"userid":777,"username":"Other"}]';
+            }
+            return json_encode(['items' => str_contains($url, 'objectid=29107') ? [['rating' => 7.0]] : []]);
+        })->import('Other', 0);
 
-        $this->assertSame(['Gyges', 'Other'], item_bgg_reviewers($this->db, 1));
-        $this->assertSame([], item_bgg_reviewers($this->db, 2));
+        $this->assertSame(['Gyges', 'Other'], $this->ratings()->reviewers());
+        $this->assertSame([], $this->ratings(null, 2)->reviewers());
 
-        $saved = bgg_ratings_save_item($this->db, 1, 12, 'gyges', '8', '');
+        $this->ratings()->save(12, 'gyges', '8', '');
 
-        $this->assertTrue($saved['ok']);
-        $this->assertSame(8.0, find_item_bgg_ratings($this->db, [12], 1)[12]['Gyges']['rating']);
-        $this->assertSame(['Gyges', 'Other'], item_bgg_reviewers($this->db, 1));
+        $this->assertSame(8.0, $this->ratings()->forItems([12])[12]['Gyges']['rating']);
+        $this->assertSame(['Gyges', 'Other'], $this->ratings()->reviewers());
     }
 
     private function rating(int $id): ?string
