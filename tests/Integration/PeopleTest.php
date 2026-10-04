@@ -110,6 +110,32 @@ final class PeopleTest extends TestCase
         $this->assertSame('Sam Lee', $this->people->find(100)['name']);
     }
 
+    public function test_own_of_no_ids_is_empty(): void
+    {
+        $this->assertSame([], $this->people->own([]));
+    }
+
+    public function test_own_leaves_out_another_owners_person(): void
+    {
+        $this->assertSame([], $this->people->own([200]));
+        $this->assertSame([200], (new People($this->db, 2))->own([200]));
+    }
+
+    public function test_own_keeps_the_owners_people_from_a_mix(): void
+    {
+        $this->assertSame([101, 100], $this->people->own([101, 200, 100, 999]));
+    }
+
+    public function test_own_returns_each_person_once(): void
+    {
+        $this->assertSame([100, 101], $this->people->own([100, 101, 100, '100']));
+    }
+
+    public function test_own_leaves_out_ids_that_arent_positive(): void
+    {
+        $this->assertSame([100], $this->people->own([0, -100, 100]));
+    }
+
     public function test_search_finds_only_the_owners_people(): void
     {
         $this->assertSame([], $this->people->search('Other'));

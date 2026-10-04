@@ -137,6 +137,18 @@ final class PlaygroupTest extends TestCase
         $this->assertSame([[1, 100, 1], [2, 101, 1], [3, 200, 2]], $this->slots());
     }
 
+    public function test_another_owners_person_is_refused_in_the_owners_words(): void
+    {
+        foreach ([fn () => $this->playgroup->add(['100', '200']), fn () => $this->playgroup->replace(1, 200)] as $write) {
+            try {
+                $write();
+                $this->fail('The person was not refused.');
+            } catch (\InvalidArgumentException $error) {
+                $this->assertSame('Choose people from your own people list.', $error->getMessage());
+            }
+        }
+    }
+
     public function test_add_with_nobody_chosen_is_refused(): void
     {
         $this->expectException(\InvalidArgumentException::class);

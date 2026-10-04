@@ -4,6 +4,7 @@ require_once dirname(__DIR__) . '/items_list.php';
 require_once dirname(__DIR__) . '/item_types.php';
 require_once dirname(__DIR__) . '/kept_status.php';
 require_once __DIR__ . '/Items.php';
+require_once __DIR__ . '/People.php';
 
 /**
  * The owner's events, such as a beach week, the items planned for each, and
@@ -16,10 +17,12 @@ require_once __DIR__ . '/Items.php';
 final class EventPlans
 {
     private Items $items;
+    private People $people;
 
     public function __construct(private mysqli $db, private int $userId)
     {
         $this->items = new Items($db, $userId);
+        $this->people = new People($db, $userId);
     }
 
     /** Every event, latest start first and undated last, with item, packed and player counts. */
@@ -271,15 +274,7 @@ final class EventPlans
     private function ownPlayerIds(array $ids): array
     {
         $ids = $this->distinctIds($ids);
-        if ($ids === []) {
-            return [];
-        }
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $mine = $this->rows(
-            "SELECT id FROM players WHERE user_id = ? AND id IN ($placeholders)",
-            str_repeat('i', count($ids) + 1), array_merge([$this->userId], $ids)
-        );
-        if (count($mine) !== count($ids)) {
+        if (count($this->people->own($ids)) !== count($ids)) {
             throw new InvalidArgumentException('Choose players from your own people list.');
         }
         return $ids;

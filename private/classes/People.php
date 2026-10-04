@@ -97,6 +97,26 @@ final class People
     }
 
     /**
+     * The distinct ids among $ids that are on the owner's people list, in
+     * the order first given. Ids that aren't positive, and another owner's
+     * people, are left out; no ids returns [] without querying. It only
+     * reads and never opens a transaction, so a caller can check inside
+     * its own.
+     */
+    public function own(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn (int $id) => $id > 0)));
+        if ($ids === []) {
+            return [];
+        }
+        $owned = array_map('intval', array_column($this->rows(
+            'SELECT id FROM players WHERE user_id = ? AND id IN (' . implode(', ', array_fill(0, count($ids), '?')) . ')',
+            str_repeat('i', count($ids) + 1), [$this->userId, ...$ids]
+        ), 'id'));
+        return array_values(array_intersect($ids, $owned));
+    }
+
+    /**
      * The id of the owner's person marked as them, or null. When the account
      * has no link but one of the owner's people represents it, the account
      * links to them first.

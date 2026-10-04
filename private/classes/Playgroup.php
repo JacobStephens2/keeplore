@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/People.php';
+
 /**
  * The owner's playgroup: the people from their people list whom they are
  * choosing items for on Choose for group. Every read and write is scoped to
@@ -156,7 +158,7 @@ final class Playgroup
     private function ownPerson(mixed $choice): int
     {
         $id = is_scalar($choice) ? filter_var(trim((string) $choice), FILTER_VALIDATE_INT) : false;
-        if ($id === false || !$this->rows('SELECT id FROM players WHERE id = ? AND user_id = ?', 'ii', [$id, $this->userId])) {
+        if ($id === false || (new People($this->db, $this->userId))->own([$id]) === []) {
             throw new InvalidArgumentException('Choose people from your own people list.');
         }
         return $id;
