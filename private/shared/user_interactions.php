@@ -9,8 +9,7 @@
     (int) ($_SESSION['player_id'] ?? 0),
     (string) ($_SESSION['FullName'] ?? '')
   );
-  $record_use_items = find_artifacts_by_user()->fetch_all(MYSQLI_ASSOC);
-  usort($record_use_items, fn($a, $b) => strcasecmp($a['Title'], $b['Title']) ?: $a['id'] <=> $b['id']);
+  $record_use_items = (new Items($db, $user_id_int))->list();
   $record_use_date = (new DateTime('now', new DateTimeZone('America/New_York')))->format('Y-m-d');
   $record_use_setting = most_recent_use_setting($user_id_int);
 

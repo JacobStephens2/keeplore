@@ -29,6 +29,18 @@ final class ItemInvalid extends InvalidArgumentException
  */
 final class Items
 {
+    /**
+     * A derived table of artifact_id and last_use, the only definition of an
+     * Item's last use: the later of its latest recorded Use date and its
+     * latest legacy play date, as Y-m-d. An Item with neither has no row.
+     * Join it on artifact_id = games.id; it isn't owner-scoped, so the
+     * query joining it must scope games to the owner.
+     */
+    public const LAST_USE = "(SELECT artifact_id, DATE(MAX(used_on)) AS last_use
+        FROM (SELECT artifact_id, use_date AS used_on FROM uses
+            UNION ALL SELECT Title, PlayDate FROM responses) item_dates
+        GROUP BY artifact_id)";
+
     /** What create gives a missing or blank field, besides today's date and the owner's interval. */
     public const DEFAULTS = ['MnT' => 30, 'MxT' => 60, 'MnP' => 1, 'MxP' => 1, 'SS' => '01', 'Age' => 0, 'is_kept' => 1];
 
@@ -46,6 +58,15 @@ final class Items
 
     /** Fields an update gives their create default when blank. */
     private const BLANK_TAKES_DEFAULT = ['MnT', 'MxT', 'MnP', 'MxP', 'SS', 'Age', 'Acq'];
+
+    /** The list's flag filters and the column each one reads. */
+    private const FLAG_FILTERS = [
+        'kept' => 'is_kept',
+        'secondary_collection' => 'is_in_secondary_collection',
+        'physical' => 'is_physical',
+        'digital' => 'is_digital',
+        'to_get_rid_of' => 'to_get_rid_of',
+    ];
 
     private Types $types;
 
@@ -90,6 +111,73 @@ final class Items
              WHERE games.id = ? AND games.user_id = ?',
             'ii', [$id, $this->userId]
         )[0] ?? null;
+    }
+
+    /**
+     * The owner's Items ordered by Title, then id. Each row is the Item's
+     * own columns plus type_name (or null), tags (a list), last_use (Y-m-d
+     * or null) and use_count (its recorded Uses, an int).
+     *
+     * Filters combine with AND; null or missing means no filter.
+     * kept, secondary_collection, physical, digital and to_get_rid_of take
+     * true (the flag is set) or false (it isn't, including a null column).
+     * type_ids takes a list of type ids; [] lists nothing. tag is normalized
+     * like item tags and title matches a substring; blank means no filter.
+     * An unknown key throws InvalidArgumentException.
+     */
+    public function list(array $filters = []): array
+    {
+        $unknown = array_diff(array_keys($filters), [...array_keys(self::FLAG_FILTERS), 'type_ids', 'tag', 'title']);
+        if ($unknown !== []) {
+            throw new InvalidArgumentException('Unknown Item list filter: ' . implode(', ', $unknown) . '.');
+        }
+        $typeIds = $filters['type_ids'] ?? null;
+        if ($typeIds === []) {
+            return [];
+        }
+
+        $where = 'games.user_id = ?';
+        $types = 'i';
+        $params = [$this->userId];
+        foreach (self::FLAG_FILTERS as $filter => $column) {
+            if (isset($filters[$filter])) {
+                $where .= $filters[$filter]
+                    ? " AND games.{$column} = 1"
+                    : " AND (games.{$column} IS NULL OR games.{$column} <> 1)";
+            }
+        }
+        if ($typeIds !== null) {
+            $where .= ' AND games.type_id IN (' . implode(', ', array_fill(0, count($typeIds), '?')) . ')';
+            $types .= str_repeat('s', count($typeIds));
+            array_push($params, ...array_map('strval', array_values($typeIds)));
+        }
+        $tagFilter = item_tag_user_filter($filters['tag'] ?? '', $this->userId);
+        $where .= $tagFilter['sql'];
+        $types .= $tagFilter['types'];
+        array_push($params, ...$tagFilter['params']);
+        $title = trim((string) ($filters['title'] ?? ''));
+        if ($title !== '') {
+            $where .= ' AND games.Title LIKE ?';
+            $types .= 's';
+            $params[] = '%' . $title . '%';
+        }
+
+        $rows = $this->rows(
+            'SELECT games.*, types.objectType AS type_name, item_last_use.last_use,
+                COALESCE(item_uses.use_count, 0) AS use_count
+             FROM games
+                LEFT JOIN types ON types.id = games.type_id
+                LEFT JOIN ' . self::LAST_USE . ' item_last_use ON item_last_use.artifact_id = games.id
+                LEFT JOIN (SELECT artifact_id, COUNT(*) AS use_count FROM uses GROUP BY artifact_id) item_uses
+                    ON item_uses.artifact_id = games.id
+             WHERE ' . $where . '
+             ORDER BY games.Title, games.id',
+            $types, $params
+        );
+        return array_map(
+            fn (array $row) => array_replace($row, ['use_count' => (int) $row['use_count']]),
+            with_item_tags($this->db, $rows, $this->userId)
+        );
     }
 
     /**

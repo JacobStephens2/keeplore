@@ -44,15 +44,13 @@ include(SHARED_PATH . '/header.php');
         <label for="Title">Item</label>
         <select id="Title" name="Title">
         <?php
-          $type_set = list_artifacts((int) $_SESSION['user_id']);
-          while($type = mysqli_fetch_assoc($type_set)) {
-            echo "<option value=\"" . h($type['id']) . "\"";
-            if($response["responsetitle"] == $type['id']) {
+          foreach ((new Items($db, (int) $_SESSION['user_id']))->list() as $item) {
+            echo "<option value=\"" . h($item['id']) . "\"";
+            if($response["responsetitle"] == $item['id']) {
               echo " selected";
             }
-            echo ">" . h($type['Title']) . "</option>";
+            echo ">" . h($item['Title']) . "</option>";
           }
-          mysqli_free_result($type_set);
         ?>
         </select>
       </div>
