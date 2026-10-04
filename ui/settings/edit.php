@@ -12,12 +12,10 @@ $user_id = (int) $_SESSION['user_id'];
 $preferences = new Preferences($db, $user_id);
 $bgg_ratings = new BggRatings($db, $user_id);
 
-$profile_fields = ['first_name', 'last_name', 'email', 'username'];
-
 if(is_post_request()) {
   // Saved apart from the rest, so a profile error costs only the profile.
   $posted_profile = [];
-  foreach ($profile_fields as $field) {
+  foreach (['first_name', 'last_name', 'email', 'username'] as $field) {
     $posted_profile[$field] = is_scalar($_POST[$field] ?? null) ? (string) $_POST[$field] : '';
   }
   try {
@@ -51,7 +49,7 @@ if(is_post_request()) {
 
 // A refused profile keeps what was posted, so it can be fixed.
 $profile = isset($profile_errors) ? $posted_profile : ($account ?? accounts()->find($user_id));
-$userArray = array_intersect_key($profile, array_flip($profile_fields)) + $preferences->get();
+$userArray = $profile + $preferences->get();
 $bgg_default_type = user_bgg_default_type($db, $user_id);
 $types = (new Types($db, $user_id))->all();
 

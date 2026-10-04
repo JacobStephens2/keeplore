@@ -4,6 +4,7 @@ namespace Tests\Integration;
 
 use AccountInvalid;
 use Accounts;
+use OutOfBoundsException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -379,11 +380,13 @@ final class AccountsTest extends TestCase
             'long first name' => [['first_name' => str_repeat('a', 256)], ['First name must be between 2 and 255 characters.']],
             'blank last name' => [['last_name' => ''], ['Last name cannot be blank.']],
             'short last name' => [['last_name' => 'B'], ['Last name must be between 2 and 255 characters.']],
+            'long last name' => [['last_name' => str_repeat('b', 256)], ['Last name must be between 2 and 255 characters.']],
             'blank email' => [['email' => ''], ['Email cannot be blank.']],
             'long email' => [['email' => str_repeat('a', 244) . '@keeplore.app'], ['Email must be at most 255 characters.']],
             'malformed email' => [['email' => 'not-an-email'], ['Email must be a valid format.']],
             'blank username' => [['username' => ''], ['Username cannot be blank.']],
             'short username' => [['username' => 'short'], ['Username must be between 8 and 255 characters.']],
+            'long username' => [['username' => str_repeat('u', 256)], ['Username must be between 8 and 255 characters.']],
             'taken username' => [['username' => 'ownerusername'], ['That username is taken. Try another.']],
             'taken email' => [['email' => 'owner@keeplore.app'], ['That email already belongs to an account. Log in or reset your password.']],
         ];
@@ -517,7 +520,7 @@ final class AccountsTest extends TestCase
 
     public function test_update_profile_of_no_account_throws_out_of_bounds(): void
     {
-        $this->expectException(\OutOfBoundsException::class);
+        $this->expectException(OutOfBoundsException::class);
         $this->accounts()->updateProfile(99, self::profileChanges());
     }
 }

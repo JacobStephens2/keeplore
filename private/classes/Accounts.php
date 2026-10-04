@@ -26,9 +26,10 @@ final class AccountInvalid extends InvalidArgumentException
  *
  * A profile needs a first and last name of 2 to 255 characters, a valid
  * email of at most 255 characters and a username of 8 to 255 characters;
- * no two accounts share an email or a username, so an account keeps its own. A password must have at
- * least 12 characters, with an uppercase letter, a lowercase letter, a
- * number and a symbol, and a matching confirmation. Invalid input throws
+ * no two accounts share an email or a username, though saving an account's
+ * own unchanged is fine. A password must have at least 12 characters, with
+ * an uppercase letter, a lowercase letter, a number and a symbol, and a
+ * matching confirmation. Invalid input throws
  * AccountInvalid with every problem, and nothing is written.
  *
  * A password reset needs a key emailed to the account's address. A key lasts
@@ -40,6 +41,8 @@ final class Accounts
     private const DUPLICATE_KEY = 1062;
     private const RESET_KEY_LIFETIME = '+1 day';
     private const INVALID_RESET_LINK = 'This reset link is invalid or has expired.';
+    private const NEW_ACCOUNT = null;
+    private const TAKEN_JUST_NOW = 'Another account took that email or username just now. Try again.';
 
     /** $now is a Y-m-d H:i:s time; the current time when omitted. */
     public function __construct(private mysqli $db, private Mailer $mailer, private ?string $now = null)
@@ -82,25 +85,18 @@ final class Accounts
         $profile = self::profile($input);
         $password = self::text($input, 'password', false);
         $errors = [
-            ...$this->profileProblems($profile),
+            ...$this->profileProblems($profile, self::NEW_ACCOUNT),
             ...self::passwordProblems($password, self::text($input, 'confirm_password', false)),
         ];
         if ($errors !== []) {
             throw new AccountInvalid($errors);
         }
 
-        try {
-            $this->statement(
-                'INSERT INTO users (first_name, last_name, email, username, hashed_password, user_group) VALUES (?, ?, ?, ?, ?, 1)',
-                'sssss', [...array_values($profile), password_hash($password, PASSWORD_BCRYPT)]
-            )->close();
-        } catch (mysqli_sql_exception $duplicate) {
-            // Another registration took the email or username since the check.
-            if ($duplicate->getCode() !== self::DUPLICATE_KEY) {
-                throw $duplicate;
-            }
-            throw new AccountInvalid($this->profileProblems($profile));
-        }
+        $this->writeProfile(
+            'INSERT INTO users (first_name, last_name, email, username, hashed_password, user_group) VALUES (?, ?, ?, ?, ?, 1)',
+            'sssss', [...array_values($profile), password_hash($password, PASSWORD_BCRYPT)],
+            $profile, self::NEW_ACCOUNT
+        );
         $account = $this->find((int) $this->db->insert_id);
 
         try {
@@ -129,18 +125,11 @@ final class Accounts
             throw new AccountInvalid($errors);
         }
 
-        try {
-            $this->statement(
-                'UPDATE users SET first_name = ?, last_name = ?, email = ?, username = ? WHERE id = ?',
-                'ssssi', [...array_values($profile), $id]
-            )->close();
-        } catch (mysqli_sql_exception $duplicate) {
-            // Another account took the email or username since the check.
-            if ($duplicate->getCode() !== self::DUPLICATE_KEY) {
-                throw $duplicate;
-            }
-            throw new AccountInvalid($this->profileProblems($profile, $id));
-        }
+        $this->writeProfile(
+            'UPDATE users SET first_name = ?, last_name = ?, email = ?, username = ? WHERE id = ?',
+            'ssssi', [...array_values($profile), $id],
+            $profile, $id
+        );
         return $this->find($id);
     }
 
@@ -221,6 +210,24 @@ final class Accounts
         return false;
     }
 
+    /**
+     * Run the write of $profile for the account $id, or NEW_ACCOUNT. Another
+     * account may take the email or username between the check and the
+     * write; that refuses the profile instead of failing.
+     */
+    private function writeProfile(string $sql, string $types, array $params, array $profile, ?int $id): void
+    {
+        try {
+            $this->statement($sql, $types, $params)->close();
+        } catch (mysqli_sql_exception $duplicate) {
+            if ($duplicate->getCode() !== self::DUPLICATE_KEY) {
+                throw $duplicate;
+            }
+            // The other account may have let the value go again since.
+            throw new AccountInvalid($this->profileProblems($profile, $id) ?: [self::TAKEN_JUST_NOW]);
+        }
+    }
+
     /** The profile fields of $input, trimmed, in column order. */
     private static function profile(array $input): array
     {
@@ -239,8 +246,8 @@ final class Accounts
         return $trim ? trim($value) : $value;
     }
 
-    /** Every profile rule $profile breaks, as the account $id's or a new account's when null. */
-    private function profileProblems(array $profile, ?int $id = null): array
+    /** Every profile rule $profile breaks, as the account $id's or NEW_ACCOUNT's. */
+    private function profileProblems(array $profile, ?int $id): array
     {
         $errors = [];
         foreach (['first_name' => 'First name', 'last_name' => 'Last name'] as $field => $label) {
@@ -260,7 +267,7 @@ final class Accounts
         } elseif (preg_match('/\A[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\z/i', $email) !== 1) {
             $errors[] = 'Email must be a valid format.';
         } elseif ($this->taken('email', $email, $id)) {
-            $errors[] = $id === null
+            $errors[] = $id === self::NEW_ACCOUNT
                 ? 'That email already belongs to an account. Log in or reset your password.'
                 : 'That email already belongs to another account.';
         }
@@ -277,10 +284,13 @@ final class Accounts
         return $errors;
     }
 
-    /** Whether an account other than $id has $value in $column. */
+    /** Whether an account other than $id has $value in $column; any account for NEW_ACCOUNT. */
     private function taken(string $column, string $value, ?int $id): bool
     {
-        return (bool) $this->rows("SELECT id FROM users WHERE $column = ? AND id <> ?", 'si', [$value, $id ?? 0]);
+        if ($id === self::NEW_ACCOUNT) {
+            return (bool) $this->rows("SELECT id FROM users WHERE $column = ?", 's', [$value]);
+        }
+        return (bool) $this->rows("SELECT id FROM users WHERE $column = ? AND id <> ?", 'si', [$value, $id]);
     }
 
     /** Every password rule $password and its confirmation break. */
