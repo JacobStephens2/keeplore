@@ -52,7 +52,6 @@ final class AgentCollectionReadTest extends TestCase
              INSERT INTO uses_players (use_id, player_id, user_id) VALUES
                (2, 101, 1), (2, 100, 1), (3, 101, 1), (4, 200, 2);"
         );
-        require_once PRIVATE_PATH . '/item_tags.php';
         require_once PRIVATE_PATH . '/kept_status.php';
         require_once PRIVATE_PATH . '/collection_list_api.php';
         require_once PRIVATE_PATH . '/use_api.php';
@@ -198,7 +197,7 @@ final class AgentCollectionReadTest extends TestCase
 
     public function test_query_and_tag_filters_still_apply(): void
     {
-        replace_item_tags($this->db, 10, 1, ['beach-safe']);
+        $this->db->query("INSERT INTO item_tags (user_id, artifact_id, tag) VALUES (1, 10, 'beach-safe')");
         $this->assertSame([10], $this->ids($this->listItems(['tag' => 'beach-safe'])['items']));
         $this->assertSame([11], $this->ids($this->listItems(['query' => 'Az'])['items']));
         $this->assertSame(['beach-safe'], $this->listItems(['tag' => 'beach-safe'])['items'][0]['tags']);

@@ -1,7 +1,5 @@
 <?php
 
-require_once dirname(__DIR__) . '/item_tags.php';
-
 class Artifact extends DatabaseObject {
 
   static protected $table_name = 'games';

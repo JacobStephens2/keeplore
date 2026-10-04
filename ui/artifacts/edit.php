@@ -33,7 +33,6 @@
   }
 
   // After a rejected save the form shows what was typed, to fix in one pass.
-  $artifact['tags'] = find_item_tags_for_artifacts($db, [$id], (int) $_SESSION['user_id'])[$id] ?? [];
   $artifact = array_replace($artifact, $input ?? []);
 
   $page_title = h($artifact['Title']); 
