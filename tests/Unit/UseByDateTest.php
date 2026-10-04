@@ -131,4 +131,18 @@ class UseByDateTest extends TestCase
             'is_snoozed' => false,
         ], use_by_status(self::item(['Acq' => null]), 90, '2024-01-10'));
     }
+
+    public function test_a_numeric_view_interval_is_used_as_the_number_it_is(): void
+    {
+        $this->assertSame(14, use_by_view_interval('14', 90));
+        $this->assertSame(0.5, use_by_view_interval('0.5', 90));
+        $this->assertSame(30, use_by_view_interval(30, 90));
+    }
+
+    public function test_a_view_interval_that_is_not_numeric_falls_back_to_the_default(): void
+    {
+        $this->assertSame(90, use_by_view_interval('', 90));
+        $this->assertSame(90, use_by_view_interval('soon', 90));
+        $this->assertSame(90.0, use_by_view_interval(null, 90.0));
+    }
 }

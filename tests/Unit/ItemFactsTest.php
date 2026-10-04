@@ -172,4 +172,26 @@ class ItemFactsTest extends TestCase
         $this->assertSame('2–4 players, best 3 · Age 8+',
             item_play_facts(['MnP' => 2, 'MxP' => 4, 'SS' => '03', 'MnT' => 30, 'MxT' => 60, 'Age' => 8], false));
     }
+
+    public function test_candidate_is_a_non_blank_candidate_that_is_not_zero(): void
+    {
+        $this->assertTrue(item_is_candidate(['Candidate' => '03: Ann, Ben at home']));
+        $this->assertTrue(item_is_candidate(['candidate' => '1']));
+        $this->assertFalse(item_is_candidate(['Candidate' => '']));
+        $this->assertFalse(item_is_candidate(['Candidate' => '   ']));
+        $this->assertFalse(item_is_candidate(['Candidate' => '0']));
+        $this->assertFalse(item_is_candidate(['Candidate' => ' 0 ']));
+        $this->assertFalse(item_is_candidate(['Candidate' => null]));
+        $this->assertFalse(item_is_candidate([]));
+    }
+
+    public function test_average_play_time_is_half_the_time_range_rounded_up(): void
+    {
+        $this->assertSame(60, item_average_play_time(['MnT' => 45, 'MxT' => 75]));
+        $this->assertSame(21, item_average_play_time(['mnt' => 20, 'mxt' => 21]));
+        // An unrecorded end counts as 0.
+        $this->assertSame(30, item_average_play_time(['mxt' => '60']));
+        $this->assertSame(23, item_average_play_time(['MnT' => 45, 'MxT' => null]));
+        $this->assertSame(0, item_average_play_time([]));
+    }
 }

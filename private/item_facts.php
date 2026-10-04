@@ -2,13 +2,14 @@
 
 /**
  * Item facts: an item's play facts read from its row. These are its sweet
- * spot, recommended minimum age, player range and play time, and the labels
- * pages show for them. Every page that filters or labels items by these facts
- * reads them here, so the Sweet spot rule lives in one place.
+ * spot, recommended minimum age, player range, play time and whether it is a
+ * Candidate, and the labels pages show for them. Every page that filters or
+ * labels items by these facts reads them here, so the Sweet spot and
+ * Candidate rules live in one place.
  *
  * Each function takes an item row and reads its columns whichever way they
- * are spelled: games' SS, Age, MnP, MxP, MnT and MxT, or the lowercase
- * spellings some queries return.
+ * are spelled: games' SS, Age, MnP, MxP, MnT, MxT and Candidate, or the
+ * lowercase spellings some queries return.
  */
 
 /**
@@ -69,6 +70,25 @@ function item_play_time(array $item) {
     // A time range reads like a player range: "30–60", or "45" with one end.
     $range = item_facts_range(item_facts_column($item, 'MnT'), item_facts_column($item, 'MxT'));
     return $range === '' ? '' : $range . ' min';
+}
+
+/**
+ * The item's average play time in minutes: half the sum of its minimum and
+ * maximum play time, rounded up, with an unrecorded end counted as 0.
+ */
+function item_average_play_time(array $item) {
+    $mnt = (float) item_facts_column($item, 'MnT');
+    $mxt = (float) item_facts_column($item, 'MxT');
+    return (int) ceil(($mnt + $mxt) / 2);
+}
+
+/**
+ * Whether the item is a Candidate: its Candidate note, trimmed, is neither
+ * blank nor "0".
+ */
+function item_is_candidate(array $item) {
+    $candidate = trim((string) item_facts_column($item, 'Candidate'));
+    return $candidate !== '' && $candidate !== '0';
 }
 
 /**
