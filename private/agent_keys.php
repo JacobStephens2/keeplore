@@ -95,18 +95,4 @@ function agent_key_write_refusal($authentication_response) {
   return null;
 }
 
-/**
- * Call from every mutating API endpoint (and any read outside the agent
- * scope). Exits 403 when the caller authenticated with an agent key.
- */
-function deny_agent_key_writes($authentication_response) {
-  $refusal = agent_key_write_refusal($authentication_response);
-  if ($refusal !== null) {
-    http_response_code(403);
-    header('Content-Type: application/json');
-    echo json_encode($refusal);
-    exit;
-  }
-}
-
 ?>
