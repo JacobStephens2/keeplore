@@ -2,7 +2,7 @@
   require_once('../../private/initialize.php');
   require_login_or_guest();
 
-  $artifact_set = find_artifacts_to_get_rid_of();
+  $artifacts = (new Items($db, (int) $_SESSION['user_id']))->list(['to_get_rid_of' => true]);
 
   $page_title = 'To Get Rid Of';
   include(SHARED_PATH . '/header.php');
@@ -15,7 +15,7 @@
     <p class="page-lede">Items you have decided to release. They no longer appear in your Interact By list.</p>
   </header>
 
-  <?php if ($artifact_set->num_rows === 0) { ?>
+  <?php if ($artifacts === []) { ?>
     <div class="empty-state">
       <p class="section-label">Empty</p>
       <h2>Nothing marked to get rid of</h2>
@@ -29,7 +29,7 @@
     <table class="list">
       <thead>
         <tr id="headerRow">
-          <th>Name (<?php echo $artifact_set->num_rows; ?>)</th>
+          <th>Name (<?php echo count($artifacts); ?>)</th>
           <th>Type</th>
           <th>Last Interaction</th>
           <th>Tracking Start</th>
@@ -39,7 +39,7 @@
       </thead>
 
       <tbody>
-        <?php while ($artifact = mysqli_fetch_assoc($artifact_set)) {
+        <?php foreach ($artifacts as $artifact) {
           $id = h(u($artifact['id']));
           $is_kept = artifact_is_kept($artifact);
         ?>
@@ -50,10 +50,10 @@
               </a>
             </td>
 
-            <td class="type"><?php echo h($artifact['type']); ?></td>
+            <td class="type"><?php echo h($artifact['type_name']); ?></td>
 
             <td class="date">
-              <?php echo h(substr($artifact['MostRecentUseOrResponse'], 0, 10)); ?>
+              <?php echo h($artifact['last_use']); ?>
             </td>
 
             <td class="date"><?php echo h($artifact['Acq']); ?></td>
@@ -91,8 +91,6 @@
     </div>
 
   <?php } ?>
-
-  <?php mysqli_free_result($artifact_set); ?>
 
   <div id="rid-of-toast" class="toast" role="status" aria-live="polite"></div>
   <script>

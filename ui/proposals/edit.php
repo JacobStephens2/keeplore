@@ -12,8 +12,7 @@ $record = $id === null ? null : $proposals->find($id);
 if ($id !== null && $record === null) {
     error_404();
 }
-$items = find_artifacts_by_user()->fetch_all(MYSQLI_ASSOC);
-usort($items, fn($a, $b) => strcasecmp($a['Title'], $b['Title']) ?: $a['id'] <=> $b['id']);
+$items = (new Items($db, (int) $_SESSION['user_id']))->list();
 $itemsById = array_column($items, null, 'id');
 $participants = (new People($db, (int) $_SESSION['user_id']))->all();
 $initialItemId = $record['item_id'] ?? filter_var($_GET['item_id'] ?? '', FILTER_VALIDATE_INT);

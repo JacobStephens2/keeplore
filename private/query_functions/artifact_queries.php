@@ -4,123 +4,7 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
-require_once dirname(__DIR__) . '/item_tags.php';
 require_once dirname(__DIR__) . '/classes/UseByQueue.php';
-
-  function find_artifacts_to_get_rid_of() {
-    global $db;
-    $user_id = (int) $_SESSION['user_id'];
-    $stmt = mysqli_prepare($db, "SELECT games.id, games.Title, games.Acq, games.interaction_frequency_days,
-        types.objectType AS type,
-        games.to_get_rid_of,
-        games.is_kept,
-        CASE
-          WHEN MAX(uses.use_date) IS NULL THEN MAX(responses.PlayDate)
-          WHEN MAX(uses.use_date) < MAX(responses.PlayDate) THEN MAX(responses.PlayDate)
-          ELSE MAX(uses.use_date)
-        END AS MostRecentUseOrResponse
-      FROM games
-        LEFT JOIN responses ON games.id = responses.Title
-        LEFT JOIN uses ON games.id = uses.artifact_id
-        LEFT JOIN types ON games.type_id = types.id
-      GROUP BY games.id, games.Title, games.Acq, games.interaction_frequency_days, types.objectType, games.user_id, games.to_get_rid_of, games.is_kept
-      HAVING games.user_id = ? AND games.to_get_rid_of = 1
-      ORDER BY games.Title ASC");
-    mysqli_stmt_bind_param($stmt, "i", $user_id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    confirm_result_set($result);
-    return $result;
-  }
-
-  function find_artifacts_by_user() {
-    global $db;
-
-    $user_id = (int) $_SESSION['user_id'];
-    $stmt = mysqli_prepare($db, "SELECT games.id, games.Title, games.is_kept, games.Acq FROM games WHERE user_id = ? ORDER BY games.Acq DESC");
-    mysqli_stmt_bind_param($stmt, "i", $user_id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    confirm_result_set($result);
-    return $result;
-  }
-  function find_artifacts_by_user_id($kept, $type, $interval, $tag = '') {
-    global $db;
-
-    $params = [];
-    $param_types = '';
-
-    $sql = "SELECT
-        games.Title,
-        games.mnp,
-        games.mxp,
-        games.mnt AS mnt,
-        games.mxt AS mxt,
-        games.Candidate,
-        games.UsedRecUserCt,
-        games.ss AS ss,
-        games.Age,
-        games.id,
-        games.is_kept,
-        games.is_in_secondary_collection,
-        types.objectType AS type,
-        games.user_id,
-        games.type_id,
-        games.BGG_Rat,
-        DATE((SELECT MAX(responses.PlayDate) FROM responses WHERE responses.Title = games.id)) AS MaxPlay,
-        DATE((SELECT MAX(uses.use_date) FROM uses WHERE uses.artifact_id = games.id)) AS MaxUse,
-        games.Acq,
-        games.interaction_frequency_days
-    FROM
-        games
-    LEFT JOIN types ON games.type_id = types.id
-    WHERE
-        games.user_id = ? ";
-
-        $params[] = $_SESSION['user_id'];
-        $param_types .= 'i';
-
-        if (isset($type) && $type != [] && $type != '1') {
-          $placeholders = implode(', ', array_fill(0, count($type), '?'));
-          $sql .= " AND games.type_id IN ( " . $placeholders . ") ";
-          foreach($type as $type_name => $type_id) {
-            $params[] = $type_id;
-            $param_types .= 's';
-          }
-        }
-
-        // Kept filter means kept only: the single kept predicate on the new
-        // column. Format flags never affect membership.
-        if ( $kept == 'yes') {
-          $sql .= " AND games.is_kept = 1 ";
-        } elseif ( $kept == 'no' ) {
-          $sql .= " AND games.is_kept = 0 ";
-        } elseif ( $kept == 'secondary_only' ) {
-          $sql .= " AND games.is_in_secondary_collection = 1 ";
-        }
-
-        $tag_filter = item_tag_user_filter($tag, $_SESSION['user_id']);
-        $sql .= $tag_filter['sql'];
-        if ($tag_filter['types'] !== '') {
-          $param_types .= $tag_filter['types'];
-          foreach ($tag_filter['params'] as $tag_param) {
-            $params[] = $tag_param;
-          }
-        }
-
-    $sql .= "
-        ORDER BY
-        games.Acq DESC,
-        games.is_kept DESC,
-        games.id ASC
-    ";
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, $param_types, ...$params);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    confirm_result_set($result);
-    return $result;
-  }
 
   function find_sweet_spots_by_artifact_id($artifact_id) {
     global $db;
@@ -137,17 +21,6 @@ require_once dirname(__DIR__) . '/classes/UseByQueue.php';
     mysqli_stmt_bind_param($stmt, "i", $artifact_id);
     mysqli_stmt_execute($stmt);
     $result = mysqli_stmt_get_result($stmt);
-    return $result;
-  }
-
-  function list_artifacts(int $user_id) {
-    global $db;
-    $sql = "SELECT games.id, games.Title FROM games WHERE games.user_id = ? ORDER BY games.Title ASC";
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, "i", $user_id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    confirm_result_set($result);
     return $result;
   }
 

@@ -21,12 +21,11 @@ class ItemsListTest extends TestCase
         $row = items_list_present_row([
             'id' => 10,
             'Title' => 'Catan',
-            'type' => 'table-game',
+            'type_name' => 'table-game',
             'tags' => ['beach-safe'],
             'is_kept' => 1,
             'Acq' => '2024-01-10',
-            'MaxPlay' => null,
-            'MaxUse' => null,
+            'last_use' => null,
             'ss' => '3-4',
             'mnt' => 45,
             'mxt' => 75,
@@ -47,17 +46,16 @@ class ItemsListTest extends TestCase
         $this->assertFalse($row['candidate']);
     }
 
-    public function test_recent_use_doubles_the_interval_and_prefers_the_later_date(): void
+    public function test_recent_use_doubles_the_interval(): void
     {
         $row = items_list_present_row([
             'id' => 11,
             'Title' => 'Carcassonne',
-            'type' => 'table-game',
+            'type_name' => 'table-game',
             'tags' => [],
             'is_kept' => 1,
             'Acq' => '2020-01-01',
-            'MaxPlay' => '2024-01-01',
-            'MaxUse' => '2024-03-01',
+            'last_use' => '2024-03-01',
             'ss' => '',
             'mnt' => 20,
             'mxt' => 21,
@@ -84,16 +82,16 @@ class ItemsListTest extends TestCase
         $this->assertSame('2024-02-09', items_list_present_row($item, 90, '2024-06-01')['use_by']);
         $this->assertSame(
             '2024-02-09',
-            items_list_present_row($item + ['MaxUse' => '2023-12-25'], 90, '2024-06-01')['use_by'],
+            items_list_present_row($item + ['last_use' => '2023-12-25'], 90, '2024-06-01')['use_by'],
             'A use before acquisition counts from acquisition.'
         );
         $this->assertSame(
             '2024-04-14',
-            items_list_present_row($item + ['MaxUse' => '2024-02-14'], 90, '2024-06-01')['use_by']
+            items_list_present_row($item + ['last_use' => '2024-02-14'], 90, '2024-06-01')['use_by']
         );
         $this->assertSame(
             '2024-01-11',
-            items_list_present_row(['interaction_frequency_days' => '0.5'] + $item + ['MaxUse' => '2024-01-10'], 90, '2024-06-01')['use_by'],
+            items_list_present_row(['interaction_frequency_days' => '0.5'] + $item + ['last_use' => '2024-01-10'], 90, '2024-06-01')['use_by'],
             'A fractional frequency keeps its fraction.'
         );
     }
@@ -103,12 +101,11 @@ class ItemsListTest extends TestCase
         $row = items_list_present_row([
             'id' => 12,
             'Title' => 'Old Game',
-            'type' => 'table-game',
+            'type_name' => 'table-game',
             'tags' => [],
             'is_kept' => 0,
             'Acq' => '2020-01-01',
-            'MaxPlay' => null,
-            'MaxUse' => null,
+            'last_use' => null,
             'ss' => '',
             'mnt' => 0,
             'mxt' => 0,
@@ -124,12 +121,11 @@ class ItemsListTest extends TestCase
         $row = items_list_present_row([
             'id' => 13,
             'Title' => 'Broken Date',
-            'type' => '',
+            'type_name' => null,
             'tags' => [],
             'is_kept' => 1,
             'Acq' => 'not-a-date',
-            'MaxPlay' => null,
-            'MaxUse' => null,
+            'last_use' => null,
             'ss' => '',
             'mnt' => 0,
             'mxt' => 0,
@@ -193,7 +189,7 @@ class ItemsListTest extends TestCase
             'The items search box must be in the page HTML with autofocus so typing does not wait for the list.'
         );
         $this->assertDoesNotMatchRegularExpression(
-            '/find_artifacts_by_user_id\s*\(/',
+            '/items_list_payload\s*\(/',
             $source,
             'The items page must not query the collection before sending the search box.'
         );

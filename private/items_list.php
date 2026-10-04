@@ -9,6 +9,7 @@ require_once __DIR__ . '/kept_status.php';
 require_once __DIR__ . '/bgg_ratings.php';
 require_once __DIR__ . '/item_types.php';
 require_once __DIR__ . '/use_by_date.php';
+require_once __DIR__ . '/classes/Items.php';
 
 function items_list_load_filter_defaults($user_id) {
     global $db;
@@ -222,22 +223,18 @@ function items_list_query_params(array $filters, array $all_types = []) {
     return $params;
 }
 
+/**
+ * One Items row for display. $artifact is a row from Items::list: its
+ * last_use is Recent Interaction and its type_name the Type.
+ */
 function items_list_present_row(array $artifact, $default_interval, $today = null) {
     $today = $today ?? date('Y-m-d');
-    $max_play = $artifact['MaxPlay'] ?? null;
-    $max_use = $artifact['MaxUse'] ?? null;
-    if ($max_play === null && $max_use === null) {
-        $most_recent_use = '';
-    } elseif ($max_play > $max_use) {
-        $most_recent_use = (string) $max_play;
-    } else {
-        $most_recent_use = (string) ($max_use ?? '');
-    }
+    $last_use = (string) ($artifact['last_use'] ?? '');
 
     // The view's interval is a default only; the item's own frequency wins.
     $use_by_date = use_by_date(
         $artifact['Acq'] ?? null,
-        $most_recent_use,
+        $last_use,
         $artifact['interaction_frequency_days'] ?? null,
         $default_interval
     ) ?? '';
@@ -253,11 +250,11 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
     return [
         'id' => (int) ($artifact['id'] ?? 0),
         'title' => (string) ($artifact['Title'] ?? ''),
-        'type' => (string) ($artifact['type'] ?? ''),
+        'type' => (string) ($artifact['type_name'] ?? ''),
         'tags' => $artifact['tags'] ?? [],
         'is_kept' => $is_kept,
         'acq' => (string) ($artifact['Acq'] ?? ''),
-        'most_recent_use' => $most_recent_use,
+        'most_recent_use' => $last_use,
         'use_by' => $use_by_date,
         'use_by_overdue' => $overdue,
         'ss' => (string) ($artifact['ss'] ?? $artifact['SS'] ?? ''),
@@ -277,27 +274,44 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
     ];
 }
 
+/**
+ * The Items page's rows: the owner's Items from Items::list, narrowed by the
+ * page's players and youngest-age filters, newest acquisition first, then
+ * kept first, then id.
+ */
 function items_list_payload($db, array $filters, $user_id, $today = null) {
-    $artifact_set = find_artifacts_by_user_id(
-        $filters['kept'],
-        $filters['type'],
-        $filters['interval'],
-        $filters['tagFilter']
-    );
-    $artifacts = [];
-    while ($row = mysqli_fetch_assoc($artifact_set)) {
-        $artifacts[] = $row;
-    }
-    mysqli_free_result($artifact_set);
+    $artifacts = (new Items($db, (int) $user_id))->list(items_list_item_filters($filters));
+    usort($artifacts, fn (array $a, array $b) =>
+        [(string) ($b['Acq'] ?? ''), artifact_is_kept($b), (int) $a['id']]
+        <=> [(string) ($a['Acq'] ?? ''), artifact_is_kept($a), (int) $b['id']]);
     $artifacts = items_list_best_at($artifacts, $filters['players']);
     $artifacts = items_list_suitable_for_age($artifacts, $filters['age'], $filters['ageUnknown']);
-    $artifacts = with_item_tags($db, $artifacts, (int) $user_id);
     $artifacts = with_item_bgg_ratings($db, $artifacts, (int) $user_id);
     $items = [];
     foreach ($artifacts as $artifact) {
         $items[] = items_list_present_row($artifact, $filters['interval'], $today);
     }
     return $items;
+}
+
+/**
+ * Items::list's filters for the page's kept, type and tag choices. An empty
+ * type list means every type; blank type entries are dropped, so a list of
+ * only blanks lists nothing.
+ */
+function items_list_item_filters(array $filters) {
+    $item_filters = match ($filters['kept']) {
+        'yes' => ['kept' => true],
+        'no' => ['kept' => false],
+        'secondary_only' => ['secondary_collection' => true],
+        default => [],
+    };
+    $type = (array) ($filters['type'] ?? []);
+    if ($type !== []) {
+        $item_filters['type_ids'] = array_values(array_filter($type, fn ($id) => $id !== '' && $id !== null));
+    }
+    $item_filters['tag'] = $filters['tagFilter'];
+    return $item_filters;
 }
 
 /**

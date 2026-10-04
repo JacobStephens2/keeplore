@@ -15,6 +15,9 @@ _Avoid_: Artifact type, ObjectType.
 **Use**:
 A recorded occasion when an item was used, on a date, optionally with people, a Setting (where it was used) and notes. One Record Use submit can record several identical uses at once through its Number of uses. Distinct from an item proposal, which is never a use.
 
+**Last use**:
+The date of an item's most recent use, or none if it has never been used. The use-by date, the Items page, To get rid of and the agent collection list all read it from one rule.
+
 **Person**:
 Someone on the owner's people list who can be recorded on uses, item proposals and events. One person can be marked as the owner themself.
 _Avoid_: User (the Keeplore account the list belongs to), Player (except for an event's players).
