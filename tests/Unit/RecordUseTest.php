@@ -133,8 +133,7 @@ class RecordUseTest extends TestCase
     public function test_new_use_forms_open_with_the_uses_modules_last_setting(): void
     {
         foreach ([
-            '/ui/index.php',
-            '/ui/artifacts/useby.php',
+            '/private/shared/quick_record_popup.php',
             '/ui/uses/record-new.php',
             '/private/shared/user_interactions.php',
         ] as $path) {
