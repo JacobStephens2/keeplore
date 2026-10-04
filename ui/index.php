@@ -11,12 +11,11 @@ $page_title = 'Menu';
 
 $user_id = (int) $_SESSION['user_id'];
 $preferences = (new Preferences($db, $user_id))->get();
-$default_interval = $preferences['default_use_interval'];
 $default_snooze_days = $preferences['default_snooze_days'];
 
 // The Use-by queue without snoozed items, most overdue first. Undated
 // items count as tracked but have nothing to be due.
-$entries = (new UseByQueue($db, $user_id))->entries(['default_interval' => $default_interval, 'hide_snoozed' => true]);
+$entries = (new UseByQueue($db, $user_id))->entries(['hide_snoozed' => true]);
 $tracked_count = count($entries);
 $dated_items = array_values(array_filter($entries, fn ($item) => $item['use_by_date'] !== null));
 

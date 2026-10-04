@@ -98,6 +98,51 @@ class ItemsListTest extends TestCase
         );
     }
 
+    public function test_a_kept_item_past_its_use_by_date_is_overdue_and_not_on_it(): void
+    {
+        $item = [
+            'id' => 14,
+            'Title' => 'Kept Game',
+            'type_name' => 'table-game',
+            'tags' => [],
+            'is_kept' => 1,
+            'Acq' => '2024-01-10',
+            'last_use' => null,
+            'ss' => '',
+            'mnt' => 0,
+            'mxt' => 0,
+            'Candidate' => 0,
+        ];
+
+        $this->assertTrue(items_list_present_row($item, 90, '2024-04-10')['use_by_overdue']);
+        $this->assertFalse(items_list_present_row($item, 90, '2024-04-09')['use_by_overdue'], 'Due today is not overdue.');
+        $this->assertFalse(
+            items_list_present_row(['is_kept' => 0] + $item, 90, '2024-04-10')['use_by_overdue'],
+            'An item that is not kept is not overdue.'
+        );
+    }
+
+    public function test_a_rows_today_defaults_to_the_apps_day(): void
+    {
+        // With a one-day interval, acquired the day before the app's day is
+        // due on it and acquired two days before is overdue on it. Server
+        // zones well ahead of and behind America/New_York make the server's
+        // day differ from the app's day at every hour.
+        $day = fn (int $days) => (new \DateTimeImmutable(record_use_today()))->modify("$days days")->format('Y-m-d');
+        $zone = date_default_timezone_get();
+        try {
+            foreach (['Pacific/Kiritimati', 'Pacific/Pago_Pago'] as $tz) {
+                date_default_timezone_set($tz);
+                $due = items_list_present_row(['is_kept' => 1, 'Acq' => $day(-1), 'last_use' => null], 1);
+                $this->assertSame($day(0), $due['use_by'], $tz);
+                $this->assertFalse($due['use_by_overdue'], $tz);
+                $this->assertTrue(items_list_present_row(['is_kept' => 1, 'Acq' => $day(-2), 'last_use' => null], 1)['use_by_overdue'], $tz);
+            }
+        } finally {
+            date_default_timezone_set($zone);
+        }
+    }
+
     public function test_unkept_item_is_never_overdue(): void
     {
         $row = items_list_present_row([

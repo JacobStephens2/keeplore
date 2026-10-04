@@ -22,11 +22,10 @@ function list_upcoming_uses_over_api(mysqli $db, ApiCaller $caller): array {
   }
 
   $preferences = (new Preferences($db, $owner))->get();
-  $default_interval = $preferences['default_use_interval'];
   $queue = new UseByQueue($db, $owner);
 
   $items = [];
-  foreach ($queue->entries(['default_interval' => $default_interval]) as $entry) {
+  foreach ($queue->entries() as $entry) {
     if ($entry['use_by_date'] === null || $entry['days_until'] > UPCOMING_USES_HORIZON_DAYS) {
       continue;
     }
@@ -36,9 +35,7 @@ function list_upcoming_uses_over_api(mysqli $db, ApiCaller $caller): array {
       'title' => $entry['Title'],
       'use_by_date' => $entry['use_by_date'],
       'most_recent_interaction' => $entry['last_use'],
-      'interval_days' => ($entry['interaction_frequency_days'] !== null)
-        ? (float) $entry['interaction_frequency_days']
-        : $default_interval,
+      'interval_days' => $entry['interval'],
       'status' => match (true) {
         $entry['status'] === 'overdue' => 'past_due',
         $entry['status'] === 'due_today' => 'due_today',
@@ -53,7 +50,7 @@ function list_upcoming_uses_over_api(mysqli $db, ApiCaller $caller): array {
     'today' => $queue->today(),
     'timezone' => APP_TIME_ZONE,
     'horizon_days' => UPCOMING_USES_HORIZON_DAYS,
-    'default_interval_days' => $default_interval,
+    'default_interval_days' => $preferences['default_use_interval'],
     'notification_prefs' => [
       'enabled' => $preferences['native_notify_enabled'],
       'hour' => $preferences['native_notify_hour'],

@@ -74,7 +74,7 @@ The date by which an item should next be used, shown as "Interact by". With no r
 _Avoid_: Play by.
 
 **Use-by queue**:
-The kept items not flagged to get rid of, plus the secondary collection when asked for, each with its last use, use-by date and whether it is overdue, due today or upcoming. The dashboard, Interact By, the daily email and notifications show it.
+The kept items not flagged to get rid of, plus the secondary collection when asked for, each with its last use, the interval its use-by date was counted from, its use-by date, whether it is overdue, due today or upcoming, and whether it is Snoozed. The dashboard, Interact By, the daily email and notifications show it.
 _Avoid_: Interaction queue.
 
 **Daily email**:
@@ -98,7 +98,7 @@ A separate overflow collection an item can belong to whether or not it is kept.
 An item flagged for removal, whether or not it is kept.
 
 **Snoozed**:
-An item hidden from the dashboard's priority queue until its snooze-until date, set for the owner's default snooze days or a number chosen when snoozing. Snoozing changes no use and no use-by date.
+An item hidden from the dashboard's priority queue until its snooze-until date, set for the owner's default snooze days or a number chosen when snoozing. The snooze-until date is counted from the app's day, the same day the Use-by queue compares it with, and the item shows again on that date. Snoozing changes no use and no use-by date.
 
 **Physical item**:
 An item with a physical form. Independent of whether it is kept.

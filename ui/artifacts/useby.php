@@ -31,8 +31,7 @@
   $preferences = (new Preferences($db, (int) $user_id))->get();
   $default_use_interval = $preferences['default_use_interval'];
   $interval = $_POST['interval'] ?? $default_use_interval;
-  $queue = new UseByQueue($db, (int) $user_id);
-  $artifacts = $queue->entries([
+  $artifacts = (new UseByQueue($db, (int) $user_id))->entries([
     'default_interval' => $interval,
     'type_ids' => $type_filter['selected'],
     'sweet_spot' => $sweetSpot,
@@ -182,13 +181,6 @@
     <tbody>
       <?php foreach ($artifacts as $artifact) {
         $id = h(u($artifact['id']));
-        if ($artifact['interaction_frequency_days'] !== null) {
-          $this_interval = $artifact['interaction_frequency_days'];
-        } else {
-          $this_interval = $interval;
-        }
-        $snoozed_until = $artifact['snoozed_until'] ?? null;
-        $is_snoozed = $snoozed_until !== null && $snoozed_until > $queue->today();
         ?>
         <tr>
           <td class="name artifact edit" data-label="Name">
@@ -203,8 +195,8 @@
                 src="/assets/copy.png"
                 alt="A clipboard icon for copying"
               >
-              <?php if ($is_snoozed) { ?>
-                <span class="snoozed-badge" title="Hidden from the dashboard priority queue until this date">Snoozed until <?php echo h($snoozed_until); ?></span>
+              <?php if ($artifact['is_snoozed']) { ?>
+                <span class="snoozed-badge" title="Hidden from the dashboard priority queue until this date">Snoozed until <?php echo h($artifact['snoozed_until']); ?></span>
               <?php } ?>
 
               <script>
@@ -318,7 +310,7 @@
 
           <td class="acquisitionDate" data-label="Tracking start"><?php echo h($artifact['Acq']); ?></td>
           <?php if ($showInterval === 'yes') { ?>
-          <td class="interval" data-label="Interval"><?php echo $this_interval; ?></td>
+          <td class="interval" data-label="Interval"><?php echo h((string) $artifact['interval']); ?></td>
           <?php } ?>
         </tr>
       <?php } ?>

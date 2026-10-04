@@ -80,9 +80,29 @@ final class UseByQueueTest extends TestCase
         $this->assertSame([10], $this->ids($this->queue('2026-06-05')->entries(['hide_snoozed' => true])));
     }
 
-    public function test_an_entry_carries_last_use_use_by_date_days_until_and_status(): void
+    public function test_hide_snoozed_hides_exactly_the_entries_that_are_snoozed(): void
+    {
+        $this->db->query("UPDATE games SET snoozed_until = '2026-06-05' WHERE id = 10");
+        foreach (['2026-06-04', '2026-06-05', '2026-06-06'] as $today) {
+            $notSnoozed = array_filter($this->queue($today)->entries(), fn (array $entry) => !$entry['is_snoozed']);
+            $this->assertSame($this->ids(array_values($notSnoozed)), $this->ids($this->queue($today)->entries(['hide_snoozed' => true])), $today);
+        }
+    }
+
+    public function test_an_entry_is_snoozed_until_its_snoozed_until_day(): void
+    {
+        $this->assertFalse($this->queue()->entries()[0]['is_snoozed']);
+        $this->db->query("UPDATE games SET snoozed_until = '2026-06-05' WHERE id = 10");
+        $this->assertTrue($this->queue()->entries()[0]['is_snoozed']);
+        $this->assertTrue($this->queue('2026-06-04')->entry(10)['is_snoozed']);
+        $this->assertFalse($this->queue('2026-06-05')->entries()[0]['is_snoozed']);
+        $this->assertFalse($this->queue('2026-06-05')->entry(10)['is_snoozed']);
+    }
+
+    public function test_an_entry_carries_last_use_interval_use_by_date_days_until_and_status(): void
     {
         $entry = $this->queue()->entries()[0];
+        $this->assertSame(90.0, $entry['interval']);
         $this->assertSame('Catan', $entry['Title']);
         $this->assertSame('board-game', $entry['type']);
         $this->assertSame('2026-02-01', $entry['last_use']);
@@ -110,7 +130,10 @@ final class UseByQueueTest extends TestCase
     public function test_the_items_own_frequency_wins_over_the_pages_interval(): void
     {
         $this->db->query('UPDATE games SET interaction_frequency_days = 10 WHERE id = 10');
-        $this->assertSame('2026-02-21', $this->queue()->entries(['default_interval' => 30])[0]['use_by_date']);
+        $entry = $this->queue()->entries(['default_interval' => 30])[0];
+        $this->assertSame('2026-02-21', $entry['use_by_date']);
+        $this->assertSame(10.0, $entry['interval']);
+        $this->assertSame(10.0, $this->queue()->entry(10)['interval']);
     }
 
     public function test_without_its_own_frequency_an_item_uses_the_pages_interval_or_the_owners_default(): void
@@ -118,7 +141,10 @@ final class UseByQueueTest extends TestCase
         $this->db->query('UPDATE games SET interaction_frequency_days = NULL WHERE id = 10');
         (new \Preferences($this->db, 1))->save(['default_use_interval' => 45]);
         $this->assertSame('2026-04-02', $this->queue()->entries(['default_interval' => 30])[0]['use_by_date']);
+        $this->assertSame(30.0, $this->queue()->entries(['default_interval' => 30])[0]['interval']);
         $this->assertSame('2026-05-02', $this->queue()->entries()[0]['use_by_date']);
+        $this->assertSame(45.0, $this->queue()->entries()[0]['interval']);
+        $this->assertSame(45.0, $this->queue()->entry(10)['interval']);
     }
 
     public function test_status_turns_on_the_pinned_today(): void

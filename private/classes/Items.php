@@ -4,6 +4,7 @@ require_once dirname(__DIR__) . '/functions.php';
 require_once dirname(__DIR__) . '/kept_status.php';
 require_once dirname(__DIR__) . '/item_tags.php';
 require_once dirname(__DIR__) . '/item_types.php';
+require_once dirname(__DIR__) . '/record_use.php';
 require_once __DIR__ . '/Preferences.php';
 
 /** An Item write's input broke the item rules; $errors lists every problem. */
@@ -328,12 +329,12 @@ final class Items
     }
 
     /**
-     * Hide the Item from the dashboard's priority queue until today plus
-     * $days (below 1 counts as 1) and return that date as Y-m-d.
+     * Hide the Item from the dashboard's priority queue until the app's day
+     * plus $days (below 1 counts as 1) and return that date as Y-m-d.
      */
     public function snooze(int $id, int $days): string
     {
-        $until = (new DateTime('today'))->modify('+' . max(1, $days) . ' days')->format('Y-m-d');
+        $until = (new DateTimeImmutable(record_use_today()))->modify('+' . max(1, $days) . ' days')->format('Y-m-d');
         $this->setColumn($id, 'snoozed_until', $until);
         return $until;
     }
