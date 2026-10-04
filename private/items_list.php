@@ -117,12 +117,7 @@ function items_list_type_switch(array $all_types, array $current_type_ids) {
         $options['other'] = ['label' => 'Other', 'type_ids' => $other_ids];
     }
 
-    $current = [];
-    foreach ($current_type_ids as $id) {
-        if ($id !== '' && $id !== null) {
-            $current[] = (string) $id;
-        }
-    }
+    $current = items_list_type_ids($current_type_ids);
     $current = $current === [] ? $all_ids : $current;
     sort($current);
     $active = null;
@@ -215,12 +210,7 @@ function items_list_filter_query(array $filters, array $all_types, $default_inte
         $query['kept'] = $kept;
     }
 
-    $type_ids = [];
-    foreach ((array) ($filters['type'] ?? []) as $type_id) {
-        if ($type_id !== '' && $type_id !== null) {
-            $type_ids[] = (string) $type_id;
-        }
-    }
+    $type_ids = items_list_type_ids($filters['type'] ?? []);
     $sorted_ids = $type_ids;
     $all_type_ids = array_map('strval', array_values($all_types));
     sort($sorted_ids);
@@ -256,17 +246,31 @@ function items_list_filter_query(array $filters, array $all_types, $default_inte
  * A query as hidden-field [name, value] pairs, so a form carries it: a list
  * becomes type[0], type[1] and so on.
  */
-function items_list_hidden_fields(array $query, string $prefix = '') {
-    $fields = [];
-    foreach ($query as $key => $value) {
-        $name = $prefix === '' ? (string) $key : $prefix . '[' . $key . ']';
-        if (is_array($value)) {
-            array_push($fields, ...items_list_hidden_fields($value, $name));
-        } else {
-            $fields[] = [$name, (string) $value];
+function items_list_hidden_fields(array $query) {
+    $flatten = function (array $values, $prefix) use (&$flatten) {
+        $fields = [];
+        foreach ($values as $key => $value) {
+            $name = $prefix === null ? (string) $key : $prefix . '[' . $key . ']';
+            if (is_array($value)) {
+                array_push($fields, ...$flatten($value, $name));
+            } else {
+                $fields[] = [$name, (string) $value];
+            }
+        }
+        return $fields;
+    };
+    return $flatten($query, null);
+}
+
+/** The non-blank ids in a Type selection, as strings in their given order. */
+function items_list_type_ids($type) {
+    $ids = [];
+    foreach ((array) $type as $id) {
+        if ($id !== '' && $id !== null) {
+            $ids[] = (string) $id;
         }
     }
-    return $fields;
+    return $ids;
 }
 
 /**
@@ -355,7 +359,7 @@ function items_list_item_filters(array $filters) {
     };
     $type = (array) ($filters['type'] ?? []);
     if ($type !== []) {
-        $item_filters['type_ids'] = array_values(array_filter($type, fn ($id) => $id !== '' && $id !== null));
+        $item_filters['type_ids'] = items_list_type_ids($type);
     }
     $item_filters['tag'] = $filters['tagFilter'];
     return $item_filters;

@@ -504,6 +504,11 @@ class ItemsListTest extends TestCase
             'interval' => [['interval' => '30']],
             'default interval' => [['interval' => '90']],
             'legacy sweet spot' => [['sweetSpotFilter' => '3']],
+            'players' => [['players' => '2']],
+            'age' => [['age' => '5']],
+            'age with unknown ages' => [['age' => '5', 'age_unknown' => 'yes']],
+            'attributes' => [['showAttributes' => 'yes']],
+            'tag' => [['tag' => 'beach-safe']],
             'everything' => [[
                 'kept' => 'no',
                 'type' => ['44'],
@@ -569,6 +574,7 @@ class ItemsListTest extends TestCase
             'kept: Not kept' => ['kept' => 'no'],
             'type: All types' => ['type' => null],
             'type: Games' => ['type' => ['81', '26']],
+            'type: Other' => ['type' => ['44']],
             'picker: Clear' => ['players' => null, 'age' => null, 'ageUnknown' => null],
         ];
         $defaults = [
@@ -578,6 +584,14 @@ class ItemsListTest extends TestCase
             'age' => null,
             'ageUnknown' => false,
         ];
+
+        $secondary = $filters;
+        $filters['kept'] = 'no';
+        foreach (['kept: Kept from secondary' => ['kept' => 'yes'], 'kept: All from secondary' => ['kept' => null]] as $control => $change) {
+            $changed = $this->filtersFromQuery(items_list_filter_query($secondary, self::QUERY_TYPES, 90, $change));
+            $expected = array_replace($secondary, ['kept' => $change['kept'] ?? 'allkeptandnot']);
+            $this->assertEquals($this->listed($expected), $this->listed($changed), $control);
+        }
 
         foreach ($changes as $control => $change) {
             $changed = $this->filtersFromQuery(items_list_filter_query($filters, self::QUERY_TYPES, 90, $change));
