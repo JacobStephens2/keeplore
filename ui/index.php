@@ -202,130 +202,36 @@ include(SHARED_PATH . '/header.php');
   </div>
 
   <?php if (!is_guest()) { ?>
-  <?php
-    $dashboard_default_setting = (new Uses($db, $user_id))->lastSetting() ?? $preferences['default_setting'];
-  ?>
   <div id="dashboard-toast" class="toast" role="status" aria-live="polite"></div>
-  <div id="record-modal" class="modal" hidden aria-hidden="true">
-    <div class="modal-backdrop" data-modal-close></div>
-    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="record-modal-title">
-      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
-      <h2 id="record-modal-title" class="modal-title">Record interaction</h2>
-      <p id="record-modal-artifact" class="modal-subtitle"></p>
-      <form id="record-modal-form" method="post" action="<?php echo url_for('/uses/record-new.php'); ?>">
-        <?php echo csrf_input(); ?>
-        <input type="hidden" name="artifact[id]" id="record-modal-artifact-id">
-        <input type="hidden" name="artifact[name]" id="record-modal-artifact-name">
-        <input type="hidden" name="user[0][id]" value="<?php echo h($_SESSION['player_id'] ?? ''); ?>">
-        <input type="hidden" name="user[0][name]" value="<?php echo h($_SESSION['FullName'] ?? ''); ?>">
-
-        <label for="record-modal-date">Date</label>
-        <input type="date" name="useDate" id="record-modal-date" required>
-
-        <label for="record-modal-setting">Setting</label>
-        <input type="text" name="Note" id="record-modal-setting" value="<?php echo h($dashboard_default_setting ?? ''); ?>">
-
-        <label for="record-modal-notes">Notes</label>
-        <textarea name="NotesTwo" id="record-modal-notes" rows="3"></textarea>
-
-        <div class="modal-actions">
-          <a class="modal-link" id="record-modal-fullform-link" href="#" target="_blank">Open full form</a>
-          <button type="button" class="modal-cancel" data-modal-close>Cancel</button>
-          <button type="submit" class="modal-save">Save</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <?php include(SHARED_PATH . '/quick_record_popup.php'); ?>
 
   <script src="<?php echo url_for('/shared/js/record-use-submit.js'); ?>"></script>
+  <script src="<?php echo url_for('/shared/js/quick-record.js'); ?>"></script>
   <script>
     (function () {
-      var modal = document.getElementById('record-modal');
-      if (!modal || !window.RecordUseSubmit) return;
-      var form = document.getElementById('record-modal-form');
-      var artifactIdInput = document.getElementById('record-modal-artifact-id');
-      var artifactNameInput = document.getElementById('record-modal-artifact-name');
-      var displayEl = document.getElementById('record-modal-artifact');
-      var dateInput = document.getElementById('record-modal-date');
-      var notesInput = document.getElementById('record-modal-notes');
-      var saveBtn = form.querySelector('.modal-save');
-      var fullFormLink = document.getElementById('record-modal-fullform-link');
-      var showToast = RecordUseSubmit.toast(document.getElementById('dashboard-toast'));
-      var currentRow = null;
-
-      function todayLocal() {
-        var d = new Date();
-        return d.getFullYear() + '-'
-          + String(d.getMonth() + 1).padStart(2, '0') + '-'
-          + String(d.getDate()).padStart(2, '0');
-      }
-
-      function openModal(artifactId, artifactName, row) {
-        currentRow = row;
-        artifactIdInput.value = artifactId;
-        artifactNameInput.value = artifactName;
-        displayEl.textContent = artifactName;
-        dateInput.value = todayLocal();
-        notesInput.value = '';
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save';
-        if (fullFormLink) {
-          fullFormLink.href = '/uses/record-new.php?artifact_id=' + encodeURIComponent(artifactId);
+      var quickRecord = QuickRecord.init(document.getElementById('record-modal'), {
+        toast: RecordUseSubmit.toast(document.getElementById('dashboard-toast')),
+        // An item no longer overdue leaves the priority queue.
+        onRecorded: function (data, li) {
+          if (data.is_overdue) return;
+          li.remove();
+          var section = document.getElementById('priority-queue');
+          if (section && !section.querySelector('.overdue-list li')) {
+            section.style.display = 'none';
+          }
         }
-        modal.hidden = false;
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('modal-open');
-        window.setTimeout(function () { dateInput.focus(); }, 30);
-      }
-
-      function closeModal() {
-        modal.hidden = true;
-        modal.setAttribute('aria-hidden', 'true');
-        document.body.classList.remove('modal-open');
-        currentRow = null;
-      }
-
-      modal.querySelectorAll('[data-modal-close]').forEach(function (el) {
-        el.addEventListener('click', closeModal);
-      });
-      document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && !modal.hidden) closeModal();
       });
 
       document.querySelectorAll('.overdue-list a[href*="record-new"]').forEach(function (link) {
         link.addEventListener('click', function (event) {
+          var idMatch = (link.getAttribute('href') || '').match(/artifact_id=(\d+)/);
+          if (!idMatch) return;
           event.preventDefault();
           var li = link.closest('li');
-          var idMatch = (link.getAttribute('href') || '').match(/artifact_id=(\d+)/);
-          var artifactId = idMatch ? idMatch[1] : null;
-          var titleEl = li ? li.querySelector('.overdue-item-title') : null;
-          var artifactName = titleEl ? titleEl.textContent.trim() : '';
-          if (!artifactId) return;
-          openModal(artifactId, artifactName, li);
+          var titleEl = li.querySelector('.overdue-item-title');
+          quickRecord.open(idMatch[1], titleEl ? titleEl.textContent.trim() : '', li);
         });
       });
-
-      RecordUseSubmit.bind(form, {
-        toast: showToast,
-        saveButton: saveBtn,
-        saveLabel: 'Save',
-        onSuccess: function (data) {
-          handleSuccess(data, currentRow);
-          closeModal();
-        }
-      });
-
-      function handleSuccess(data, row) {
-        if (!row) return;
-        if (!data.is_overdue) {
-          row.remove();
-          var section = document.getElementById('priority-queue');
-          var ul = section ? section.querySelector('.overdue-list') : null;
-          if (ul && !ul.querySelector('li')) {
-            section.style.display = 'none';
-          }
-        }
-      }
     })();
   </script>
   <?php } ?>

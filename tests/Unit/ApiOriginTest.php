@@ -81,12 +81,13 @@ JS));
         $this->assertSame(['/ui/uses/modules/publicEnvironmentVariables.js'], $naming);
     }
 
-    public function test_use_by_record_modal_calls_the_configured_api_host(): void
+    public function test_quick_record_popup_searches_people_on_the_configured_api_host(): void
     {
-        $source = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/useby.php');
+        $partial = (string) file_get_contents(PROJECT_PATH . '/private/shared/quick_record_popup.php');
+        $module = (string) file_get_contents(PROJECT_PATH . '/ui/shared/js/quick-record.js');
 
-        $this->assertStringContainsString("var API_BASE = 'https://' + <?php echo json_encode(API_ORIGIN); ?>;", $source);
-        $this->assertStringNotContainsString('window.location.host', $source);
+        $this->assertStringContainsString("data-people-search-url=\"<?php echo h('https://' . API_ORIGIN . '/users.php'); ?>\"", $partial);
+        $this->assertStringNotContainsString('window.location.host', $module);
     }
 
     public function test_header_prints_the_api_origin_meta_tag(): void

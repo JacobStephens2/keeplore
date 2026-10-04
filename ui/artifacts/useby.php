@@ -158,62 +158,7 @@
   <div id="useby-toast" class="toast" role="status" aria-live="polite"></div>
 
   <?php if (!is_guest()) { ?>
-  <?php
-    $modal_default_setting = (new Uses($db, (int) $_SESSION['user_id']))->lastSetting() ?? $preferences['default_setting'];
-  ?>
-  <div id="record-modal" class="modal" hidden aria-hidden="true">
-    <div class="modal-backdrop" data-modal-close></div>
-    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="record-modal-title">
-      <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>
-      <h2 id="record-modal-title" class="modal-title">Record interaction</h2>
-      <p id="record-modal-artifact" class="modal-subtitle"></p>
-      <form id="record-modal-form" method="post" action="<?php echo url_for('/uses/record-new.php'); ?>">
-        <?php echo csrf_input(); ?>
-        <input type="hidden" name="artifact[id]" id="record-modal-artifact-id">
-        <input type="hidden" name="artifact[name]" id="record-modal-artifact-name">
-
-        <label>People</label>
-        <div id="record-modal-users">
-          <div class="modal-user-chip" data-user-index="0">
-            <span class="modal-user-name"><?php echo h($_SESSION['FullName'] ?? 'Me'); ?></span>
-            <input type="hidden" name="user[0][id]" value="<?php echo h($_SESSION['player_id'] ?? ''); ?>" data-player-id="<?php echo h($_SESSION['player_id'] ?? ''); ?>">
-            <input type="hidden" name="user[0][name]" value="<?php echo h($_SESSION['FullName'] ?? ''); ?>">
-          </div>
-        </div>
-
-        <div id="record-modal-add-user">
-          <div class="modal-user-search-wrap">
-            <input type="search" id="record-modal-user-search" placeholder="Add another person…" autocomplete="off">
-            <ul id="record-modal-user-results" class="modal-user-results" hidden></ul>
-          </div>
-          <button type="button" id="record-modal-new-user-toggle" class="new-interactor-toggle">+ New person</button>
-        </div>
-
-        <div id="record-modal-new-user-form" class="new-interactor-form" style="display: none;">
-          <input type="text" id="record-modal-new-first" placeholder="First name" autocomplete="off">
-          <input type="text" id="record-modal-new-last" placeholder="Last name" autocomplete="off">
-          <button type="button" id="record-modal-new-create" class="new-interactor-create">Create &amp; add</button>
-          <button type="button" id="record-modal-new-cancel" class="new-interactor-cancel">Cancel</button>
-          <span id="record-modal-new-msg" class="new-interactor-msg" role="status" aria-live="polite"></span>
-        </div>
-
-        <label for="record-modal-date">Date</label>
-        <input type="date" name="useDate" id="record-modal-date" required>
-
-        <label for="record-modal-setting">Setting</label>
-        <input type="text" name="Note" id="record-modal-setting" value="<?php echo h($modal_default_setting ?? ''); ?>">
-
-        <label for="record-modal-notes">Notes</label>
-        <textarea name="NotesTwo" id="record-modal-notes" rows="3"></textarea>
-
-        <div class="modal-actions">
-          <a class="modal-link" id="record-modal-fullform-link" href="#" target="_blank">Open full form</a>
-          <button type="button" class="modal-cancel" data-modal-close>Cancel</button>
-          <button type="submit" class="modal-save">Save</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  <?php include(SHARED_PATH . '/quick_record_popup.php'); ?>
   <?php } ?>
 
   <div class="table-scroll">
@@ -396,6 +341,7 @@
   </div>
 
   <script src="<?php echo url_for('/shared/js/record-use-submit.js'); ?>"></script>
+  <script src="<?php echo url_for('/shared/js/quick-record.js'); ?>"></script>
   <script>
     document.querySelector('span#totalOverdue').innerText = '<?php echo $total_overdue; ?>';
     <?php
@@ -486,133 +432,33 @@
 
       var overdueSpan = document.querySelector('span#totalOverdue');
 
-      var recordModal = document.getElementById('record-modal');
-      var recordForm = document.getElementById('record-modal-form');
-      var modalArtifactInput = document.getElementById('record-modal-artifact-id');
-      var modalArtifactNameInput = document.getElementById('record-modal-artifact-name');
-      var modalArtifactDisplay = document.getElementById('record-modal-artifact');
-      var modalDateInput = document.getElementById('record-modal-date');
-      var modalSettingInput = document.getElementById('record-modal-setting');
-      var modalNotesInput = document.getElementById('record-modal-notes');
-      var modalSaveBtn = recordForm ? recordForm.querySelector('.modal-save') : null;
-      var modalFullFormLink = document.getElementById('record-modal-fullform-link');
-      var currentRecordRow = null;
-
-      function todayLocal() {
-        var d = new Date();
-        return d.getFullYear() + '-'
-          + String(d.getMonth() + 1).padStart(2, '0') + '-'
-          + String(d.getDate()).padStart(2, '0');
-      }
-
-      function openRecordModal(artifactId, artifactName, tr) {
-        if (!recordModal) return;
-        currentRecordRow = tr;
-        modalArtifactInput.value = artifactId;
-        modalArtifactNameInput.value = artifactName;
-        modalArtifactDisplay.textContent = artifactName;
-        modalDateInput.value = todayLocal();
-        modalNotesInput.value = '';
-        if (window.recordModalResetUsers) { window.recordModalResetUsers(); }
-        if (modalSaveBtn) { modalSaveBtn.disabled = false; modalSaveBtn.textContent = 'Save'; }
-        if (modalFullFormLink) {
-          modalFullFormLink.href = '/uses/record-new.php?artifact_id=' + encodeURIComponent(artifactId);
-        }
-        recordModal.hidden = false;
-        recordModal.setAttribute('aria-hidden', 'false');
-        document.body.classList.add('modal-open');
-        window.setTimeout(function () { modalDateInput.focus(); }, 30);
-      }
-
-      function closeRecordModal() {
-        if (!recordModal) return;
-        recordModal.hidden = true;
-        recordModal.setAttribute('aria-hidden', 'true');
-        document.body.classList.remove('modal-open');
-        currentRecordRow = null;
-      }
-
-      if (recordModal) {
-        recordModal.querySelectorAll('[data-modal-close]').forEach(function (el) {
-          el.addEventListener('click', closeRecordModal);
-        });
-        document.addEventListener('keydown', function (event) {
-          if (event.key === 'Escape' && !recordModal.hidden) closeRecordModal();
-        });
-      }
+      var recordPopup = document.getElementById('record-modal');
+      var quickRecord = recordPopup ? QuickRecord.init(recordPopup, {
+        toast: showToast,
+        onRecorded: handleRecorded
+      }) : null;
 
       document.querySelectorAll('table#useBy td.record a').forEach(function (link) {
         link.addEventListener('click', function (event) {
-          if (!recordModal) return;
+          if (!quickRecord) return;
+          var idMatch = (link.getAttribute('href') || '').match(/artifact_id=(\d+)/);
+          if (!idMatch) return;
           event.preventDefault();
           var tr = link.closest('tr');
-          var idMatch = (link.getAttribute('href') || '').match(/artifact_id=(\d+)/);
-          var artifactId = idMatch ? idMatch[1] : null;
-          var titleAnchor = tr ? tr.querySelector('td.name a') : null;
-          var artifactName = titleAnchor ? titleAnchor.textContent.trim() : '';
-          if (!artifactId) return;
-          openRecordModal(artifactId, artifactName, tr);
+          var titleAnchor = tr.querySelector('td.name a');
+          quickRecord.open(idMatch[1], titleAnchor ? titleAnchor.textContent.trim() : '', tr);
         });
       });
 
-      if (recordForm && window.RecordUseSubmit) {
-        RecordUseSubmit.bind(recordForm, {
-          toast: showToast,
-          saveButton: modalSaveBtn,
-          saveLabel: 'Save',
-          onSuccess: function (data) {
-            handleRecordSuccess(data, currentRecordRow);
-            closeRecordModal();
-          }
-        });
-
-        // Enter saves the interaction (via the AJAX submit above) instead of
-        // triggering a native submit / page reload.
-        recordForm.addEventListener('keydown', function (event) {
-          if (event.key !== 'Enter') return;
-          var t = event.target;
-          if (!t) return;
-          // Notes: let Enter insert a newline.
-          if (t.tagName === 'TEXTAREA') return;
-          // The "+ New person" sub-form handles its own Enter (creates the person).
-          if (t.closest && t.closest('#record-modal-new-user-form')) return;
-          // In the interactor search, if suggestions are open Enter picks the top match.
-          if (t.id === 'record-modal-user-search') {
-            var res = document.getElementById('record-modal-user-results');
-            if (res && !res.hidden && res.firstElementChild) {
-              event.preventDefault();
-              res.firstElementChild.click();
-              return;
-            }
-          }
-          event.preventDefault();
-          if (typeof recordForm.requestSubmit === 'function') {
-            recordForm.requestSubmit();
-          } else {
-            recordForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-          }
-        });
-      }
-
-      function handleRecordSuccess(data, tr) {
-        if (!tr) return;
-        var wasOverdue = false;
+      // A row no longer overdue leaves the table and the overdue count;
+      // otherwise it shows its new dates.
+      function handleRecorded(data, tr) {
         var overdueCell = tr.querySelector('td.overdue');
-        if (overdueCell) wasOverdue = overdueCell.textContent.trim() === 'Yes';
+        var wasOverdue = overdueCell ? overdueCell.textContent.trim() === 'Yes' : false;
 
         if (!data.is_overdue) {
-          if (typeof table !== 'undefined' && table) {
-            table.row(tr).remove().draw(false);
-          } else {
-            tr.remove();
-          }
-          if (wasOverdue) {
-            var overdueSpan = document.querySelector('span#totalOverdue');
-            if (overdueSpan) {
-              var n = parseInt(overdueSpan.textContent, 10);
-              if (!isNaN(n) && n > 0) overdueSpan.textContent = (n - 1);
-            }
-          }
+          table.row(tr).remove().draw(false);
+          if (wasOverdue) decrementOverdueCount();
           return;
         }
 
@@ -620,6 +466,12 @@
         if (useByCell && data.new_use_by_date) useByCell.textContent = data.new_use_by_date;
         var recentCell = tr.querySelector('td.mostRecentUse');
         if (recentCell) recentCell.textContent = data.most_recent_use_date || '—';
+      }
+
+      function decrementOverdueCount() {
+        if (!overdueSpan) return;
+        var n = parseInt(overdueSpan.textContent, 10);
+        if (!isNaN(n) && n > 0) overdueSpan.textContent = (n - 1);
       }
 
       function wireRowRemovalForm(form, options) {
@@ -650,10 +502,7 @@
                 } else if (tr) {
                   tr.remove();
                 }
-                if (wasOverdue && overdueSpan) {
-                  var n = parseInt(overdueSpan.textContent, 10);
-                  if (!isNaN(n) && n > 0) overdueSpan.textContent = (n - 1);
-                }
+                if (wasOverdue) decrementOverdueCount();
                 showToast(result.data.message || options.successFallback, 'success');
               } else {
                 var msg = (result.data && result.data.message) || ('Request failed (HTTP ' + (result.ok ? 'OK' : 'error') + ')');
@@ -674,159 +523,6 @@
 
       document.querySelectorAll('table#useBy td.get-rid-of form.untrack-form').forEach(function (form) {
         wireRowRemovalForm(form, { pendingLabel: 'Removing…', successFallback: 'Removed from tracked collection.' });
-      });
-    })();
-
-    // Record-interaction modal: add additional interactors (existing or brand-new).
-    (function () {
-      var usersWrap = document.getElementById('record-modal-users');
-      var search = document.getElementById('record-modal-user-search');
-      var results = document.getElementById('record-modal-user-results');
-      var newToggle = document.getElementById('record-modal-new-user-toggle');
-      var newForm = document.getElementById('record-modal-new-user-form');
-      var newFirst = document.getElementById('record-modal-new-first');
-      var newLast = document.getElementById('record-modal-new-last');
-      var newCreate = document.getElementById('record-modal-new-create');
-      var newCancel = document.getElementById('record-modal-new-cancel');
-      var newMsg = document.getElementById('record-modal-new-msg');
-      if (!usersWrap || !search) return;
-
-      var API_BASE = 'https://' + <?php echo json_encode(API_ORIGIN); ?>;
-      var currentUserId = '<?php echo h($_SESSION['user_id'] ?? ''); ?>';
-      var csrfToken = (document.querySelector('#record-modal-form input[name="csrf_token"]') || {}).value || '';
-      var searchWrap = search.closest('.modal-user-search-wrap');
-      var userIndex = 1; // index 0 is the current user (static chip)
-
-      function hideResults() { results.innerHTML = ''; results.hidden = true; }
-
-      function addChip(id, name) {
-        if (id) {
-          if (usersWrap.querySelector('input[data-player-id="' + id + '"]')) { return; }
-        }
-        var i = userIndex++;
-        var chip = document.createElement('div');
-        chip.className = 'modal-user-chip';
-
-        var label = document.createElement('span');
-        label.className = 'modal-user-name';
-        label.textContent = name;
-
-        var hidId = document.createElement('input');
-        hidId.type = 'hidden';
-        hidId.name = 'user[' + i + '][id]';
-        hidId.value = id;
-        hidId.setAttribute('data-player-id', id);
-
-        var hidName = document.createElement('input');
-        hidName.type = 'hidden';
-        hidName.name = 'user[' + i + '][name]';
-        hidName.value = name;
-
-        var remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'modal-user-remove';
-        remove.setAttribute('aria-label', 'Remove ' + name);
-        remove.innerHTML = '&times;';
-        remove.addEventListener('click', function () { chip.remove(); });
-
-        chip.append(label, hidId, hidName, remove);
-        usersWrap.appendChild(chip);
-      }
-
-      function resetNewForm() {
-        newFirst.value = '';
-        newLast.value = '';
-        newMsg.textContent = '';
-        newForm.style.display = 'none';
-        newToggle.style.display = '';
-      }
-
-      // Exposed so opening the modal for a new artifact starts clean.
-      window.recordModalResetUsers = function () {
-        usersWrap.querySelectorAll('.modal-user-chip:not([data-user-index="0"])').forEach(function (c) { c.remove(); });
-        userIndex = 1;
-        search.value = '';
-        hideResults();
-        resetNewForm();
-      };
-
-      search.addEventListener('input', function () {
-        var q = search.value.trim();
-        if (q === '') { hideResults(); return; }
-        fetch(API_BASE + '/users.php', {
-          method: 'POST',
-          credentials: 'include',
-          body: JSON.stringify({ query: q, userid: currentUserId }),
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (data.authenticated === false) { location.href = '/login.php'; return; }
-            results.innerHTML = '';
-            var list = (data.users || []).slice(0, 10);
-            if (!list.length) { results.hidden = true; return; }
-            results.hidden = false;
-            list.forEach(function (u) {
-              var li = document.createElement('li');
-              li.textContent = (u.FirstName + ' ' + u.LastName).trim();
-              li.addEventListener('click', function () {
-                addChip(u.id, (u.FirstName + ' ' + u.LastName).trim());
-                search.value = '';
-                hideResults();
-                search.focus();
-              });
-              results.appendChild(li);
-            });
-          })
-          .catch(function () { hideResults(); });
-      });
-
-      // Tapping anywhere outside the search box dismisses the results so the
-      // "+ New person" button underneath becomes tappable.
-      document.addEventListener('pointerdown', function (event) {
-        if (results.hidden) { return; }
-        if (searchWrap && !searchWrap.contains(event.target)) { hideResults(); }
-      });
-
-      function createPerson() {
-        var first = newFirst.value.trim();
-        var last = newLast.value.trim();
-        if (first === '' && last === '') { newMsg.textContent = 'Enter a name.'; return; }
-        newCreate.disabled = true;
-        newMsg.textContent = 'Creating…';
-        var body = new FormData();
-        body.append('FirstName', first);
-        body.append('LastName', last);
-        body.append('csrf_token', csrfToken);
-        fetch('/users/new.php', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-          body: body,
-        })
-          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-          .then(function (res) {
-            newCreate.disabled = false;
-            if (res.ok && res.d && res.d.ok) {
-              addChip(res.d.id, res.d.FullName);
-              resetNewForm();
-            } else {
-              newMsg.textContent = (res.d && res.d.message) || 'Could not create person.';
-            }
-          })
-          .catch(function (err) { newCreate.disabled = false; newMsg.textContent = 'Error: ' + err.message; });
-      }
-
-      newToggle.addEventListener('click', function () {
-        newForm.style.display = 'flex';
-        newToggle.style.display = 'none';
-        newFirst.focus();
-      });
-      newCancel.addEventListener('click', resetNewForm);
-      newCreate.addEventListener('click', createPerson);
-      [newFirst, newLast].forEach(function (el) {
-        el.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') { e.preventDefault(); createPerson(); }
-        });
       });
     })();
 

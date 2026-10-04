@@ -64,7 +64,7 @@ class RecordUseSubmitTest extends TestCase
         $this->assertSame('Record use', $result['saveBtn']['textContent']);
     }
 
-    public function test_record_pages_bind_the_shared_module(): void
+    public function test_record_pages_load_the_shared_module(): void
     {
         $pages = [
             PROJECT_PATH . '/ui/artifacts/useby.php',
@@ -72,15 +72,24 @@ class RecordUseSubmitTest extends TestCase
             PROJECT_PATH . '/private/shared/user_interactions.php',
         ];
         foreach ($pages as $path) {
-            $source = (string) file_get_contents($path);
             $this->assertStringContainsString(
                 'record-use-submit.js',
-                $source,
+                (string) file_get_contents($path),
                 $path . ' must load the shared submit module.'
             );
+        }
+    }
+
+    public function test_quick_record_and_edit_user_bind_the_shared_module(): void
+    {
+        $binders = [
+            PROJECT_PATH . '/ui/shared/js/quick-record.js',
+            PROJECT_PATH . '/private/shared/user_interactions.php',
+        ];
+        foreach ($binders as $path) {
             $this->assertStringContainsString(
                 'RecordUseSubmit.bind',
-                $source,
+                (string) file_get_contents($path),
                 $path . ' must bind the shared submit module.'
             );
         }

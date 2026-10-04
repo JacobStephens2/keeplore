@@ -130,8 +130,11 @@ An event's games grouped by who is coming: a group for each child's age and one 
 Where a planned item will be used at an event, such as the beach. Belongs to the event, not the item, and is distinct from a use's Setting.
 
 **Use group**:
-The people, date, and Setting of the use last saved from Record Use. "Record another use with this group" reopens Record Use with them filled in, so only the item is left to pick. Quick records from other pages do not change it.
+The people, date, and Setting of the use last saved from Record Use. "Record another use with this group" reopens Record Use with them filled in, so only the item is left to pick. A Quick record does not change it.
 _Avoid_: Group (alone; proposals and event groupings also have groups).
+
+**Quick record**:
+A use recorded without leaving the page: from the Quick record popup on the dashboard or Use By, or from Edit User's form. A quick record does not change the Use group.
 
 **Number of uses**:
 How many identical uses one Record Use submit saves, from 1 to 20, such as two rounds of Old Maid with the same family on the same day.
