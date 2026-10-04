@@ -31,27 +31,18 @@ if(is_post_request()) {
     // Using one variable ensures that msg is the same
     $login_failure_msg = "Log in was unsuccessful.";
 
-    $user = find_user_by_username($username);
-    if($user) {
-
-      if(password_verify($password, $user['hashed_password'])) { // original
-        // password matches
-        $logger->logAuth('login_success', ['username' => $username]);
-        $remember = isset($_POST['remember_me']);
-        log_in_user($user, $remember);
-        if (isset($_POST['redirectURL'])) {
-          redirect_to(url_for(urldecode($_POST['redirectURL'])));      
-        } else {
-          redirect_to(url_for('/index.php'));      
-        }
+    $account = (new Accounts($db, SmtpMailer::fromEnvironment()))->logIn($username, $password);
+    if($account) {
+      $logger->logAuth('login_success', ['username' => $username]);
+      $remember = isset($_POST['remember_me']);
+      log_in_user($account, $remember);
+      if (isset($_POST['redirectURL'])) {
+        redirect_to(url_for(urldecode($_POST['redirectURL'])));      
       } else {
-        // username found, but password does not match
-        $logger->logAuth('login_failed', ['username' => $username]);
-        $errors[] = $login_failure_msg;
+        redirect_to(url_for('/index.php'));      
       }
-
     } else {
-      // no username found
+      // An unknown name and a wrong password fail alike.
       $logger->logAuth('login_failed', ['username' => $username]);
       $errors[] = $login_failure_msg;
     }

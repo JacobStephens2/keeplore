@@ -13,30 +13,23 @@ if (is_post_request()) {
     $errors[] = "Too many registration attempts. Please try again in an hour.";
   }
 
-  $subject = [];
   $user['first_name'] = $_POST['first_name'] ?? '';
   $user['last_name'] = $_POST['last_name'] ?? '';
   $user['email'] = $_POST['email'] ?? '';
   $user['username'] = $_POST['username'] ?? '';
   $user['password'] = $_POST['password'] ?? '';
   $user['confirm_password'] = $_POST['confirm_password'] ?? '';
+  $user['device'] = $_SERVER['HTTP_USER_AGENT'] ?? '';
 
   if (empty($errors)) {
-    $result = insert_user($user);
-  }
-
-  if(empty($errors) && $result === true) {
-    $new_id = mysqli_insert_id($db);
-    $_SESSION['message'] = 'User registered';
-    $user['user_group'] = 1;
     try {
-      log_in_user($user);
+      $account = (new Accounts($db, SmtpMailer::fromEnvironment()))->register($user);
+      $_SESSION['message'] = 'User registered';
+      log_in_user($account);
       redirect_to(url_for('/index.php'));
-    } catch (Exception $e) {
-      redirect_to(url_for('/index.php'));
+    } catch (AccountInvalid $invalid) {
+      $errors = $invalid->errors;
     }
-  } else {
-    $errors = $result;
   }
 
 } else {

@@ -35,7 +35,6 @@ final class PeopleTest extends TestCase
             ADD COLUMN G VARCHAR(10) DEFAULT NULL,
             ADD COLUMN birth_year INT DEFAULT NULL,
             ADD COLUMN represents_user_id INT DEFAULT NULL');
-        $this->runSql('ALTER TABLE users ADD COLUMN player_id INT DEFAULT NULL');
         $this->runSql('CREATE TABLE uses_players (
             id INT PRIMARY KEY AUTO_INCREMENT,
             use_id INT NOT NULL,
@@ -247,6 +246,30 @@ final class PeopleTest extends TestCase
         $this->people->update(100, ['first_name' => 'Sam', 'last_name' => 'Lee', 'is_me' => false]);
 
         $this->assertFalse($this->people->find(100)['is_me']);
+        $this->assertNull($this->accountLink());
+    }
+
+    public function test_me_is_the_person_the_account_links_to(): void
+    {
+        $this->people->update(101, ['first_name' => 'Jo', 'last_name' => 'Smith', 'is_me' => true]);
+
+        $this->assertSame(101, $this->people->me());
+        $this->assertSame(101, $this->accountLink());
+    }
+
+    public function test_me_repairs_a_missing_link_to_the_person_who_represents_the_account(): void
+    {
+        $this->db->query('UPDATE players SET represents_user_id = 1 WHERE id = 101');
+
+        $this->assertSame(101, $this->people->me());
+        $this->assertSame(101, $this->accountLink());
+    }
+
+    public function test_me_is_null_with_no_link_and_no_person_who_represents_the_account(): void
+    {
+        $this->db->query('UPDATE players SET represents_user_id = 1 WHERE id = 200');
+
+        $this->assertNull($this->people->me());
         $this->assertNull($this->accountLink());
     }
 

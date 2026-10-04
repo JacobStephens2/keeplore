@@ -3,34 +3,17 @@
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
-// Performs all actions necessary to log in an admin
-function log_in_user($user, $remember = false) {
+// Logs in the account Accounts returned: the session, the remember-me
+// window and the JWT cookie.
+function log_in_user($account, $remember = false) {
   // Renerating the ID protects the admin from session fixation.
   session_regenerate_id();
-
-  global $db;
-
-  $stmt = mysqli_prepare($db, "SELECT * FROM users WHERE id = ?");
-  mysqli_stmt_bind_param($stmt, "i", $user['id']);
-  mysqli_stmt_execute($stmt);
-  $userResultObject = mysqli_stmt_get_result($stmt);
-  $userArray = mysqli_fetch_assoc($userResultObject);
-  mysqli_stmt_close($stmt);
 
   // 30 days if "Remember me" is checked, otherwise 24 hours
   $expiry_seconds = $remember ? 2592000 : 86400;
   $expiry_minutes = $expiry_seconds / 60;
 
-  $_SESSION['FullName'] = $userArray['first_name'] . ' ' . $userArray['last_name'];
-  $_SESSION['user_id'] = $user['id'];
-  $_SESSION['player_id'] = $user['player_id'];
-  if (empty($_SESSION['player_id'])) {
-    $_SESSION['player_id'] = backfill_user_player_id($user['id']);
-  }
-  $_SESSION['last_login'] = time();
-  $_SESSION['username'] = $user['username'];
-  $_SESSION['user_group'] = $user['user_group'];
-  $_SESSION['logged_in'] = true;
+  put_account_in_session($account);
 
   // Extend PHP session lifetime to match JWT / remember-me window
   ini_set('session.gc_maxlifetime', $expiry_seconds);
@@ -51,7 +34,7 @@ function log_in_user($user, $remember = false) {
       'iss'  => $_SERVER['SERVER_NAME'], // Issuer
       'nbf'  => $issuedAt->getTimestamp(), // Not before
       'exp'  => $issuedAt->modify('+' . $expiry_minutes . ' minutes')->getTimestamp(),
-      'user_id' => $user['id'],
+      'user_id' => $account['id'],
   ];
   $access_token = JWT::encode(
       $jwt_access_token_data,
@@ -173,29 +156,22 @@ function log_out() {
   return true;
 }
 
-function backfill_user_player_id($user_id) {
-  global $db;
-  $stmt = mysqli_prepare($db, "SELECT id FROM players WHERE represents_user_id = ? ORDER BY id ASC LIMIT 1");
-  mysqli_stmt_bind_param($stmt, "i", $user_id);
-  mysqli_stmt_execute($stmt);
-  $result = mysqli_stmt_get_result($stmt);
-  $row = mysqli_fetch_assoc($result);
-  mysqli_stmt_close($stmt);
-  if (!$row) {
-    return null;
-  }
-  $player_id = (int) $row['id'];
-  $update = mysqli_prepare($db, "UPDATE users SET player_id = ? WHERE id = ? AND (player_id IS NULL OR player_id = 0)");
-  mysqli_stmt_bind_param($update, "ii", $player_id, $user_id);
-  mysqli_stmt_execute($update);
-  mysqli_stmt_close($update);
-  return $player_id;
+// The session's account, and the person who is the owner themself.
+function put_account_in_session($account) {
+  $_SESSION['FullName'] = $account['name'];
+  $_SESSION['user_id'] = $account['id'];
+  $_SESSION['player_id'] = $account['person_id'];
+  $_SESSION['last_login'] = time();
+  $_SESSION['username'] = $account['username'];
+  $_SESSION['user_group'] = $account['user_group'];
+  $_SESSION['logged_in'] = true;
 }
 
 function is_logged_in() {
   if (isset($_SESSION['user_id'])) {
     if (empty($_SESSION['player_id']) && empty($_SESSION['guest_mode'])) {
-      $_SESSION['player_id'] = backfill_user_player_id($_SESSION['user_id']);
+      global $db;
+      $_SESSION['player_id'] = (new People($db, (int) $_SESSION['user_id']))->me();
     }
     return true;
   }
@@ -205,24 +181,10 @@ function is_logged_in() {
       $decoded = JWT::decode($_COOKIE['access_token'], new Key(JWT_SECRET, 'HS256'));
       if (isset($decoded->user_id)) {
         global $db;
-        $stmt = mysqli_prepare($db, "SELECT * FROM users WHERE id = ?");
-        mysqli_stmt_bind_param($stmt, "i", $decoded->user_id);
-        mysqli_stmt_execute($stmt);
-        $result = mysqli_stmt_get_result($stmt);
-        $user = mysqli_fetch_assoc($result);
-        mysqli_stmt_close($stmt);
-        if ($user) {
+        $account = (new Accounts($db, SmtpMailer::fromEnvironment()))->find((int) $decoded->user_id);
+        if ($account) {
           session_regenerate_id();
-          $_SESSION['FullName'] = $user['first_name'] . ' ' . $user['last_name'];
-          $_SESSION['user_id'] = $user['id'];
-          $_SESSION['player_id'] = $user['player_id'];
-          if (empty($_SESSION['player_id'])) {
-            $_SESSION['player_id'] = backfill_user_player_id($user['id']);
-          }
-          $_SESSION['last_login'] = time();
-          $_SESSION['username'] = $user['username'];
-          $_SESSION['user_group'] = $user['user_group'];
-          $_SESSION['logged_in'] = true;
+          put_account_in_session($account);
           return true;
         }
       }
