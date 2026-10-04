@@ -39,7 +39,7 @@ include(SHARED_PATH . '/header.php');
       } else {
 
          try {
-            (new Accounts($db, SmtpMailer::fromEnvironment()))->requestPasswordReset($email);
+            accounts()->requestPasswordReset($email);
             echo
                "
                <div class='error update-message'>

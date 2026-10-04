@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__) . '/functions.php';
 require_once __DIR__ . '/Mailer.php';
+require_once __DIR__ . '/People.php';
 
 /** Invalid account input: every problem found, in the order checked. */
 final class AccountInvalid extends InvalidArgumentException
@@ -20,24 +21,94 @@ final class AccountInvalid extends InvalidArgumentException
  *
  * An account is an array of id, first_name, last_name, name (first and last
  * joined), email, username, user_group and person_id (int or null). It never
- * carries the password hash.
+ * carries the password hash. person_id is People::me(), so reading an
+ * account can repair its missing link to the person who represents it.
  *
- * A password must have at least 12 characters, with an uppercase letter, a
- * lowercase letter, a number and a symbol, and a matching confirmation.
- * Invalid input throws AccountInvalid with every problem, and nothing is
- * written.
+ * A profile needs a first and last name of 2 to 255 characters, a valid
+ * email of at most 255 characters and a username of 8 to 255 characters;
+ * no two accounts share an email or a username. A password must have at
+ * least 12 characters, with an uppercase letter, a lowercase letter, a
+ * number and a symbol, and a matching confirmation. Invalid input throws
+ * AccountInvalid with every problem, and nothing is written.
  *
  * A password reset needs a key emailed to the account's address. A key lasts
  * one day, and a successful reset uses up every key for that address.
  */
 final class Accounts
 {
+    private const COLUMNS = 'id, first_name, last_name, email, username, user_group';
+    private const DUPLICATE_KEY = 1062;
     private const RESET_KEY_LIFETIME = '+1 day';
     private const INVALID_RESET_LINK = 'This reset link is invalid or has expired.';
 
     /** $now is a Y-m-d H:i:s time; the current time when omitted. */
     public function __construct(private mysqli $db, private Mailer $mailer, private ?string $now = null)
     {
+    }
+
+    /** The account with this id, or null if there is none. */
+    public function find(int $id): ?array
+    {
+        $row = $this->rows('SELECT ' . self::COLUMNS . ' FROM users WHERE id = ?', 'i', [$id])[0] ?? null;
+        return $row === null ? null : $this->account($row);
+    }
+
+    /**
+     * The account whose username or email is $usernameOrEmail, if $password
+     * is its password. Null alike for an unknown name and a wrong password.
+     */
+    public function logIn(string $usernameOrEmail, string $password): ?array
+    {
+        $row = $this->rows(
+            'SELECT ' . self::COLUMNS . ', hashed_password FROM users WHERE username = ? OR email = ? ORDER BY username = ? DESC LIMIT 1',
+            'sss', [$usernameOrEmail, $usernameOrEmail, $usernameOrEmail]
+        )[0] ?? null;
+        if ($row === null || !password_verify($password, (string) $row['hashed_password'])) {
+            return null;
+        }
+        return $this->account($row);
+    }
+
+    /**
+     * Create an account in user group 1 from first_name, last_name, email,
+     * username, password and confirm_password, and return it. The developer
+     * is sent a new-account notice naming the optional device; a notice that
+     * fails is logged and the account is still created.
+     *
+     * @throws AccountInvalid for a profile or password that breaks the rules.
+     */
+    public function register(array $input): array
+    {
+        $profile = self::profile($input);
+        $password = self::text($input, 'password', false);
+        $errors = [
+            ...$this->profileProblems($profile),
+            ...self::passwordProblems($password, self::text($input, 'confirm_password', false)),
+        ];
+        if ($errors !== []) {
+            throw new AccountInvalid($errors);
+        }
+
+        try {
+            $this->statement(
+                'INSERT INTO users (first_name, last_name, email, username, hashed_password, user_group) VALUES (?, ?, ?, ?, ?, 1)',
+                'sssss', [...array_values($profile), password_hash($password, PASSWORD_BCRYPT)]
+            )->close();
+        } catch (mysqli_sql_exception $duplicate) {
+            // Another registration took the email or username since the check.
+            if ($duplicate->getCode() !== self::DUPLICATE_KEY) {
+                throw $duplicate;
+            }
+            throw new AccountInvalid($this->profileProblems($profile));
+        }
+        $account = $this->find((int) $this->db->insert_id);
+
+        try {
+            $this->mailer->send(DEV_EMAIL, APP_NAME . ' — New Account Created', $this->newAccountNotice($account, self::text($input, 'device') ?: 'unknown'));
+        } catch (RuntimeException $failure) {
+            error_log('Failed to send the new-account notice: ' . $failure->getMessage());
+        }
+        return $account;
     }
 
     /**
@@ -117,6 +188,66 @@ final class Accounts
         return false;
     }
 
+    /** The profile fields of $input, trimmed, in column order. */
+    private static function profile(array $input): array
+    {
+        $profile = [];
+        foreach (['first_name', 'last_name', 'email', 'username'] as $field) {
+            $profile[$field] = self::text($input, $field);
+        }
+        return $profile;
+    }
+
+    /** $input[$field] as a string, trimmed unless $trim is false; '' when missing or not text. */
+    private static function text(array $input, string $field, bool $trim = true): string
+    {
+        $value = $input[$field] ?? '';
+        $value = is_scalar($value) ? (string) $value : '';
+        return $trim ? trim($value) : $value;
+    }
+
+    /** Every profile rule $profile breaks. */
+    private function profileProblems(array $profile): array
+    {
+        $errors = [];
+        foreach (['first_name' => 'First name', 'last_name' => 'Last name'] as $field => $label) {
+            $length = mb_strlen($profile[$field]);
+            if ($length === 0) {
+                $errors[] = "$label cannot be blank.";
+            } elseif ($length < 2 || $length > 255) {
+                $errors[] = "$label must be between 2 and 255 characters.";
+            }
+        }
+
+        $email = $profile['email'];
+        if ($email === '') {
+            $errors[] = 'Email cannot be blank.';
+        } elseif (mb_strlen($email) > 255) {
+            $errors[] = 'Email must be at most 255 characters.';
+        } elseif (preg_match('/\A[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\z/i', $email) !== 1) {
+            $errors[] = 'Email must be a valid format.';
+        } elseif ($this->taken('email', $email)) {
+            $errors[] = 'That email already belongs to an account. Log in or reset your password.';
+        }
+
+        $username = $profile['username'];
+        $length = mb_strlen($username);
+        if ($length === 0) {
+            $errors[] = 'Username cannot be blank.';
+        } elseif ($length < 8 || $length > 255) {
+            $errors[] = 'Username must be between 8 and 255 characters.';
+        } elseif ($this->taken('username', $username)) {
+            $errors[] = 'That username is taken. Try another.';
+        }
+        return $errors;
+    }
+
+    /** Whether an account has $value in $column. */
+    private function taken(string $column, string $value): bool
+    {
+        return (bool) $this->rows("SELECT id FROM users WHERE $column = ?", 's', [$value]);
+    }
+
     /** Every password rule $password and its confirmation break. */
     private static function passwordProblems(string $password, string $confirm): array
     {
@@ -142,6 +273,22 @@ final class Accounts
         return $errors;
     }
 
+    private function newAccountNotice(array $account, string $device): string
+    {
+        $lines = [
+            'Name' => $account['name'],
+            'Username' => $account['username'],
+            'Email' => $account['email'],
+            'Date' => gmdate('c', $this->now()),
+            'Device' => mb_substr($device, 0, 1024),
+        ];
+        $html = '<p>A new account was created on ' . h(APP_NAME) . '.</p>';
+        foreach ($lines as $label => $value) {
+            $html .= '<p>' . $label . ': ' . h($value) . '</p>';
+        }
+        return $html;
+    }
+
     private static function resetEmail(string $email, string $key): string
     {
         $link = h('https://' . DOMAIN . '/reset-password/reset-password.php?'
@@ -155,6 +302,21 @@ final class Accounts
             . '<p>If you did not request this reset password email, no action is needed. Your password will not be reset.</p>'
             . '<p>Thanks,</p>'
             . '<p>' . h(APP_NAME) . '</p>';
+    }
+
+    private function account(array $row): array
+    {
+        $id = (int) $row['id'];
+        return [
+            'id' => $id,
+            'first_name' => (string) $row['first_name'],
+            'last_name' => (string) $row['last_name'],
+            'name' => trim($row['first_name'] . ' ' . $row['last_name']),
+            'email' => (string) $row['email'],
+            'username' => (string) $row['username'],
+            'user_group' => (int) $row['user_group'],
+            'person_id' => (new People($this->db, $id))->me(),
+        ];
     }
 
     private function now(): int

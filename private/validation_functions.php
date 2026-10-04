@@ -112,22 +112,4 @@
   //   return $page_count === 0;
   // }
 
-  // has_unique_username('johnqpublic')
-  // * Validates uniqueness of admins.username
-  // * For new records, provide only the username.
-  // * For existing records, provide current ID as second argument
-  //   has_unique_username('johnqpublic', 4)
-  function has_unique_username($username, $current_id="0") {
-    global $db;
-
-    $stmt = mysqli_prepare($db, "SELECT id FROM users WHERE username = ? AND id != ?");
-    mysqli_stmt_bind_param($stmt, "si", $username, $current_id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    $count = mysqli_num_rows($result);
-    mysqli_stmt_close($stmt);
-
-    return $count === 0;
-  }
-
 ?>

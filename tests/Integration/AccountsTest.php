@@ -37,9 +37,11 @@ final class AccountsTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->runSql('ALTER TABLE players ADD COLUMN represents_user_id INT DEFAULT NULL');
         require_once PRIVATE_PATH . '/classes/Accounts.php';
         defined('DOMAIN') || define('DOMAIN', 'keeplore.app');
         defined('APP_NAME') || define('APP_NAME', 'Keeplore');
+        defined('DEV_EMAIL') || define('DEV_EMAIL', 'dev@keeplore.app');
 
         $this->giveAccount(1, 'owner@keeplore.app', 'ownerusername');
         $this->giveAccount(2, 'other+tag@keeplore.app', 'otherusername');
@@ -81,11 +83,10 @@ final class AccountsTest extends TestCase
         return new Accounts($this->db, $this->mailer, $now);
     }
 
-    /** Whether the account's password is $password (Accounts can't log in yet). */
+    /** Whether the account's password is $password. */
     private function passwordIs(int $id, string $password): bool
     {
-        $hash = $this->db->query("SELECT hashed_password FROM users WHERE id = $id")->fetch_row()[0];
-        return password_verify($password, $hash);
+        return ($this->accounts()->logIn($this->accounts()->find($id)['username'], $password)['id'] ?? null) === $id;
     }
 
     /** Request a reset for $email and return [email, key] from the link in the email sent. */
@@ -115,7 +116,7 @@ final class AccountsTest extends TestCase
         } catch (AccountInvalid $invalid) {
             return $invalid;
         }
-        $this->fail('The reset must be refused as invalid.');
+        $this->fail('The input must be refused as invalid.');
     }
 
     public function test_a_requested_link_resets_the_password(): void
@@ -252,5 +253,185 @@ final class AccountsTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->accounts()->requestPasswordReset('owner@keeplore.app');
+    }
+    private const ACCOUNT_KEYS = ['id', 'first_name', 'last_name', 'name', 'email', 'username', 'user_group', 'person_id'];
+
+    private static function registration(array $changes = []): array
+    {
+        return $changes + [
+            'first_name' => 'Ada',
+            'last_name' => 'Byron',
+            'email' => 'ada@keeplore.app',
+            'username' => 'adabyron1815',
+            'password' => self::NEW_PASSWORD,
+            'confirm_password' => self::NEW_PASSWORD,
+        ];
+    }
+
+    private function accountCount(): int
+    {
+        return (int) $this->db->query('SELECT COUNT(*) FROM users')->fetch_row()[0];
+    }
+
+    public function test_find_returns_the_account_without_the_password_hash(): void
+    {
+        $account = $this->accounts()->find(1);
+
+        $this->assertSame([
+            'id' => 1,
+            'first_name' => 'Sam',
+            'last_name' => 'Lee',
+            'name' => 'Sam Lee',
+            'email' => 'owner@keeplore.app',
+            'username' => 'ownerusername',
+            'user_group' => 1,
+            'person_id' => null,
+        ], $account);
+        $this->assertNull($this->accounts()->find(99));
+    }
+
+    public function test_an_accounts_person_is_the_person_marked_as_them(): void
+    {
+        $this->db->query('UPDATE users SET player_id = 101 WHERE id = 1');
+        $this->db->query('UPDATE players SET represents_user_id = 2 WHERE id = 200');
+
+        $this->assertSame(101, $this->accounts()->find(1)['person_id']);
+        $this->assertSame(200, $this->accounts()->find(2)['person_id']);
+        $this->assertSame(200, $this->accounts()->logIn('otherusername', self::OLD_PASSWORD)['person_id']);
+    }
+
+    public function test_log_in_by_username_or_email_returns_the_account(): void
+    {
+        $account = $this->accounts()->find(2);
+
+        $this->assertSame($account, $this->accounts()->logIn('otherusername', self::OLD_PASSWORD));
+        $this->assertSame($account, $this->accounts()->logIn('other+tag@keeplore.app', self::OLD_PASSWORD));
+        $this->assertSame(1, $this->accounts()->logIn('owner@keeplore.app', self::OLD_PASSWORD)['id']);
+    }
+
+    public function test_an_unknown_name_and_a_wrong_password_both_fail_to_log_in(): void
+    {
+        $this->assertNull($this->accounts()->logIn('nobodyusername', self::OLD_PASSWORD));
+        $this->assertNull($this->accounts()->logIn('ownerusername', self::NEW_PASSWORD));
+        $this->assertNull($this->accounts()->logIn('ownerusername', ''));
+        $this->assertNull($this->accounts()->logIn('', ''));
+    }
+
+    public function test_register_creates_an_account_that_can_log_in(): void
+    {
+        $account = $this->accounts()->register(self::registration([
+            'first_name' => ' Ada ',
+            'email' => ' ada@keeplore.app ',
+        ]));
+
+        $this->assertSame(self::ACCOUNT_KEYS, array_keys($account));
+        $this->assertSame([
+            'first_name' => 'Ada',
+            'last_name' => 'Byron',
+            'name' => 'Ada Byron',
+            'email' => 'ada@keeplore.app',
+            'username' => 'adabyron1815',
+            'user_group' => 1,
+            'person_id' => null,
+        ], array_slice($account, 1));
+        $this->assertSame($account, $this->accounts()->find($account['id']));
+        $this->assertSame($account, $this->accounts()->logIn('adabyron1815', self::NEW_PASSWORD));
+        $this->assertSame($account, $this->accounts()->logIn('ada@keeplore.app', self::NEW_PASSWORD));
+    }
+
+    public function test_register_sends_the_developer_an_escaped_new_account_notice(): void
+    {
+        $this->accounts()->register(self::registration(['last_name' => '<b>Byron</b>', 'device' => 'Phone & "tablet"']));
+
+        $this->assertCount(1, $this->mailer->sent);
+        [$to, $subject, $html] = $this->mailer->sent[0];
+        $this->assertSame('dev@keeplore.app', $to);
+        $this->assertSame('Keeplore — New Account Created', $subject);
+        $this->assertStringContainsString('Ada &lt;b&gt;Byron&lt;/b&gt;', $html);
+        $this->assertStringContainsString('adabyron1815', $html);
+        $this->assertStringContainsString('ada@keeplore.app', $html);
+        $this->assertStringContainsString('2026-06-01T12:00:00', $html);
+        $this->assertStringContainsString('Phone &amp; &quot;tablet&quot;', $html);
+        $this->assertStringNotContainsString('<b>', $html);
+    }
+
+    public function test_register_succeeds_and_logs_when_the_notice_fails(): void
+    {
+        $this->mailer->failFor('dev@keeplore.app', 'SMTP down');
+        $log = tempnam(sys_get_temp_dir(), 'keeplore-log');
+        $previousLog = ini_set('error_log', $log);
+        try {
+            $account = $this->accounts()->register(self::registration());
+        } finally {
+            ini_set('error_log', $previousLog);
+        }
+
+        $this->assertSame($account, $this->accounts()->logIn('adabyron1815', self::NEW_PASSWORD));
+        $this->assertStringContainsString('SMTP down', file_get_contents($log));
+        unlink($log);
+    }
+
+    public static function brokenProfiles(): array
+    {
+        return [
+            'blank first name' => [['first_name' => ' '], ['First name cannot be blank.']],
+            'short first name' => [['first_name' => 'A'], ['First name must be between 2 and 255 characters.']],
+            'long first name' => [['first_name' => str_repeat('a', 256)], ['First name must be between 2 and 255 characters.']],
+            'blank last name' => [['last_name' => ''], ['Last name cannot be blank.']],
+            'short last name' => [['last_name' => 'B'], ['Last name must be between 2 and 255 characters.']],
+            'blank email' => [['email' => ''], ['Email cannot be blank.']],
+            'long email' => [['email' => str_repeat('a', 244) . '@keeplore.app'], ['Email must be at most 255 characters.']],
+            'malformed email' => [['email' => 'not-an-email'], ['Email must be a valid format.']],
+            'blank username' => [['username' => ''], ['Username cannot be blank.']],
+            'short username' => [['username' => 'short'], ['Username must be between 8 and 255 characters.']],
+            'taken username' => [['username' => 'ownerusername'], ['That username is taken. Try another.']],
+            'taken email' => [['email' => 'owner@keeplore.app'], ['That email already belongs to an account. Log in or reset your password.']],
+        ];
+    }
+
+    /** @dataProvider brokenProfiles */
+    public function test_register_refuses_a_profile_that_breaks_the_rules(array $changes, array $errors): void
+    {
+        $invalid = $this->invalid(fn () => $this->accounts()->register(self::registration($changes)));
+
+        $this->assertSame($errors, $invalid->errors);
+        $this->assertSame(2, $this->accountCount());
+        $this->assertSame([], $this->mailer->sent);
+    }
+
+    /** @dataProvider brokenPasswords */
+    public function test_register_refuses_a_password_that_breaks_the_rules(string $password, string $confirm, array $errors): void
+    {
+        $registration = self::registration(['password' => $password, 'confirm_password' => $confirm]);
+
+        $invalid = $this->invalid(fn () => $this->accounts()->register($registration));
+
+        $this->assertSame($errors, $invalid->errors);
+        $this->assertSame(2, $this->accountCount());
+    }
+
+    public function test_register_lists_every_problem_at_once(): void
+    {
+        $invalid = $this->invalid(fn () => $this->accounts()->register([
+            'first_name' => 'A',
+            'last_name' => '',
+            'email' => 'other+tag@keeplore.app',
+            'username' => 'otherusername',
+            'password' => 'short',
+            'confirm_password' => 'shorter',
+        ]));
+
+        $this->assertSame([
+            'First name must be between 2 and 255 characters.',
+            'Last name cannot be blank.',
+            'That email already belongs to an account. Log in or reset your password.',
+            'That username is taken. Try another.',
+            'Password must contain 12 or more characters.',
+            'Password must contain at least 1 uppercase letter.',
+            'Password must contain at least 1 number.',
+            'Password must contain at least 1 symbol.',
+            'Password and confirm password must match.',
+        ], $invalid->errors);
+        $this->assertSame(2, $this->accountCount());
     }
 }

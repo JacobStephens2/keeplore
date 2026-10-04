@@ -1,5 +1,5 @@
 CREATE TABLE users (
-    id INT PRIMARY KEY,
+    id INT PRIMARY KEY AUTO_INCREMENT,
     first_name VARCHAR(255) DEFAULT NULL,
     last_name VARCHAR(255) DEFAULT NULL,
     email VARCHAR(255) DEFAULT NULL,
@@ -15,6 +15,7 @@ CREATE TABLE users (
     native_notify_hour TINYINT UNSIGNED NOT NULL DEFAULT 9,
     native_notify_lead_days TINYINT UNSIGNED NOT NULL DEFAULT 3,
     native_notify_past_due TINYINT(1) NOT NULL DEFAULT 1,
+    player_id INT DEFAULT NULL,
     UNIQUE KEY uq_users_username (username),
     UNIQUE KEY uq_users_email (email)
 ) ENGINE=InnoDB;

@@ -23,20 +23,12 @@ if(is_post_request()) {
     // Using one variable ensures that msg is the same
     $login_failure_msg = "Log in was unsuccessful.";
 
-    $user = find_user_by_username($username);
-    if($user) {
-
-      if(password_verify($password, $user['hashed_password'])) { // original
-        // password matches
-        log_in_user($user);
-        redirect_to(url_for('/index.php'));      
-      } else {
-        // username found, but password does not match
-        $errors[] = $login_failure_msg;
-      }
-
+    $account = accounts()->logIn($username, $password);
+    if($account) {
+      log_in_user($account);
+      redirect_to(url_for('/index.php'));      
     } else {
-      // no username found
+      // An unknown name and a wrong password fail alike.
       $errors[] = $login_failure_msg;
     }
 

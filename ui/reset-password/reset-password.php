@@ -25,7 +25,7 @@
 </style>
 
 <?php
-$accounts = new Accounts($db, SmtpMailer::fromEnvironment());
+$accounts = accounts();
 $updating = is_post_request() && ($_POST['action'] ?? '') === 'update';
 $email = (string) ($updating ? ($_POST['email'] ?? '') : ($_GET['email'] ?? ''));
 $key = (string) ($updating ? ($_POST['key'] ?? '') : ($_GET['key'] ?? ''));
