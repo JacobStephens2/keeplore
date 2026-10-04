@@ -59,7 +59,7 @@ function use_api_fields(array $use): array {
  * keys are refused (ADR-0002), and every refusal from the module is a 400.
  *
  * Returns [status, response fields]; on success the fields' use is the
- * recorded use.
+ * recorded use, and the write is logged.
  */
 function record_use_over_api(mysqli $db, ApiCaller $caller, $body): array {
   $refusal = $caller->agentKeyRefusal();
@@ -87,6 +87,7 @@ function record_use_over_api(mysqli $db, ApiCaller $caller, $body): array {
   }
 
   $use = use_api_fields($uses->find($id));
+  log_use_write_over_api('POST', $use);
   return [201, ['message' => 'Use recorded successfully.', 'use' => [
     'id' => $use['id'],
     'artifact_id' => $use['artifact_id'],
@@ -104,7 +105,7 @@ function record_use_over_api(mysqli $db, ApiCaller $caller, $body): array {
  * doesn't have is a 404.
  *
  * Returns [status, response fields]; on success the fields' use is the
- * deleted use.
+ * deleted use, and the write is logged.
  */
 function delete_use_over_api(mysqli $db, ApiCaller $caller, array $query): array {
   $refusal = $caller->agentKeyRefusal();
@@ -127,22 +128,17 @@ function delete_use_over_api(mysqli $db, ApiCaller $caller, array $query): array
   } catch (OutOfBoundsException $not_found) {
     return [404, ['message' => 'Use record not found.']];
   }
-  return [200, ['message' => 'Use record deleted successfully.', 'use' => use_api_fields($use)]];
+  $deleted = use_api_fields($use);
+  log_use_write_over_api('DELETE', $deleted);
+  return [200, ['message' => 'Use record deleted successfully.', 'use' => $deleted]];
 }
 
-/**
- * Logs the use a write over HTTP answered with under $method's action, and
- * passes the [status, response fields] answer on.
- */
-function log_use_write_over_api(string $method, array $answer): array {
-  $use = $answer[1]['use'] ?? null;
-  if ($use !== null) {
-    (new AppLogger())->logDataChange(USE_API_LOG_ACTIONS[$method], 'use', $use['id'], [
-      'artifact_id' => $use['artifact_id'],
-      'use_date' => $use['use_date'],
-    ]);
-  }
-  return $answer;
+/** Logs a use write over HTTP under $method's action. */
+function log_use_write_over_api(string $method, array $use): void {
+  (new AppLogger())->logDataChange(USE_API_LOG_ACTIONS[$method], 'use', $use['id'], [
+    'artifact_id' => $use['artifact_id'],
+    'use_date' => $use['use_date'],
+  ]);
 }
 
 /** The owner of the item $item_id names, or null when there is no such item. */

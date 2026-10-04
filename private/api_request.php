@@ -19,11 +19,12 @@ require_once __DIR__ . '/classes/ApiCaller.php';
  * Returns [status, body], with the body always an object.
  */
 function answer_api_request(mysqli $db, string $endpoint, array $handlers, array $request, bool $metered = true): array {
-  [$status, $fields] = api_request_answer($db, $endpoint, $handlers, $request, $metered);
+  [$status, $fields] = api_request_status_and_fields($db, $endpoint, $handlers, $request, $metered);
   return [$status, (object) $fields];
 }
 
-function api_request_answer(mysqli $db, string $endpoint, array $handlers, array $request, bool $metered): array {
+/** answer_api_request()'s [status, response fields], before the fields become the body. */
+function api_request_status_and_fields(mysqli $db, string $endpoint, array $handlers, array $request, bool $metered): array {
   if ($metered) {
     (new AppLogger())->logApiRequest($endpoint, ['method' => $request['method']]);
     if (!(new RateLimiter($db))->checkAndRecord('api', 60, 60)) {

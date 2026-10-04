@@ -40,9 +40,7 @@ const ApiClient = {
     // An expired or missing session answers 401.
     // Redirect to the login page automatically so callers don't have to check.
     if (response.status === 401) {
-      location.href = '/login.php';
-      // Return a never-resolving promise so the caller doesn't continue.
-      return new Promise(() => {});
+      return this.redirectToLogin();
     }
 
     if (response.status === 429) {
@@ -59,12 +57,19 @@ const ApiClient = {
     // An endpoint not yet answered through the API request module may still
     // answer an expired session with 200 and { authenticated: false }.
     if (data.authenticated === false) {
-      location.href = '/login.php';
-      // Return a never-resolving promise so the caller doesn't continue.
-      return new Promise(() => {});
+      return this.redirectToLogin();
     }
 
     return data;
+  },
+
+  /**
+   * Sends the visitor to the login page. Returns a never-resolving promise
+   * so the caller doesn't continue.
+   */
+  redirectToLogin() {
+    location.href = '/login.php';
+    return new Promise(() => {});
   },
 
   // ---------------------------------------------------------------------------

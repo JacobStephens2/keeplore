@@ -165,6 +165,19 @@ final class ApiRequestTest extends TestCase
         $this->assertSame('60', $this->db->query('SELECT COUNT(*) FROM rate_limits')->fetch_row()[0]);
     }
 
+    public function test_a_metered_request_is_logged_under_its_endpoint_and_an_unmetered_one_is_not(): void
+    {
+        $metered = 'metered-' . bin2hex(random_bytes(4));
+        $unmetered = 'unmetered-' . bin2hex(random_bytes(4));
+
+        answer_api_request($this->db, $metered, ['GET' => fn () => [200, []]], $this->request());
+        answer_api_request($this->db, $unmetered, ['GET' => fn () => [200, []]], $this->request(), metered: false);
+
+        $log = (string) @file_get_contents(PROJECT_PATH . '/logs/app.log');
+        $this->assertStringContainsString('"endpoint":"' . $metered . '"', $log);
+        $this->assertStringNotContainsString($unmetered, $log);
+    }
+
     public function test_an_unmetered_endpoint_still_needs_a_credential_and_a_supported_method(): void
     {
         $handlers = ['POST' => fn () => [200, []]];

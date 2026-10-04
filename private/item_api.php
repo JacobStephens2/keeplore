@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/agent_keys.php';
+require_once __DIR__ . '/classes/ApiCaller.php';
 require_once __DIR__ . '/item_tags.php';
 require_once __DIR__ . '/classes/Items.php';
 
@@ -72,19 +73,7 @@ function write_item_over_api(mysqli $db, object $authentication, string $method,
  * Null when the master key names no such user.
  */
 function item_api_owner(mysqli $db, object $authentication, $requested_user_id): ?int {
-  if (isset($authentication->user_id)) {
-    return (int) $authentication->user_id;
-  }
-  $user_id = item_api_positive_int($requested_user_id);
-  if ($user_id === null) {
-    return null;
-  }
-  $stmt = $db->prepare('SELECT id FROM users WHERE id = ?');
-  $stmt->bind_param('i', $user_id);
-  $stmt->execute();
-  $exists = $stmt->get_result()->num_rows > 0;
-  $stmt->close();
-  return $exists ? $user_id : null;
+  return ApiCaller::from($db, $authentication)?->owner($requested_user_id);
 }
 
 /**
