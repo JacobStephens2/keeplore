@@ -103,6 +103,7 @@ final class ItemFormTest extends TestCase
         $this->assertStringNotContainsString('autofocus', $html);
         $this->assertStringContainsString('<label for="Title">Name</label>', $html);
         $this->assertStringContainsString('data-keep-title', $html);
+        $this->assertStringNotContainsString('ss-hint', $html);
         $this->assertStringNotContainsString('data-default-type-id', $html);
         $this->assertMatchesRegularExpression('/<input type="url" name="bgg_url" id="bgg_url"/', $html);
         $this->assertStringNotContainsString('image_url', $html);
@@ -119,7 +120,7 @@ final class ItemFormTest extends TestCase
 
         foreach (['SS' => 'sweet_spot', 'age' => 'age', 'MnP' => 'players', 'MxP' => 'players'] as $id => $group) {
             $this->assertMatchesRegularExpression(
-                '/id="' . $id . '"[^>]*aria-describedby="[^"]*' . $id . '-bgg-basis"[^>]*>\s*(<p id="ss-hint"[^\n]*\s*)?<p id="' . $id . '-bgg-basis" class="form-field-hint" data-bgg-basis="' . $group . '"/',
+                '/id="' . $id . '"[^>]*aria-describedby="' . $id . '-bgg-basis"[^>]*>\s*<p id="' . $id . '-bgg-basis" class="form-field-hint" data-bgg-basis="' . $group . '"/',
                 $html,
                 "{$id} should be described by its {$group} basis"
             );

@@ -81,7 +81,11 @@ function item_form_html(string $mode, array $item, $default_interval): string {
         <input type="text" name="tags" id="tags" value="' . h($tags) . '" placeholder="portable, beach-safe, two-player, party" />
       </div>';
   $basis = fn($group, $id) => $create ? '' : item_bgg_field_basis_html($item, $group, $id);
-  $rating = h((string) (bgg_overall_rating_text($item['BGG_Rat'] ?? $item['bgg_rat'] ?? null) ?? ''));
+  $bgg_link = h(normalize_item_bgg_url($item['bgg_url'] ?? ''));
+  // What the lookup fills besides the visible fields: the vote basis and BGG's average.
+  $bgg_basis_inputs = '<input type="hidden" name="bgg_player_votes" id="bgg_player_votes" value="' . $value('bgg_player_votes') . '">
+        <input type="hidden" name="bgg_age_basis" id="bgg_age_basis" value="' . $value('bgg_age_basis') . '">
+        <input type="hidden" name="BGG_Rat" id="BGG_Rat" value="' . h((string) (bgg_overall_rating_text($item['BGG_Rat'] ?? null) ?? '')) . '">' . "\n";
   $interval = $item['interaction_frequency_days'] ?? null;
 
   ob_start();
@@ -101,10 +105,8 @@ function item_form_html(string $mode, array $item, $default_interval): string {
           $preview_url = normalize_item_image_url($item['image_url'] ?? '');
         ?>
         <input type="hidden" name="image_url" id="image_url" value="<?php echo h($preview_url); ?>">
-        <input type="hidden" name="bgg_url" id="bgg_url" value="<?php echo h(normalize_item_bgg_url($item['bgg_url'] ?? '')); ?>">
-        <input type="hidden" name="bgg_player_votes" id="bgg_player_votes" value="<?php echo $value('bgg_player_votes'); ?>">
-        <input type="hidden" name="bgg_age_basis" id="bgg_age_basis" value="<?php echo $value('bgg_age_basis'); ?>">
-        <input type="hidden" name="BGG_Rat" id="BGG_Rat" value="<?php echo $rating; ?>">
+        <input type="hidden" name="bgg_url" id="bgg_url" value="<?php echo $bgg_link; ?>">
+        <?php echo $bgg_basis_inputs; ?>
         <img id="itemPicturePreview" class="item-picture-preview"
           alt="<?php echo $preview_url !== '' ? $value('Title') . ' cover' : ''; ?>"
           <?php if ($preview_url !== '') { ?>src="<?php echo h($preview_url); ?>"<?php } else { ?>hidden<?php } ?>
@@ -146,8 +148,10 @@ function item_form_html(string $mode, array $item, $default_interval): string {
 
       <div class="form-field">
         <label for="SS">Sweet Spot(s)</label>
-        <input type="text" name="SS" id="SS" aria-describedby="ss-hint<?php if (!$create) { ?> SS-bgg-basis<?php } ?>" value="<?php echo $value('SS'); ?>">
+        <input type="text" name="SS" id="SS" aria-describedby="<?php echo $create ? 'ss-hint' : 'SS-bgg-basis'; ?>" value="<?php echo $value('SS'); ?>">
+<?php if ($create) { ?>
         <p id="ss-hint" class="form-field-hint">Ideal player counts, comma-separated. Example: 2, 3, 4</p>
+<?php } ?>
         <?php echo $basis('sweet_spot', 'SS'); ?>
       </div>
 
@@ -187,13 +191,11 @@ function item_form_html(string $mode, array $item, $default_interval): string {
 
       <div class="form-field form-field-span">
         <?php $bgg_keep_title = true; include SHARED_PATH . '/bgg_lookup_panel.php'; ?>
-        <input type="hidden" name="bgg_player_votes" id="bgg_player_votes" value="<?php echo $value('bgg_player_votes'); ?>">
-        <input type="hidden" name="bgg_age_basis" id="bgg_age_basis" value="<?php echo $value('bgg_age_basis'); ?>">
-        <input type="hidden" name="BGG_Rat" id="BGG_Rat" value="<?php echo $rating; ?>">
+        <?php echo $bgg_basis_inputs; ?>
         <label for="bgg_url">BoardGameGeek Link</label>
         <input type="url" name="bgg_url" id="bgg_url" maxlength="1024"
           placeholder="https://boardgamegeek.com/boardgame/..."
-          value="<?php echo h(normalize_item_bgg_url($item['bgg_url'] ?? '')); ?>"
+          value="<?php echo $bgg_link; ?>"
         >
       </div>
 
@@ -202,7 +204,7 @@ function item_form_html(string $mode, array $item, $default_interval): string {
 
       <div class="form-field form-field-span">
         <label for="Notes">Notes</label>
-        <textarea name="Notes" id="Notes" cols="30" rows="10"><?php echo $value('Notes'); ?></textarea>
+        <textarea name="Notes" id="Notes" cols="30" rows="<?php echo $create ? 5 : 10; ?>"><?php echo $value('Notes'); ?></textarea>
       </div>
 <?php if ($create) { ?>
 

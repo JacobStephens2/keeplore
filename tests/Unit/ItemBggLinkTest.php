@@ -32,7 +32,6 @@ class ItemBggLinkTest extends TestCase
         foreach (['requestBggData', 'bggLookupStatus', 'bggConfirm', 'bggUseMatch', 'bggOtherMatches'] as $id) {
             $this->assertStringContainsString('id="' . $id . '"', $panel, $id);
         }
-        $this->assertStringContainsString("SHARED_PATH . '/bgg_lookup_panel.php'", $this->source('/private/item_form.php'));
         foreach (['/ui/artifacts/new.php', '/ui/artifacts/edit.php'] as $path) {
             $this->assertStringContainsString("url_for('/artifacts/new-bgg.js')", $this->source($path), $path);
         }
