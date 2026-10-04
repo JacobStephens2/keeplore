@@ -9,7 +9,7 @@ $page_title = 'Uses By Item Over Last 365 Days';
 include(SHARED_PATH . '/header.php');
 include(SHARED_PATH . '/dataTable.html'); 
 
-$since = (new DateTimeImmutable(record_use_today()))->modify('-365 days')->format('Y-m-d');
+$since = (new DateTimeImmutable(app_today()))->modify('-365 days')->format('Y-m-d');
 $use_counts = (new Uses($db, (int) $_SESSION['user_id']))->useCounts($since);
 
 // find the last letter of the name

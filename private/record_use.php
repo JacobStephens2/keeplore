@@ -131,12 +131,3 @@ function record_use_form(?array $last_group, bool $again, array $fallback): arra
     }
     return $fallback + ['offerGroup' => $has_group ? $last_group : null];
 }
-
-/** The time zone the app's day is counted in. */
-const APP_TIME_ZONE = 'America/New_York';
-
-/** Today's date (Y-m-d) in the app's America/New_York day. */
-function record_use_today(): string
-{
-    return (new DateTime('now', new DateTimeZone(APP_TIME_ZONE)))->format('Y-m-d');
-}

@@ -160,10 +160,10 @@ final class ItemsTest extends TestCase
         $this->assertSame(1, (int) $item['MxP']);
         $this->assertSame('01', $item['SS']);
         $this->assertSame(0, (int) $item['Age']);
-        $this->assertSame(date('Y-m-d'), $item['Acq']);
+        $this->assertSame(app_today(), $item['Acq']);
         $this->assertSame(1, (int) $item['is_kept']);
         $this->assertEquals(120, $item['interaction_frequency_days']);
-        $this->assertSame(date('Y-m-d'), $item['CandidateGroupDate']);
+        $this->assertSame(app_today(), $item['CandidateGroupDate']);
         $this->assertSame('0', $item['UsedRecUserCt']);
         $this->assertNull($item['type_id']);
         $this->assertNull($item['type']);
@@ -191,11 +191,27 @@ final class ItemsTest extends TestCase
         $this->assertSame([30, 60, 1, 1], [(int) $item['MnT'], (int) $item['MxT'], (int) $item['MnP'], (int) $item['MxP']]);
         $this->assertSame('01', $item['SS']);
         $this->assertSame(0, (int) $item['Age']);
-        $this->assertSame(date('Y-m-d'), $item['Acq']);
+        $this->assertSame(app_today(), $item['Acq']);
         $this->assertSame(1, (int) $item['is_kept']);
         $this->assertEquals(120, $item['interaction_frequency_days']);
         $this->assertNull($item['type_id']);
         $this->assertNull($item['Yr']);
+    }
+
+    public function test_create_dates_a_blank_acquisition_and_the_candidate_group_on_the_app_day(): void
+    {
+        $zone = date_default_timezone_get();
+        try {
+            foreach (['Pacific/Kiritimati', 'Pacific/Pago_Pago'] as $tz) {
+                date_default_timezone_set($tz);
+                $item = $this->items->find($this->items->create(['Title' => 'Quelf', 'Acq' => '']));
+
+                $this->assertSame(app_today(), $item['Acq'], $tz);
+                $this->assertSame(app_today(), $item['CandidateGroupDate'], $tz);
+            }
+        } finally {
+            date_default_timezone_set($zone);
+        }
     }
 
     public function test_create_writes_the_given_fields_through_the_normalizers(): void
@@ -348,7 +364,7 @@ final class ItemsTest extends TestCase
         $this->assertSame([30, 60, 1, 1], [(int) $item['MnT'], (int) $item['MxT'], (int) $item['MnP'], (int) $item['MxP']]);
         $this->assertSame('01', $item['SS']);
         $this->assertSame(0, (int) $item['Age']);
-        $this->assertSame(date('Y-m-d'), $item['Acq']);
+        $this->assertSame(app_today(), $item['Acq']);
     }
 
     public function test_update_with_a_blank_type_keeps_the_current_type(): void

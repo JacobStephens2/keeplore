@@ -4,7 +4,7 @@ require_once dirname(__DIR__) . '/functions.php';
 require_once dirname(__DIR__) . '/kept_status.php';
 require_once dirname(__DIR__) . '/item_tags.php';
 require_once dirname(__DIR__) . '/item_types.php';
-require_once dirname(__DIR__) . '/record_use.php';
+require_once dirname(__DIR__) . '/app_day.php';
 require_once __DIR__ . '/Preferences.php';
 
 /** An Item write's input broke the item rules; $errors lists every problem. */
@@ -122,7 +122,7 @@ final class Items
             $this->validate($item, $item);
             $columns = $this->columns($item, $item) + [
                 'user_id' => $this->userId,
-                'CandidateGroupDate' => date('Y-m-d'),
+                'CandidateGroupDate' => app_today(),
                 'UsedRecUserCt' => 0,
             ];
             $this->statement(
@@ -342,7 +342,7 @@ final class Items
      */
     public function snooze(int $id, int $days): string
     {
-        $until = (new DateTimeImmutable(record_use_today()))->modify('+' . max(1, $days) . ' days')->format('Y-m-d');
+        $until = (new DateTimeImmutable(app_today()))->modify('+' . max(1, $days) . ' days')->format('Y-m-d');
         $this->setColumn($id, 'snoozed_until', $until);
         return $until;
     }
@@ -409,7 +409,7 @@ final class Items
     /** Create's default for each blank field it fills, besides the owner's interval and the type. */
     private function createDefaults(): array
     {
-        return self::DEFAULTS + ['Acq' => date('Y-m-d')];
+        return self::DEFAULTS + ['Acq' => app_today()];
     }
 
     private function fillBlanks(array $fields, array $defaults): array

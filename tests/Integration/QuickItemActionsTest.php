@@ -78,7 +78,7 @@ final class QuickItemActionsTest extends TestCase
 
     private function inDays(int $days): string
     {
-        return (new \DateTimeImmutable(record_use_today()))->modify("+$days days")->format('Y-m-d');
+        return (new \DateTimeImmutable(app_today()))->modify("+$days days")->format('Y-m-d');
     }
 
     public function test_snooze_hides_the_item_for_the_days_asked_for(): void

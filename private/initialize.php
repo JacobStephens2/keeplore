@@ -53,6 +53,7 @@
   session_start();
 
   require_once('functions.php');
+  require_once('app_day.php');
   require_once('record_use.php');
   require_once('use_by_date.php');
   require_once('classes/UseByQueue.php');

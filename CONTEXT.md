@@ -69,6 +69,9 @@ The number of an item's proposals recorded as “chose something else” within 
 **Item chosen instead**:
 The alternative selected by the group, optionally recorded as an existing item or a name without adding it to the collection. Selection does not establish actual use, so recording it does not create a use or change the alternative's use history.
 
+**App day**:
+The calendar day in America/New_York that Keeplore counts today from: use-by dates, snooze-until dates, the Daily email's hour, and the dates forms start with. Every reader of today goes through one module.
+
 **Use-by date**:
 The date by which an item should next be used, shown as "Interact by". With no recorded use, or a most recent use before acquisition, it is the acquisition date plus the item's interval; otherwise the most recent use plus twice the interval. An item with neither an acquisition date nor a use has none. A use-by date before today is overdue.
 _Avoid_: Play by.
@@ -98,7 +101,7 @@ A separate overflow collection an item can belong to whether or not it is kept.
 An item flagged for removal, whether or not it is kept.
 
 **Snoozed**:
-An item hidden from the dashboard's priority queue until its snooze-until date, set for the owner's default snooze days or a number chosen when snoozing. The snooze-until date is counted from the app's day, the same day the Use-by queue compares it with, and the item shows again on that date. Snoozing changes no use and no use-by date.
+An item hidden from the dashboard's priority queue until its snooze-until date, set for the owner's default snooze days or a number chosen when snoozing. The snooze-until date is counted from [the app's day](#app-day), the same day the Use-by queue compares it with, and the item shows again on that date. Snoozing changes no use and no use-by date.
 
 **Physical item**:
 An item with a physical form. Independent of whether it is kept.

@@ -260,6 +260,6 @@ final class UseByQueueTest extends TestCase
 
     public function test_today_defaults_to_the_record_use_day(): void
     {
-        $this->assertSame(record_use_today(), (new UseByQueue($this->db, 1))->today());
+        $this->assertSame(app_today(), (new UseByQueue($this->db, 1))->today());
     }
 }

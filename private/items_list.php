@@ -9,7 +9,7 @@ require_once __DIR__ . '/kept_status.php';
 require_once __DIR__ . '/item_types.php';
 require_once __DIR__ . '/item_facts.php';
 require_once __DIR__ . '/use_by_date.php';
-require_once __DIR__ . '/record_use.php';
+require_once __DIR__ . '/app_day.php';
 require_once __DIR__ . '/classes/Items.php';
 require_once __DIR__ . '/classes/BggRatings.php';
 require_once __DIR__ . '/classes/Preferences.php';
@@ -279,7 +279,7 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
     $last_use = (string) ($artifact['last_use'] ?? '');
 
     // The view's interval is a default only; the item's own frequency wins.
-    $use_by = use_by_status($artifact, $default_interval, $today ?? record_use_today());
+    $use_by = use_by_status($artifact, $default_interval, $today ?? app_today());
 
     // Only a kept item is overdue here.
     $is_kept = artifact_is_kept($artifact);

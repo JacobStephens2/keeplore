@@ -66,7 +66,7 @@
     // Only this page's own form offers its group again; quick records
     // from the dashboard, Use By, and Edit User post here by AJAX.
     if (($_POST['return_to'] ?? '') !== 'user-edit') {
-      $_SESSION['record_use_group'] = record_use_group($_POST, record_use_today());
+      $_SESSION['record_use_group'] = record_use_group($_POST, app_today());
     }
     $_SESSION['message'] = $message;
     redirect_to($after_record);
@@ -85,7 +85,7 @@
 
   $form = record_use_form($_SESSION['record_use_group'] ?? null, isset($_GET['again']), [
     'people' => [['id' => (int) $_SESSION['player_id'], 'name' => (string) $_SESSION['FullName']]],
-    'useDate' => record_use_today(),
+    'useDate' => app_today(),
     'Note' => (new Uses($db, (int) $_SESSION['user_id']))->lastSetting()
       ?? (new Preferences($db, (int) $_SESSION['user_id']))->get()['default_setting'],
   ]);

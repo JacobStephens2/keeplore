@@ -65,7 +65,7 @@ include(SHARED_PATH . '/header.php');
 				type="date" 
 				id="AversionDate" 
 				name="AversionDate" 
-				value="<?php echo date('Y') . '-' . date('m') . '-' . date('d'); ?>"
+				value="<?php echo h(app_today()); ?>"
 			/>
 
 			<label for="Users">

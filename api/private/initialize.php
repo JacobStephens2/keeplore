@@ -29,6 +29,7 @@ if ($keeplore_origin_host === '127.0.0.1' || $keeplore_origin_host === 'localhos
 require_once('../private/vendor/autoload.php');
 
 require_once('../private/auth_functions.php');
+require_once('../private/app_day.php');
 
 include_once('database_functions.php');
 $database = db_connect();

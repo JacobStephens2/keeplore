@@ -70,7 +70,7 @@ final class UpcomingUsesApiTest extends TestCase
     private function addItemUsed(int $id, string $title, int $frequency, int $daysAgo, int $userId = 1): void
     {
         $this->db->query("INSERT INTO games (id, user_id, Title, type_id, interaction_frequency_days) VALUES ($id, $userId, '$title', 1, $frequency)");
-        $this->db->query("INSERT INTO uses (artifact_id, user_id, use_date) VALUES ($id, $userId, DATE_SUB('" . record_use_today() . "', INTERVAL $daysAgo DAY))");
+        $this->db->query("INSERT INTO uses (artifact_id, user_id, use_date) VALUES ($id, $userId, DATE_SUB('" . app_today() . "', INTERVAL $daysAgo DAY))");
     }
 
     public function test_a_session_reads_its_queue_within_sixty_days_with_its_notification_preferences(): void
@@ -87,7 +87,7 @@ final class UpcomingUsesApiTest extends TestCase
 
         $this->assertSame(200, $status);
         $this->assertSame(true, $fields['authenticated']);
-        $this->assertSame(record_use_today(), $fields['today']);
+        $this->assertSame(app_today(), $fields['today']);
         $this->assertSame('America/New_York', $fields['timezone']);
         $this->assertSame(60, $fields['horizon_days']);
         $this->assertEquals(90, $fields['default_interval_days']);

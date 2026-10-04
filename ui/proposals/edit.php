@@ -21,7 +21,7 @@ if ($initialItemId && !isset($itemsById[$initialItemId])) {
 }
 $values = $record ?? [
     'item_id' => $initialItemId ?: '',
-    'proposal_date' => (new DateTimeImmutable('now', new DateTimeZone('America/New_York')))->format('Y-m-d'),
+    'proposal_date' => app_today(),
     'outcome' => '',
     'note' => '',
     'chosen_item_id' => '',

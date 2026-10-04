@@ -1,12 +1,11 @@
 <?php
     require_once(__DIR__ . '/../initialize.php');
 
-    date_default_timezone_set('America/New_York');
-    $current_hour = (int) date('G');
+    $current_hour = (int) app_now()->format('G');
 
     // Log to stdout so crontab can append to the shared log volume. The
     // promoted release tree is root-owned and not writable by www-data.
-    echo __FILE__ . " began running at " . date('Y-m-d G:i:s') . " (hour: $current_hour)\n";
+    echo __FILE__ . " began running at " . app_now()->format('Y-m-d G:i:s') . " (hour: $current_hour)\n";
 
     $mailer = SmtpMailer::fromEnvironment();
 
@@ -20,6 +19,6 @@
 
     }
 
-    echo __FILE__ . ' finished running at ' . date('Y-m-d G:i:s') . "\n";
+    echo __FILE__ . ' finished running at ' . app_now()->format('Y-m-d G:i:s') . "\n";
 
 ?>

@@ -128,7 +128,7 @@ class ItemsListTest extends TestCase
         // due on it and acquired two days before is overdue on it. Server
         // zones well ahead of and behind America/New_York make the server's
         // day differ from the app's day at every hour.
-        $day = fn (int $days) => (new \DateTimeImmutable(record_use_today()))->modify("$days days")->format('Y-m-d');
+        $day = fn (int $days) => (new \DateTimeImmutable(app_today()))->modify("$days days")->format('Y-m-d');
         $zone = date_default_timezone_get();
         try {
             foreach (['Pacific/Kiritimati', 'Pacific/Pago_Pago'] as $tz) {
