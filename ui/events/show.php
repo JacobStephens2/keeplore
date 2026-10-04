@@ -20,9 +20,8 @@ $by_tag = $by === 'tag' || $then === 'tag';
 
 $items = $event['items'];
 $players = $event['players'];
-$plan = event_plan($event, $grouping);
-['groups' => $groups, 'packed' => $packed, 'shopping' => $shopping, 'spare' => $spare,
-    'player_ages' => $player_ages_label, 'settings' => $settings] = $plan;
+['groups' => $groups, 'text' => $text, 'packed' => $packed, 'shopping' => $shopping, 'spare' => $spare,
+    'player_ages' => $player_ages_label, 'settings' => $settings] = event_plan($event, $grouping);
 $not_kept = count($shopping['items']);
 $to_add = $plans->itemsToAdd($id);
 $players_to_add = $plans->playersToAdd($id);
@@ -242,7 +241,7 @@ include(SHARED_PATH . '/header.php');
 
         <details class="event-text" data-fold="plain-text">
             <summary>Plain-text list</summary>
-            <textarea id="event-text" rows="12" readonly><?php echo h($plan['text']); ?></textarea>
+            <textarea id="event-text" rows="12" readonly><?php echo h($text); ?></textarea>
             <button type="button" class="event-copy" data-copy="event-text">Copy list</button>
             <span class="menu-support" aria-live="polite"></span>
         </details>

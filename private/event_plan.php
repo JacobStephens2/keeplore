@@ -63,15 +63,19 @@ function event_plan(array $event, array $grouping) {
     $spare = event_plan_spare(event_plan_sorted_by_title($event['items']), $view,
         $grouping['at_least'], event_plan_chosen_tags($grouping['count_tags']));
     $items = $spare['items'];
-    $needed = array_values(array_filter($items, function ($item) {
-        return !$item['can_stay_home'];
-    }));
-    $can_stay_home = array_values(array_filter($items, function ($item) {
-        return $item['can_stay_home'];
-    }));
+    $needed = [];
+    $can_stay_home = [];
+    foreach ($items as $item) {
+        if ($item['can_stay_home']) {
+            $can_stay_home[] = $item;
+        } else {
+            $needed[] = $item;
+        }
+    }
     $groups = event_plan_groups($items, $view);
 
-    $settings = array_values(array_unique(array_filter(array_map('trim', array_column($items, 'setting')))));
+    // Read in the event's own order, so settings differing only in case keep their order.
+    $settings = array_values(array_unique(array_filter(array_map('trim', array_column($event['items'], 'setting')))));
     sort($settings, SORT_NATURAL | SORT_FLAG_CASE);
 
     return [
@@ -176,14 +180,14 @@ function event_plan_grouping(array $request, array $saved) {
  * 1], ...]], short groups in the plan's order.
  */
 function event_plan_spare(array $items, array $view, $at_least, array $count_tags) {
-    $flagged = function (array $chosen) use ($items) {
+    $with_can_stay_home = function (array $chosen) use ($items) {
         foreach (array_keys($items) as $i) {
             $items[$i]['can_stay_home'] = !isset($chosen[$i]);
         }
         return $items;
     };
     if ($at_least <= 0) {
-        return ['items' => $flagged(array_fill_keys(array_keys($items), true)), 'short' => []];
+        return ['items' => $with_can_stay_home(array_fill_keys(array_keys($items), true)), 'short' => []];
     }
     ['by' => $by, 'then' => $then] = $view;
 
@@ -278,7 +282,7 @@ function event_plan_spare(array $items, array $view, $at_least, array $count_tag
             $short[] = ['label' => $cell['label'], 'count' => count($cell['members'])];
         }
     }
-    return ['items' => $flagged($chosen), 'short' => $short];
+    return ['items' => $with_can_stay_home($chosen), 'short' => $short];
 }
 
 /** An event's dates as "Jul 3 – Jul 10, 2027", or '' with neither. */

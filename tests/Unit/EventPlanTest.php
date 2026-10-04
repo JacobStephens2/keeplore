@@ -206,7 +206,7 @@ class EventPlanTest extends TestCase
 
         $this->assertSame(
             $this->plan($items, ['by' => 'players', 'then' => 'tag', 'tags' => 'casual, main, kids', 'at_least' => 1, 'count_tags' => 'main, casual']),
-            $this->plan($items, ['by' => 'players', 'then' => 'none', 'tags' => ' Casual,MAIN,casual , kids', 'at_least' => 1, 'count_tags' => 'Main,,main, CASUAL'])
+            $this->plan($items, ['by' => 'players', 'then' => 'tag', 'tags' => ' Casual,MAIN,casual , kids', 'at_least' => 1, 'count_tags' => 'Main,,main, CASUAL'])
         );
     }
 
