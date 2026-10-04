@@ -25,6 +25,16 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY uq_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS password_reset_temp (
+  email VARCHAR(255) NOT NULL,
+  `key` VARCHAR(255) NOT NULL,
+  expDate DATETIME NOT NULL,
+  selector VARCHAR(16) DEFAULT NULL,
+  token VARCHAR(64) DEFAULT NULL,
+  expires BIGINT DEFAULT NULL,
+  KEY idx_password_reset_temp_email (email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS types (
   id INT AUTO_INCREMENT PRIMARY KEY,
   objectType VARCHAR(100) NOT NULL,

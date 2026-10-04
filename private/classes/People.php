@@ -63,6 +63,31 @@ final class People
         return $row === null ? null : $this->person($row);
     }
 
+    /**
+     * The id of the owner's person marked as them, or null. When the account
+     * has no link but one of the owner's people represents it, the account
+     * links to them first.
+     */
+    public function me(): ?int
+    {
+        $link = (int) ($this->rows('SELECT player_id FROM users WHERE id = ?', 'i', [$this->userId])[0]['player_id'] ?? 0);
+        if ($link !== 0) {
+            return $link;
+        }
+        $id = $this->rows(
+            'SELECT id FROM players WHERE represents_user_id = ? AND user_id = ? ORDER BY id LIMIT 1',
+            'ii', [$this->userId, $this->userId]
+        )[0]['id'] ?? null;
+        if ($id === null) {
+            return null;
+        }
+        $this->statement(
+            'UPDATE users SET player_id = ? WHERE id = ? AND (player_id IS NULL OR player_id = 0)',
+            'ii', [$id, $this->userId]
+        )->close();
+        return (int) $id;
+    }
+
     /** Add a person to the owner's list and return their id. */
     public function create(array $input): int
     {
