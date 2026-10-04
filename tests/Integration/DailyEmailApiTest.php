@@ -67,17 +67,17 @@ final class DailyEmailApiTest extends TestCase
 
     private function session(int $userId = 1): ApiCaller
     {
-        return ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'session', 'user_id' => $userId]);
+        return ApiCaller::session($this->db, $userId);
     }
 
     private function agentKey(int $userId = 1): ApiCaller
     {
-        return ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => $userId]);
+        return ApiCaller::agentKey($this->db, $userId);
     }
 
     private function masterKey(): ApiCaller
     {
-        return ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']);
+        return ApiCaller::masterKey($this->db);
     }
 
     public function test_the_signed_in_owner_is_sent_their_email(): void

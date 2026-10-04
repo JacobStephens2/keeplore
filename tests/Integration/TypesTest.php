@@ -284,7 +284,7 @@ final class TypesTest extends TestCase
     {
         require_once PRIVATE_PATH . '/types_api.php';
 
-        [$status, $fields] = list_types_over_api($this->db, \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => 1]));
+        [$status, $fields] = list_types_over_api($this->db, \ApiCaller::agentKey($this->db, 1));
 
         $this->assertSame(200, $status);
         $this->assertSame(['types' => [['id' => 1, 'type' => 'board-game'], ['id' => 2, 'type' => 'film']]], $fields);
@@ -294,7 +294,7 @@ final class TypesTest extends TestCase
     {
         require_once PRIVATE_PATH . '/types_api.php';
 
-        [$status, $fields] = list_types_over_api($this->db, \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']));
+        [$status, $fields] = list_types_over_api($this->db, \ApiCaller::masterKey($this->db));
 
         $this->assertSame(400, $status);
         $this->assertSame(['message' => 'types.php requires a user-scoped key.'], $fields);

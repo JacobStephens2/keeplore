@@ -313,18 +313,13 @@ final class ProposalOutcomesTest extends TestCase
         $this->assertCount(1, $this->proposals->history($item['id']));
     }
 
-    private function caller(array $authentication): \ApiCaller
-    {
-        return \ApiCaller::from($this->db, (object) (['authenticated' => true] + $authentication));
-    }
-
     public function test_the_proposals_api_reads_a_session_or_agent_keys_own_user_whatever_it_names(): void
     {
         $this->proposals->save($this->proposal());
         (new ProposalOutcomes($this->db, 2))->save($this->proposal(['item_id' => 20]));
 
-        foreach (['session', 'agent_key'] as $type) {
-            [$status, $response] = report_proposals_over_api($this->db, $this->caller(['auth_type' => $type, 'user_id' => 1]), ['user_id' => '2']);
+        foreach (['session' => \ApiCaller::session($this->db, 1), 'agent_key' => \ApiCaller::agentKey($this->db, 1)] as $type => $caller) {
+            [$status, $response] = report_proposals_over_api($this->db, $caller, ['user_id' => '2']);
 
             $this->assertSame(200, $status, $type);
             $this->assertSame(1, array_column($response['proposals'], null, 'item_id')[10]['explicit_declines']);
@@ -337,7 +332,7 @@ final class ProposalOutcomesTest extends TestCase
     {
         (new ProposalOutcomes($this->db, 2))->save($this->proposal(['item_id' => 20]));
 
-        [$status, $response] = report_proposals_over_api($this->db, $this->caller(['auth_type' => 'api_key']), ['user_id' => '2']);
+        [$status, $response] = report_proposals_over_api($this->db, \ApiCaller::masterKey($this->db), ['user_id' => '2']);
 
         $this->assertSame(200, $status);
         $this->assertSame([20], array_column($response['proposals'], 'item_id'));
@@ -347,7 +342,7 @@ final class ProposalOutcomesTest extends TestCase
     public function test_the_proposals_api_refuses_the_master_key_without_an_existing_user(): void
     {
         foreach ([[], ['user_id' => 'me'], ['user_id' => '0'], ['user_id' => '999']] as $query) {
-            [$status, $response] = report_proposals_over_api($this->db, $this->caller(['auth_type' => 'api_key']), $query);
+            [$status, $response] = report_proposals_over_api($this->db, \ApiCaller::masterKey($this->db), $query);
 
             $this->assertSame(400, $status, json_encode($query));
             $this->assertSame(['message' => 'Missing or invalid required parameter: user_id'], $response);
@@ -359,7 +354,7 @@ final class ProposalOutcomesTest extends TestCase
         foreach (['2026-08-31', '2026-09-12'] as $date) {
             $this->proposals->save($this->proposal(['proposal_date' => $date]));
         }
-        $session = $this->caller(['auth_type' => 'session', 'user_id' => 1]);
+        $session = \ApiCaller::session($this->db, 1);
 
         [, $response] = report_proposals_over_api($this->db, $session, [
             'start' => '2026-09-01', 'end' => '2026-09-30', 'include_other' => '1', 'sort' => 'item_name', 'direction' => 'asc',

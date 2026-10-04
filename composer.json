@@ -1,6 +1,7 @@
 {
   "license": "GPL-3.0-or-later",
     "require-dev": {
-        "phpunit/phpunit": "^10"
+        "phpunit/phpunit": "^10",
+        "firebase/php-jwt": "^7.0"
     }
 }

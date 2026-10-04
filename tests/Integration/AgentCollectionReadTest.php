@@ -235,7 +235,7 @@ final class AgentCollectionReadTest extends TestCase
 
     private function agentKey(int $userId): \ApiCaller
     {
-        return \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => $userId]);
+        return \ApiCaller::agentKey($this->db, $userId);
     }
 
     public function test_players_list_is_scoped_to_the_user_with_the_published_fields(): void
@@ -252,26 +252,21 @@ final class AgentCollectionReadTest extends TestCase
 
     public function test_players_list_refuses_the_master_key(): void
     {
-        [$status, $fields] = list_people_over_api($this->db, \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']));
+        [$status, $fields] = list_people_over_api($this->db, \ApiCaller::masterKey($this->db));
 
         $this->assertSame(400, $status);
         $this->assertSame(['message' => 'players.php requires a user-scoped key.'], $fields);
     }
 
-    private function caller(array $authentication): \ApiCaller
-    {
-        return \ApiCaller::from($this->db, (object) (['authenticated' => true] + $authentication));
-    }
-
     private function masterKey(): \ApiCaller
     {
-        return $this->caller(['auth_type' => 'api_key']);
+        return \ApiCaller::masterKey($this->db);
     }
 
     public function test_the_list_api_reads_an_agent_key_or_sessions_own_collection_whatever_userid_names(): void
     {
-        foreach (['agent_key', 'session'] as $type) {
-            [$status, $response] = list_collection_over_api($this->db, $this->caller(['auth_type' => $type, 'user_id' => 1]), (object) ['userid' => 2]);
+        foreach (['agent_key' => \ApiCaller::agentKey($this->db, 1), 'session' => \ApiCaller::session($this->db, 1)] as $type => $caller) {
+            [$status, $response] = list_collection_over_api($this->db, $caller, (object) ['userid' => 2]);
 
             $this->assertSame(200, $status, $type);
             $this->assertSame([12, 11, 10, 13], $this->ids($response['artifacts']));

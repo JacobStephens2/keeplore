@@ -62,7 +62,7 @@ final class PersonSearchApiTest extends TestCase
 
     private function session(int $userId = 1): \ApiCaller
     {
-        return \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'session', 'user_id' => $userId]);
+        return \ApiCaller::session($this->db, $userId);
     }
 
     public function test_search_answers_the_owners_matches_with_the_published_fields(): void
@@ -92,7 +92,7 @@ final class PersonSearchApiTest extends TestCase
 
     public function test_search_refuses_the_master_key(): void
     {
-        $masterKey = \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'api_key']);
+        $masterKey = \ApiCaller::masterKey($this->db);
 
         [$status, $fields] = search_people_over_api($this->db, $masterKey, json_decode('{"query": "", "userid": 2}'));
 
@@ -102,7 +102,7 @@ final class PersonSearchApiTest extends TestCase
 
     public function test_search_refuses_an_agent_key(): void
     {
-        $agentKey = \ApiCaller::from($this->db, (object) ['authenticated' => true, 'auth_type' => 'agent_key', 'user_id' => 1]);
+        $agentKey = \ApiCaller::agentKey($this->db, 1);
 
         [$status] = search_people_over_api($this->db, $agentKey, json_decode('{"query": "sam"}'));
 

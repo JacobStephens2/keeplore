@@ -14,6 +14,15 @@ define('PUBLIC_PATH',  PROJECT_PATH . '/artifacts');
 define('SHARED_PATH',  PRIVATE_PATH . '/shared');
 define('WWW_ROOT',     '');
 
+// Configuration the API reads from its constants, with test values when
+// the environment hasn't defined them ----------------------------------
+if (!defined('JWT_SECRET')) {
+    define('JWT_SECRET', 'test-jwt-secret-of-at-least-thirty-two-bytes');
+}
+if (!defined('ARTIFACTS_API_KEY')) {
+    define('ARTIFACTS_API_KEY', 'test-master-key');
+}
+
 // Fake superglobals that many functions rely on -----------------------
 $_SERVER['REQUEST_METHOD'] = 'GET';
 $_SERVER['REMOTE_ADDR']    = '127.0.0.1';

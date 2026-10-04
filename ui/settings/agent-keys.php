@@ -1,13 +1,12 @@
 <?php
-  // Per-agent per-user API keys (spec #10, ticket #18, ADR 0002). A key
-  // scopes its holder to this user's collection, uses, and proposals reads
-  // plus the kept toggle. The plaintext secret is shown once at creation.
+  // The owner's agent keys (ADR 0002), issued, listed and revoked through
+  // AgentKeys. A new key's token is shown once, when it is issued.
 
   require_once('../../private/initialize.php');
   require_login();
   global $db;
 
-  $user_id = (int) $_SESSION['user_id'];
+  $agent_keys = new AgentKeys($db, (int) $_SESSION['user_id']);
   $errors = [];
   $new_token = null;
   $new_token_name = '';
@@ -16,25 +15,24 @@
     $action = $_POST['action'] ?? '';
     if ($action === 'create') {
       $agent_name = trim($_POST['agent_name'] ?? '');
-      $created = create_agent_key($db, $user_id, $agent_name);
-      if (isset($created['error'])) {
-        $errors[] = $created['error'];
-      } else {
-        $new_token = $created['token'];
+      try {
+        $new_token = $agent_keys->issue($agent_name)['token'];
         $new_token_name = $agent_name;
         $_SESSION['message'] = 'Agent key created for ' . $agent_name . '.';
+      } catch (InvalidArgumentException $e) {
+        $errors[] = $e->getMessage();
       }
     } elseif ($action === 'revoke') {
-      $key_id = (int) ($_POST['key_id'] ?? 0);
-      if ($key_id > 0 && revoke_agent_key($db, $user_id, $key_id)) {
+      try {
+        $agent_keys->revoke((int) ($_POST['key_id'] ?? 0));
         $_SESSION['message'] = 'Agent key revoked.';
-      } else {
+      } catch (OutOfBoundsException $e) {
         $errors[] = 'Could not revoke that key.';
       }
     }
   }
 
-  $keys = list_agent_keys($db, $user_id);
+  $keys = $agent_keys->all();
 
   $page_title = 'Agent API keys';
   include(SHARED_PATH . '/header.php');

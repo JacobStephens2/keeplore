@@ -1,11 +1,17 @@
 <?php
 
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+
+require_once __DIR__ . '/AgentKeys.php';
+
 /**
- * Who an authenticated HTTP API request is, and whose data it may act for.
- * A session or an agent key acts for its own user, whatever the request
- * names. The master key has no user of its own: it acts for the existing
- * user a request names, or for no one. An agent key may only read and flip
- * kept (ADR-0002); every other handler asks for its refusal.
+ * Who an HTTP API request is, from the credentials it carries, and whose
+ * data it may act for. A session or an agent key acts for its own user,
+ * whatever the request names. The master key has no user of its own: it
+ * acts for the existing user a request names, or for no one. An agent key
+ * may only read and flip kept (ADR-0002); every other handler asks for its
+ * refusal.
  */
 final class ApiCaller
 {
@@ -17,22 +23,56 @@ final class ApiCaller
 
     private function __construct(
         private mysqli $db,
-        private string $type,
-        private ?int $userId
+        private ?int $userId,
+        private bool $isAgentKey
     ) {
     }
 
-    /** The caller authenticate()'s result names, or null when it did not authenticate. */
-    public static function from(mysqli $db, object $authentication): ?self
+    /**
+     * The caller a request's credentials name, or null when they don't
+     * authenticate. $accessToken is the session cookie's access token and
+     * $authorization the Authorization header, each null when absent. An
+     * access token means a session or nothing; otherwise a Bearer header
+     * means an agent key or nothing; otherwise the header must be the master
+     * key.
+     */
+    public static function fromCredentials(mysqli $db, ?string $accessToken, ?string $authorization): ?self
     {
-        if (($authentication->authenticated ?? false) !== true) {
-            return null;
+        if ($accessToken !== null) {
+            try {
+                $session = JWT::decode($accessToken, new Key(JWT_SECRET, 'HS256'));
+            } catch (Exception $e) {
+                return null;
+            }
+            return isset($session->user_id) ? self::session($db, (int) $session->user_id) : null;
         }
-        return new self(
-            $db,
-            (string) ($authentication->auth_type ?? ''),
-            isset($authentication->user_id) ? (int) $authentication->user_id : null
-        );
+        if ($authorization !== null && strncasecmp($authorization, 'Bearer ', 7) === 0) {
+            $token = trim(substr($authorization, 7));
+            $userId = $token === '' ? null : AgentKeys::userForToken($db, $token);
+            return $userId === null ? null : self::agentKey($db, $userId);
+        }
+        if ($authorization !== null && hash_equals(ARTIFACTS_API_KEY, $authorization)) {
+            return self::masterKey($db);
+        }
+        return null;
+    }
+
+    /** A signed-in session, acting for $userId. */
+    public static function session(mysqli $db, int $userId): self
+    {
+        return new self($db, $userId, false);
+    }
+
+    /** One of $userId's agent keys, acting for them. */
+    public static function agentKey(mysqli $db, int $userId): self
+    {
+        return new self($db, $userId, true);
+    }
+
+    /** The master key, acting for the existing user a request names. */
+    public static function masterKey(mysqli $db): self
+    {
+        return new self($db, null, false);
     }
 
     /**
@@ -61,7 +101,7 @@ final class ApiCaller
     /** [403, response fields] for an agent key, which may only read and flip kept; null otherwise. */
     public function agentKeyRefusal(): ?array
     {
-        if ($this->type !== 'agent_key') {
+        if (!$this->isAgentKey) {
             return null;
         }
         return [403, self::AGENT_KEY_REFUSAL];

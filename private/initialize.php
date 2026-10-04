@@ -63,11 +63,11 @@
   require_once('classes/Preferences.php');
   require_once('classes/DailyEmail.php');
   require_once('classes/Accounts.php');
+  require_once('classes/AgentKeys.php');
   require_once('classes/SmtpMailer.php');
   require_once('database.php');
   require_once('kept_status.php');
   require_once('item_tags.php');
-  require_once('agent_keys.php');
   require_once('agent_api_docs.php');
   require_once('query_functions.php');
   require_once('validation_functions.php');
