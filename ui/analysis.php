@@ -4,8 +4,7 @@
   require_login_or_guest();
 
   $page_title = 'Analysis';
-  date_default_timezone_set('America/New_York');
-  $report = analysis_report_for_user($db, (int) $_SESSION['user_id'], date('Y-m-d'));
+  $report = analysis_report_for_user($db, (int) $_SESSION['user_id'], app_today());
 
   $totals = $report['totals'];
   $pace = $report['pace'];

@@ -26,7 +26,7 @@ final class DailyEmail
         'coming_week' => ['status' => 'upcoming', 'within_days' => 7, 'heading' => 'Interactions due in coming week', 'label' => 'Due in the coming week', 'label_style' => 'font-weight:bold;', 'get_rid_of' => false, 'use_by' => true],
     ];
 
-    /** $today is a Y-m-d day; the app's America/New_York day when omitted. */
+    /** $today is a Y-m-d day; the App day (app_today()) when omitted. */
     public function __construct(private mysqli $db, private int $userId, private Mailer $mailer, private ?string $today = null)
     {
     }

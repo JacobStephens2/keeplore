@@ -3,7 +3,7 @@
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/kept_status.php';
 require_once __DIR__ . '/item_types.php';
-require_once __DIR__ . '/record_use.php';
+require_once __DIR__ . '/app_day.php';
 require_once __DIR__ . '/classes/Items.php';
 
 /**
@@ -55,7 +55,7 @@ function item_form_input(array $form): array {
 /** Create Item's starting values: the Items module's defaults, today's date and blanks. */
 function item_form_create_values(): array {
   return [
-    'Title' => '', 'type_id' => null, 'tags' => '', 'Acq' => record_use_today(),
+    'Title' => '', 'type_id' => null, 'tags' => '', 'Acq' => app_today(),
     'interaction_frequency_days' => null, 'Yr' => '', 'Notes' => '', 'image_url' => '',
     'bgg_url' => '', 'bgg_player_votes' => '', 'bgg_age_basis' => '', 'BGG_Rat' => '',
   ] + Items::DEFAULTS;

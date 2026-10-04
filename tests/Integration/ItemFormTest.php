@@ -83,7 +83,7 @@ final class ItemFormTest extends TestCase
         $html = item_form_html('create', item_form_create_values(), 90);
 
         $this->assertMatchesRegularExpression('/id="is_kept" value="1" checked/', $html);
-        $this->assertStringContainsString('id="Acq" value="' . record_use_today() . '"', $html);
+        $this->assertStringContainsString('id="Acq" value="' . app_today() . '"', $html);
         $this->assertMatchesRegularExpression('/id="interaction_frequency_days"[^>]*value="90"/', $html);
         $this->assertStringContainsString('id="MnT" value="30"', $html);
         $this->assertStringContainsString('id="MxT" value="60"', $html);

@@ -1,7 +1,7 @@
 <?php
 
 require_once dirname(__DIR__) . '/use_by_date.php';
-require_once dirname(__DIR__) . '/record_use.php';
+require_once dirname(__DIR__) . '/app_day.php';
 require_once dirname(__DIR__) . '/item_facts.php';
 require_once __DIR__ . '/Items.php';
 require_once __DIR__ . '/Preferences.php';
@@ -21,10 +21,10 @@ final class UseByQueue
 {
     private string $today;
 
-    /** $today is a Y-m-d day; the app's America/New_York day when omitted. */
+    /** $today is a Y-m-d day; the App day (app_today()) when omitted. */
     public function __construct(private mysqli $db, private int $userId, ?string $today = null)
     {
-        $this->today = $today ?? record_use_today();
+        $this->today = $today ?? app_today();
     }
 
     public function today(): string

@@ -10,7 +10,7 @@
     (string) ($_SESSION['FullName'] ?? '')
   );
   $record_use_items = (new Items($db, $user_id_int))->list();
-  $record_use_date = (new DateTime('now', new DateTimeZone('America/New_York')))->format('Y-m-d');
+  $record_use_date = app_today();
   $uses = new Uses($db, $user_id_int);
   $record_use_setting = $uses->lastSetting() ?? (new Preferences($db, $user_id_int))->get()['default_setting'];
 

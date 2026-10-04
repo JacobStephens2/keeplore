@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/classes/ApiCaller.php';
 require_once __DIR__ . '/classes/Preferences.php';
-require_once __DIR__ . '/record_use.php';
+require_once __DIR__ . '/app_day.php';
 require_once __DIR__ . '/classes/UseByQueue.php';
 
 /** How many days ahead upcoming uses reach. */
