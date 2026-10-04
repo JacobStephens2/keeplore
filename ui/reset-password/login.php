@@ -23,7 +23,7 @@ if(is_post_request()) {
     // Using one variable ensures that msg is the same
     $login_failure_msg = "Log in was unsuccessful.";
 
-    $account = (new Accounts($db, SmtpMailer::fromEnvironment()))->logIn($username, $password);
+    $account = accounts()->logIn($username, $password);
     if($account) {
       log_in_user($account);
       redirect_to(url_for('/index.php'));      

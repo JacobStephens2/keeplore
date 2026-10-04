@@ -3,6 +3,12 @@
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
+// Accounts, sending its mail over SMTP.
+function accounts() {
+  global $db;
+  return new Accounts($db, SmtpMailer::fromEnvironment());
+}
+
 // Logs in the account Accounts returned: the session, the remember-me
 // window and the JWT cookie.
 function log_in_user($account, $remember = false) {
@@ -156,7 +162,8 @@ function log_out() {
   return true;
 }
 
-// The session's account, and the person who is the owner themself.
+// Records the account as the session's owner, with its person_id as the
+// person who is the owner themself.
 function put_account_in_session($account) {
   $_SESSION['FullName'] = $account['name'];
   $_SESSION['user_id'] = $account['id'];
@@ -170,8 +177,7 @@ function put_account_in_session($account) {
 function is_logged_in() {
   if (isset($_SESSION['user_id'])) {
     if (empty($_SESSION['player_id']) && empty($_SESSION['guest_mode'])) {
-      global $db;
-      $_SESSION['player_id'] = (new People($db, (int) $_SESSION['user_id']))->me();
+      $_SESSION['player_id'] = accounts()->find((int) $_SESSION['user_id'])['person_id'] ?? null;
     }
     return true;
   }
@@ -180,8 +186,7 @@ function is_logged_in() {
     try {
       $decoded = JWT::decode($_COOKIE['access_token'], new Key(JWT_SECRET, 'HS256'));
       if (isset($decoded->user_id)) {
-        global $db;
-        $account = (new Accounts($db, SmtpMailer::fromEnvironment()))->find((int) $decoded->user_id);
+        $account = accounts()->find((int) $decoded->user_id);
         if ($account) {
           session_regenerate_id();
           put_account_in_session($account);

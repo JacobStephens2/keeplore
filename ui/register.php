@@ -23,7 +23,7 @@ if (is_post_request()) {
 
   if (empty($errors)) {
     try {
-      $account = (new Accounts($db, SmtpMailer::fromEnvironment()))->register($user);
+      $account = accounts()->register($user);
       $_SESSION['message'] = 'User registered';
       log_in_user($account);
       redirect_to(url_for('/index.php'));

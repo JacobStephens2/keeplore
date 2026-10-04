@@ -41,7 +41,7 @@ final class AccountsTest extends TestCase
         require_once PRIVATE_PATH . '/classes/Accounts.php';
         defined('DOMAIN') || define('DOMAIN', 'keeplore.app');
         defined('APP_NAME') || define('APP_NAME', 'Keeplore');
-        defined('DEV_EMAIL') || define('DEV_EMAIL', 'developer@keeplore.app');
+        defined('DEV_EMAIL') || define('DEV_EMAIL', 'dev@keeplore.app');
 
         $this->giveAccount(1, 'owner@keeplore.app', 'ownerusername');
         $this->giveAccount(2, 'other+tag@keeplore.app', 'otherusername');
@@ -345,7 +345,7 @@ final class AccountsTest extends TestCase
 
         $this->assertCount(1, $this->mailer->sent);
         [$to, $subject, $html] = $this->mailer->sent[0];
-        $this->assertSame('developer@keeplore.app', $to);
+        $this->assertSame('dev@keeplore.app', $to);
         $this->assertSame('Keeplore — New Account Created', $subject);
         $this->assertStringContainsString('Ada &lt;b&gt;Byron&lt;/b&gt;', $html);
         $this->assertStringContainsString('adabyron1815', $html);
@@ -357,7 +357,7 @@ final class AccountsTest extends TestCase
 
     public function test_register_succeeds_and_logs_when_the_notice_fails(): void
     {
-        $this->mailer->failFor('developer@keeplore.app', 'SMTP down');
+        $this->mailer->failFor('dev@keeplore.app', 'SMTP down');
         $log = tempnam(sys_get_temp_dir(), 'keeplore-log');
         $previousLog = ini_set('error_log', $log);
         try {

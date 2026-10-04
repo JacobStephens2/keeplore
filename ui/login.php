@@ -31,7 +31,7 @@ if(is_post_request()) {
     // Using one variable ensures that msg is the same
     $login_failure_msg = "Log in was unsuccessful.";
 
-    $account = (new Accounts($db, SmtpMailer::fromEnvironment()))->logIn($username, $password);
+    $account = accounts()->logIn($username, $password);
     if($account) {
       $logger->logAuth('login_success', ['username' => $username]);
       $remember = isset($_POST['remember_me']);

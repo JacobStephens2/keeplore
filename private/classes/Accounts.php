@@ -21,7 +21,8 @@ final class AccountInvalid extends InvalidArgumentException
  *
  * An account is an array of id, first_name, last_name, name (first and last
  * joined), email, username, user_group and person_id (int or null). It never
- * carries the password hash.
+ * carries the password hash. person_id is People::me(), so reading an
+ * account can repair its missing link to the person who represents it.
  *
  * A profile needs a first and last name of 2 to 255 characters, a valid
  * email of at most 255 characters and a username of 8 to 255 characters;
@@ -36,6 +37,7 @@ final class AccountInvalid extends InvalidArgumentException
 final class Accounts
 {
     private const COLUMNS = 'id, first_name, last_name, email, username, user_group';
+    private const DUPLICATE_KEY = 1062;
     private const RESET_KEY_LIFETIME = '+1 day';
     private const INVALID_RESET_LINK = 'This reset link is invalid or has expired.';
 
@@ -94,7 +96,7 @@ final class Accounts
             )->close();
         } catch (mysqli_sql_exception $duplicate) {
             // Another registration took the email or username since the check.
-            if ($duplicate->getCode() !== 1062) {
+            if ($duplicate->getCode() !== self::DUPLICATE_KEY) {
                 throw $duplicate;
             }
             throw new AccountInvalid($this->profileProblems($profile));
@@ -204,8 +206,8 @@ final class Accounts
         return $trim ? trim($value) : $value;
     }
 
-    /** Every profile rule $profile breaks, with the account $id's own email and username not counting as taken. */
-    private function profileProblems(array $profile, int $id = 0): array
+    /** Every profile rule $profile breaks. */
+    private function profileProblems(array $profile): array
     {
         $errors = [];
         foreach (['first_name' => 'First name', 'last_name' => 'Last name'] as $field => $label) {
@@ -224,7 +226,7 @@ final class Accounts
             $errors[] = 'Email must be at most 255 characters.';
         } elseif (preg_match('/\A[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\z/i', $email) !== 1) {
             $errors[] = 'Email must be a valid format.';
-        } elseif ($this->taken('email', $email, $id)) {
+        } elseif ($this->taken('email', $email)) {
             $errors[] = 'That email already belongs to an account. Log in or reset your password.';
         }
 
@@ -234,16 +236,16 @@ final class Accounts
             $errors[] = 'Username cannot be blank.';
         } elseif ($length < 8 || $length > 255) {
             $errors[] = 'Username must be between 8 and 255 characters.';
-        } elseif ($this->taken('username', $username, $id)) {
+        } elseif ($this->taken('username', $username)) {
             $errors[] = 'That username is taken. Try another.';
         }
         return $errors;
     }
 
-    /** Whether an account other than $id has $value in $column. */
-    private function taken(string $column, string $value, int $id): bool
+    /** Whether an account has $value in $column. */
+    private function taken(string $column, string $value): bool
     {
-        return (bool) $this->rows("SELECT id FROM users WHERE $column = ? AND id <> ?", 'si', [$value, $id]);
+        return (bool) $this->rows("SELECT id FROM users WHERE $column = ?", 's', [$value]);
     }
 
     /** Every password rule $password and its confirmation break. */
