@@ -10,7 +10,8 @@ function count_playgroup() {
   return $subject; // returns an assoc. array
 }
 
-function choose_artifacts_for_group($range, $typeArray, $kept = 0) {
+// The group's items of the Types in $type_ids (none when it is empty).
+function choose_artifacts_for_group($range, array $type_ids, $kept = 0) {
   global $db;
   $playgroup_count = count_playgroup();
 
@@ -30,7 +31,7 @@ function choose_artifacts_for_group($range, $typeArray, $kept = 0) {
   players.LastName,
   players.G,
   players.Priority,
-  responses.id AS ResponseID,
+  ANY_VALUE(responses.id) AS ResponseID,
   Max(responses.AversionDate) AS MaxOfAversionDate,
   Max(responses.PlayDate) AS MaxOfPlayDate,
   Max(responses.PassDate) AS MaxOfPassDate,
@@ -50,6 +51,7 @@ function choose_artifacts_for_group($range, $typeArray, $kept = 0) {
     games.MxP,
     games.id,
     games.type,
+    games.type_id,
     games.user_id,
     players.FirstName,
     players.LastName,
@@ -71,13 +73,15 @@ function choose_artifacts_for_group($range, $typeArray, $kept = 0) {
     $params[] = $count;
     $params[] = $count;
   }
-  if (isset($typeArray) && $typeArray != 1 && count($typeArray) > 0) {
-    $placeholders = implode(',', array_fill(0, count($typeArray), '?'));
-    $sql .= "AND games.type IN (" . $placeholders . ") ";
-    foreach($typeArray as $type) {
-      $types .= "s";
-      $params[] = $type;
+  if (count($type_ids) > 0) {
+    $placeholders = implode(',', array_fill(0, count($type_ids), '?'));
+    $sql .= "AND games.type_id IN (" . $placeholders . ") ";
+    foreach($type_ids as $type_id) {
+      $types .= "i";
+      $params[] = (int) $type_id;
     }
+  } else {
+    $sql .= "AND FALSE ";
   }
 
   if ($kept == 1) {

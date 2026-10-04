@@ -5,14 +5,12 @@
   include(SHARED_PATH . '/header.php');
   if(is_post_request()) {
     $_SESSION['range'] = $_POST['range'] ?? 'false';
-    $_SESSION['type'] = $_POST['type'] ?? '1';
     $_SESSION['kept'] = $_POST['kept'] ?? 0;
   }
+  $type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
   $range = $_SESSION['range'] ?? 'false';
-  $typeArray = $_SESSION['type'] ?? [];
-  $type = $_SESSION['type'] ?? [];
   $kept = $_SESSION['kept'] ?? [];
-  $artifact_set = choose_artifacts_for_group($range, $typeArray, $kept);
+  $artifact_set = choose_artifacts_for_group($range, $type_filter['selected'], $kept);
   $usergroup = find_playgroup_by_user_id();
 ?>
 

@@ -6,68 +6,11 @@
 
   require_login_or_guest();
 
-  if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['type'])) {
-      $type = $_POST['type'];
-    } else {
-      $type = [];
-    }
-  } else {
-    if (isset($_SESSION['type']) && count($_SESSION['type']) > 0) {
-      $type = $_SESSION['type'];
-    } else {
-      $type = array_column((new Types($db, (int) $_SESSION['user_id']))->all(), 'id', 'name');
-    }
-  }
-
-  $sql = "SELECT *
-    FROM games
-    WHERE Candidate IS NOT NULL
-    AND Candidate != '0'
-    AND Candidate != ''
-    AND user_id = ?
-  ";
-  $params = [(int) $_SESSION['user_id']];
-  $types = "i";
-
-  if (isset($_POST['showOnline'])) {
-    switch($_POST['showOnline']) {
-      case 'showOnlyOnline':
-        $sql .= " AND Candidate LIKE '%online%' ";
-        break;
-      case 'hideOnline':
-        $sql .= " AND Candidate NOT LIKE '%online%' ";
-        break;
-    }
-  }
-
-  if (isset($_POST['removeUserByName']) && $_POST['removeUserByName'] != '') {
-    $sql .= " AND Candidate NOT LIKE ? ";
-    $params[] = '%' . $_POST['removeUserByName'] . '%';
-    $types .= "s";
-  }
-
-  if (isset($_POST['removeUserByNameTwo']) && $_POST['removeUserByNameTwo'] != '') {
-    $sql .= " AND Candidate NOT LIKE ? ";
-    $params[] = '%' . $_POST['removeUserByNameTwo'] . '%';
-    $types .= "s";
-  }
-
-  if (count($type) > 0) {
-    $placeholders = implode(',', array_fill(0, count($type), '?'));
-    $sql .= "AND type IN (" . $placeholders . ") ";
-    foreach ($type as $typeIndividual) {
-      $params[] = $typeIndividual;
-      $types .= "s";
-    }
-  }
-
-  $sql .= " ORDER BY type ASC, Candidate ASC";
-
-  $stmt = mysqli_prepare($db, $sql);
-  mysqli_stmt_bind_param($stmt, $types, ...$params);
-  mysqli_stmt_execute($stmt);
-  $resultObject = mysqli_stmt_get_result($stmt);
+  $type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
+  $resultObject = candidate_items($db, (int) $_SESSION['user_id'], $type_filter['selected'], [
+    'online' => ['showOnlyOnline' => 'only', 'hideOnline' => 'hide'][$_POST['showOnline'] ?? ''] ?? null,
+    'exclude_names' => [(string) ($_POST['removeUserByName'] ?? ''), (string) ($_POST['removeUserByNameTwo'] ?? '')],
+  ]);
 
   include(SHARED_PATH . '/header.php');
   include(SHARED_PATH . '/dataTable.html'); 
@@ -155,7 +98,7 @@
           $artifact_id = (int) $row['id'];
           $current_user_id = (int) $_SESSION['user_id'];
 
-          $stmt_uses = mysqli_prepare($db, "SELECT id, MAX(use_date) AS most_recent_use_date FROM uses WHERE artifact_id = ? AND user_id = ?");
+          $stmt_uses = mysqli_prepare($db, "SELECT MAX(use_date) AS most_recent_use_date FROM uses WHERE artifact_id = ? AND user_id = ?");
           mysqli_stmt_bind_param($stmt_uses, "ii", $artifact_id, $current_user_id);
           mysqli_stmt_execute($stmt_uses);
           $mostRecentUseDateArray = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt_uses));

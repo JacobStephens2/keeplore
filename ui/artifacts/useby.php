@@ -12,43 +12,29 @@
 <script defer src="useby.js?v=8"></script>
 
 <?php // process form submission and initialize variables
-  if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['type'])) {
-      $type = $_POST['type'];
-    } else {
-      $type = [];
-    }
-  } else {
-    if (isset($_SESSION['type']) && count($_SESSION['type']) > 0) {
-      $type = $_SESSION['type'];
-    } else {
-      $type = array_column((new Types($db, (int) $_SESSION['user_id']))->all(), 'id', 'name');
-    }
-  }
+  $type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
 
   $user_id = $_SESSION['user_id'];
-  $_SESSION['type'] = $type;
   $sweetSpot = $_POST['sweetSpot'] ?? '';
   $minimumAge = $_POST['minimumAge'] ?? 0;
   $shelfSort = $_POST['shelfSort'] ?? 'no';
   $showAttributes = $_POST['showAttributes'] ?? 'no';
   $showInterval = $_POST['showInterval'] ?? 'no';
   // Hide snoozed items by default, and remember the user's last choice
-  // across future page loads (mirrors how $type is persisted in the session).
+  // across future page loads (as the Type filter remembers its selection).
   if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hideSnoozed = $_POST['hideSnoozed'] ?? 'no';
   } else {
     $hideSnoozed = $_SESSION['hideSnoozed'] ?? 'yes';
   }
   $_SESSION['hideSnoozed'] = $hideSnoozed;
-  $typeArray = $_SESSION['type'] ?? [];
   $preferences = (new Preferences($db, (int) $user_id))->get();
   $default_use_interval = $preferences['default_use_interval'];
   $interval = $_POST['interval'] ?? $default_use_interval;
   $queue = new UseByQueue($db, (int) $user_id);
   $artifacts = $queue->entries([
     'default_interval' => $interval,
-    'type_ids' => is_array($type) ? array_values($type) : [],
+    'type_ids' => $type_filter['selected'],
     'sweet_spot' => $sweetSpot,
     'minimum_age' => $minimumAge,
     'include_secondary_collection' => $shelfSort === 'yes',
