@@ -62,7 +62,7 @@
       <?php echo csrf_input(); ?>
       <input type="hidden" name="action" value="create">
       <label for="agent_name">Agent name</label>
-      <input type="text" name="agent_name" id="agent_name" required maxlength="100"
+      <input type="text" name="agent_name" id="agent_name" required maxlength="<?php echo AgentKeys::MAX_NAME_LENGTH; ?>"
         placeholder="e.g. weekly-review">
       <input type="submit" value="Create key">
     </form>
