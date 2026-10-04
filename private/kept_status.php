@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Kept-status seam (spec #10, ADR 0001).
+ * Kept status (spec #10, ADR 0001).
  *
  * The kept predicate and the flag normalizers live here:
  *

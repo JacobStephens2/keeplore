@@ -142,13 +142,13 @@ final class Items
     /** Mark the Item kept or not. Unlike update, the rest of the Item isn't checked against the item rules. */
     public function setKept(int $id, bool $kept): void
     {
-        $this->setColumn($id, 'is_kept', normalize_kept_value($kept));
+        $this->setColumn($id, 'is_kept', (int) $kept);
     }
 
     /** Mark the Item to get rid of or not. Unlike update, the rest of the Item isn't checked against the item rules. */
     public function setToGetRidOf(int $id, bool $toGetRidOf): void
     {
-        $this->setColumn($id, 'to_get_rid_of', normalize_kept_value($toGetRidOf));
+        $this->setColumn($id, 'to_get_rid_of', (int) $toGetRidOf);
     }
 
     /**
