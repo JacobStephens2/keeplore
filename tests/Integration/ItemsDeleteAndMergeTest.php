@@ -17,8 +17,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class ItemsDeleteAndMergeTest extends TestCase
 {
-    /** Every table that points at an Item, with its Item column. */
-    private const POINTING_AT_ITEM = [
+    /** Every table that points at an Item, with its Item column, checked independently of Items. */
+    private const EXPECTED_ITEM_REFERENCES = [
         ['uses', 'artifact_id'],
         ['responses', 'Title'],
         ['sweetspots', 'Title'],
@@ -129,7 +129,7 @@ final class ItemsDeleteAndMergeTest extends TestCase
 
     private function assertNothingPointsAt(int $id): void
     {
-        foreach (self::POINTING_AT_ITEM as [$table, $column]) {
+        foreach (self::EXPECTED_ITEM_REFERENCES as [$table, $column]) {
             $this->assertSame(['0'], $this->column("SELECT COUNT(*) FROM {$table} WHERE {$column} = {$id}"), "{$table}.{$column} still points at item {$id}");
         }
     }
@@ -163,7 +163,7 @@ final class ItemsDeleteAndMergeTest extends TestCase
         $this->assertSame(['1'], $this->column('SELECT id FROM uses WHERE artifact_id = 10'));
         $this->assertSame(['beach-safe'], $this->column('SELECT tag FROM item_tags WHERE artifact_id = 10'));
         $this->assertSame(['survivor'], $this->column('SELECT note FROM event_items WHERE artifact_id = 10'));
-        foreach (self::POINTING_AT_ITEM as [$table, $column]) {
+        foreach (self::EXPECTED_ITEM_REFERENCES as [$table, $column]) {
             if ($column !== 'chosen_item_id') {
                 $this->assertSame(['1'], $this->column("SELECT COUNT(*) FROM {$table} WHERE {$column} = 20"), "another owner's {$table}");
             }

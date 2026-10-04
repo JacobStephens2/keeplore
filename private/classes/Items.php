@@ -80,20 +80,20 @@ final class Items
      * legacy rows written before user_id was recorded.
      *
      * Delete deletes each table's rows for the Item, first the rows that
-     * belong to them ('with': a table and its column holding their id).
-     * Merge moves them to the survivor; where 'collides', the survivor's own
-     * row wins and the loser's is deleted. A column with 'link_from' is a
-     * second link, beside the row's own Item in the 'link_from' column:
-     * delete clears it, and merge clears it where it now points at the row's
-     * own Item.
+     * belong to them ('belonging_rows': a table and its column holding
+     * their id). Merge moves them to the survivor; where 'collides', the
+     * survivor's own row wins and the loser's is deleted. A column with an
+     * 'own_item_column' is a second link, beside the row's own Item in that
+     * column: delete clears it, and merge clears it where it now points at
+     * the row's own Item.
      */
     private const POINTING_AT_ITEM = [
-        ['table' => 'uses', 'column' => 'artifact_id', 'with' => ['uses_players', 'use_id']],
+        ['table' => 'uses', 'column' => 'artifact_id', 'belonging_rows' => ['uses_players', 'use_id']],
         ['table' => 'responses', 'column' => 'Title'],
         ['table' => 'sweetspots', 'column' => 'Title'],
         // Participants follow a proposal by cascade.
         ['table' => 'proposal_outcomes', 'column' => 'item_id'],
-        ['table' => 'proposal_outcomes', 'column' => 'chosen_item_id', 'link_from' => 'item_id'],
+        ['table' => 'proposal_outcomes', 'column' => 'chosen_item_id', 'own_item_column' => 'item_id'],
         ['table' => 'item_tags', 'column' => 'artifact_id', 'collides' => true],
         ['table' => 'item_bgg_ratings', 'column' => 'artifact_id', 'collides' => true],
         ['table' => 'event_items', 'column' => 'artifact_id', 'collides' => true],
@@ -252,12 +252,12 @@ final class Items
             $this->lockedItem($id);
             foreach (self::POINTING_AT_ITEM as $reference) {
                 ['table' => $table, 'column' => $column] = $reference;
-                if (isset($reference['link_from'])) {
+                if (isset($reference['own_item_column'])) {
                     $this->statement("UPDATE {$table} SET {$column} = NULL WHERE {$column} = ?", 'i', [$id])->close();
                     continue;
                 }
-                if (isset($reference['with'])) {
-                    [$rowsTable, $rowsColumn] = $reference['with'];
+                if (isset($reference['belonging_rows'])) {
+                    [$rowsTable, $rowsColumn] = $reference['belonging_rows'];
                     $this->statement(
                         "DELETE {$rowsTable} FROM {$rowsTable} JOIN {$table} ON {$table}.id = {$rowsTable}.{$rowsColumn}
                          WHERE {$table}.{$column} = ?",
@@ -299,9 +299,9 @@ final class Items
                 if ($collides) {
                     $this->statement("DELETE FROM {$table} WHERE {$column} = ?", 'i', [$loserId])->close();
                 }
-                if (isset($reference['link_from'])) {
+                if (isset($reference['own_item_column'])) {
                     $this->statement(
-                        "UPDATE {$table} SET {$column} = NULL WHERE {$column} = ? AND {$column} = {$reference['link_from']}",
+                        "UPDATE {$table} SET {$column} = NULL WHERE {$column} = ? AND {$column} = {$reference['own_item_column']}",
                         'i', [$survivorId]
                     )->close();
                 }
