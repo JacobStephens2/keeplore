@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
  * A queued import only runs if cron starts the worker from the live release,
  * and Settings only shows progress if it can reach the status endpoint.
  */
-final class BggImportJobsWiringTest extends TestCase
+final class BggImportsWiringTest extends TestCase
 {
     public function test_crontab_copy_runs_the_worker_every_minute_from_the_live_release(): void
     {
@@ -30,9 +30,12 @@ final class BggImportJobsWiringTest extends TestCase
         $this->assertStringContainsString("url_for('/settings/bgg-import.php')", $settings);
         $this->assertStringContainsString("url_for('/settings/bgg-import-status.php')", $settings);
         $this->assertStringContainsString("url_for('/settings/bgg-import.js')", $settings);
-        $this->assertStringContainsString('bgg_import_job_queue(', $queue);
-        $this->assertStringContainsString('bgg_import_job_view(', $status);
-        $this->assertStringContainsString('bgg_import_job_view(', $settings);
+        $this->assertStringContainsString('->queue()', $queue);
+        $this->assertStringContainsString('->status()', $status);
+        $this->assertStringContainsString('->status()', $settings);
+        foreach ([$settings, $queue, $status] as $page) {
+            $this->assertStringContainsString('new BggImports(', $page);
+        }
         foreach ([$queue, $status] as $page) {
             $this->assertStringContainsString('require_login()', $page);
         }

@@ -1,7 +1,6 @@
 <?php 
 
 require_once('../../private/initialize.php');
-require_once(PRIVATE_PATH . '/bgg_import_jobs.php');
 global $db;
 
 require_login();
@@ -290,7 +289,7 @@ $types = $owner_types->all();
     </div>
   </form>
 
-  <?php $bgg_import = bgg_import_job_view($db, $user_id); ?>
+  <?php $bgg_import = (new BggImports($db, $user_id))->status(); ?>
   <section class="surface-panel" id="bgg_import" aria-labelledby="bgg_import_heading">
     <h2 id="bgg_import_heading">BoardGameGeek import</h2>
     <p>Import every rating and comment your reviewer left on items that link to BoardGameGeek. It runs in the background, a few minutes for a large collection, and you can leave this page. Your hand entries stay.</p>
