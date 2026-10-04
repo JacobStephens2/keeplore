@@ -8,6 +8,7 @@
 require_once __DIR__ . '/kept_status.php';
 require_once __DIR__ . '/item_types.php';
 require_once __DIR__ . '/use_by_date.php';
+require_once __DIR__ . '/record_use.php';
 require_once __DIR__ . '/classes/Items.php';
 require_once __DIR__ . '/classes/BggRatings.php';
 require_once __DIR__ . '/classes/Preferences.php';
@@ -275,22 +276,18 @@ function items_list_type_ids($type) {
 
 /**
  * One Items row for display. $artifact is a row from Items::list: its
- * last_use is Recent Interaction and its type_name the Type.
+ * last_use is Recent Interaction and its type_name the Type. $today is a
+ * Y-m-d day, the app's day when omitted.
  */
 function items_list_present_row(array $artifact, $default_interval, $today = null) {
-    $today = $today ?? date('Y-m-d');
     $last_use = (string) ($artifact['last_use'] ?? '');
 
     // The view's interval is a default only; the item's own frequency wins.
-    $use_by_date = use_by_date(
-        $artifact['Acq'] ?? null,
-        $last_use,
-        $artifact['interaction_frequency_days'] ?? null,
-        $default_interval
-    ) ?? '';
+    $use_by = use_by_status($artifact, $default_interval, $today ?? record_use_today());
 
+    // Only a kept item is overdue here.
     $is_kept = artifact_is_kept($artifact);
-    $overdue = $use_by_date !== '' && $use_by_date < $today && $is_kept;
+    $overdue = $is_kept && $use_by['status'] === 'overdue';
 
     $mnt = (float) ($artifact['mnt'] ?? $artifact['MnT'] ?? 0);
     $mxt = (float) ($artifact['mxt'] ?? $artifact['MxT'] ?? 0);
@@ -305,7 +302,7 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
         'is_kept' => $is_kept,
         'acq' => (string) ($artifact['Acq'] ?? ''),
         'most_recent_use' => $last_use,
-        'use_by' => $use_by_date,
+        'use_by' => $use_by['use_by_date'] ?? '',
         'use_by_overdue' => $overdue,
         'ss' => (string) ($artifact['ss'] ?? $artifact['SS'] ?? ''),
         'players' => items_list_players_label(

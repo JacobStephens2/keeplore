@@ -2,7 +2,6 @@
 
 require_once dirname(__DIR__) . '/functions.php';
 require_once __DIR__ . '/Mailer.php';
-require_once __DIR__ . '/Preferences.php';
 require_once __DIR__ . '/UseByQueue.php';
 
 /**
@@ -56,12 +55,11 @@ final class DailyEmail
 
     /**
      * The queue's entries in each section, by last use with never used
-     * first, each with the `interval` its use-by date was counted from.
+     * first.
      */
     private function entriesBySection(): array
     {
-        $defaultInterval = (new Preferences($this->db, $this->userId))->get()['default_use_interval'];
-        $entries = (new UseByQueue($this->db, $this->userId, $this->today))->entries(['default_interval' => $defaultInterval]);
+        $entries = (new UseByQueue($this->db, $this->userId, $this->today))->entries();
         usort($entries, fn (array $a, array $b) => $a['last_use'] <=> $b['last_use']);
 
         $entriesBySection = array_fill_keys(array_keys(self::SECTIONS), []);
@@ -69,7 +67,7 @@ final class DailyEmail
             foreach (self::SECTIONS as $key => $section) {
                 if ($entry['status'] === $section['status']
                     && ($section['within_days'] === null || $entry['days_until'] <= $section['within_days'])) {
-                    $entriesBySection[$key][] = $entry + ['interval' => $entry['interaction_frequency_days'] ?? $defaultInterval];
+                    $entriesBySection[$key][] = $entry;
                 }
             }
         }

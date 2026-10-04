@@ -11,11 +11,10 @@ require_once __DIR__ . '/Preferences.php';
  * whether it is overdue, due today or upcoming. Every page, email and
  * notification that shows what is due reads it from here.
  *
- * Each entry is the item's own columns plus `type`, `last_use`,
- * `use_by_date` (both Y-m-d or null), `days_until` (signed whole days from
- * today, null without a use-by date) and `status` (`overdue`, `due_today`,
- * `upcoming`, or null without a use-by date). How soon counts as "due soon"
- * is each caller's choice.
+ * Each entry is the item's own columns plus `type`, `last_use` (Y-m-d or
+ * null) and use_by_status()'s answer on the queue's day: `interval`,
+ * `use_by_date`, `days_until`, `status` and `is_snoozed`. How soon counts as
+ * "due soon" is each caller's choice.
  */
 final class UseByQueue
 {
@@ -55,6 +54,7 @@ final class UseByQueue
             : '(games.is_kept = 1 OR games.is_in_secondary_collection = 1)';
 
         if (!empty($filters['hide_snoozed'])) {
+            // use_by_status()'s is_snoozed rule, kept in SQL so hidden rows are never fetched.
             $where[] = '(games.snoozed_until IS NULL OR games.snoozed_until <= ?)';
             $types .= 's';
             $params[] = $this->today;
@@ -114,20 +114,7 @@ final class UseByQueue
 
     private function present(array $row, $defaultInterval): array
     {
-        $useBy = use_by_date($row['Acq'], $row['last_use'], $row['interaction_frequency_days'], $defaultInterval);
-        $daysUntil = $useBy === null ? null : (int) (new DateTimeImmutable($this->today, new DateTimeZone('UTC')))
-            ->diff(new DateTimeImmutable($useBy, new DateTimeZone('UTC')))->format('%r%a');
-
-        return $row + [
-            'use_by_date' => $useBy,
-            'days_until' => $daysUntil,
-            'status' => match (true) {
-                $daysUntil === null => null,
-                $daysUntil < 0 => 'overdue',
-                $daysUntil === 0 => 'due_today',
-                default => 'upcoming',
-            },
-        ];
+        return $row + use_by_status($row, $defaultInterval, $this->today);
     }
 
     /**
