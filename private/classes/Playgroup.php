@@ -5,7 +5,7 @@
  * choosing items for on Choose for group. Every read and write is scoped to
  * the owner: another owner's slot is never found and never changed, and
  * only the owner's own people can fill a slot. A person can be in several
- * slots; the group's size counts them once.
+ * slots; the playgroup's size counts them once.
  *
  * A member is an array of id (the slot), person_id and name (first and last
  * joined).
@@ -46,7 +46,7 @@ final class Playgroup
     {
         $chosen = array_values(array_filter($personIds, fn ($id) => trim((string) $id) !== ''));
         if ($chosen === []) {
-            throw new InvalidArgumentException('Choose a person to add to the group.');
+            throw new InvalidArgumentException('Choose a person to add to the playgroup.');
         }
         $this->transaction(function () use ($chosen) {
             $ids = array_map([$this, 'ownPerson'], $chosen);
@@ -80,8 +80,15 @@ final class Playgroup
      * Choose for group's rows: one per item of the Types in $typeIds (none
      * when it is empty) and member who has a legacy play or aversion date for
      * it, with their latest play, aversion, pass and request dates. With
-     * $matchGroupSize, only items whose player counts include the group's
-     * size; with $keptOnly, only kept items.
+     * $matchGroupSize, only items whose player counts include the
+     * playgroup's size; with $keptOnly, only kept items.
+     *
+     * Each row keeps the legacy page's columns: the item's title, id, ss,
+     * MnP, MxP, MxT, Age, type and is_kept; the member's FullName (their
+     * person id), PlayerID, FirstName, LastName, G and Priority; and
+     * ResponseID and MaxOfAversionDate, MaxOfPlayDate, MaxOfPassDate and
+     * MaxOfRequestDate. Rows are in the member's G and Priority order, then
+     * oldest aversion and newest play first.
      */
     public function choose(array $typeIds, bool $matchGroupSize, bool $keptOnly): array
     {
@@ -140,7 +147,7 @@ final class Playgroup
     private function requireSlot(int $slotId): void
     {
         if (!$this->rows('SELECT ID FROM playgroup WHERE ID = ? AND user_id = ? FOR UPDATE', 'ii', [$slotId, $this->userId])) {
-            throw new OutOfBoundsException('Group member not found.');
+            throw new OutOfBoundsException('Playgroup member not found.');
         }
     }
 

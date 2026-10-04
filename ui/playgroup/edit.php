@@ -7,10 +7,11 @@ $member = $playgroup->member($ID);
 if ($member === null) {
   error_404();
 }
+$person_id = $member['person_id'];
 if(is_post_request()) {
-  $member['person_id'] = (int) ($_POST['FullName'] ?? 0);
+  $person_id = (int) ($_POST['FullName'] ?? 0);
   try {
-    $playgroup->replace($ID, $member['person_id']);
+    $playgroup->replace($ID, $person_id);
     $_SESSION['message'] = 'The playgroup player was updated successfully.';
     redirect_to(url_for('/playgroup/index.php'));
   } catch (InvalidArgumentException $error) {
@@ -42,7 +43,7 @@ if(is_post_request()) {
           <?php
             foreach ((new People($db, (int) $_SESSION['user_id']))->all() as $person) {
               echo "<option value=\"" . h($person['id']) . "\"";
-              if($member['person_id'] === $person['id']) {
+              if($person_id === $person['id']) {
                 echo " selected";
               }
               echo ">" . h($person['name']) . "</option>";
