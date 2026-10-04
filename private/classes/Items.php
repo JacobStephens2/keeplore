@@ -43,8 +43,11 @@ final class Items
             UNION ALL SELECT Title, PlayDate FROM responses) item_dates
         GROUP BY artifact_id)";
 
-    /** Uses recorded by their Item's owner, the only Uses last use and use count read. */
-    private const OWNERS_USES = 'uses JOIN games owner_items
+    /**
+     * Uses recorded by their Item's owner, the only Uses last use and use
+     * counts read. The Item is joined as owner_items.
+     */
+    public const OWNERS_USES = 'uses JOIN games owner_items
         ON owner_items.id = uses.artifact_id AND owner_items.user_id = uses.user_id';
 
     /** What create gives a missing or blank field, besides today's date and the owner's interval. */

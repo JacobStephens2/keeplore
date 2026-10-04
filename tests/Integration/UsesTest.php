@@ -415,4 +415,114 @@ final class UsesTest extends TestCase
 
         $this->assertSame('', $this->uses->lastSetting());
     }
+
+    /** Give the legacy tables the columns Use counts read, and mark person 100 as owner 1. */
+    private function legacyPlays(): void
+    {
+        $this->runSql('ALTER TABLE responses ADD COLUMN Player INT, ADD COLUMN AversionDate DATE;
+            ALTER TABLE players ADD COLUMN represents_user_id INT DEFAULT NULL;
+            UPDATE users SET player_id = 100 WHERE id = 1;
+            UPDATE users SET player_id = 200 WHERE id = 2;');
+    }
+
+    private function play(int $itemId, string $date, int $personId = 100, int $ownerId = 1): void
+    {
+        $stmt = $this->db->prepare('INSERT INTO responses (Title, user_id, Player, PlayDate) VALUES (?, ?, ?, ?)');
+        $stmt->bind_param('iiis', $itemId, $ownerId, $personId, $date);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    public function test_the_use_count_adds_uses_and_the_owners_legacy_plays(): void
+    {
+        $this->legacyPlays();
+        $this->uses->record($this->use(['item_id' => 11, 'count' => 2]));
+        $this->play(11, '2020-05-01');
+        $this->play(12, '2021-06-01');
+
+        $this->assertSame([
+            ['item_id' => 11, 'item_title' => 'Azul', 'item_type' => 'board-game', 'use_count' => 3],
+            ['item_id' => 12, 'item_title' => 'Arrival', 'item_type' => 'film', 'use_count' => 1],
+            ['item_id' => 10, 'item_title' => 'Catan', 'item_type' => 'board-game', 'use_count' => 1],
+        ], $this->uses->useCounts());
+    }
+
+    public function test_another_owners_uses_and_legacy_plays_never_count(): void
+    {
+        $this->legacyPlays();
+        (new Uses($this->db, 2))->record(['item_id' => 20, 'use_date' => '2026-09-12']);
+        $this->db->query("INSERT INTO uses (artifact_id, user_id, use_date) VALUES (11, 2, '2026-09-12')");
+        $this->play(20, '2026-09-12', 200, 2);
+        $this->play(11, '2026-09-12', 100, 2);
+        $this->play(20, '2026-09-12', 100, 1);
+
+        $this->assertSame([10 => 1], array_column($this->uses->useCounts(), 'use_count', 'item_id'));
+        $this->assertSame([20 => 2], array_column((new Uses($this->db, 2))->useCounts(), 'use_count', 'item_id'));
+    }
+
+    public function test_legacy_plays_by_anyone_but_the_owners_own_person_do_not_count(): void
+    {
+        $this->legacyPlays();
+        $this->play(11, '2026-09-12', 101);
+        $this->play(11, '2026-09-12', 100);
+
+        $this->assertSame([11 => 1, 10 => 1], array_column($this->uses->useCounts(), 'use_count', 'item_id'));
+    }
+
+    public function test_an_aversion_only_row_does_not_count(): void
+    {
+        $this->legacyPlays();
+        $this->db->query("INSERT INTO responses (Title, user_id, Player, AversionDate) VALUES (11, 1, 100, '2026-09-12')");
+        $this->db->query("INSERT INTO responses (Title, user_id, Player, PlayDate, AversionDate) VALUES (12, 1, 100, '2026-09-10', '2026-09-12')");
+
+        $this->assertSame([12 => 1, 10 => 1], array_column($this->uses->useCounts(), 'use_count', 'item_id'));
+        $this->assertSame([], $this->uses->useCounts('2026-09-11'));
+    }
+
+    public function test_the_since_date_is_inclusive_for_uses_and_legacy_plays(): void
+    {
+        $this->legacyPlays();
+        $this->uses->record($this->use(['item_id' => 11, 'use_date' => '2026-09-12']));
+        $this->uses->record($this->use(['item_id' => 11, 'use_date' => '2026-09-11']));
+        $this->play(12, '2026-09-12');
+        $this->play(12, '2026-09-11');
+
+        $this->assertSame([
+            ['item_id' => 12, 'item_title' => 'Arrival', 'item_type' => 'film', 'use_count' => 1],
+            ['item_id' => 11, 'item_title' => 'Azul', 'item_type' => 'board-game', 'use_count' => 1],
+        ], $this->uses->useCounts('2026-09-12'));
+    }
+
+    public function test_an_owner_with_no_person_marked_as_themself_still_gets_their_uses_counted(): void
+    {
+        $this->legacyPlays();
+        $this->db->query('UPDATE users SET player_id = NULL WHERE id = 1');
+        $this->play(11, '2026-09-12', 100);
+        $this->play(12, '2026-09-12', 0);
+
+        $this->assertSame([10 => 1], array_column($this->uses->useCounts(), 'use_count', 'item_id'));
+    }
+
+    public function test_the_owners_person_is_found_as_people_finds_them(): void
+    {
+        $this->legacyPlays();
+        $this->db->query('UPDATE users SET player_id = NULL WHERE id = 1');
+        $this->db->query('UPDATE players SET represents_user_id = 1 WHERE id = 101');
+        $this->play(11, '2026-09-12', 101);
+
+        $this->assertSame([11 => 1, 10 => 1], array_column($this->uses->useCounts(), 'use_count', 'item_id'));
+    }
+
+    public function test_a_since_date_that_is_not_a_calendar_date_throws(): void
+    {
+        $this->legacyPlays();
+        foreach (['2026-02-30', 'last year', ''] as $since) {
+            try {
+                $this->uses->useCounts($since);
+                $this->fail("Expected InvalidArgumentException for '$since'.");
+            } catch (\InvalidArgumentException $error) {
+                $this->assertSame('Enter a valid date in YYYY-MM-DD format.', $error->getMessage());
+            }
+        }
+    }
 }

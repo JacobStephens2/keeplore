@@ -1,5 +1,8 @@
 <?php
 
+require_once __DIR__ . '/Items.php';
+require_once __DIR__ . '/People.php';
+
 /**
  * The owner's recorded uses: each an item used on a date, optionally with
  * people, a Setting and notes. Every read and write is scoped to the owner,
@@ -8,6 +11,9 @@
 final class Uses
 {
     public const MAX_COUNT = 20;
+
+    /** The rule that makes a legacy response a play: a play date set. */
+    private const IS_PLAY = 'responses.PlayDate > 0';
 
     public function __construct(private mysqli $db, private int $userId)
     {
@@ -89,6 +95,48 @@ final class Uses
             $params[] = $this->validDate($since);
         }
         return $this->read(implode(' AND ', $where), $types, $params);
+    }
+
+    /**
+     * Each of the owner's items' Use count: its uses under Items' owner rule
+     * plus the legacy plays of it the owner's own person took part in, on or
+     * after the YYYY-MM-DD since date, or in all recorded history when it is
+     * null. An owner with no person marked as themself counts uses only.
+     * Each row is item_id, item_title, item_type (or null) and use_count,
+     * highest count first, then by title; items with no use in the period
+     * are left out. A malformed since throws InvalidArgumentException.
+     */
+    public function useCounts(?string $since = null): array
+    {
+        // With no person marked as the owner, Player = NULL matches no legacy play.
+        $me = (new People($this->db, $this->userId))->me();
+        $uses = ['owner_items.user_id = ?'];
+        $plays = ['responses.user_id = ?', 'responses.Player = ?', self::IS_PLAY];
+        $usesParams = [$this->userId];
+        $playsParams = [$this->userId, $me];
+        if ($since !== null) {
+            $since = $this->validDate($since);
+            $uses[] = 'uses.use_date >= ?';
+            $plays[] = 'responses.PlayDate >= ?';
+            $usesParams[] = $playsParams[] = $since;
+        }
+        $params = array_merge($usesParams, $playsParams, [$this->userId]);
+        return array_map(fn (array $row) => [
+            'item_id' => (int) $row['item_id'],
+            'item_title' => (string) $row['item_title'],
+            'item_type' => $row['item_type'] === null ? null : (string) $row['item_type'],
+            'use_count' => (int) $row['use_count'],
+        ], $this->rows(
+            'SELECT games.id AS item_id, games.Title AS item_title, types.objectType AS item_type, COUNT(*) AS use_count
+             FROM (SELECT uses.artifact_id AS item_id FROM ' . Items::OWNERS_USES . ' WHERE ' . implode(' AND ', $uses) . '
+                UNION ALL SELECT responses.Title FROM responses WHERE ' . implode(' AND ', $plays) . ') counted
+                JOIN games ON games.id = counted.item_id AND games.user_id = ?
+                LEFT JOIN types ON types.id = games.type_id
+             GROUP BY games.id, games.Title, types.objectType
+             ORDER BY use_count DESC, games.Title, games.id',
+            implode('', array_map(fn ($param) => is_string($param) ? 's' : 'i', $params)),
+            $params
+        ));
     }
 
     /**

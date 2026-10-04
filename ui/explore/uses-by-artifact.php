@@ -8,23 +8,11 @@
 
   include(SHARED_PATH . '/header.php');
 
-  if ($_SESSION['player_id'] == '') {
-    echo 'Go to users, choose yourself, ensure "This user is me" is checked, submit the form, then log out and log back in.';
+  if ((new People($db, (int) $_SESSION['user_id']))->me() === null) {
+    echo 'Go to users, choose yourself, ensure "This user is me" is checked and submit the form to count your legacy plays.';
   }
 
-  $player_id = (int) $_SESSION['player_id'];
-  $stmt = mysqli_prepare($db, "SELECT
-    COUNT('responses.PlayDate') AS CountOfUses,
-    games.Title AS ArtifactTitle,
-    responses.Title AS ArtifactID
-    FROM responses
-    JOIN games ON games.id = responses.Title
-    WHERE responses.Player = ?
-    GROUP BY responses.Title
-    ORDER BY CountOfUses DESC");
-  mysqli_stmt_bind_param($stmt, "i", $player_id);
-  mysqli_stmt_execute($stmt);
-  $usesByPlayerResultObject = mysqli_stmt_get_result($stmt);
+  $use_counts = (new Uses($db, (int) $_SESSION['user_id']))->useCounts();
 
   // find the last letter of the name
   // and set fitting punctuation
@@ -39,7 +27,7 @@
 <main>
   
   <h1>
-    <?php echo $_SESSION['username'] . $possessivePunctuation . $page_title; ?>
+    <?php echo h($_SESSION['username'] . $possessivePunctuation . $page_title); ?>
   </h1>
 
   <a href="uses-by-artifact-last-year.php">
@@ -53,14 +41,14 @@
       <th>Item</th>
     </tr>
 
-    <?php foreach ($usesByPlayerResultObject as $usesByPlayerArray) { ?>
+    <?php foreach ($use_counts as $use_count) { ?>
       <tr>
         <td>
-          <?php echo $usesByPlayerArray['CountOfUses']; ?>
+          <?php echo $use_count['use_count']; ?>
         </td>
         <td>
-          <a href="/artifacts/edit.php?id=<?php echo $usesByPlayerArray['ArtifactID']; ?>">
-            <?php echo $usesByPlayerArray['ArtifactTitle']; ?>
+          <a href="/artifacts/edit.php?id=<?php echo $use_count['item_id']; ?>">
+            <?php echo h($use_count['item_title']); ?>
           </a>
         </td>
       </tr>
