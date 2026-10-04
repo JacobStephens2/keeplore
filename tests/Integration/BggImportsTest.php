@@ -85,6 +85,22 @@ final class BggImportsTest extends TestCase
         };
     }
 
+    /** The fake BGG, calling $atItem with the URL before it answers for each item. */
+    private function during(callable $atItem): callable
+    {
+        $bgg = $this->fakeBgg();
+        return function (string $url) use ($bgg, $atItem) {
+            if (str_contains($url, 'objectid=')) {
+                $atItem($url);
+            }
+            return $bgg($url);
+        };
+    }
+    private function today(): string
+    {
+        return (string) $this->db->query('SELECT CURDATE()')->fetch_row()[0];
+    }
+
     public function test_queueing_needs_a_reviewer_on_settings(): void
     {
         $result = $this->imports(2)->queue();
@@ -136,15 +152,10 @@ final class BggImportsTest extends TestCase
         $this->db->query('UPDATE games SET bgg_url = NULL WHERE id = 11');
         $this->imports(1)->queue();
         $seen = [];
-        $bgg = $this->fakeBgg();
-        $watching = function (string $url) use ($bgg, &$seen) {
-            if (str_contains($url, 'objectid=')) {
-                $seen[] = $this->imports(1)->status()['text'];
-            }
-            return $bgg($url);
-        };
 
-        \BggImports::runQueued($this->db, $watching, 0);
+        \BggImports::runQueued($this->db, $this->during(function () use (&$seen) {
+            $seen[] = $this->imports(1)->status()['text'];
+        }), 0);
 
         $this->assertSame(['Importing Gyges: checked 0 of 1 item, 0 rated or commented so far.'], $seen);
         $this->assertSame(
@@ -157,15 +168,10 @@ final class BggImportsTest extends TestCase
     {
         $this->imports(1)->queue();
         $seen = [];
-        $bgg = $this->fakeBgg();
-        $watching = function (string $url) use ($bgg, &$seen) {
-            if (str_contains($url, 'objectid=')) {
-                $seen[] = $this->imports(1)->status();
-            }
-            return $bgg($url);
-        };
 
-        \BggImports::runQueued($this->db, $watching, 0);
+        \BggImports::runQueued($this->db, $this->during(function () use (&$seen) {
+            $seen[] = $this->imports(1)->status();
+        }), 0);
 
         $this->assertSame([
             ['active' => true, 'can_queue' => false, 'text' => 'Importing Gyges: checked 0 of 2 items, 0 rated or commented so far.'],
@@ -190,16 +196,22 @@ final class BggImportsTest extends TestCase
     public function test_an_import_the_worker_abandoned_does_not_block_the_next(): void
     {
         $this->imports(1)->queue();
-        $this->db->query("UPDATE bgg_import_jobs SET status = 'running', updated_at = NOW() - INTERVAL 11 MINUTE");
+        $seen = [];
 
-        $result = $this->imports(1)->queue();
+        // The worker goes quiet mid-import, and the owner looks and queues again.
+        \BggImports::runQueued($this->db, $this->during(function () use (&$seen) {
+            if ($seen === []) {
+                $this->db->query('UPDATE bgg_import_jobs SET updated_at = NOW() - INTERVAL 11 MINUTE');
+                $seen[] = $this->imports(1)->status();
+                $seen[] = $this->imports(1)->queue();
+            }
+        }), 0);
 
-        $this->assertTrue($result['ok']);
-        $statuses = $this->db->query('SELECT status, error FROM bgg_import_jobs ORDER BY id')->fetch_all(MYSQLI_ASSOC);
         $this->assertSame([
-            ['status' => 'failed', 'error' => 'The import stopped before it finished.'],
-            ['status' => 'queued', 'error' => null],
-        ], $statuses);
+            ['active' => false, 'can_queue' => true, 'text' => 'Import of Gyges failed: The import stopped before it finished.'],
+            ['ok' => true, 'message' => 'Import of Gyges queued. It starts within a minute.'],
+        ], $seen);
+        $this->assertSame('2', (string) $this->db->query('SELECT COUNT(*) FROM bgg_import_jobs')->fetch_row()[0]);
     }
 
     public function test_an_import_no_worker_picked_up_fails_and_says_so(): void
@@ -219,12 +231,19 @@ final class BggImportsTest extends TestCase
         $this->db->query("UPDATE users SET bgg_username = 'Gyges' WHERE id = 2");
         $this->imports(2)->queue();
         $this->imports(1)->queue();
-        $this->db->query("UPDATE bgg_import_jobs SET status = 'running' WHERE user_id = 2");
-        $this->db->query("UPDATE bgg_import_jobs SET created_at = NOW() - INTERVAL 11 MINUTE, updated_at = NOW() - INTERVAL 11 MINUTE WHERE user_id = 1");
+        $seen = [];
+
+        // While user 2's import runs, user 1's has waited past the stale age.
+        \BggImports::runQueued($this->db, $this->during(function () use (&$seen) {
+            if ($seen === []) {
+                $this->db->query('UPDATE bgg_import_jobs SET created_at = NOW() - INTERVAL 11 MINUTE, updated_at = NOW() - INTERVAL 11 MINUTE WHERE user_id = 1');
+                $seen[] = $this->imports(1)->status();
+            }
+        }), 0);
 
         $this->assertSame(
-            ['active' => true, 'can_queue' => false, 'text' => 'Import of Gyges queued. It starts within a minute.'],
-            $this->imports(1)->status()
+            [['active' => true, 'can_queue' => false, 'text' => 'Import of Gyges queued. It starts within a minute.']],
+            $seen
         );
     }
 
@@ -254,15 +273,15 @@ final class BggImportsTest extends TestCase
     public function test_an_import_marked_stale_stays_failed_when_its_worker_wakes(): void
     {
         $this->imports(1)->queue();
-        $bgg = $this->fakeBgg();
-        $slow = function (string $url) use ($bgg) {
-            if (str_contains($url, 'objectid=29107')) {
-                $this->db->query("UPDATE bgg_import_jobs SET status = 'failed', error = 'The import stopped before it finished.'");
-            }
-            return $bgg($url);
-        };
 
-        \BggImports::runQueued($this->db, $slow, 0);
+        // Before item 11 the worker has been quiet past the stale age, and
+        // Settings looks; then it wakes and carries on.
+        \BggImports::runQueued($this->db, $this->during(function (string $url) {
+            if (str_contains($url, 'objectid=29107')) {
+                $this->db->query('UPDATE bgg_import_jobs SET updated_at = NOW() - INTERVAL 11 MINUTE');
+                $this->imports(1)->status();
+            }
+        }), 0);
 
         $this->assertSame(
             'Import of Gyges failed: The import stopped before it finished.',
@@ -283,8 +302,4 @@ final class BggImportsTest extends TestCase
         $this->assertSame('Import of Gyges queued. It starts within a minute.', $this->imports(1)->status()['text']);
     }
 
-    private function today(): string
-    {
-        return (string) $this->db->query('SELECT CURDATE()')->fetch_row()[0];
-    }
 }

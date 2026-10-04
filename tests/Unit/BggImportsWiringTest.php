@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
  * A queued import only runs if cron starts the worker from the live release,
  * and Settings only shows progress if it can reach the status endpoint.
  */
-final class BggImportJobsWiringTest extends TestCase
+final class BggImportsWiringTest extends TestCase
 {
     public function test_crontab_copy_runs_the_worker_every_minute_from_the_live_release(): void
     {
