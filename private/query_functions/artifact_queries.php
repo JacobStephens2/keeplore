@@ -27,7 +27,7 @@ require_once dirname(__DIR__) . '/classes/UseByQueue.php';
 function email_artifact_use_notice($user_id) {
 
   global $db;
-  $interval = default_use_interval($db, $user_id);
+  $interval = (new Preferences($db, (int) $user_id))->get()['default_use_interval'];
 
   $due_today_array = array();
   $overdue_array = array();

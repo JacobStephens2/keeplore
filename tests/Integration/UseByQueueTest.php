@@ -116,7 +116,7 @@ final class UseByQueueTest extends TestCase
     public function test_without_its_own_frequency_an_item_uses_the_pages_interval_or_the_owners_default(): void
     {
         $this->db->query('UPDATE games SET interaction_frequency_days = NULL WHERE id = 10');
-        $this->db->query('UPDATE users SET default_use_interval = 45 WHERE id = 1');
+        (new \Preferences($this->db, 1))->save(['default_use_interval' => 45]);
         $this->assertSame('2026-04-02', $this->queue()->entries(['default_interval' => 30])[0]['use_by_date']);
         $this->assertSame('2026-05-02', $this->queue()->entries()[0]['use_by_date']);
     }

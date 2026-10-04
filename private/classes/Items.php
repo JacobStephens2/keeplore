@@ -4,6 +4,7 @@ require_once dirname(__DIR__) . '/functions.php';
 require_once dirname(__DIR__) . '/kept_status.php';
 require_once dirname(__DIR__) . '/item_tags.php';
 require_once dirname(__DIR__) . '/item_types.php';
+require_once __DIR__ . '/Preferences.php';
 
 /** An Item write's input broke the item rules; $errors lists every problem. */
 final class ItemInvalid extends InvalidArgumentException
@@ -111,7 +112,7 @@ final class Items
     {
         return $this->transaction(function () use ($input) {
             $item = $this->fillBlanks($this->writable($input), $this->createDefaults() + [
-                'interaction_frequency_days' => $this->defaultUseInterval(),
+                'interaction_frequency_days' => (new Preferences($this->db, $this->userId))->get()['default_use_interval'],
                 'type_id' => null,
             ]);
             $this->validate($item, $item);
@@ -365,12 +366,6 @@ final class Items
             }
         }
         return $fields;
-    }
-
-    private function defaultUseInterval(): ?string
-    {
-        $interval = $this->rows('SELECT default_use_interval FROM users WHERE id = ?', 'i', [$this->userId])[0]['default_use_interval'] ?? null;
-        return $interval === null ? null : (string) $interval;
     }
 
     /** The input's writable fields; id, user_id and snoozed_until are never among them. */

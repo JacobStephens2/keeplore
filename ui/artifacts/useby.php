@@ -42,7 +42,8 @@
   }
   $_SESSION['hideSnoozed'] = $hideSnoozed;
   $typeArray = $_SESSION['type'] ?? [];
-  $default_use_interval = default_use_interval($db, $user_id);
+  $preferences = (new Preferences($db, (int) $user_id))->get();
+  $default_use_interval = $preferences['default_use_interval'];
   $interval = $_POST['interval'] ?? $default_use_interval;
   $queue = new UseByQueue($db, (int) $user_id);
   $artifacts = $queue->entries([
@@ -158,7 +159,7 @@
 
   <?php if (!is_guest()) { ?>
   <?php
-    $modal_default_setting = most_recent_use_setting((int) $_SESSION['user_id']);
+    $modal_default_setting = most_recent_use_setting((int) $_SESSION['user_id'], $preferences['default_setting']);
   ?>
   <div id="record-modal" class="modal" hidden aria-hidden="true">
     <div class="modal-backdrop" data-modal-close></div>

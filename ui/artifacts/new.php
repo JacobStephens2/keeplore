@@ -2,12 +2,7 @@
 require_once('../../private/initialize.php');
 require_login();
 
-$user_id = $_SESSION['user_id'];
-$default_interval = singleValueQuery(
-  "SELECT default_use_interval
-  FROM users
-  WHERE id = '$user_id'
-");
+$default_interval = (new Preferences($db, (int) $_SESSION['user_id']))->get()['default_use_interval'];
 
 $artifact = [
   'Title' => '', 'type_id' => '', 'Age' => '', 'Yr' => '', 'image_url' => '',
@@ -138,7 +133,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
       <div class="form-field">
         <label for="interaction_frequency_days">Interaction Frequency (Days)</label>
         <input type="number" step="0.1" name="interaction_frequency_days" id="interaction_frequency_days"
-          value="<?php echo $default_interval; ?>"
+          value="<?php echo h($default_interval); ?>"
           onwheel="this.blur()"
         >
       </div>

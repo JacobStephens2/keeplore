@@ -11,7 +11,7 @@
   );
   $record_use_items = (new Items($db, $user_id_int))->list();
   $record_use_date = (new DateTime('now', new DateTimeZone('America/New_York')))->format('Y-m-d');
-  $record_use_setting = most_recent_use_setting($user_id_int);
+  $record_use_setting = most_recent_use_setting($user_id_int, (new Preferences($db, $user_id_int))->get()['default_setting']);
 
   $interactions = find_player_uses($db, $user_id, $player_id);
   $most_used_items = rank_items_by_player_uses($interactions);

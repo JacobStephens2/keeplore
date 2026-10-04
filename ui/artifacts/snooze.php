@@ -19,12 +19,7 @@
 
   // Snooze length: the user's default, optionally overridden by the request.
   $user_id = (int) $_SESSION['user_id'];
-  $default_snooze_days = (int) (singleValueQuery(
-    "SELECT default_snooze_days FROM users WHERE id = '" . $user_id . "'"
-  ) ?? 7);
-  if ($default_snooze_days < 1) {
-    $default_snooze_days = 7;
-  }
+  $default_snooze_days = (new Preferences($db, $user_id))->get()['default_snooze_days'];
   $days = isset($_REQUEST['days']) ? (int) $_REQUEST['days'] : $default_snooze_days;
   if ($days < 1) {
     $days = $default_snooze_days;

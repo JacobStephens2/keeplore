@@ -51,11 +51,11 @@ final class ItemsTest extends TestCase
                 'https://cf.geekdo-images.com/catan.jpg', '04', 60, 120, 3, 4, 10, '2020-01-01'),
             (11, 1, 'Azul', 1, 'board-game', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-01'),
             (20, 2, 'Private item', 3, 'card game', 1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-01-01')");
-        $this->runSql('UPDATE users SET default_use_interval = 120 WHERE id = 1');
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->runSql("INSERT INTO item_tags (user_id, artifact_id, tag) VALUES
             (1, 10, 'beach-safe'), (1, 10, 'family'), (1, 11, 'family'), (2, 20, 'mine')");
         require_once PRIVATE_PATH . '/classes/Items.php';
+        (new \Preferences($this->db, 1))->save(['default_use_interval' => 120]);
         $this->items = new Items($this->db, 1);
     }
 
@@ -149,6 +149,15 @@ final class ItemsTest extends TestCase
         $this->assertNull($item['is_digital']);
         $this->assertNull($item['is_physical']);
         $this->assertSame(0, (int) $item['to_get_rid_of']);
+    }
+
+    public function test_create_falls_back_to_90_days_when_the_owner_has_no_default_use_interval(): void
+    {
+        $this->runSql('UPDATE users SET default_use_interval = NULL WHERE id = 1');
+
+        $item = $this->items->find($this->items->create(['Title' => 'Quelf']));
+
+        $this->assertEquals(90, $item['interaction_frequency_days']);
     }
 
     public function test_create_treats_blank_fields_as_missing(): void

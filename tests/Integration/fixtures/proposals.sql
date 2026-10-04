@@ -1,6 +1,14 @@
 CREATE TABLE users (
     id INT PRIMARY KEY,
-    default_use_interval INT DEFAULT 90
+    default_use_interval DECIMAL(8,2) DEFAULT 90,
+    default_snooze_days INT NOT NULL DEFAULT 7,
+    default_setting VARCHAR(255) DEFAULT NULL,
+    daily_email TINYINT(1) NOT NULL DEFAULT 1,
+    daily_email_hour TINYINT UNSIGNED NOT NULL DEFAULT 8,
+    native_notify_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    native_notify_hour TINYINT UNSIGNED NOT NULL DEFAULT 9,
+    native_notify_lead_days TINYINT UNSIGNED NOT NULL DEFAULT 3,
+    native_notify_past_due TINYINT(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB;
 CREATE TABLE types (id INT PRIMARY KEY, objectType VARCHAR(100)) ENGINE=InnoDB;
 CREATE TABLE games (

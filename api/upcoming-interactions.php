@@ -42,18 +42,13 @@
     exit;
   }
 
-  $default_interval = default_use_interval($database, $user_id);
-  $user_stmt = mysqli_prepare($database, "SELECT native_notify_enabled, native_notify_hour, native_notify_lead_days, native_notify_past_due FROM users WHERE id = ?");
-  mysqli_stmt_bind_param($user_stmt, "i", $user_id);
-  mysqli_stmt_execute($user_stmt);
-  $user_result = mysqli_stmt_get_result($user_stmt);
-  $user_row = mysqli_fetch_assoc($user_result);
-  mysqli_stmt_close($user_stmt);
+  $preferences = (new Preferences($database, $user_id))->get();
+  $default_interval = $preferences['default_use_interval'];
   $prefs = [
-    'enabled' => (int) ($user_row['native_notify_enabled'] ?? 1) === 1,
-    'hour' => (int) ($user_row['native_notify_hour'] ?? 9),
-    'lead_days' => (int) ($user_row['native_notify_lead_days'] ?? 3),
-    'past_due' => (int) ($user_row['native_notify_past_due'] ?? 1) === 1,
+    'enabled' => $preferences['native_notify_enabled'],
+    'hour' => $preferences['native_notify_hour'],
+    'lead_days' => $preferences['native_notify_lead_days'],
+    'past_due' => $preferences['native_notify_past_due'],
   ];
 
   $queue = new UseByQueue($database, $user_id);

@@ -9,18 +9,10 @@ if (!is_logged_in() && !is_guest()) {
 require_login_or_guest();
 $page_title = 'Menu';
 
-// Fetch user's default interval and snooze length
 $user_id = (int) $_SESSION['user_id'];
-$default_interval = default_use_interval($db, $user_id);
-$stmt = mysqli_prepare($db, "SELECT default_snooze_days FROM users WHERE id = ?");
-mysqli_stmt_bind_param($stmt, "i", $user_id);
-mysqli_stmt_execute($stmt);
-$snooze_row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-mysqli_stmt_close($stmt);
-$default_snooze_days = (int) ($snooze_row['default_snooze_days'] ?? 7);
-if ($default_snooze_days < 1) {
-  $default_snooze_days = 7;
-}
+$preferences = (new Preferences($db, $user_id))->get();
+$default_interval = $preferences['default_use_interval'];
+$default_snooze_days = $preferences['default_snooze_days'];
 
 // The Use-by queue without snoozed items, most overdue first. Undated
 // items count as tracked but have nothing to be due.
@@ -211,7 +203,7 @@ include(SHARED_PATH . '/header.php');
 
   <?php if (!is_guest()) { ?>
   <?php
-    $dashboard_default_setting = most_recent_use_setting((int) $_SESSION['user_id']);
+    $dashboard_default_setting = most_recent_use_setting($user_id, $preferences['default_setting']);
   ?>
   <div id="dashboard-toast" class="toast" role="status" aria-live="polite"></div>
   <div id="record-modal" class="modal" hidden aria-hidden="true">
