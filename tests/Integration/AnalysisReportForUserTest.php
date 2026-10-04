@@ -95,12 +95,13 @@ final class AnalysisReportForUserTest extends TestCase
         $lastUse = array_column((new Items($this->db, 1))->list(), 'last_use', 'id')[10];
         $this->assertSame('2026-08-01', $lastUse);
 
-        $neglected = array_column($this->report()['neglected'], null, 'id');
+        $report = $this->report();
+        $neglected = array_column($report['neglected'], null, 'id');
         $this->assertSame($lastUse, $neglected[10]['last_used']);
         $this->assertSame(51, $neglected[10]['days_idle']);
         $this->assertSame(
             ['Last 30 days' => 1, '31-90 days' => 1, '91-365 days' => 0, 'Over a year' => 0, 'Never used' => 0],
-            array_column($this->report()['recency']['buckets'], 'count', 'label')
+            array_column($report['recency']['buckets'], 'count', 'label')
         );
     }
 
@@ -119,11 +120,12 @@ final class AnalysisReportForUserTest extends TestCase
 
     public function test_the_person_marked_as_the_owner_is_not_company(): void
     {
-        $company = $this->report()['company'];
+        $report = $this->report();
+        $company = $report['company'];
 
         $this->assertSame([['id' => 100, 'name' => 'Sam Lee', 'count' => 1, 'last_shared' => '2026-03-01']], $company['people']);
         $this->assertSame(1, $company['shared_uses']);
         $this->assertSame(1, $company['solo_uses']);
-        $this->assertSame(1, $this->report()['totals']['people']);
+        $this->assertSame(1, $report['totals']['people']);
     }
 }

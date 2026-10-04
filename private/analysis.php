@@ -31,7 +31,7 @@ function analysis_report(array $data, string $today) {
   // future-dated ones have not happened yet and stay off every timeline.
   $per_day = [];
   foreach ($uses as $use) {
-    $n = analysis_use_day($use);
+    $n = analysis_date_day($use['use_date']);
     if ($n !== null && $n <= $today_n) {
       $per_day[$n] = ($per_day[$n] ?? 0) + 1;
     }
@@ -69,11 +69,6 @@ function analysis_report(array $data, string $today) {
 // daylight-saving changes cannot skew.
 function analysis_day_number(string $date) {
   return intdiv(strtotime(substr($date, 0, 10) . ' UTC'), 86400);
-}
-
-// Day number of a use, or null when it has no real date.
-function analysis_use_day(array $use) {
-  return analysis_date_day($use['use_date'] ?? null);
 }
 
 // Day number of a date, or null when it is no real date (NULL, '', or a
@@ -253,11 +248,11 @@ function analysis_item_stats(array $items, array $uses, int $today_n) {
     ];
   }
   foreach ($uses as $use) {
-    $id = (int) $use['item_id'];
+    $id = $use['item_id'];
     if (!isset($stats[$id])) {
       continue;
     }
-    $n = analysis_use_day($use);
+    $n = analysis_date_day($use['use_date']);
     if ($n !== null && $n > $today_n) {
       continue;
     }
@@ -303,11 +298,11 @@ function analysis_types(array $item_stats) {
       $per_type[$type] = ($per_type[$type] ?? 0) + $item['recent_count'];
     }
   }
-  arsort($per_type);
   $types = [];
   foreach ($per_type as $type => $count) {
     $types[] = ['label' => (string) $type, 'count' => $count];
   }
+  usort($types, fn($a, $b) => [$b['count'], $a['label']] <=> [$a['count'], $b['label']]);
   return $types;
 }
 
@@ -385,18 +380,17 @@ function analysis_company(array $uses, array $people) {
   $company = [];
   foreach ($people as $person) {
     if (!$person['is_me']) {
-      $company[(int) $person['id']] = ['id' => (int) $person['id'], 'name' => $person['name'], 'uses' => []];
+      $company[$person['id']] = ['id' => $person['id'], 'name' => $person['name'], 'uses' => []];
     }
   }
 
   $shared = [];
   foreach ($uses as $use) {
-    $n = analysis_use_day($use);
+    $n = analysis_date_day($use['use_date']);
     foreach ($use['people'] as $person) {
-      $person_id = (int) $person['id'];
-      if (isset($company[$person_id])) {
-        $company[$person_id]['uses'][(int) $use['id']] = $n === null ? null : analysis_date_from_day_number($n);
-        $shared[(int) $use['id']] = true;
+      if (isset($company[$person['id']])) {
+        $company[$person['id']]['uses'][$use['id']] = $n === null ? null : analysis_date_from_day_number($n);
+        $shared[$use['id']] = true;
       }
     }
   }
@@ -439,7 +433,7 @@ function analysis_settings(array $uses, array $item_stats) {
       $settings[$key] = ['setting' => $name, 'count' => 0, 'items' => []];
     }
     $settings[$key]['count']++;
-    $id = (int) $use['item_id'];
+    $id = $use['item_id'];
     if (isset($item_stats[$id])) {
       $settings[$key]['items'][$id] = ($settings[$key]['items'][$id] ?? 0) + 1;
     }

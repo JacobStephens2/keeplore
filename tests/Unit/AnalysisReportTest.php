@@ -272,8 +272,8 @@ class AnalysisReportTest extends TestCase
             $report['top_all_time'][0]
         );
         $this->assertSame(
-            // An item with no Type shows under "-".
-            [['label' => 'table-game', 'count' => 2], ['label' => 'book', 'count' => 1], ['label' => '-', 'count' => 1]],
+            // An item with no Type shows under "-"; ties go by label.
+            [['label' => 'table-game', 'count' => 2], ['label' => '-', 'count' => 1], ['label' => 'book', 'count' => 1]],
             $report['types']
         );
     }
