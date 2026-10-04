@@ -85,6 +85,7 @@ final class Aversions
         });
     }
 
+    /** Delete the owner's Aversion. */
     public function remove(int $id): void
     {
         $this->transaction(function () use ($id) {

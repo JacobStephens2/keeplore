@@ -180,7 +180,7 @@ final class PlaygroupTest extends TestCase
         $this->assertSame('Sam', $rows[0]['FirstName']);
     }
 
-    public function test_choose_links_each_member_to_their_latest_aversion_of_the_item_or_to_nothing(): void
+    public function test_choose_links_each_member_to_their_highest_aversion_id_of_the_item_or_to_nothing(): void
     {
         $this->db->query("INSERT INTO responses (id, Title, user_id, Player, PlayDate, AversionDate) VALUES
             (1, 10, 1, 100, '2026-02-01', NULL), (2, 10, 1, 101, NULL, '2026-01-05'),
