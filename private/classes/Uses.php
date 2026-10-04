@@ -83,7 +83,7 @@ final class Uses
             array_push($params, ...array_map('strval', array_values($typeIds)));
         }
         $since = $filters['since'] ?? '';
-        if ($since !== '') {
+        if (!is_string($since) || trim($since) !== '') {
             $where[] = 'uses.use_date >= ?';
             $types .= 's';
             $params[] = $this->validDate($since);

@@ -85,7 +85,6 @@ function record_use_participants(
     return $people;
 }
 
-
 /**
  * The group a use was recorded with: who was there, when, and where. Record
  * Use keeps it after a save so "Record another use with this group" can

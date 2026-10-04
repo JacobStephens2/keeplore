@@ -317,6 +317,7 @@ final class UsesTest extends TestCase
 
         $this->assertSame([$after, $onTheDay], array_column($this->uses->all(['since' => '2026-09-12']), 'id'));
         $this->assertContains($before, array_column($this->uses->all(['since' => '']), 'id'));
+        $this->assertContains($before, array_column($this->uses->all(['since' => '  ']), 'id'));
         $this->assertCount(4, $this->uses->all(['since' => null]));
     }
 
@@ -403,6 +404,8 @@ final class UsesTest extends TestCase
         (new Uses($this->db, 2))->record(['item_id' => 20, 'use_date' => '2026-09-12', 'setting' => 'Their place']);
         $this->assertNull((new Uses($this->db, 3))->lastSetting());
 
+        $this->uses->record($this->use(['setting' => 'Kitchen table']));
+        $this->db->query("INSERT INTO uses (artifact_id, user_id, use_date, note) VALUES (10, 1, '2026-01-01', NULL)");
         $this->assertNull($this->uses->lastSetting());
     }
 
