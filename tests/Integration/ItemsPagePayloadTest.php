@@ -182,10 +182,7 @@ final class ItemsPagePayloadTest extends TestCase
 
     public function test_the_page_interval_is_the_default_for_items_without_their_own(): void
     {
-        $rows = array_column(items_list_payload($this->db, [
-            'kept' => 'allkeptandnot', 'type' => [], 'interval' => 10, 'players' => null,
-            'age' => null, 'ageUnknown' => false, 'showAttributes' => 'no', 'tagFilter' => '',
-        ], 1, '2026-06-01'), null, 'id');
+        $rows = array_column($this->payload(['interval' => 10]), null, 'id');
         $this->assertSame('2026-02-21', $rows[10]['use_by']);
         $this->assertSame('2026-03-02', $rows[13]['use_by']);
     }

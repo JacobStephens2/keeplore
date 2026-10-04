@@ -229,12 +229,12 @@ function items_list_query_params(array $filters, array $all_types = []) {
  */
 function items_list_present_row(array $artifact, $default_interval, $today = null) {
     $today = $today ?? date('Y-m-d');
-    $most_recent_use = (string) ($artifact['last_use'] ?? '');
+    $last_use = (string) ($artifact['last_use'] ?? '');
 
     // The view's interval is a default only; the item's own frequency wins.
     $use_by_date = use_by_date(
         $artifact['Acq'] ?? null,
-        $most_recent_use,
+        $last_use,
         $artifact['interaction_frequency_days'] ?? null,
         $default_interval
     ) ?? '';
@@ -254,7 +254,7 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
         'tags' => $artifact['tags'] ?? [],
         'is_kept' => $is_kept,
         'acq' => (string) ($artifact['Acq'] ?? ''),
-        'most_recent_use' => $most_recent_use,
+        'most_recent_use' => $last_use,
         'use_by' => $use_by_date,
         'use_by_overdue' => $overdue,
         'ss' => (string) ($artifact['ss'] ?? $artifact['SS'] ?? ''),
