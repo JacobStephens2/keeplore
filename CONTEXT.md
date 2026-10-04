@@ -18,6 +18,10 @@ A recorded occasion when an item was used, on a date, optionally with people, a 
 **Last use**:
 The date of an item's most recent use, or none if it has never been used. The use-by date, the Items page, To get rid of and the agent collection list all read it from one rule.
 
+**Account**:
+The Keeplore account someone registers and logs in to, holding their name, email, username and password; it owns the people list, items and Preferences. A password reset needs the key emailed to the account's address, which lasts one day and is used up by the reset.
+_Avoid_: User (except in the table's name).
+
 **Person**:
 Someone on the owner's people list who can be recorded on uses, item proposals and events. One person can be marked as the owner themself.
 _Avoid_: User (the Keeplore account the list belongs to), Player (except for an event's players).
