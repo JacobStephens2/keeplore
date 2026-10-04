@@ -44,6 +44,10 @@ An item proposal recorded as either an explicit decline or “chose something el
 A direct refusal of a proposed item, including a temporary refusal such as “not tonight,” optionally accompanied by a recorded reason. This outcome takes precedence when the group also chooses something else.
 _Avoid_: Dislike (a decline does not necessarily indicate dislike).
 
+**Aversion**:
+A legacy record, from before item proposals, that a person was averse to an item on a date. It is recorded and edited only on the archived Aversion pages, and Choose for group shows the latest one. Distinct from an Explicit decline, which is the outcome of an item proposal.
+_Avoid_: Response (the legacy table also holds plays), Dislike.
+
 **Chose something else**:
 A proposal outcome in which the group selected something else without explicitly declining the proposed item.
 _Avoid_: Explicit decline (when another selection is the only observed response).

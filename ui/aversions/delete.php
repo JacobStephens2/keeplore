@@ -2,18 +2,21 @@
 require_once('../../private/initialize.php');
 require_login();
 
-if(!isset($_GET['id'])) {
-  redirect_to(url_for('/aversions/index.php'));
+$aversions = new Aversions($db, (int) $_SESSION['user_id']);
+$id = (int) ($_GET['id'] ?? 0);
+$aversion = $aversions->find($id);
+if ($aversion === null) {
+  error_404();
 }
-$id = $_GET['id'];
 
 if(is_post_request()) {
-  $result = delete_response($id);
-  $_SESSION['message'] = 'The response was deleted successfully.';
+  try {
+    $aversions->remove($id);
+  } catch (OutOfBoundsException) {
+    error_404();
+  }
+  $_SESSION['message'] = 'The aversion was deleted successfully.';
   redirect_to(url_for('/aversions/index.php'));
-
-} else {
-  $use = find_response_by_id($id);
 }
 
 $page_title = 'Delete Aversion';
@@ -26,13 +29,12 @@ include(SHARED_PATH . '/header.php');
   <div class="response-delete">
     <h1><?php echo $page_title; ?></h1>
     <p>Are you sure you want to delete this aversion?</p>
-    <p class="item">use id: <?php echo h($use['id']); ?></p>
-    <p class="item">Play date: <?php echo h($use['PlayDate']); ?></p>
-    <p class="item">Game: <?php echo h($use['Title']); ?></p>
-    <p class="item">Player: <?php echo h($use['FirstName']) . ' ' . h($use['LastName']); ?></p>
+    <p class="item">Aversion date: <?php echo h($aversion['date']); ?></p>
+    <p class="item">Item: <?php echo h($aversion['item']); ?></p>
+    <p class="item">Person: <?php echo h($aversion['person']); ?></p>
 
     <form
-      action="<?php echo url_for('/aversions/delete.php?id=' . h(u($use['id']))); ?>"
+      action="<?php echo url_for('/aversions/delete.php?id=' . h(u($id))); ?>"
       method="post"
       >
       <?php echo csrf_input(); ?>

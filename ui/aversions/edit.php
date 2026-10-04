@@ -2,28 +2,26 @@
 require_once('../../private/initialize.php');
 require_login();
 
-if(!isset($_GET['id'])) {
-  redirect_to(url_for('/aversions/index.php'));
+$aversions = new Aversions($db, (int) $_SESSION['user_id']);
+$id = (int) ($_GET['id'] ?? 0);
+$aversion = $aversions->find($id);
+if ($aversion === null) {
+  error_404();
 }
-$id = $_GET['id'];
 
 if(is_post_request()) {
-  // handle post requests sent by this page
-  $response = [];
-  $response['id'] = $id ?? '';
-  $response['Title'] = $_POST['Title'] ?? '';
-  $response['PlayDate'] = $_POST['PlayDate'] ?? '';
-  $response['Player'] = $_POST['Player'] ?? '';
-
-  $result = update_response($response);
-  if($result === true) {
-    $_SESSION['message'] = 'The object was updated successfully.';
+  $aversion['item_id'] = (int) ($_POST['Title'] ?? 0);
+  $aversion['person_id'] = (int) ($_POST['Player'] ?? 0);
+  $aversion['date'] = (string) ($_POST['AversionDate'] ?? '');
+  try {
+    $aversions->update($id, $aversion['item_id'], $aversion['person_id'], $aversion['date']);
+    $_SESSION['message'] = 'The aversion was updated successfully.';
     redirect_to(url_for('/aversions/index.php'));
-  } else {
-    $errors = $result;
+  } catch (InvalidArgumentException $error) {
+    $errors[] = $error->getMessage();
+  } catch (OutOfBoundsException) {
+    error_404();
   }
-} else {
-  $response = find_response_by_id($id);
 }
 
 $page_title = 'Edit Aversion';
@@ -46,7 +44,7 @@ include(SHARED_PATH . '/header.php');
         <?php
           foreach ((new Items($db, (int) $_SESSION['user_id']))->list() as $item) {
             echo "<option value=\"" . h($item['id']) . "\"";
-            if($response["responsetitle"] == $item['id']) {
+            if($aversion['item_id'] === (int) $item['id']) {
               echo " selected";
             }
             echo ">" . h($item['Title']) . "</option>";
@@ -57,11 +55,11 @@ include(SHARED_PATH . '/header.php');
       <div class="form-field">
         <label for="User">User</label>
         <select id="User" name="Player">
-          <option value='Invalid'>Choose a User</option>
+          <option value="">Choose a person</option>
           <?php
             foreach ((new People($db, (int) $_SESSION['user_id']))->all() as $person) {
               echo "<option value=\"" . h($person['id']) . "\"";
-              if($response["Player"] == $person['id']) {
+              if($aversion['person_id'] === $person['id']) {
                 echo " selected";
               }
               echo ">" . h($person['name']) . "</option>";
@@ -72,10 +70,8 @@ include(SHARED_PATH . '/header.php');
 
       <div class="form-field">
         <label for="AversionDate">Aversion Date</label>
-        <input type="date" name="AversionDate" id="AversionDate" value="<?php echo h($response['AversionDate']); ?>" />
+        <input type="date" name="AversionDate" id="AversionDate" value="<?php echo h($aversion['date']); ?>" />
       </div>
-
-      <input type="hidden" name="id" value="<?php echo h($response['id']); ?>" />
 
       <div class="form-field-span">
         <input type="submit" value="Save Aversion" />
@@ -84,7 +80,7 @@ include(SHARED_PATH . '/header.php');
 
     <a 
       class="action" 
-      href="<?php echo url_for('/aversions/delete.php?id=' . h(u($response['id']))); ?>"
+      href="<?php echo url_for('/aversions/delete.php?id=' . h(u($id))); ?>"
     >
       <button>
         Delete Aversion

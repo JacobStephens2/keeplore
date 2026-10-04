@@ -86,9 +86,10 @@ final class Playgroup
      * Each row keeps the legacy page's columns: the item's title, id, ss,
      * MnP, MxP, MxT, Age, type and is_kept; the member's FullName (their
      * person id), PlayerID, FirstName, LastName, G and Priority; and
-     * ResponseID and MaxOfAversionDate, MaxOfPlayDate, MaxOfPassDate and
-     * MaxOfRequestDate. Rows are in the member's G and Priority order, then
-     * oldest aversion and newest play first.
+     * MaxOfAversionDate, MaxOfPlayDate, MaxOfPassDate and MaxOfRequestDate.
+     * AversionID is the id of one of the member's Aversions of the item (the
+     * highest), or null when they have none. Rows are in the member's G and
+     * Priority order, then oldest aversion and newest play first.
      */
     public function choose(array $typeIds, bool $matchGroupSize, bool $keptOnly): array
     {
@@ -99,7 +100,7 @@ final class Playgroup
               games.title, games.id, games.ss, games.MnP, games.MxP, games.MxT, games.Age, games.type, games.is_kept,
               playgroup.FullName,
               players.id AS PlayerID, players.FirstName, players.LastName, players.G, players.Priority,
-              ANY_VALUE(responses.id) AS ResponseID,
+              MAX(CASE WHEN ' . Aversions::IS_AVERSION . ' THEN responses.id END) AS AversionID,
               MAX(responses.AversionDate) AS MaxOfAversionDate,
               MAX(responses.PlayDate) AS MaxOfPlayDate,
               MAX(responses.PassDate) AS MaxOfPassDate,
