@@ -45,19 +45,4 @@ class ItemTagsTest extends TestCase
             parse_item_tags_input(['Two-Player', ' party ', 'two-player'])
         );
     }
-
-    public function test_attach_item_tags_fills_matching_records_and_defaults_to_empty(): void
-    {
-        $items = [
-            ['id' => 10, 'Title' => 'Catan'],
-            ['id' => 11, 'Title' => 'Azul'],
-        ];
-        $result = attach_item_tags($items, [
-            10 => ['beach-safe', 'portable'],
-        ]);
-
-        $this->assertSame(['beach-safe', 'portable'], $result[0]['tags']);
-        $this->assertSame([], $result[1]['tags']);
-        $this->assertArrayNotHasKey('tags', $items[0]);
-    }
 }

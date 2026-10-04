@@ -147,7 +147,7 @@ final class Items
              WHERE games.id = ? AND games.user_id = ?',
             'ii', [$id, $this->userId]
         )[0] ?? null;
-        return $row === null ? null : with_item_tags($this->db, [$row], $this->userId)[0];
+        return $row === null ? null : $this->withTags([$row])[0];
     }
 
     /**
@@ -158,18 +158,21 @@ final class Items
      * Filters combine with AND; null or missing means no filter.
      * kept, secondary_collection, physical, digital and to_get_rid_of take
      * true (the flag is set) or false (it isn't, including a null column).
-     * type_ids takes a list of type ids; [] lists nothing. tag is normalized
-     * like item tags and title matches a substring; blank means no filter.
+     * type_ids takes a list of type ids; ids takes a list of item ids, and
+     * one that isn't the owner's is left out. For both, [] lists nothing.
+     * tag is normalized like item tags and title matches a substring; blank
+     * means no filter.
      * An unknown key throws InvalidArgumentException.
      */
     public function list(array $filters = []): array
     {
-        $unknown = array_diff(array_keys($filters), [...array_keys(self::FLAG_FILTERS), 'type_ids', 'tag', 'title']);
+        $unknown = array_diff(array_keys($filters), [...array_keys(self::FLAG_FILTERS), 'type_ids', 'ids', 'tag', 'title']);
         if ($unknown !== []) {
             throw new InvalidArgumentException('Unknown Item list filter: ' . implode(', ', $unknown) . '.');
         }
         $typeIds = $filters['type_ids'] ?? null;
-        if ($typeIds === []) {
+        $ids = $filters['ids'] ?? null;
+        if ($typeIds === [] || $ids === []) {
             return [];
         }
 
@@ -185,6 +188,11 @@ final class Items
             $where .= ' AND games.type_id IN (' . implode(', ', array_fill(0, count($typeIds), '?')) . ')';
             $types .= str_repeat('s', count($typeIds));
             array_push($params, ...array_map('strval', array_values($typeIds)));
+        }
+        if ($ids !== null) {
+            $where .= ' AND games.id IN (' . implode(', ', array_fill(0, count($ids), '?')) . ')';
+            $types .= str_repeat('i', count($ids));
+            array_push($params, ...array_map('intval', array_values($ids)));
         }
         [$tagSql, $tagTypes, $tagParams] = $this->tagFilter($filters['tag'] ?? '');
         $where .= $tagSql;
@@ -211,7 +219,7 @@ final class Items
         );
         return array_map(
             fn (array $row) => array_replace($row, ['use_count' => (int) $row['use_count']]),
-            with_item_tags($this->db, $rows, $this->userId)
+            $this->withTags($rows)
         );
     }
 
@@ -361,6 +369,25 @@ final class Items
                 'iis', [$this->userId, $id, $tag]
             )->close();
         }
+    }
+
+    /** The $items rows, each with the owner's tags on it as a sorted list, empty when it has none. */
+    private function withTags(array $items): array
+    {
+        $ids = array_values(array_unique(array_map(fn (array $item) => (int) $item['id'], $items)));
+        $tagsById = [];
+        if ($ids !== []) {
+            $tags = $this->rows(
+                'SELECT artifact_id, tag FROM item_tags
+                 WHERE artifact_id IN (' . implode(', ', array_fill(0, count($ids), '?')) . ') AND user_id = ?
+                 ORDER BY tag ASC',
+                str_repeat('i', count($ids)) . 'i', [...$ids, $this->userId]
+            );
+            foreach ($tags as $tag) {
+                $tagsById[(int) $tag['artifact_id']][] = $tag['tag'];
+            }
+        }
+        return array_map(fn (array $item) => array_replace($item, ['tags' => $tagsById[(int) $item['id']] ?? []]), $items);
     }
 
     /** The list's tag filter as [sql, types, params]: the owner's Items with the normalized tag, or no filter when it's blank. */

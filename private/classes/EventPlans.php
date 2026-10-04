@@ -1,22 +1,25 @@
 <?php
 
-require_once dirname(__DIR__) . '/item_tags.php';
 require_once dirname(__DIR__) . '/items_list.php';
 require_once dirname(__DIR__) . '/item_types.php';
 require_once dirname(__DIR__) . '/kept_status.php';
+require_once __DIR__ . '/Items.php';
 
 /**
  * The owner's events, such as a beach week, the items planned for each, and
  * the owner's players coming to each. An event item carries the event's own
  * setting, note and packed mark; the item's facts (players, sweet spot, age,
- * tags) come from the item.
+ * tags) are read from the item through Items.
  * Another user's event reads as absent and throws OutOfBoundsException on
  * change; bad input throws InvalidArgumentException.
  */
 final class EventPlans
 {
+    private Items $items;
+
     public function __construct(private mysqli $db, private int $userId)
     {
+        $this->items = new Items($db, $userId);
     }
 
     /** Every event, latest start first and undated last, with item, packed and player counts. */
@@ -57,23 +60,27 @@ final class EventPlans
         }
         $event['id'] = (int) $event['id'];
         $event['notes'] = (string) $event['notes'];
-        $items = $this->rows(
-            'SELECT g.id, g.Title, g.MnP, g.MxP, g.SS, g.Age, g.MnT, g.MxT, g.is_kept, ei.setting, ei.note, ei.is_packed
-             FROM event_items ei JOIN games g ON g.id = ei.artifact_id AND g.user_id = ?
-             WHERE ei.event_id = ?
-             ORDER BY g.Title ASC, g.id ASC',
-            'ii', [$this->userId, $id]
-        );
-        foreach ($items as &$item) {
-            $item['id'] = (int) $item['id'];
-            foreach (['MnP', 'MxP', 'Age', 'MnT', 'MxT'] as $field) {
-                $item[$field] = $item[$field] === null ? null : (int) $item[$field];
-            }
-            $item['SS'] = (string) $item['SS'];
-            $item['is_packed'] = (bool) $item['is_packed'];
-            $item['is_kept'] = artifact_is_kept($item);
-        }
-        $event['items'] = with_item_tags($this->db, $items, $this->userId);
+        $planned = $this->plannedItems($id);
+        $number = fn ($value) => $value === null ? null : (int) $value;
+        // Items leaves out a planned item that isn't the owner's.
+        $event['items'] = array_map(function ($item) use ($planned, $number) {
+            $plan = $planned[$item['id']];
+            return [
+                'id' => (int) $item['id'],
+                'Title' => $item['Title'],
+                'MnP' => $number($item['MnP']),
+                'MxP' => $number($item['MxP']),
+                'SS' => (string) $item['SS'],
+                'Age' => $number($item['Age']),
+                'MnT' => $number($item['MnT']),
+                'MxT' => $number($item['MxT']),
+                'is_kept' => artifact_is_kept($item),
+                'setting' => $plan['setting'],
+                'note' => $plan['note'],
+                'is_packed' => (bool) $plan['is_packed'],
+                'tags' => $item['tags'],
+            ];
+        }, $this->items->list(['ids' => array_keys($planned)]));
         $players = $this->players($id, true, $this->year($event['starts_on']));
         // Unknown ages last, then youngest first; usort is stable (PHP 8), so
         // players of one age stay in name order.
@@ -91,22 +98,16 @@ final class EventPlans
      */
     public function itemsToAdd(int $eventId): array
     {
-        $items = $this->rows(
-            'SELECT g.id, g.Title, g.MnP, g.MxP, g.SS, g.Age, g.is_kept, COALESCE(t.objectType, g.type) AS type_name
-             FROM games g
-             LEFT JOIN types t ON t.id = g.type_id
-             LEFT JOIN event_items ei ON ei.artifact_id = g.id AND ei.event_id = ?
-             WHERE g.user_id = ? AND ei.artifact_id IS NULL
-             ORDER BY g.Title ASC, g.id ASC',
-            'ii', [$eventId, $this->userId]
-        );
+        $planned = $this->plannedItems($eventId);
+        $items = array_filter($this->items->list(), fn ($item) => !isset($planned[$item['id']]));
         return array_map(fn($item) => [
             'id' => (int) $item['id'],
             'Title' => $item['Title'],
-            'facts' => items_list_play_facts($item),
+            // Players, sweet spot and age, without the play time.
+            'facts' => items_list_play_facts(array_intersect_key($item, array_flip(['MnP', 'MxP', 'SS', 'Age']))),
             'is_kept' => artifact_is_kept($item),
             'is_game' => item_type_is_game($item['type_name']),
-        ], $items);
+        ], array_values($items));
     }
 
     /** The owner's players not yet coming to the event, in name order. */
@@ -159,7 +160,10 @@ final class EventPlans
     public function addItems(int $eventId, array $itemIds): int
     {
         $this->requireEvent($eventId);
-        $itemIds = $this->ownIds('games', $itemIds, 'Choose items from your own items in Keeplore.');
+        $itemIds = $this->distinctIds($itemIds);
+        if (count($this->items->list(['ids' => $itemIds])) !== count($itemIds)) {
+            throw new InvalidArgumentException('Choose items from your own items in Keeplore.');
+        }
         return $this->linkToEvent('event_items', 'artifact_id', $eventId, $itemIds);
     }
 
@@ -167,7 +171,7 @@ final class EventPlans
     public function addPlayers(int $eventId, array $playerIds): int
     {
         $this->requireEvent($eventId);
-        $playerIds = $this->ownIds('players', $playerIds, 'Choose players from your own people list.');
+        $playerIds = $this->ownPlayerIds($playerIds);
         return $this->linkToEvent('event_players', 'player_id', $eventId, $playerIds);
     }
 
@@ -246,22 +250,37 @@ final class EventPlans
     }
 
     /**
-     * The distinct positive ids, each checked to belong to the owner in
-     * $table (games or players, never input).
+     * The event's own setting, note and packed mark for each item planned
+     * for it, keyed by item id.
      */
-    private function ownIds(string $table, array $ids, string $message): array
+    private function plannedItems(int $eventId): array
     {
-        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($id) => $id > 0)));
+        return array_column($this->rows(
+            'SELECT artifact_id, setting, note, is_packed FROM event_items WHERE event_id = ?',
+            'i', [$eventId]
+        ), null, 'artifact_id');
+    }
+
+    /** The distinct positive ids among $ids. */
+    private function distinctIds(array $ids): array
+    {
+        return array_values(array_unique(array_filter(array_map('intval', $ids), fn($id) => $id > 0)));
+    }
+
+    /** The distinct positive ids, each checked to be one of the owner's players. */
+    private function ownPlayerIds(array $ids): array
+    {
+        $ids = $this->distinctIds($ids);
         if ($ids === []) {
             return [];
         }
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $mine = $this->rows(
-            "SELECT id FROM {$table} WHERE user_id = ? AND id IN ($placeholders)",
+            "SELECT id FROM players WHERE user_id = ? AND id IN ($placeholders)",
             str_repeat('i', count($ids) + 1), array_merge([$this->userId], $ids)
         );
         if (count($mine) !== count($ids)) {
-            throw new InvalidArgumentException($message);
+            throw new InvalidArgumentException('Choose players from your own people list.');
         }
         return $ids;
     }

@@ -36,7 +36,10 @@ final class EventPlansTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-events.sql'));
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-event-players.sql'));
         $this->runSql('ALTER TABLE players ADD COLUMN birth_year INT NULL');
-        $this->runSql("UPDATE games SET mnp = 3, mxp = 4, ss = '3,4', Age = 10, mnt = 60, mxt = 120 WHERE id = 10");
+        // The item columns in the case the schema gives them, as Items reads them.
+        $this->runSql('ALTER TABLE games RENAME COLUMN mnp TO MnP, RENAME COLUMN mxp TO MxP, RENAME COLUMN ss TO SS,
+            RENAME COLUMN mnt TO MnT, RENAME COLUMN mxt TO MxT');
+        $this->runSql("UPDATE games SET MnP = 3, MxP = 4, SS = '3,4', Age = 10, MnT = 60, MxT = 120 WHERE id = 10");
         require_once PRIVATE_PATH . '/classes/EventPlans.php';
     }
 
@@ -230,6 +233,16 @@ final class EventPlansTest extends TestCase
         $this->assertSame('3–4 players, best 3, 4 · Age 10+', $candidates[1]['facts']);
         $this->runSql("UPDATE types SET objectType = 'table game' WHERE id = 1");
         $this->assertSame([false, true, true], array_column($this->plans()->itemsToAdd($id), 'is_game'));
+    }
+
+    public function test_a_candidate_with_only_a_legacy_type_string_is_not_a_game(): void
+    {
+        $id = $this->plans()->save(['name' => 'Beach week']);
+        $this->runSql("UPDATE games SET type_id = NULL, type = 'table game' WHERE id = 10");
+
+        $candidates = array_column($this->plans()->itemsToAdd($id), 'is_game', 'Title');
+
+        $this->assertFalse($candidates['Catan']);
     }
 
     public function test_a_planned_item_says_whether_it_is_kept(): void
