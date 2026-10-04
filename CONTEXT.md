@@ -23,7 +23,7 @@ A recorded occasion when an item was used, on a date, optionally with people, a 
 The number of an item's uses in a period, or in all recorded history: the owner's uses of it plus the legacy plays their own person took part in. Explore's uses by item pages show it.
 
 **Last use**:
-The date of an item's most recent use, or none if it has never been used. The use-by date, the Items page, To get rid of and the agent collection list all read it from one rule.
+The date of an item's most recent use, or none if it has never been used. The use-by date, the Items page, To get rid of, Analysis and the agent collection list all read it from one rule.
 
 **Account**:
 The Keeplore account someone registers and logs in to, holding their name, email, username and password; it owns the people list, items and Preferences. A password reset needs the key emailed to the account's address, which lasts one day and is used up by the reset.

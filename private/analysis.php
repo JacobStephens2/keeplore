@@ -3,13 +3,18 @@
 /**
  * Analysis seam: every figure the /analysis page shows.
  *
- * - analysis_report(): pure. One user's plain rows plus an explicit "today"
- *   in, the whole report out. The page only renders what it returns.
- * - analysis_report_for_user(): the database adapter. Loads the rows and
- *   hands them to analysis_report().
+ * - analysis_report(): pure. One owner's items, uses and people, in the row
+ *   shapes Items::list(), Uses::all() and People::all() return, plus an
+ *   explicit "today" in, the whole report out. The page only renders what
+ *   it returns.
+ * - analysis_report_for_user(): the database adapter. Reads the rows through
+ *   those three modules and hands them to analysis_report().
  */
 
 require_once __DIR__ . '/kept_status.php';
+require_once __DIR__ . '/classes/Items.php';
+require_once __DIR__ . '/classes/Uses.php';
+require_once __DIR__ . '/classes/People.php';
 
 const ANALYSIS_RECENT_DAYS = 90;
 const ANALYSIS_LIST_LENGTH = 10;
@@ -39,8 +44,8 @@ function analysis_report(array $data, string $today) {
 
   return [
     'totals' => [
-      // The player standing for the user is not someone they track.
-      'people' => count(array_filter($people, fn($person) => empty($person['represents_user_id']))),
+      // The person marked as the owner is not someone they track.
+      'people' => count(array_filter($people, fn($person) => !$person['is_me'])),
       'items' => count($items),
       'kept_items' => count(array_filter($items, 'artifact_is_kept')),
       'uses' => count($uses),
@@ -55,7 +60,7 @@ function analysis_report(array $data, string $today) {
     'recency' => analysis_recency($item_stats, $today_n),
     'neglected' => analysis_neglected($item_stats, $today_n),
     'settings' => analysis_settings($uses, $item_stats),
-    'company' => analysis_company($uses, $people, $data['participations'] ?? []),
+    'company' => analysis_company($uses, $people),
     'records' => $records,
   ];
 }
@@ -66,10 +71,15 @@ function analysis_day_number(string $date) {
   return intdiv(strtotime(substr($date, 0, 10) . ' UTC'), 86400);
 }
 
-// Day number of a use, or null when it has no real date (NULL, '', or a
-// zero date MySQL let through).
+// Day number of a use, or null when it has no real date.
 function analysis_use_day(array $use) {
-  $date = substr((string) ($use['use_date'] ?? ''), 0, 10);
+  return analysis_date_day($use['use_date'] ?? null);
+}
+
+// Day number of a date, or null when it is no real date (NULL, '', or a
+// zero date MySQL let through).
+function analysis_date_day(?string $date) {
+  $date = substr((string) $date, 0, 10);
   if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $parts)
       || !checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
     return null;
@@ -224,25 +234,26 @@ function analysis_records(array $per_day, int $today_n) {
   ];
 }
 
-// Per-item use tallies keyed by item id. Uses of items that no longer exist
-// or that are future-dated are left out; undated uses count without a date.
+// Per-item use tallies keyed by item id, with each item's Last use from
+// Items. Uses of items that no longer exist or that are future-dated are
+// left out; undated uses count without a date.
 function analysis_item_stats(array $items, array $uses, int $today_n) {
   $stats = [];
   foreach ($items as $item) {
     $stats[(int) $item['id']] = [
       'id' => (int) $item['id'],
       'title' => (string) ($item['Title'] ?? ''),
-      'type' => (string) ($item['type'] ?? ''),
+      'type' => (string) ($item['type_name'] ?? ''),
       'is_kept' => artifact_is_kept($item),
       'to_get_rid_of' => !empty($item['to_get_rid_of']),
       'acq_n' => empty($item['Acq']) ? null : analysis_day_number($item['Acq']),
       'count' => 0,
       'recent_count' => 0,
-      'last_used_n' => null,
+      'last_used_n' => analysis_date_day($item['last_use'] ?? null),
     ];
   }
   foreach ($uses as $use) {
-    $id = (int) ($use['artifact_id'] ?? 0);
+    $id = (int) $use['item_id'];
     if (!isset($stats[$id])) {
       continue;
     }
@@ -251,14 +262,8 @@ function analysis_item_stats(array $items, array $uses, int $today_n) {
       continue;
     }
     $stats[$id]['count']++;
-    if ($n === null) {
-      continue;
-    }
-    if ($n > $today_n - ANALYSIS_RECENT_DAYS) {
+    if ($n !== null && $n > $today_n - ANALYSIS_RECENT_DAYS) {
       $stats[$id]['recent_count']++;
-    }
-    if ($stats[$id]['last_used_n'] === null || $n > $stats[$id]['last_used_n']) {
-      $stats[$id]['last_used_n'] = $n;
     }
   }
   return $stats;
@@ -373,34 +378,27 @@ function analysis_neglected(array $item_stats, int $today_n) {
   return array_slice($idle, 0, ANALYSIS_LIST_LENGTH);
 }
 
-// Who the user shares uses with. The player standing for the user is not
-// company; duplicate junction rows count once per use.
-function analysis_company(array $uses, array $people, array $participations) {
-  $use_dates = [];
-  foreach ($uses as $use) {
-    $n = analysis_use_day($use);
-    $use_dates[(int) $use['id']] = $n === null ? null : analysis_date_from_day_number($n);
-  }
+// Who the owner shares uses with, from each use's own people. The person
+// marked as the owner is not company; a person listed twice on a use counts
+// once for it.
+function analysis_company(array $uses, array $people) {
   $company = [];
   foreach ($people as $person) {
-    if (empty($person['represents_user_id'])) {
-      $company[(int) $person['id']] = [
-        'id' => (int) $person['id'],
-        'name' => trim(($person['FirstName'] ?? '') . ' ' . ($person['LastName'] ?? '')),
-        'uses' => [],
-      ];
+    if (!$person['is_me']) {
+      $company[(int) $person['id']] = ['id' => (int) $person['id'], 'name' => $person['name'], 'uses' => []];
     }
   }
 
   $shared = [];
-  foreach ($participations as $row) {
-    $use_id = (int) ($row['use_id'] ?? 0);
-    $player_id = (int) ($row['player_id'] ?? 0);
-    if (!array_key_exists($use_id, $use_dates) || !isset($company[$player_id])) {
-      continue;
+  foreach ($uses as $use) {
+    $n = analysis_use_day($use);
+    foreach ($use['people'] as $person) {
+      $person_id = (int) $person['id'];
+      if (isset($company[$person_id])) {
+        $company[$person_id]['uses'][(int) $use['id']] = $n === null ? null : analysis_date_from_day_number($n);
+        $shared[(int) $use['id']] = true;
+      }
     }
-    $company[$player_id]['uses'][$use_id] = $use_dates[$use_id];
-    $shared[$use_id] = true;
   }
 
   $ranked = [];
@@ -425,13 +423,14 @@ function analysis_company(array $uses, array $people, array $participations) {
   ];
 }
 
-// Where uses happen (the use's "Setting" field, stored as uses.note), busiest
-// first, each with the items most used there. Spellings that differ only by
-// case or surrounding space are one setting, shown as first typed.
+// Where uses happen (the use's Setting), busiest first, each with the items
+// most used there. Spellings that differ only by case or surrounding space
+// are one setting, shown as first typed: on the use recorded first.
 function analysis_settings(array $uses, array $item_stats) {
+  usort($uses, fn($a, $b) => $a['id'] <=> $b['id']);
   $settings = [];
   foreach ($uses as $use) {
-    $name = trim((string) ($use['note'] ?? ''));
+    $name = trim($use['setting']);
     if ($name === '') {
       continue;
     }
@@ -440,7 +439,7 @@ function analysis_settings(array $uses, array $item_stats) {
       $settings[$key] = ['setting' => $name, 'count' => 0, 'items' => []];
     }
     $settings[$key]['count']++;
-    $id = (int) ($use['artifact_id'] ?? 0);
+    $id = (int) $use['item_id'];
     if (isset($item_stats[$id])) {
       $settings[$key]['items'][$id] = ($settings[$key]['items'][$id] ?? 0) + 1;
     }
@@ -462,28 +461,10 @@ function analysis_settings(array $uses, array $item_stats) {
 
 // ---- Database adapter -------------------------------------------------------
 
-function analysis_fetch_all(mysqli $db, string $sql, int $user_id) {
-  $stmt = mysqli_prepare($db, $sql);
-  mysqli_stmt_bind_param($stmt, 'i', $user_id);
-  mysqli_stmt_execute($stmt);
-  $rows = mysqli_fetch_all(mysqli_stmt_get_result($stmt), MYSQLI_ASSOC);
-  mysqli_stmt_close($stmt);
-  return $rows;
-}
-
 function analysis_report_for_user(mysqli $db, int $user_id, string $today) {
   return analysis_report([
-    'uses' => analysis_fetch_all($db,
-      "SELECT id, artifact_id, use_date, note FROM uses WHERE user_id = ? ORDER BY id", $user_id),
-    'items' => analysis_fetch_all($db,
-      "SELECT games.id, games.Title, COALESCE(types.objectType, '') AS type,
-              games.is_kept, games.to_get_rid_of, games.Acq
-       FROM games
-       LEFT JOIN types ON games.type_id = types.id
-       WHERE games.user_id = ?", $user_id),
-    'people' => analysis_fetch_all($db,
-      "SELECT id, FirstName, LastName, represents_user_id FROM players WHERE user_id = ?", $user_id),
-    'participations' => analysis_fetch_all($db,
-      "SELECT use_id, player_id FROM uses_players WHERE user_id = ?", $user_id),
+    'items' => (new Items($db, $user_id))->list(),
+    'uses' => (new Uses($db, $user_id))->all(),
+    'people' => (new People($db, $user_id))->all(),
   ], $today);
 }
