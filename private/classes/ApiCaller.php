@@ -9,6 +9,12 @@
  */
 final class ApiCaller
 {
+    /** The response fields of every agent-key refusal (ADR-0002). */
+    public const AGENT_KEY_REFUSAL = [
+        'authenticated' => true,
+        'message' => 'Agent keys permit reads plus the kept toggle only.',
+    ];
+
     private function __construct(
         private mysqli $db,
         private string $type,
@@ -58,10 +64,7 @@ final class ApiCaller
         if ($this->type !== 'agent_key') {
             return null;
         }
-        return [403, [
-            'authenticated' => true,
-            'message' => 'Agent keys permit reads plus the kept toggle only.',
-        ]];
+        return [403, self::AGENT_KEY_REFUSAL];
     }
 }
 

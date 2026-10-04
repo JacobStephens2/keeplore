@@ -38,6 +38,7 @@ final class ProposalOutcomesTest extends TestCase
             require_once $module;
         }
         $this->proposals = new ProposalOutcomes($this->db, 1);
+        require_once PRIVATE_PATH . '/proposals_api.php';
     }
 
     protected function tearDown(): void
@@ -310,5 +311,64 @@ final class ProposalOutcomesTest extends TestCase
         $this->assertNotNull($item, 'The item page must be able to load items without a type.');
         $this->assertSame('Uncategorized item', $item['Title']);
         $this->assertCount(1, $this->proposals->history($item['id']));
+    }
+
+    private function caller(array $authentication): \ApiCaller
+    {
+        return \ApiCaller::from($this->db, (object) (['authenticated' => true] + $authentication));
+    }
+
+    public function test_the_proposals_api_reads_a_session_or_agent_keys_own_user_whatever_it_names(): void
+    {
+        $this->proposals->save($this->proposal());
+        (new ProposalOutcomes($this->db, 2))->save($this->proposal(['item_id' => 20]));
+
+        foreach (['session', 'agent_key'] as $type) {
+            [$status, $response] = report_proposals_over_api($this->db, $this->caller(['auth_type' => $type, 'user_id' => 1]), ['user_id' => '2']);
+
+            $this->assertSame(200, $status, $type);
+            $this->assertSame(1, array_column($response['proposals'], null, 'item_id')[10]['explicit_declines']);
+            $this->assertNotContains(20, array_column($response['proposals'], 'item_id'));
+            $this->assertSame(1, $response['user_id']);
+        }
+    }
+
+    public function test_the_proposals_api_reads_the_existing_user_the_master_key_names(): void
+    {
+        (new ProposalOutcomes($this->db, 2))->save($this->proposal(['item_id' => 20]));
+
+        [$status, $response] = report_proposals_over_api($this->db, $this->caller(['auth_type' => 'api_key']), ['user_id' => '2']);
+
+        $this->assertSame(200, $status);
+        $this->assertSame([20], array_column($response['proposals'], 'item_id'));
+        $this->assertSame(2, $response['user_id']);
+    }
+
+    public function test_the_proposals_api_refuses_the_master_key_without_an_existing_user(): void
+    {
+        foreach ([[], ['user_id' => 'me'], ['user_id' => '0'], ['user_id' => '999']] as $query) {
+            [$status, $response] = report_proposals_over_api($this->db, $this->caller(['auth_type' => 'api_key']), $query);
+
+            $this->assertSame(400, $status, json_encode($query));
+            $this->assertSame(['message' => 'Missing or invalid required parameter: user_id'], $response);
+        }
+    }
+
+    public function test_the_proposals_api_passes_the_report_filters_and_answers_a_bad_one_with_400(): void
+    {
+        foreach (['2026-08-31', '2026-09-12'] as $date) {
+            $this->proposals->save($this->proposal(['proposal_date' => $date]));
+        }
+        $session = $this->caller(['auth_type' => 'session', 'user_id' => 1]);
+
+        [, $response] = report_proposals_over_api($this->db, $session, [
+            'start' => '2026-09-01', 'end' => '2026-09-30', 'include_other' => '1', 'sort' => 'item_name', 'direction' => 'asc',
+        ]);
+        $this->assertSame([12, 11, 10, 13], array_column($response['proposals'], 'item_id'));
+        $this->assertSame(1, array_column($response['proposals'], null, 'item_id')[10]['explicit_declines']);
+
+        [$status, $response] = report_proposals_over_api($this->db, $session, ['sort' => 'newest']);
+        $this->assertSame(400, $status);
+        $this->assertSame(['message' => 'Choose a valid report sort.'], $response);
     }
 }
