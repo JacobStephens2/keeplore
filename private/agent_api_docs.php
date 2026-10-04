@@ -56,7 +56,7 @@ function agent_api_docs($api_origin = null) {
           'Every row carries id, Title, type, type_id, is_kept, is_physical, is_digital, is_in_secondary_collection, and tags.',
           'kept, physical, digital, and secondary_collection take true or false. type_id takes one id or a list; ids come from GET /types.php.',
           'fields "collection" adds MnP, MxP, SS (sweet spot), MnT, MxT, Wt, Yr, and Acq.',
-          'include ["uses_summary"] adds plays (count of recorded uses) and last_use (YYYY-MM-DD or null).',
+          'include ["uses_summary"] adds plays (count of recorded uses) and last_use (YYYY-MM-DD or null): the same last use the Interact By page uses, the later of the latest recorded use and any legacy play date.',
           'tag filters to items the owner labelled with that tag (for example beach-safe). Tags are empty until the owner adds them, so an empty tag result does not mean no item fits.',
           'Invalid filter values return 400 with an errors list.',
           'GET with no body also lists page 1 for an agent key.',

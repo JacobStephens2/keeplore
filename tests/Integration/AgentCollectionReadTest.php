@@ -108,6 +108,16 @@ final class AgentCollectionReadTest extends TestCase
         $this->assertFalse($result['has_more']);
     }
 
+    public function test_type_falls_back_to_the_legacy_type_name_without_a_type_id(): void
+    {
+        $this->db->query("UPDATE games SET type_id = NULL, type = 'card-game' WHERE id = 13");
+
+        $rows = $this->listItems(['query' => 'Former'])['items'];
+
+        $this->assertSame([13], $this->ids($rows));
+        $this->assertSame('card-game', $rows[0]['type']);
+    }
+
     public function test_kept_filter_returns_only_kept_items_for_the_user(): void
     {
         $this->assertSame([11, 10], $this->ids($this->listItems(['kept' => true])['items']));
@@ -151,6 +161,16 @@ final class AgentCollectionReadTest extends TestCase
         $rows = $this->listItems(['include' => 'uses_summary', 'type_id' => 2])['items'];
         $this->assertSame(0, $rows[0]['plays']);
         $this->assertNull($rows[0]['last_use']);
+    }
+
+    public function test_last_use_counts_a_legacy_play_date_later_than_the_latest_use(): void
+    {
+        $this->db->query("INSERT INTO responses (Title, user_id, PlayDate) VALUES (10, 1, '2026-04-12'), (10, 1, '2026-02-01')");
+
+        $catan = $this->listItems(['include' => 'uses_summary', 'physical' => true])['items'][0];
+
+        $this->assertSame('2026-04-12', $catan['last_use']);
+        $this->assertSame(2, $catan['plays']);
     }
 
     public function test_offset_pagination_reports_has_more(): void
