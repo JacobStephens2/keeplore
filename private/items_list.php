@@ -10,10 +10,11 @@ require_once __DIR__ . '/bgg_ratings.php';
 require_once __DIR__ . '/item_types.php';
 require_once __DIR__ . '/use_by_date.php';
 require_once __DIR__ . '/classes/Items.php';
+require_once __DIR__ . '/classes/Preferences.php';
 
 function items_list_load_filter_defaults($user_id) {
     global $db;
-    $default_interval = default_use_interval($db, $user_id);
+    $default_interval = (new Preferences($db, (int) $user_id))->get()['default_use_interval'];
     return [$default_interval, array_column((new Types($db, (int) $user_id))->all(), 'id', 'name')];
 }
 

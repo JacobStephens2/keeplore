@@ -9,50 +9,32 @@ require_login();
 
 $page_title = 'Edit User Settings';
 $user_id = (int) $_SESSION['user_id'];
+$preferences = new Preferences($db, $user_id);
 
 if(is_post_request()) {
-  $daily_email = isset($_POST['daily_email']) ? 1 : 0;
-  $daily_email_hour = (int) ($_POST['daily_email_hour'] ?? 8);
-  if ($daily_email_hour < 0 || $daily_email_hour > 23) {
-    $daily_email_hour = 8;
-  }
-  $native_notify_enabled = isset($_POST['native_notify_enabled']) ? 1 : 0;
-  $native_notify_hour = (int) ($_POST['native_notify_hour'] ?? 9);
-  if ($native_notify_hour < 0 || $native_notify_hour > 23) {
-    $native_notify_hour = 9;
-  }
-  $native_notify_lead_days = (int) ($_POST['native_notify_lead_days'] ?? 3);
-  if ($native_notify_lead_days < 0 || $native_notify_lead_days > 14) {
-    $native_notify_lead_days = 3;
-  }
-  $native_notify_past_due = isset($_POST['native_notify_past_due']) ? 1 : 0;
-  $default_snooze_days = (int) ($_POST['default_snooze_days'] ?? 7);
-  if ($default_snooze_days < 1 || $default_snooze_days > 365) {
-    $default_snooze_days = 7;
-  }
-  $stmt = mysqli_prepare($db, "UPDATE users
-    SET first_name = ?, last_name = ?, email = ?, username = ?,
-        default_setting = ?, default_use_interval = ?, default_snooze_days = ?, daily_email = ?, daily_email_hour = ?,
-        native_notify_enabled = ?, native_notify_hour = ?, native_notify_lead_days = ?, native_notify_past_due = ?
-    WHERE id = ? LIMIT 1");
-  mysqli_stmt_bind_param($stmt, "sssssiiiiiiiii",
+  $stmt = mysqli_prepare($db, "UPDATE users SET first_name = ?, last_name = ?, email = ?, username = ? WHERE id = ? LIMIT 1");
+  mysqli_stmt_bind_param($stmt, "ssssi",
     $_POST['first_name'],
     $_POST['last_name'],
     $_POST['email'],
     $_POST['username'],
-    $_POST['default_setting'],
-    $_POST['default_use_interval'],
-    $default_snooze_days,
-    $daily_email,
-    $daily_email_hour,
-    $native_notify_enabled,
-    $native_notify_hour,
-    $native_notify_lead_days,
-    $native_notify_past_due,
     $user_id
   );
   $update_result = mysqli_stmt_execute($stmt);
   mysqli_stmt_close($stmt);
+
+  // An unchecked box posts nothing; it means off.
+  $preferences->save([
+    'default_use_interval' => $_POST['default_use_interval'] ?? null,
+    'default_snooze_days' => $_POST['default_snooze_days'] ?? null,
+    'default_setting' => $_POST['default_setting'] ?? null,
+    'daily_email' => isset($_POST['daily_email']),
+    'daily_email_hour' => $_POST['daily_email_hour'] ?? null,
+    'native_notify_enabled' => isset($_POST['native_notify_enabled']),
+    'native_notify_hour' => $_POST['native_notify_hour'] ?? null,
+    'native_notify_lead_days' => $_POST['native_notify_lead_days'] ?? null,
+    'native_notify_past_due' => isset($_POST['native_notify_past_due']),
+  ]);
 
   // Checked against BGG apart from the rest, so a typo or a BGG outage costs
   // only this field.
@@ -60,15 +42,11 @@ if(is_post_request()) {
   $bgg_default_type_result = user_bgg_default_type_set($db, $user_id, $_POST['bgg_default_type_id'] ?? '');
 }
 
-$stmt = mysqli_prepare($db, "SELECT
-  first_name, last_name, email, username, bgg_username,
-  default_use_interval, default_snooze_days, default_setting, daily_email, daily_email_hour,
-  native_notify_enabled, native_notify_hour, native_notify_lead_days, native_notify_past_due
-  FROM users WHERE id = ?");
+$stmt = mysqli_prepare($db, "SELECT first_name, last_name, email, username, bgg_username FROM users WHERE id = ?");
 mysqli_stmt_bind_param($stmt, "i", $user_id);
 mysqli_stmt_execute($stmt);
 $userResult = mysqli_stmt_get_result($stmt);
-$userArray = mysqli_fetch_assoc($userResult);
+$userArray = mysqli_fetch_assoc($userResult) + $preferences->get();
 mysqli_stmt_close($stmt);
 $bgg_default_type = user_bgg_default_type($db, $user_id);
 $types = (new Types($db, $user_id))->all();

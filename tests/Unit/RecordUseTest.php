@@ -138,7 +138,7 @@ class RecordUseTest extends TestCase
             $this->fail('Should not fall back when a use note exists.');
         };
 
-        $this->assertSame('Kitchen table', most_recent_use_setting(8, $query));
+        $this->assertSame('Kitchen table', most_recent_use_setting(8, 'Home', $query));
     }
 
     public function test_most_recent_setting_falls_back_to_the_user_default(): void
@@ -147,10 +147,10 @@ class RecordUseTest extends TestCase
             if (strpos($sql, 'FROM uses') !== false) {
                 return 'No results';
             }
-            return 'Home';
+            $this->fail('Should only look up the last use.');
         };
 
-        $this->assertSame('Home', most_recent_use_setting(8, $query));
+        $this->assertSame('Home', most_recent_use_setting(8, 'Home', $query));
     }
 
     public function test_use_count_defaults_to_one(): void

@@ -55,7 +55,7 @@ The kept items not flagged to get rid of, plus the secondary collection when ask
 _Avoid_: Interaction queue.
 
 **Interaction frequency**:
-An item's own interval in days, used for its use-by date in place of the default use interval. A page's interval setting changes only the default, never an item's own frequency.
+An item's own interval in days, used for its use-by date in place of the default use interval, one of the owner's Preferences. A page's interval setting changes only the default, never an item's own frequency.
 
 **Kept**:
 An item the user has chosen to keep in the primary collection.
@@ -93,6 +93,10 @@ A BoardGameGeek user, such as Gyges, whose ratings and comments on the owner's i
 **Type for BoardGameGeek items**:
 The owner's type, such as table game, for items filled from a BoardGameGeek match on Create Item, set on Settings. A type the owner already picked on the form stays.
 _Avoid_: BGG type (reads like BoardGameGeek's own subtype, such as boardgame or expansion).
+
+**Preferences**:
+The owner's own defaults and reminders, set on Settings: the default use interval, default snooze days, default Setting for a use, the daily email and its hour, and native notifications. Each has one default and one allowed range.
+_Avoid_: Settings (the page), User settings.
 
 **Digital item**:
 An item with a digital form. Independent of whether it is kept. An item can be both physical and digital.

@@ -17,14 +17,7 @@
     error_404();
   }
 
-  $user_id = $_SESSION['user_id'];
-  $stmt = mysqli_prepare($db, "SELECT default_use_interval FROM users WHERE id = ?");
-  mysqli_stmt_bind_param($stmt, "i", $user_id);
-  mysqli_stmt_execute($stmt);
-  $default_interval_result = mysqli_stmt_get_result($stmt);
-  $default_interval_row = mysqli_fetch_array($default_interval_result);
-  $default_interval = ($default_interval_row !== null) ? $default_interval_row[0] : null;
-  mysqli_stmt_close($stmt);
+  $default_interval = (new Preferences($db, (int) $_SESSION['user_id']))->get()['default_use_interval'];
 
   if(is_post_request()) {
     $input = item_input_from_form($_POST);
@@ -180,7 +173,7 @@
           onwheel="this.blur()"
           value="<?php
             if ($artifact['interaction_frequency_days'] === null) {
-              echo $default_interval;
+              echo h($default_interval);
             } else {
               echo h($artifact['interaction_frequency_days']);
             }

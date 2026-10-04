@@ -3,6 +3,7 @@
 require_once dirname(__DIR__) . '/use_by_date.php';
 require_once dirname(__DIR__) . '/record_use.php';
 require_once __DIR__ . '/Items.php';
+require_once __DIR__ . '/Preferences.php';
 
 /**
  * The owner's Use-by queue: kept items not flagged to get rid of, plus the
@@ -88,7 +89,7 @@ final class UseByQueue
             array_push($params, ...array_map('strval', array_values($typeIds)));
         }
 
-        $interval = $filters['default_interval'] ?? default_use_interval($this->db, $this->userId);
+        $interval = $filters['default_interval'] ?? $this->defaultUseInterval();
         $entries = array_map(
             fn (array $row) => $this->present($row, $interval),
             $this->rows(implode(' AND ', $where), $types, $params)
@@ -103,7 +104,12 @@ final class UseByQueue
     public function entry(int $itemId): ?array
     {
         $row = $this->rows('games.id = ?', 'i', [$itemId])[0] ?? null;
-        return $row === null ? null : $this->present($row, default_use_interval($this->db, $this->userId));
+        return $row === null ? null : $this->present($row, $this->defaultUseInterval());
+    }
+
+    private function defaultUseInterval(): float
+    {
+        return (new Preferences($this->db, $this->userId))->get()['default_use_interval'];
     }
 
     private function present(array $row, $defaultInterval): array
