@@ -158,9 +158,10 @@ final class Items
      * Filters combine with AND; null or missing means no filter.
      * kept, secondary_collection, physical, digital and to_get_rid_of take
      * true (the flag is set) or false (it isn't, including a null column).
-     * type_ids takes a list of type ids and ids a list of item ids, leaving
-     * out any that aren't the owner's; [] lists nothing. tag is normalized
-     * like item tags and title matches a substring; blank means no filter.
+     * type_ids takes a list of type ids; ids takes a list of item ids, and
+     * one that isn't the owner's is left out. For both, [] lists nothing.
+     * tag is normalized like item tags and title matches a substring; blank
+     * means no filter.
      * An unknown key throws InvalidArgumentException.
      */
     public function list(array $filters = []): array

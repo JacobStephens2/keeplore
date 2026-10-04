@@ -63,21 +63,24 @@ final class EventPlans
         $planned = $this->plannedItems($id);
         $number = fn ($value) => $value === null ? null : (int) $value;
         // Items leaves out a planned item that isn't the owner's.
-        $event['items'] = array_map(fn ($item) => [
-            'id' => (int) $item['id'],
-            'Title' => $item['Title'],
-            'MnP' => $number($item['MnP']),
-            'MxP' => $number($item['MxP']),
-            'SS' => (string) $item['SS'],
-            'Age' => $number($item['Age']),
-            'MnT' => $number($item['MnT']),
-            'MxT' => $number($item['MxT']),
-            'is_kept' => artifact_is_kept($item),
-            'setting' => $planned[$item['id']]['setting'],
-            'note' => $planned[$item['id']]['note'],
-            'is_packed' => (bool) $planned[$item['id']]['is_packed'],
-            'tags' => $item['tags'],
-        ], $this->items->list(['ids' => array_keys($planned)]));
+        $event['items'] = array_map(function ($item) use ($planned, $number) {
+            $plan = $planned[$item['id']];
+            return [
+                'id' => (int) $item['id'],
+                'Title' => $item['Title'],
+                'MnP' => $number($item['MnP']),
+                'MxP' => $number($item['MxP']),
+                'SS' => (string) $item['SS'],
+                'Age' => $number($item['Age']),
+                'MnT' => $number($item['MnT']),
+                'MxT' => $number($item['MxT']),
+                'is_kept' => artifact_is_kept($item),
+                'setting' => $plan['setting'],
+                'note' => $plan['note'],
+                'is_packed' => (bool) $plan['is_packed'],
+                'tags' => $item['tags'],
+            ];
+        }, $this->items->list(['ids' => array_keys($planned)]));
         $players = $this->players($id, true, $this->year($event['starts_on']));
         // Unknown ages last, then youngest first; usort is stable (PHP 8), so
         // players of one age stay in name order.
@@ -157,9 +160,10 @@ final class EventPlans
     public function addItems(int $eventId, array $itemIds): int
     {
         $this->requireEvent($eventId);
-        $itemIds = $this->ownIds(
-            $itemIds, fn ($ids) => $this->items->list(['ids' => $ids]), 'Choose items from your own items in Keeplore.'
-        );
+        $itemIds = $this->distinctIds($itemIds);
+        if (count($this->items->list(['ids' => $itemIds])) !== count($itemIds)) {
+            throw new InvalidArgumentException('Choose items from your own items in Keeplore.');
+        }
         return $this->linkToEvent('event_items', 'artifact_id', $eventId, $itemIds);
     }
 
@@ -167,10 +171,7 @@ final class EventPlans
     public function addPlayers(int $eventId, array $playerIds): int
     {
         $this->requireEvent($eventId);
-        $playerIds = $this->ownIds($playerIds, fn ($ids) => $this->rows(
-            'SELECT id FROM players WHERE user_id = ? AND id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')',
-            str_repeat('i', count($ids) + 1), array_merge([$this->userId], $ids)
-        ), 'Choose players from your own people list.');
+        $playerIds = $this->ownPlayerIds($playerIds);
         return $this->linkToEvent('event_players', 'player_id', $eventId, $playerIds);
     }
 
@@ -260,15 +261,26 @@ final class EventPlans
         ), null, 'artifact_id');
     }
 
-    /**
-     * The distinct positive ids, each checked to belong to the owner:
-     * $mine returns a row for each of the given ids that is the owner's.
-     */
-    private function ownIds(array $ids, callable $mine, string $message): array
+    /** The distinct positive ids among $ids. */
+    private function distinctIds(array $ids): array
     {
-        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($id) => $id > 0)));
-        if ($ids !== [] && count($mine($ids)) !== count($ids)) {
-            throw new InvalidArgumentException($message);
+        return array_values(array_unique(array_filter(array_map('intval', $ids), fn($id) => $id > 0)));
+    }
+
+    /** The distinct positive ids, each checked to be one of the owner's players. */
+    private function ownPlayerIds(array $ids): array
+    {
+        $ids = $this->distinctIds($ids);
+        if ($ids === []) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $mine = $this->rows(
+            "SELECT id FROM players WHERE user_id = ? AND id IN ($placeholders)",
+            str_repeat('i', count($ids) + 1), array_merge([$this->userId], $ids)
+        );
+        if (count($mine) !== count($ids)) {
+            throw new InvalidArgumentException('Choose players from your own people list.');
         }
         return $ids;
     }

@@ -39,7 +39,7 @@ final class EventPlansTest extends TestCase
         // The item columns in the case the schema gives them, as Items reads them.
         $this->runSql('ALTER TABLE games RENAME COLUMN mnp TO MnP, RENAME COLUMN mxp TO MxP, RENAME COLUMN ss TO SS,
             RENAME COLUMN mnt TO MnT, RENAME COLUMN mxt TO MxT');
-        $this->runSql("UPDATE games SET mnp = 3, mxp = 4, ss = '3,4', Age = 10, mnt = 60, mxt = 120 WHERE id = 10");
+        $this->runSql("UPDATE games SET MnP = 3, MxP = 4, SS = '3,4', Age = 10, MnT = 60, MxT = 120 WHERE id = 10");
         require_once PRIVATE_PATH . '/classes/EventPlans.php';
     }
 
