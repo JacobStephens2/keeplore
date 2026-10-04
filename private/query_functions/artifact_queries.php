@@ -7,43 +7,6 @@ use PHPMailer\PHPMailer\Exception;
 require_once dirname(__DIR__) . '/item_tags.php';
 require_once dirname(__DIR__) . '/classes/UseByQueue.php';
 
-  function find_artifacts_to_get_rid_of() {
-    global $db;
-    $user_id = (int) $_SESSION['user_id'];
-    $stmt = mysqli_prepare($db, "SELECT games.id, games.Title, games.Acq, games.interaction_frequency_days,
-        types.objectType AS type,
-        games.to_get_rid_of,
-        games.is_kept,
-        CASE
-          WHEN MAX(uses.use_date) IS NULL THEN MAX(responses.PlayDate)
-          WHEN MAX(uses.use_date) < MAX(responses.PlayDate) THEN MAX(responses.PlayDate)
-          ELSE MAX(uses.use_date)
-        END AS MostRecentUseOrResponse
-      FROM games
-        LEFT JOIN responses ON games.id = responses.Title
-        LEFT JOIN uses ON games.id = uses.artifact_id
-        LEFT JOIN types ON games.type_id = types.id
-      GROUP BY games.id, games.Title, games.Acq, games.interaction_frequency_days, types.objectType, games.user_id, games.to_get_rid_of, games.is_kept
-      HAVING games.user_id = ? AND games.to_get_rid_of = 1
-      ORDER BY games.Title ASC");
-    mysqli_stmt_bind_param($stmt, "i", $user_id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    confirm_result_set($result);
-    return $result;
-  }
-
-  function find_artifacts_by_user() {
-    global $db;
-
-    $user_id = (int) $_SESSION['user_id'];
-    $stmt = mysqli_prepare($db, "SELECT games.id, games.Title, games.is_kept, games.Acq FROM games WHERE user_id = ? ORDER BY games.Acq DESC");
-    mysqli_stmt_bind_param($stmt, "i", $user_id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    confirm_result_set($result);
-    return $result;
-  }
   function find_artifacts_by_user_id($kept, $type, $interval, $tag = '') {
     global $db;
 
@@ -137,17 +100,6 @@ require_once dirname(__DIR__) . '/classes/UseByQueue.php';
     mysqli_stmt_bind_param($stmt, "i", $artifact_id);
     mysqli_stmt_execute($stmt);
     $result = mysqli_stmt_get_result($stmt);
-    return $result;
-  }
-
-  function list_artifacts(int $user_id) {
-    global $db;
-    $sql = "SELECT games.id, games.Title FROM games WHERE games.user_id = ? ORDER BY games.Title ASC";
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, "i", $user_id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    confirm_result_set($result);
     return $result;
   }
 

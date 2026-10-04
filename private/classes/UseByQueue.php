@@ -2,6 +2,7 @@
 
 require_once dirname(__DIR__) . '/use_by_date.php';
 require_once dirname(__DIR__) . '/record_use.php';
+require_once __DIR__ . '/Items.php';
 
 /**
  * The owner's Use-by queue: kept items not flagged to get rid of, plus the
@@ -107,15 +108,11 @@ final class UseByQueue
 
     private function present(array $row, $defaultInterval): array
     {
-        $lastUse = max((string) $row['last_use'], (string) $row['last_play']);
-        $lastUse = $lastUse === '' ? null : substr($lastUse, 0, 10);
-        unset($row['last_use'], $row['last_play']);
-        $useBy = use_by_date($row['Acq'], $lastUse, $row['interaction_frequency_days'], $defaultInterval);
+        $useBy = use_by_date($row['Acq'], $row['last_use'], $row['interaction_frequency_days'], $defaultInterval);
         $daysUntil = $useBy === null ? null : (int) (new DateTimeImmutable($this->today, new DateTimeZone('UTC')))
             ->diff(new DateTimeImmutable($useBy, new DateTimeZone('UTC')))->format('%r%a');
 
         return $row + [
-            'last_use' => $lastUse,
             'use_by_date' => $useBy,
             'days_until' => $daysUntil,
             'status' => match (true) {
@@ -128,8 +125,8 @@ final class UseByQueue
     }
 
     /**
-     * The owner's items matching $where, with their latest use and latest
-     * legacy play date read from per-item aggregates so no row repeats.
+     * The owner's items matching $where, with their last use read from
+     * Items' last-use rule so no row repeats.
      */
     private function rows(string $where, string $types, array $params): array
     {
@@ -138,13 +135,10 @@ final class UseByQueue
                 types.objectType AS type, games.user_id, games.is_kept, games.is_in_secondary_collection,
                 games.to_get_rid_of, games.snoozed_until, games.mnp, games.mxp, games.mnt, games.mxt,
                 games.Candidate, games.UsedRecUserCt, games.ss, games.age,
-                recent_use.last_use, recent_play.last_play
+                item_last_use.last_use
              FROM games
                 LEFT JOIN types ON types.id = games.type_id
-                LEFT JOIN (SELECT artifact_id, MAX(use_date) AS last_use FROM uses GROUP BY artifact_id) recent_use
-                    ON recent_use.artifact_id = games.id
-                LEFT JOIN (SELECT Title, MAX(PlayDate) AS last_play FROM responses GROUP BY Title) recent_play
-                    ON recent_play.Title = games.id
+                LEFT JOIN " . Items::LAST_USE . " item_last_use ON item_last_use.artifact_id = games.id
              WHERE games.user_id = ? AND $where"
         );
         $stmt->bind_param('i' . $types, $this->userId, ...$params);

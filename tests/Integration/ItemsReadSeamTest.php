@@ -34,6 +34,7 @@ final class ItemsReadSeamTest extends TestCase
         require_once PRIVATE_PATH . '/database.php';
         require_once PRIVATE_PATH . '/kept_status.php';
         require_once PRIVATE_PATH . '/query_functions/artifact_queries.php';
+        require_once PRIVATE_PATH . '/classes/Items.php';
         $GLOBALS['db'] = $this->db;
         $_SESSION['user_id'] = 1;
     }
@@ -91,15 +92,15 @@ final class ItemsReadSeamTest extends TestCase
 
     public function test_to_get_rid_of_list_includes_is_kept_under_strict_group_by(): void
     {
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
-        $result = find_artifacts_to_get_rid_of();
-        $rows = [];
-        while ($row = mysqli_fetch_assoc($result)) {
-            $rows[] = $row;
-        }
+        $this->db->query("INSERT INTO responses (Title, user_id, PlayDate) VALUES (11, 1, '2026-03-01')");
+        $rows = (new \Items($this->db, 1))->list(['to_get_rid_of' => true]);
         $this->assertCount(1, $rows);
         $this->assertSame(11, (int) $rows[0]['id']);
         $this->assertArrayHasKey('is_kept', $rows[0]);
         $this->assertTrue(artifact_is_kept($rows[0]));
+        $this->assertSame('2026-03-01', $rows[0]['last_use']);
+        $this->assertSame('board-game', $rows[0]['type_name']);
     }
 }
