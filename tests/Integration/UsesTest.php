@@ -275,10 +275,10 @@ final class UsesTest extends TestCase
         [$azulWithJo] = $this->uses->record($this->use(['item_id' => 11, 'use_date' => '2026-09-13', 'player_ids' => [101]]));
         [$catanWithSam] = $this->uses->record($this->use(['use_date' => '2026-09-14', 'player_ids' => [100]]));
 
-        $this->assertSame([$azulWithJo, $catanWithJo], array_column($this->uses->all(null, 101), 'id'));
-        $this->assertSame([$catanWithJo], array_column($this->uses->all(10, 101), 'id'));
-        $this->assertSame([$azulWithJo], array_column($this->uses->all(11), 'id'));
-        $this->assertContains($catanWithSam, array_column($this->uses->all(10), 'id'));
+        $this->assertSame([$azulWithJo, $catanWithJo], array_column($this->uses->all(['person_id' => 101]), 'id'));
+        $this->assertSame([$catanWithJo], array_column($this->uses->all(['item_id' => 10, 'person_id' => 101]), 'id'));
+        $this->assertSame([$azulWithJo], array_column($this->uses->all(['item_id' => 11]), 'id'));
+        $this->assertContains($catanWithSam, array_column($this->uses->all(['item_id' => 10]), 'id'));
     }
 
     public function test_all_matches_nothing_for_another_owners_item_or_person(): void
@@ -286,7 +286,130 @@ final class UsesTest extends TestCase
         (new Uses($this->db, 2))->record(['item_id' => 20, 'use_date' => '2026-09-12', 'player_ids' => [200]]);
         $this->uses->record($this->use());
 
-        $this->assertSame([], $this->uses->all(20));
-        $this->assertSame([], $this->uses->all(null, 200));
+        $this->assertSame([], $this->uses->all(['item_id' => 20]));
+        $this->assertSame([], $this->uses->all(['person_id' => 200]));
+    }
+
+    public function test_all_filters_by_item_type(): void
+    {
+        [$catan] = $this->uses->record($this->use());
+        [$arrival] = $this->uses->record($this->use(['item_id' => 12, 'use_date' => '2026-09-13']));
+
+        $this->assertSame([$arrival], array_column($this->uses->all(['type_ids' => [2]]), 'id'));
+        $this->assertContains($catan, array_column($this->uses->all(['type_ids' => [1]]), 'id'));
+        $this->assertNotContains($arrival, array_column($this->uses->all(['type_ids' => [1]]), 'id'));
+        $this->assertCount(3, $this->uses->all(['type_ids' => ['1', '2']]));
+        $this->assertCount(3, $this->uses->all(['type_ids' => null]));
+    }
+
+    public function test_no_type_ids_lists_nothing(): void
+    {
+        $this->uses->record($this->use());
+
+        $this->assertSame([], $this->uses->all(['type_ids' => []]));
+    }
+
+    public function test_all_keeps_uses_on_or_after_the_since_date(): void
+    {
+        [$before] = $this->uses->record($this->use(['use_date' => '2026-09-11']));
+        [$onTheDay] = $this->uses->record($this->use(['use_date' => '2026-09-12']));
+        [$after] = $this->uses->record($this->use(['use_date' => '2026-09-13']));
+
+        $this->assertSame([$after, $onTheDay], array_column($this->uses->all(['since' => '2026-09-12']), 'id'));
+        $this->assertContains($before, array_column($this->uses->all(['since' => '']), 'id'));
+        $this->assertCount(4, $this->uses->all(['since' => null]));
+    }
+
+    public function test_uses_with_no_date_stay_in_the_unfiltered_listing(): void
+    {
+        $this->db->query('INSERT INTO uses (artifact_id, user_id, use_date) VALUES (10, 1, NULL)');
+        $undated = (int) $this->db->insert_id;
+
+        $this->assertContains($undated, array_column($this->uses->all(), 'id'));
+        $this->assertNotContains($undated, array_column($this->uses->all(['since' => '2000-01-01']), 'id'));
+    }
+
+    public static function malformedSince(): array
+    {
+        return [
+            'not a date' => ['soon'],
+            'impossible date' => ['2026-02-30'],
+            'US order' => ['09/12/2026'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('malformedSince')]
+    public function test_a_malformed_since_date_is_refused(string $since): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Enter a valid date in YYYY-MM-DD format.');
+        $this->uses->all(['since' => $since]);
+    }
+
+    public function test_an_unknown_filter_is_refused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->uses->all(['type' => [1]]);
+    }
+
+    public function test_filters_combine(): void
+    {
+        [$catanWithJo] = $this->uses->record($this->use(['player_ids' => [101]]));
+        $this->uses->record($this->use(['use_date' => '2026-01-01', 'player_ids' => [101]]));
+        $this->uses->record($this->use(['item_id' => 12, 'player_ids' => [101]]));
+
+        $this->assertSame([$catanWithJo], array_column($this->uses->all([
+            'person_id' => 101, 'type_ids' => [1], 'since' => '2026-09-01',
+        ]), 'id'));
+    }
+
+    public function test_each_use_carries_its_items_type_name(): void
+    {
+        [$catan] = $this->uses->record($this->use());
+        [$arrival] = $this->uses->record($this->use(['item_id' => 12]));
+        $this->db->query('UPDATE games SET type_id = NULL WHERE id = 11');
+        [$azul] = $this->uses->record($this->use(['item_id' => 11]));
+
+        $this->assertSame('board-game', $this->uses->find($catan)['item_type']);
+        $this->assertSame('film', $this->uses->find($arrival)['item_type']);
+        $this->assertNull($this->uses->find($azul)['item_type']);
+        $this->assertSame('board-game', array_column($this->uses->all(), 'item_type', 'id')[$catan]);
+    }
+
+    public function test_another_owners_item_and_people_do_not_leak_into_the_listing(): void
+    {
+        $this->db->query("INSERT INTO uses (artifact_id, user_id, use_date, note) VALUES (20, 1, '2026-09-20', 'Their place')");
+        $crossed = (int) $this->db->insert_id;
+        $this->db->query("INSERT INTO uses_players (use_id, player_id, user_id) VALUES ($crossed, 200, 1)");
+
+        $use = array_column($this->uses->all(), null, 'id')[$crossed];
+        $this->assertSame('', $use['item_title']);
+        $this->assertNull($use['item_type']);
+        $this->assertSame([], $use['people']);
+        $this->assertSame([], $this->uses->all(['type_ids' => [1, 2], 'since' => '2026-09-20']));
+    }
+
+    public function test_the_last_setting_is_the_most_recently_recorded_uses(): void
+    {
+        $this->uses->record($this->use(['use_date' => '2026-12-31', 'setting' => 'Cabin']));
+        $this->uses->record($this->use(['use_date' => '2026-01-01', 'setting' => 'Kitchen table']));
+        (new Uses($this->db, 2))->record(['item_id' => 20, 'use_date' => '2026-09-12', 'setting' => 'Their place']);
+
+        $this->assertSame('Kitchen table', $this->uses->lastSetting());
+    }
+
+    public function test_the_last_setting_is_null_without_a_use_or_a_stored_setting(): void
+    {
+        (new Uses($this->db, 2))->record(['item_id' => 20, 'use_date' => '2026-09-12', 'setting' => 'Their place']);
+        $this->assertNull((new Uses($this->db, 3))->lastSetting());
+
+        $this->assertNull($this->uses->lastSetting());
+    }
+
+    public function test_an_empty_last_setting_is_kept(): void
+    {
+        $this->uses->record($this->use(['setting' => '']));
+
+        $this->assertSame('', $this->uses->lastSetting());
     }
 }

@@ -24,7 +24,7 @@ class UserEditRecordUseTest extends TestCase
         $this->assertStringContainsString('id="record-use-form"', $include);
         $this->assertStringContainsString('/uses/record-new.php', $include);
         $this->assertStringContainsString('record_use_participants', $include);
-        $this->assertStringContainsString('most_recent_use_setting', $include);
+        $this->assertStringContainsString('->lastSetting()', $include);
         $this->assertStringContainsString('record-use-submit.js', $include);
         $this->assertStringContainsString('RecordUseSubmit.bind', $include);
     }

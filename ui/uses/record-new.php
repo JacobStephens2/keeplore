@@ -92,10 +92,8 @@
   $form = record_use_form($_SESSION['record_use_group'] ?? null, isset($_GET['again']), [
     'people' => [['id' => (int) $_SESSION['player_id'], 'name' => (string) $_SESSION['FullName']]],
     'useDate' => record_use_today(),
-    'Note' => most_recent_use_setting(
-      (int) $_SESSION['user_id'],
-      (new Preferences($db, (int) $_SESSION['user_id']))->get()['default_setting']
-    ),
+    'Note' => (new Uses($db, (int) $_SESSION['user_id']))->lastSetting()
+      ?? (new Preferences($db, (int) $_SESSION['user_id']))->get()['default_setting'],
   ]);
 
   include(SHARED_PATH . '/header.php'); 

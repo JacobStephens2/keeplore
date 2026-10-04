@@ -4,8 +4,9 @@
  * Record-use write seam.
  *
  * Pages that record a use (Record Use, Interact By, dashboard, Edit User)
- * share this module for the AJAX body, the post-save redirect, who is
- * listed as a participant, and the default Setting value.
+ * share this module for the AJAX body, the post-save redirect, and who is
+ * listed as a participant. The Setting a new use opens with is the Uses
+ * module's lastSetting(), falling back to the default Setting Preference.
  */
 
 require_once __DIR__ . '/classes/Uses.php';
@@ -84,21 +85,6 @@ function record_use_participants(
     return $people;
 }
 
-/**
- * The Setting a new use opens with: the owner's last use's note, or
- * $default_setting, the owner's Preference, when they have no use.
- */
-function most_recent_use_setting(int $user_id, string $default_setting, callable $query = null): string
-{
-    $query = $query ?? 'singleValueQuery';
-    $note = $query(
-        "SELECT note FROM uses WHERE user_id = '" . $user_id . "' ORDER BY id DESC LIMIT 1"
-    );
-    if ($note === null || $note === false || $note === 'No results' || $note === 'Possible query error') {
-        return $default_setting;
-    }
-    return (string) $note;
-}
 
 /**
  * The group a use was recorded with: who was there, when, and where. Record

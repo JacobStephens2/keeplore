@@ -41,65 +41,6 @@
     }
   }
 
-  function find_uses_by_user_id($type, $minimumDate) {
-    global $db;
-
-    $params = [];
-    $param_types = '';
-
-    $sql = "SELECT
-      games.Title,
-      types.objectType AS type,
-      games.Candidate,
-      games.ss AS SwS,
-      games.id AS gameID,
-      uses.id AS useID,
-      uses.note,
-      uses.use_date,
-      games.type_id
-      FROM uses
-      LEFT JOIN games ON uses.artifact_id = games.id
-      LEFT JOIN types ON games.type_id = types.id
-      WHERE uses.user_id = ?
-      AND uses.use_date IS NOT NULL
-    ";
-
-    $params[] = $_SESSION['user_id'];
-    $param_types .= 's';
-
-    if (gettype($type == 'array')) {
-      if (count($type) > 0) {
-        $placeholders = implode(',', array_fill(0, count($type), '?'));
-        $sql .= "AND games.type_id IN (" . $placeholders . ") ";
-        foreach($type as $typeIndividual) {
-          $params[] = $typeIndividual;
-          $param_types .= 's';
-        }
-      } else {
-        $sql .= " AND games.type_id = '' ";
-      }
-    }
-
-    if ($minimumDate != '') {
-      $sql .= " AND uses.use_date >= ? ";
-      $params[] = $minimumDate;
-      $param_types .= 's';
-    }
-
-    $sql .= " ORDER BY uses.use_date DESC,
-      uses.id DESC,
-      games.Title DESC
-      LIMIT 9999
-    ";
-
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, $param_types, ...$params);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    confirm_result_set($result);
-    return $result;
-  }
-
   function find_aversions_by_user_id() {
   global $db;
 

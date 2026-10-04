@@ -8,22 +8,21 @@ require_once PROJECT_PATH . '/private/player_item_uses.php';
 
 /**
  * Seams:
- * - rank_items_by_player_uses(): group a player's recorded uses by item
- *   and rank them most uses first
- * - find_player_uses(): load that player's already-scoped use rows
+ * - rank_items_by_player_uses(): group a player's recorded uses, as the
+ *   Uses module reads them, by item and rank them most uses first
  * - player_use_item_cells(): Item and Type cells shared by both tables
  * - ui/users/edit.php source: loads the interactions include
- * - private/shared/user_interactions.php source: ranking without
- *   scanning the chronological interactions table
+ * - private/shared/user_interactions.php source: reads the person's uses
+ *   through the Uses module and ranks them
  */
 class PlayerItemUsesTest extends TestCase
 {
     private function useRow(int $artifactId, string $title, string $type = 'board-game'): array
     {
         return [
-            'artifactID' => $artifactId,
-            'Title' => $title,
-            'type' => $type,
+            'item_id' => $artifactId,
+            'item_title' => $title,
+            'item_type' => $type,
         ];
     }
 
@@ -40,9 +39,9 @@ class PlayerItemUsesTest extends TestCase
 
         $this->assertSame([
             [
-                'artifactID' => 10,
-                'Title' => 'Catan',
-                'type' => 'board-game',
+                'item_id' => 10,
+                'item_title' => 'Catan',
+                'item_type' => 'board-game',
                 'use_count' => 1,
             ],
         ], $ranked);
@@ -58,9 +57,9 @@ class PlayerItemUsesTest extends TestCase
 
         $this->assertSame([
             [
-                'artifactID' => 10,
-                'Title' => 'Catan',
-                'type' => 'board-game',
+                'item_id' => 10,
+                'item_title' => 'Catan',
+                'item_type' => 'board-game',
                 'use_count' => 3,
             ],
         ], $ranked);
@@ -77,7 +76,7 @@ class PlayerItemUsesTest extends TestCase
             $this->useRow(30, 'Wingspan'),
         ]);
 
-        $this->assertSame(['Azul', 'Wingspan', 'Catan'], array_column($ranked, 'Title'));
+        $this->assertSame(['Azul', 'Wingspan', 'Catan'], array_column($ranked, 'item_title'));
         $this->assertSame([3, 2, 1], array_column($ranked, 'use_count'));
     }
 
@@ -94,10 +93,10 @@ class PlayerItemUsesTest extends TestCase
 
         $this->assertSame(
             ['Azul', 'Catan', 'The Left Hand of Darkness'],
-            array_column($ranked, 'Title')
+            array_column($ranked, 'item_title')
         );
         $this->assertSame([2, 2, 2], array_column($ranked, 'use_count'));
-        $this->assertSame('book', $ranked[2]['type']);
+        $this->assertSame('book', $ranked[2]['item_type']);
     }
 
     public function test_item_cells_link_the_title_and_show_the_type(): void
@@ -128,39 +127,18 @@ class PlayerItemUsesTest extends TestCase
         return (string) file_get_contents(PROJECT_PATH . '/private/shared/user_interactions.php');
     }
 
-    private function findPlayerUsesFn(): string
-    {
-        $source = (string) file_get_contents(PROJECT_PATH . '/private/player_item_uses.php');
-        $this->assertSame(
-            1,
-            preg_match('/function find_player_uses\s*\(.*?\n\}/s', $source, $match),
-            'find_player_uses must exist so Edit User can load uses without owning the SQL.'
-        );
-        return $match[0];
-    }
-
-    public function test_find_player_uses_scopes_to_the_account_and_player(): void
-    {
-        $fn = $this->findPlayerUsesFn();
-        $this->assertMatchesRegularExpression('/FROM uses_players/i', $fn);
-        $this->assertStringContainsString('uses_players.user_id = ?', $fn);
-        $this->assertStringContainsString('uses_players.player_id = ?', $fn);
-        $this->assertStringContainsString('ORDER BY uses.use_date DESC', $fn);
-        $this->assertStringContainsString('games.id AS artifactID', $fn);
-    }
-
-    public function test_edit_user_ranks_the_player_uses_already_on_the_page(): void
+    public function test_edit_user_reads_the_persons_uses_through_the_uses_module(): void
     {
         $page = $this->editUserPage();
         $include = $this->interactionsInclude();
         $this->assertStringContainsString("SHARED_PATH . '/user_interactions.php'", $page);
         $this->assertStringContainsString("PRIVATE_PATH . '/player_item_uses.php'", $include);
-        $this->assertStringContainsString('find_player_uses(', $include);
+        $this->assertStringContainsString("->all(['person_id' => \$player_id])", $include);
         $this->assertStringContainsString('rank_items_by_player_uses(', $include);
         $this->assertStringNotContainsString(
-            'FROM uses_players',
+            'FROM uses',
             $include,
-            'The interactions include must load uses through find_player_uses, not inline SQL.'
+            'The interactions include must read uses through the Uses module, not inline SQL.'
         );
     }
 

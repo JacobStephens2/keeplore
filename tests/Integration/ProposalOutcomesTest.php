@@ -226,18 +226,22 @@ final class ProposalOutcomesTest extends TestCase
 
     public function test_proposals_do_not_change_either_items_use_history_or_due_date(): void
     {
-        require_once PRIVATE_PATH . '/query_functions/response_queries.php';
-        require_once PRIVATE_PATH . '/database.php';
         require_once PRIVATE_PATH . '/classes/UseByQueue.php';
-        $GLOBALS['db'] = $this->db;
-        $_SESSION['user_id'] = 1;
+        require_once PRIVATE_PATH . '/classes/Uses.php';
+        $this->db->query('CREATE TABLE uses_players (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            use_id INT NOT NULL,
+            player_id INT NOT NULL,
+            user_id INT NOT NULL
+        ) ENGINE=InnoDB');
         $queue = new \UseByQueue($this->db, 1, '2026-06-01');
+        $uses = new \Uses($this->db, 1);
         $before = [$queue->entry(10), $queue->entry(11)];
-        $usesBefore = find_uses_by_user_id([1, 2], '')->fetch_all(MYSQLI_ASSOC);
+        $usesBefore = $uses->all();
         $id = $this->proposals->save($this->proposal(['chosen_item_id' => 11]));
         $this->proposals->save($this->proposal(['chosen_item_id' => 11, 'outcome' => 'chose_something_else']), $id);
         $this->assertSame($before, [$queue->entry(10), $queue->entry(11)]);
-        $this->assertSame($usesBefore, find_uses_by_user_id([1, 2], '')->fetch_all(MYSQLI_ASSOC));
+        $this->assertSame($usesBefore, $uses->all());
         $this->proposals->delete($id);
         $this->assertSame($before, [$queue->entry(10), $queue->entry(11)]);
     }

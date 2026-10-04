@@ -26,7 +26,7 @@ function list_uses_over_api(mysqli $db, object $authentication, array $query): a
     return [400, ['message' => 'user_id or artifact_id parameter is required for API key authentication.']];
   }
 
-  return [200, ['uses' => array_map('use_api_fields', (new Uses($db, $owner))->all($item_id, $person_id))]];
+  return [200, ['uses' => array_map('use_api_fields', (new Uses($db, $owner))->all(['item_id' => $item_id, 'person_id' => $person_id]))]];
 }
 
 /**
