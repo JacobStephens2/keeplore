@@ -24,38 +24,22 @@
   $hide_duplicate_group_settings = $_POST['hide_duplicate_group_settings'] ?? 'no';
   $hide_online_setting = $_POST['hide_online_setting'] ?? 'no';
 
-  $use_set = find_uses_by_user_id($type, $minimumDate);
-
-  // Batch-load all uses into an array
   $uses_array = [];
-  $use_ids = [];
-  $total_rows = $use_set->num_rows;
-  while ($use = mysqli_fetch_assoc($use_set)) {
-    $uses_array[] = $use;
-    $use_ids[] = $use['useID'];
+  $uses_error = null;
+  try {
+    $uses_array = (new Uses($db, (int) $_SESSION['user_id']))->all([
+      'type_ids' => array_values((array) $type),
+      'since' => (string) $minimumDate,
+    ]);
+  } catch (InvalidArgumentException $invalid) {
+    $uses_error = $invalid->getMessage();
   }
-  mysqli_free_result($use_set);
+  $total_rows = count($uses_array);
 
-  // Batch-fetch all players for all uses in ONE query (fixes N+1)
-  $players_by_use = [];
-  if (!empty($use_ids)) {
-    $placeholders = implode(',', array_fill(0, count($use_ids), '?'));
-    $player_query = "SELECT uses_players.use_id, players.id, players.FirstName, players.LastName
-      FROM uses_players
-      LEFT JOIN players ON uses_players.player_id = players.id
-      WHERE uses_players.user_id = ?
-      AND uses_players.use_id IN ($placeholders)
-    ";
-    $stmt = mysqli_prepare($db, $player_query);
-    $param_types = 's' . str_repeat('s', count($use_ids));
-    mysqli_stmt_bind_param($stmt, $param_types, $_SESSION['user_id'], ...$use_ids);
-    mysqli_stmt_execute($stmt);
-    $players_result = mysqli_stmt_get_result($stmt);
-    while ($player = mysqli_fetch_assoc($players_result)) {
-      $players_by_use[$player['use_id']][] = $player;
-    }
-    mysqli_stmt_close($stmt);
-  }
+  // Candidate, sweet spot and "Candidate spot used" read the owner's Items,
+  // loaded once and only when the attributes are shown.
+  $items = $showAttributes === 'yes' ? (new Items($db, (int) $_SESSION['user_id']))->list() : [];
+  $items_by_id = array_column($items, null, 'id');
 ?>
 
 <script defer src="/shared/filter_button.js"></script>
@@ -80,7 +64,7 @@
       </section>
 
       <label for="minimumDate">Minimum Date (<?php echo DEFAULT_USE_INTERVAL; ?> days ago: <?php echo date('m/d/Y', strtotime(DEFAULT_USE_INTERVAL . ' days ago')); ?>)</label>
-      <input type="date" name="minimumDate" id="minimumDate" value="<?php echo $minimumDate; ?>">
+      <input type="date" name="minimumDate" id="minimumDate" value="<?php echo h((string) $minimumDate); ?>">
 
       <label for="showAttributes">Show item attributes</label>
       <input type="hidden" name="showAttributes" value="no">
@@ -111,6 +95,9 @@
       <button type="submit">Submit</button>
     </form>
 
+    <?php if ($uses_error !== null) { ?>
+    <p class="form-error"><?php echo h($uses_error); ?></p>
+    <?php } else { ?>
     <div class="table-scroll">
   	<table class="list" id="uses" data-page-length='100'>
       <thead>
@@ -142,12 +129,12 @@
 
             // Hide online setting uses
             if ($hide_online_setting === 'yes') {
-              if (h($use['note']) === 'online') {
+              if (h($use['setting']) === 'online') {
                 continue;
               }
             }
 
-            $players = $players_by_use[$use['useID']] ?? [];
+            $players = $use['people'];
             $player_count = count($players);
 
             $i = 0;
@@ -160,7 +147,7 @@
 
             $usersArray = [];
             foreach ($players as $player) {
-              $usersArray[$player['id']] = $player['FirstName'] . ' ' . $player['LastName'];
+              $usersArray[$player['id']] = $player['first_name'] . ' ' . $player['last_name'];
             }
 
             // sort by the key ascending
@@ -175,11 +162,11 @@
               }
             }
 
-            if ($use['note'] != 'online') {
+            if ($use['setting'] != 'online') {
               $situation .= ' at';
             }
 
-            $situation .= ' ' . $use['note'];
+            $situation .= ' ' . $use['setting'];
 
             $group_and_setting = $situation;
             if (!in_array($group_and_setting, $group_and_setting_array)) {
@@ -187,7 +174,7 @@
             }
 
             $situation .= ' (';
-            $situation .= h($use['Title']);
+            $situation .= h($use['item_title']);
 
             $group_setting_game = $situation;
 
@@ -198,12 +185,12 @@
             }
 
             $candidate_artifact = '';
-            if ($showAttributes === 'yes') {
-              $group_setting_game_escaped = db_escape($db, $group_setting_game);
-              $query = "SELECT title
-                FROM games WHERE candidate LIKE '$group_setting_game_escaped%'
-              ";
-              $candidate_artifact = singleValueQuery($query);
+            $item = $items_by_id[$use['item_id']] ?? [];
+            foreach ($items as $candidate_item) {
+              if (str_starts_with(mb_strtolower((string) $candidate_item['Candidate']), mb_strtolower($group_setting_game))) {
+                $candidate_artifact = $candidate_item['Title'];
+                break;
+              }
             }
 
             $situation .= ' on ' . h(substr($use['use_date'],0,10));
@@ -215,7 +202,7 @@
                 <?php if (!is_guest()) { ?>
                 <a
                   class="action"
-                  href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($use['useID']))); ?>"
+                  href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($use['id']))); ?>"
                   >
                   <?php echo h(substr($use['use_date'],0,10)); ?>
                 </a>
@@ -225,9 +212,9 @@
               <td class="title">
                 <a
                   class="action"
-                  href="<?php echo url_for('/artifacts/' . (is_guest() ? 'show' : 'edit') . '.php?id=' . h(u($use['gameID']))); ?>"
+                  href="<?php echo url_for('/artifacts/' . (is_guest() ? 'show' : 'edit') . '.php?id=' . h(u($use['item_id']))); ?>"
                   >
-                  <?php echo h($use['Title']); ?>
+                  <?php echo h($use['item_title']); ?>
                 </a>
               </td>
 
@@ -236,11 +223,11 @@
               </td>
 
               <td class="type">
-                <?php echo h($use['type']); ?>
+                <?php echo h($use['item_type']); ?>
               </td>
 
               <td class="setting">
-                <?php echo h($use['note']); ?>
+                <?php echo h($use['setting']); ?>
               </td>
 
               <?php
@@ -248,21 +235,21 @@
                   ?>
                   <td class="candidate">
                     <?php
-                      if (h($use['Candidate']) != '' && h($use['Candidate']) != 0) {
+                      if (h($item['Candidate'] ?? '') != '' && h($item['Candidate'] ?? '') != 0) {
                         echo 'Yes';
                       }
                     ?>
                   </td>
 
                   <td class="sweet_spot">
-                    <?php echo h($use['SwS']); ?>
+                    <?php echo h($item['SS'] ?? ''); ?>
                   </td>
 
                   <td class="user_count">
                     <?php echo $player_count; ?>
                   </td>
 
-                  <td class="canidate_spot_used"><?php if ($candidate_artifact != 'No results' && $candidate_artifact != '') {echo "$candidate_artifact";} ?></td>
+                  <td class="canidate_spot_used"><?php echo h($candidate_artifact); ?></td>
                   <?php
                 }
               ?>
@@ -307,6 +294,7 @@
       }
       ?>
     </script>
+    <?php } ?>
 
 </main>
 

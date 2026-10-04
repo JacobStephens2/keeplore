@@ -159,7 +159,7 @@
 
   <?php if (!is_guest()) { ?>
   <?php
-    $modal_default_setting = most_recent_use_setting((int) $_SESSION['user_id'], $preferences['default_setting']);
+    $modal_default_setting = (new Uses($db, (int) $_SESSION['user_id']))->lastSetting() ?? $preferences['default_setting'];
   ?>
   <div id="record-modal" class="modal" hidden aria-hidden="true">
     <div class="modal-backdrop" data-modal-close></div>

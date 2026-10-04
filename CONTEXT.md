@@ -13,7 +13,7 @@ One of the owner's own categories for items, such as table game, book or film. E
 _Avoid_: Artifact type, ObjectType.
 
 **Use**:
-A recorded occasion when an item was used, on a date, optionally with people, a Setting (where it was used) and notes. One Record Use submit can record several identical uses at once through its Number of uses. Distinct from an item proposal, which is never a use.
+A recorded occasion when an item was used, on a date, optionally with people, a Setting (where it was used) and notes. One Record Use submit can record several identical uses at once through its Number of uses. Every read of an owner's uses, their people and the Setting of their most recently recorded use goes through one module, scoped to the owner. Distinct from an item proposal, which is never a use.
 
 **Last use**:
 The date of an item's most recent use, or none if it has never been used. The use-by date, the Items page, To get rid of and the agent collection list all read it from one rule.

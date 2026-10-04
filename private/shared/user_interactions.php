@@ -11,9 +11,10 @@
   );
   $record_use_items = (new Items($db, $user_id_int))->list();
   $record_use_date = (new DateTime('now', new DateTimeZone('America/New_York')))->format('Y-m-d');
-  $record_use_setting = most_recent_use_setting($user_id_int, (new Preferences($db, $user_id_int))->get()['default_setting']);
+  $uses = new Uses($db, $user_id_int);
+  $record_use_setting = $uses->lastSetting() ?? (new Preferences($db, $user_id_int))->get()['default_setting'];
 
-  $interactions = find_player_uses($db, $user_id, $player_id);
+  $interactions = $uses->all(['person_id' => $player_id]);
   $most_used_items = rank_items_by_player_uses($interactions);
 ?>
 <section id="uses">
@@ -109,7 +110,7 @@
       <?php foreach ($interactions as $row) { ?>
         <tr>
           <td>
-            <a href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($row['use_id']))); ?>">
+            <a href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($row['id']))); ?>">
               <?php echo $row['use_date'] ? h($row['use_date']) : 'No date'; ?>
             </a>
           </td>

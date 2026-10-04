@@ -203,7 +203,7 @@ include(SHARED_PATH . '/header.php');
 
   <?php if (!is_guest()) { ?>
   <?php
-    $dashboard_default_setting = most_recent_use_setting($user_id, $preferences['default_setting']);
+    $dashboard_default_setting = (new Uses($db, $user_id))->lastSetting() ?? $preferences['default_setting'];
   ?>
   <div id="dashboard-toast" class="toast" role="status" aria-live="polite"></div>
   <div id="record-modal" class="modal" hidden aria-hidden="true">

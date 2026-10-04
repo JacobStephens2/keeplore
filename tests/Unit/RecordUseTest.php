@@ -9,9 +9,10 @@ require_once PROJECT_PATH . '/private/record_use.php';
 /**
  * Seam: private/record_use.php
  *
- * The record-use write path (AJAX JSON, return URL, participants, last
- * setting) is one module so Edit User, Interact By, and Record Use share
- * it instead of each page inventing the same POST contract.
+ * The record-use write path (AJAX JSON, return URL, participants) is one
+ * module so Edit User, Interact By, and Record Use share it instead of each
+ * page inventing the same POST contract. The Setting a new use opens with
+ * is read through the Uses module (tests/Integration/UsesTest.php).
  */
 class RecordUseTest extends TestCase
 {
@@ -129,30 +130,24 @@ class RecordUseTest extends TestCase
         );
     }
 
-    public function test_most_recent_setting_is_the_last_use_note(): void
+    public function test_new_use_forms_open_with_the_uses_modules_last_setting(): void
     {
-        $query = function (string $sql) {
-            if (strpos($sql, 'FROM uses') !== false) {
-                return 'Kitchen table';
-            }
-            $this->fail('Should not fall back when a use note exists.');
-        };
-
-        $this->assertSame('Kitchen table', most_recent_use_setting(8, 'Home', $query));
+        foreach ([
+            '/ui/index.php',
+            '/ui/artifacts/useby.php',
+            '/ui/uses/record-new.php',
+            '/private/shared/user_interactions.php',
+        ] as $path) {
+            $source = (string) file_get_contents(PROJECT_PATH . $path);
+            $this->assertMatchesRegularExpression(
+                "/->lastSetting\(\)\s*\?\?/",
+                $source,
+                $path . ' must open a new use with the Uses module\'s last Setting, falling back to the default.'
+            );
+            $this->assertStringNotContainsString('most_recent_use_setting', $source);
+        }
+        $this->assertFalse(function_exists('most_recent_use_setting'));
     }
-
-    public function test_most_recent_setting_falls_back_to_the_user_default(): void
-    {
-        $query = function (string $sql) {
-            if (strpos($sql, 'FROM uses') !== false) {
-                return 'No results';
-            }
-            $this->fail('Should only look up the last use.');
-        };
-
-        $this->assertSame('Home', most_recent_use_setting(8, 'Home', $query));
-    }
-
     public function test_use_count_defaults_to_one(): void
     {
         $this->assertSame(1, record_use_count([]));

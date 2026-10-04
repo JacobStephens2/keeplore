@@ -43,26 +43,62 @@ final class Uses
 
     /**
      * The owner's uses, newest first (by use date, then id), each as find()
-     * reads it. An item or person filter keeps only that item's uses, or
-     * the uses that person took part in.
+     * reads it, including uses with no date.
+     *
+     * Filters combine with AND; null or missing means no filter. item_id
+     * keeps that item's uses and person_id the uses that person took part
+     * in. type_ids keeps the uses whose item has one of those types; []
+     * lists nothing. since keeps uses on or after a YYYY-MM-DD date; blank
+     * means no filter. An unknown key or a malformed since throws
+     * InvalidArgumentException.
      */
-    public function all(?int $itemId = null, ?int $personId = null): array
+    public function all(array $filters = []): array
     {
+        $unknown = array_diff(array_keys($filters), ['item_id', 'person_id', 'type_ids', 'since']);
+        if ($unknown !== []) {
+            throw new InvalidArgumentException('Unknown Use list filter: ' . implode(', ', $unknown) . '.');
+        }
+        $typeIds = $filters['type_ids'] ?? null;
+        if ($typeIds === []) {
+            return [];
+        }
+
         $where = ['TRUE'];
         $types = '';
         $params = [];
-        if ($itemId !== null) {
+        if (isset($filters['item_id'])) {
             $where[] = 'uses.artifact_id = ?';
             $types .= 'i';
-            $params[] = $itemId;
+            $params[] = $filters['item_id'];
         }
-        if ($personId !== null) {
+        if (isset($filters['person_id'])) {
             $where[] = 'EXISTS (SELECT 1 FROM uses_players
                 WHERE uses_players.use_id = uses.id AND uses_players.player_id = ? AND uses_players.user_id = uses.user_id)';
             $types .= 'i';
-            $params[] = $personId;
+            $params[] = $filters['person_id'];
+        }
+        if ($typeIds !== null) {
+            $where[] = 'games.type_id IN (' . implode(', ', array_fill(0, count($typeIds), '?')) . ')';
+            $types .= str_repeat('s', count($typeIds));
+            array_push($params, ...array_map('strval', array_values($typeIds)));
+        }
+        $since = $filters['since'] ?? '';
+        if (!is_string($since) || trim($since) !== '') {
+            $where[] = 'uses.use_date >= ?';
+            $types .= 's';
+            $params[] = $this->validDate($since);
         }
         return $this->read(implode(' AND ', $where), $types, $params);
+    }
+
+    /**
+     * The Setting of the owner's most recently recorded use (highest id),
+     * or null when they have no use or that Setting is NULL.
+     */
+    public function lastSetting(): ?string
+    {
+        $row = $this->rows('SELECT note FROM uses WHERE user_id = ? ORDER BY id DESC LIMIT 1', 'i', [$this->userId])[0] ?? null;
+        return $row === null || $row['note'] === null ? null : (string) $row['note'];
     }
 
     /** The owner's uses matching $where, newest first, each with its people. */
@@ -72,13 +108,16 @@ final class Uses
             'id' => (int) $use['id'],
             'item_id' => (int) $use['item_id'],
             'item_title' => (string) $use['item_title'],
+            'item_type' => $use['item_type'] === null ? null : (string) $use['item_type'],
             'use_date' => substr((string) $use['use_date'], 0, 10),
             'setting' => (string) $use['setting'],
             'notes' => (string) $use['notes'],
         ], $this->rows(
-            "SELECT uses.id, uses.artifact_id AS item_id, games.Title AS item_title, uses.use_date,
-                uses.note AS setting, uses.notesTwo AS notes
-             FROM uses LEFT JOIN games ON games.id = uses.artifact_id AND games.user_id = uses.user_id
+            "SELECT uses.id, uses.artifact_id AS item_id, games.Title AS item_title, types.objectType AS item_type,
+                uses.use_date, uses.note AS setting, uses.notesTwo AS notes
+             FROM uses
+                LEFT JOIN games ON games.id = uses.artifact_id AND games.user_id = uses.user_id
+                LEFT JOIN types ON types.id = games.type_id
              WHERE uses.user_id = ? AND $where
              ORDER BY uses.use_date DESC, uses.id DESC",
             'i' . $types, array_merge([$this->userId], $params)
@@ -159,11 +198,7 @@ final class Uses
             throw new InvalidArgumentException('Choose an item from your own items.');
         }
 
-        $date = $input['use_date'] ?? '';
-        if (!is_string($date) || !preg_match('/^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$/D', $date)
-            || !checkdate((int) substr($date, 5, 2), (int) substr($date, 8, 2), (int) substr($date, 0, 4))) {
-            throw new InvalidArgumentException('Enter a valid date in YYYY-MM-DD format.');
-        }
+        $date = $this->validDate($input['use_date'] ?? '');
 
         $text = [];
         foreach (['setting', 'notes'] as $field) {
@@ -193,6 +228,15 @@ final class Uses
             'use_date' => $date,
             'player_ids' => $playerIds,
         ] + $text;
+    }
+
+    private function validDate(mixed $date): string
+    {
+        if (!is_string($date) || !preg_match('/^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$/D', $date)
+            || !checkdate((int) substr($date, 5, 2), (int) substr($date, 8, 2), (int) substr($date, 0, 4))) {
+            throw new InvalidArgumentException('Enter a valid date in YYYY-MM-DD format.');
+        }
+        return $date;
     }
 
     private function requireUse(int $id): void

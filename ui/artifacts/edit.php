@@ -304,7 +304,7 @@
 
   <section id="interactionsList">
     <?php
-      $item_uses = (new Uses($db, (int) $_SESSION['user_id']))->all($id);
+      $item_uses = (new Uses($db, (int) $_SESSION['user_id']))->all(['item_id' => $id]);
     ?>
     <h2>
       You have recorded
