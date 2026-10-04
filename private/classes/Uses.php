@@ -110,14 +110,17 @@ final class Uses
     {
         // With no person marked as the owner, Player = NULL matches no legacy play.
         $me = (new People($this->db, $this->userId))->me();
-        $usesSince = $playsSince = '';
-        $period = [];
+        $uses = ['owner_items.user_id = ?'];
+        $plays = ['responses.user_id = ?', 'responses.Player = ?', self::IS_PLAY];
+        $usesParams = [$this->userId];
+        $playsParams = [$this->userId, $me];
         if ($since !== null) {
-            $usesSince = ' AND uses.use_date >= ?';
-            $playsSince = ' AND responses.PlayDate >= ?';
-            $period = [$this->validDate($since)];
+            $since = $this->validDate($since);
+            $uses[] = 'uses.use_date >= ?';
+            $plays[] = 'responses.PlayDate >= ?';
+            $usesParams[] = $playsParams[] = $since;
         }
-        $periodTypes = str_repeat('s', count($period));
+        $params = array_merge($usesParams, $playsParams, [$this->userId]);
         return array_map(fn (array $row) => [
             'item_id' => (int) $row['item_id'],
             'item_title' => (string) $row['item_title'],
@@ -125,16 +128,14 @@ final class Uses
             'use_count' => (int) $row['use_count'],
         ], $this->rows(
             'SELECT games.id AS item_id, games.Title AS item_title, types.objectType AS item_type, COUNT(*) AS use_count
-             FROM (SELECT uses.artifact_id AS item_id FROM ' . Items::OWNERS_USES . "
-                    WHERE owner_items.user_id = ?$usesSince
-                UNION ALL SELECT responses.Title FROM responses
-                    WHERE responses.user_id = ? AND responses.Player = ? AND " . self::IS_PLAY . "$playsSince) counted
+             FROM (SELECT uses.artifact_id AS item_id FROM ' . Items::OWNERS_USES . ' WHERE ' . implode(' AND ', $uses) . '
+                UNION ALL SELECT responses.Title FROM responses WHERE ' . implode(' AND ', $plays) . ') counted
                 JOIN games ON games.id = counted.item_id AND games.user_id = ?
                 LEFT JOIN types ON types.id = games.type_id
              GROUP BY games.id, games.Title, types.objectType
-             ORDER BY use_count DESC, games.Title, games.id",
-            'i' . $periodTypes . 'ii' . $periodTypes . 'i',
-            array_merge([$this->userId], $period, [$this->userId, $me], $period, [$this->userId])
+             ORDER BY use_count DESC, games.Title, games.id',
+            implode('', array_map(fn ($param) => is_string($param) ? 's' : 'i', $params)),
+            $params
         ));
     }
 
