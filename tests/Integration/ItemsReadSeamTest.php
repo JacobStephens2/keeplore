@@ -33,10 +33,12 @@ final class ItemsReadSeamTest extends TestCase
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
         require_once PRIVATE_PATH . '/database.php';
         require_once PRIVATE_PATH . '/kept_status.php';
-        require_once PRIVATE_PATH . '/query_functions/artifact_queries.php';
         require_once PRIVATE_PATH . '/classes/Items.php';
-        $GLOBALS['db'] = $this->db;
-        $_SESSION['user_id'] = 1;
+        require_once PRIVATE_PATH . '/items_list.php';
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-url.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-bgg-ratings-manual.sql'));
     }
 
     protected function tearDown(): void
@@ -58,12 +60,23 @@ final class ItemsReadSeamTest extends TestCase
         } while ($this->db->more_results() && $this->db->next_result());
     }
 
-    private function fetchIds($result): array
+    private function payload(string $kept): array
     {
-        $ids = [];
-        while ($row = mysqli_fetch_assoc($result)) {
-            $ids[] = (int) $row['id'];
-        }
+        return items_list_payload($this->db, [
+            'kept' => $kept,
+            'type' => [],
+            'interval' => 90,
+            'players' => null,
+            'age' => null,
+            'ageUnknown' => false,
+            'showAttributes' => 'no',
+            'tagFilter' => '',
+        ], 1);
+    }
+
+    private function payloadIds(string $kept): array
+    {
+        $ids = array_column($this->payload($kept), 'id');
         sort($ids);
         return $ids;
     }
@@ -71,28 +84,21 @@ final class ItemsReadSeamTest extends TestCase
     public function test_kept_filters_agree_under_strict_group_by(): void
     {
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
-        $this->assertSame([10, 11], $this->fetchIds(find_artifacts_by_user_id('yes', [], 90)));
-        $this->assertSame([12, 13], $this->fetchIds(find_artifacts_by_user_id('no', [], 90)));
-        $this->assertSame([12], $this->fetchIds(find_artifacts_by_user_id('secondary_only', [], 90)));
+        $this->assertSame([10, 11], $this->payloadIds('yes'));
+        $this->assertSame([12, 13], $this->payloadIds('no'));
+        $this->assertSame([12], $this->payloadIds('secondary_only'));
     }
 
-    public function test_items_list_query_returns_the_overall_bgg_rating(): void
+    public function test_items_page_rows_carry_the_overall_bgg_rating(): void
     {
+        $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
         $this->db->query("UPDATE games SET BGG_Rat = '7.09' WHERE id = 10");
-        $result = find_artifacts_by_user_id('yes', [], 90);
-        $found = null;
-        while ($row = mysqli_fetch_assoc($result)) {
-            if ((int) $row['id'] === 10) {
-                $found = $row;
-            }
-        }
-        $this->assertNotNull($found);
-        $this->assertSame('7.09', $found['BGG_Rat']);
+        $rows = array_column($this->payload('yes'), null, 'id');
+        $this->assertSame('7.09', $rows[10]['bgg_average']);
     }
 
     public function test_to_get_rid_of_list_includes_is_kept_under_strict_group_by(): void
     {
-        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
         $this->db->query("INSERT INTO responses (Title, user_id, PlayDate) VALUES (11, 1, '2026-03-01')");
         $rows = (new \Items($this->db, 1))->list(['to_get_rid_of' => true]);

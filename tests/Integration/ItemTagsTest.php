@@ -34,9 +34,7 @@ final class ItemTagsTest extends TestCase
         $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         require_once PRIVATE_PATH . '/item_tags.php';
         require_once PRIVATE_PATH . '/database.php';
-        require_once PRIVATE_PATH . '/query_functions/artifact_queries.php';
-        $GLOBALS['db'] = $this->db;
-        $_SESSION['user_id'] = 1;
+        require_once PRIVATE_PATH . '/classes/Items.php';
     }
 
     protected function tearDown(): void
@@ -101,19 +99,15 @@ final class ItemTagsTest extends TestCase
         $this->assertSame([], artifact_ids_with_tag($this->db, 1, 'two-player'));
     }
 
-    public function test_collection_query_filters_by_tag_under_strict_group_by(): void
+    public function test_item_list_filters_by_tag_under_strict_group_by(): void
     {
         $this->db->query("SET SESSION sql_mode = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
         replace_item_tags($this->db, 10, 1, ['beach-safe']);
         replace_item_tags($this->db, 11, 1, ['party']);
         replace_item_tags($this->db, 20, 2, ['beach-safe']);
 
-        $ids = [];
-        $result = find_artifacts_by_user_id('yes', [], 90, 'beach-safe');
-        while ($row = mysqli_fetch_assoc($result)) {
-            $ids[] = (int) $row['id'];
-        }
-        $this->assertSame([10], $ids);
+        $rows = (new \Items($this->db, 1))->list(['kept' => true, 'tag' => 'beach-safe']);
+        $this->assertSame([10], array_map(fn (array $row) => (int) $row['id'], $rows));
     }
 
     public function test_user_item_list_filters_by_tag_and_attaches_tags(): void
