@@ -33,7 +33,8 @@ final class AccountInvalid extends InvalidArgumentException
  * AccountInvalid with every problem, and nothing is written.
  *
  * A password reset needs a key emailed to the account's address. A key lasts
- * one day, and a successful reset uses up every key for that address.
+ * one day, and a successful reset uses up every key for that address, as
+ * does changing the account's email.
  */
 final class Accounts
 {
@@ -116,7 +117,8 @@ final class Accounts
      */
     public function updateProfile(int $id, array $input): array
     {
-        if ($this->find($id) === null) {
+        $before = $this->find($id);
+        if ($before === null) {
             throw new OutOfBoundsException('Account not found.');
         }
         $profile = self::profile($input);
@@ -130,6 +132,10 @@ final class Accounts
             'ssssi', [...array_values($profile), $id],
             $profile, $id
         );
+        if ($profile['email'] !== $before['email']) {
+            // A key emailed to the old address must not reset whoever has it next.
+            $this->statement('DELETE FROM password_reset_temp WHERE email = ?', 's', [$before['email']])->close();
+        }
         return $this->find($id);
     }
 
@@ -161,7 +167,7 @@ final class Accounts
     /** Whether $key is an unexpired reset key for $email. */
     public function resetLinkIsValid(string $email, string $key): bool
     {
-        return $this->keyIsValid($email, $key, '');
+        return $this->keyIsValid($email, $key, false);
     }
 
     /**
@@ -175,7 +181,7 @@ final class Accounts
         $this->db->begin_transaction();
         try {
             // Locking the email's keys makes a second reset with the same key wait, then fail.
-            $errors = $this->keyIsValid($email, $key, ' FOR UPDATE') ? [] : [self::INVALID_RESET_LINK];
+            $errors = $this->keyIsValid($email, $key, true) ? [] : [self::INVALID_RESET_LINK];
             $errors = [...$errors, ...self::passwordProblems($password, $confirm)];
             if ($errors !== []) {
                 throw new AccountInvalid($errors);
@@ -192,14 +198,14 @@ final class Accounts
         }
     }
 
-    /** Whether $key is an unexpired reset key for $email, read with the $lock clause. */
-    private function keyIsValid(string $email, string $key, string $lock): bool
+    /** Whether $key is an unexpired reset key for $email, locking the email's keys when $lock. */
+    private function keyIsValid(string $email, string $key, bool $lock): bool
     {
         if ($key === '') {
             return false;
         }
         $keys = $this->rows(
-            'SELECT `key` FROM password_reset_temp WHERE email = ? AND expDate >= ?' . $lock,
+            'SELECT `key` FROM password_reset_temp WHERE email = ? AND expDate >= ?' . ($lock ? ' FOR UPDATE' : ''),
             'ss', [$email, date('Y-m-d H:i:s', $this->now())]
         );
         foreach ($keys as $row) {

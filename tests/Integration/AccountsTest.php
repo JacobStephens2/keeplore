@@ -384,6 +384,10 @@ final class AccountsTest extends TestCase
             'blank email' => [['email' => ''], ['Email cannot be blank.']],
             'long email' => [['email' => str_repeat('a', 244) . '@keeplore.app'], ['Email must be at most 255 characters.']],
             'malformed email' => [['email' => 'not-an-email'], ['Email must be a valid format.']],
+            'email with no domain' => [['email' => 'user@'], ['Email must be a valid format.']],
+            'email with no top-level domain' => [['email' => 'user@host'], ['Email must be a valid format.']],
+            'email with a one-letter top-level domain' => [['email' => 'user@host.x'], ['Email must be a valid format.']],
+            'email with a space' => [['email' => 'user @example.com'], ['Email must be a valid format.']],
             'blank username' => [['username' => ''], ['Username cannot be blank.']],
             'short username' => [['username' => 'short'], ['Username must be between 8 and 255 characters.']],
             'long username' => [['username' => str_repeat('u', 256)], ['Username must be between 8 and 255 characters.']],
@@ -478,6 +482,36 @@ final class AccountsTest extends TestCase
         $this->assertSame('owner@keeplore.app', $account['email']);
         $this->assertSame('ownerusername', $account['username']);
         $this->assertSame($account, $this->accounts()->find(1));
+    }
+
+    /**
+     * @testWith ["first.last+tag@example.co.uk"]
+     *           ["USER@EXAMPLE.COM"]
+     */
+    public function test_update_profile_accepts_a_valid_email(string $email): void
+    {
+        $this->assertSame($email, $this->accounts()->updateProfile(1, self::profileChanges(['email' => $email]))['email']);
+    }
+
+    public function test_changing_the_email_uses_up_its_reset_keys(): void
+    {
+        [$email, $key] = $this->requestLink('owner@keeplore.app');
+
+        $this->accounts()->updateProfile(1, self::profileChanges());
+        $this->accounts()->updateProfile(2, self::profileChanges(['email' => 'owner@keeplore.app', 'username' => 'otherusername']));
+
+        $this->assertFalse($this->accounts()->resetLinkIsValid($email, $key));
+        $this->invalid(fn () => $this->accounts()->resetPassword($email, $key, self::NEW_PASSWORD, self::NEW_PASSWORD));
+        $this->assertTrue($this->passwordIs(2, self::OLD_PASSWORD));
+    }
+
+    public function test_saving_the_same_email_keeps_its_reset_keys(): void
+    {
+        [$email, $key] = $this->requestLink('owner@keeplore.app');
+
+        $this->accounts()->updateProfile(1, self::profileChanges(['email' => 'owner@keeplore.app']));
+
+        $this->assertTrue($this->accounts()->resetLinkIsValid($email, $key));
     }
 
     public static function brokenProfileUpdates(): array
