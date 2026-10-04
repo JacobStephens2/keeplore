@@ -9,10 +9,15 @@
  * A type is an array of id, name, kept_count and not_kept_count, the counts
  * being the owner's items with the type that are kept and that are not.
  *
- * A bad name, or a delete destination that is not another of the owner's
- * types, throws InvalidArgumentException; rename or delete of a type the
- * owner doesn't have throws OutOfBoundsException. Nothing is written either
- * way.
+ * The owner's Type for BoardGameGeek items, used on Create Item, is one of
+ * their types too: it reads as none once that type is no longer theirs, and
+ * it moves with the type's items when the type is deleted.
+ *
+ * A bad name, a delete destination that is not another of the owner's
+ * types, or a Type for BoardGameGeek items that is not a type throws
+ * InvalidArgumentException; rename, delete or a Type for BoardGameGeek items
+ * of a type the owner doesn't have throws OutOfBoundsException. Nothing is
+ * written either way.
  */
 final class Types
 {
@@ -32,6 +37,45 @@ final class Types
     public function find(int $id): ?array
     {
         return $this->select('AND types.id = ?', 'ii', [$this->userId, $id])[0] ?? null;
+    }
+
+    /**
+     * The owner's Type for BoardGameGeek items, or null when none is set or
+     * the stored type is no longer one of the owner's.
+     */
+    public function bggDefault(): ?array
+    {
+        return $this->select(
+            'AND types.id = (SELECT bgg_default_type_id FROM users WHERE id = ?)',
+            'ii', [$this->userId, $this->userId]
+        )[0] ?? null;
+    }
+
+    /**
+     * Set the owner's Type for BoardGameGeek items from the id Settings
+     * posts, blank clearing it, and return whether the stored value changed.
+     * The type is locked as delete() locks it, so a concurrent delete can't
+     * leave the setting naming a type that is gone.
+     */
+    public function setBggDefault(string $raw): bool
+    {
+        $raw = trim($raw);
+        if ($raw !== '' && preg_match('/^[1-9][0-9]*$/', $raw) !== 1) {
+            throw new InvalidArgumentException('That is not a type.');
+        }
+        return $this->transaction(function () use ($raw) {
+            $id = $raw === '' ? null : (int) $raw;
+            if ($id !== null && $this->lockedName($id) === null) {
+                throw new OutOfBoundsException('That type is not one of yours.');
+            }
+            $stmt = $this->statement(
+                'UPDATE users SET bgg_default_type_id = ? WHERE id = ? AND NOT (bgg_default_type_id <=> ?)',
+                'iii', [$id, $this->userId, $id]
+            );
+            $changed = $stmt->affected_rows > 0;
+            $stmt->close();
+            return $changed;
+        });
     }
 
     /** Add a type to the owner's list and return its id. */

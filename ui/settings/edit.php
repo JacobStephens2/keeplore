@@ -2,7 +2,6 @@
 
 require_once('../../private/initialize.php');
 require_once(PRIVATE_PATH . '/bgg_import_jobs.php');
-require_once(PRIVATE_PATH . '/item_types.php');
 global $db;
 
 require_login();
@@ -11,6 +10,7 @@ $page_title = 'Edit User Settings';
 $user_id = (int) $_SESSION['user_id'];
 $preferences = new Preferences($db, $user_id);
 $bgg_ratings = new BggRatings($db, $user_id);
+$owner_types = new Types($db, $user_id);
 
 if(is_post_request()) {
   // Saved apart from the rest, so a profile error costs only the profile.
@@ -44,14 +44,22 @@ if(is_post_request()) {
   } catch (InvalidArgumentException | BggUnreachable $e) {
     $bgg_error = $e->getMessage();
   }
-  $bgg_default_type_result = user_bgg_default_type_set($db, $user_id, $_POST['bgg_default_type_id'] ?? '');
+
+  // Saved apart from the rest, so a failure costs only this field.
+  try {
+    $bgg_default_type_changed = $owner_types->setBggDefault((string) ($_POST['bgg_default_type_id'] ?? ''));
+  } catch (InvalidArgumentException | OutOfBoundsException $e) {
+    $bgg_default_type_error = $e->getMessage();
+  } catch (mysqli_sql_exception) {
+    $bgg_default_type_error = 'Your type for BoardGameGeek items could not be saved. Please try again.';
+  }
 }
 
 // A refused profile keeps what was posted, so it can be fixed.
 $profile = isset($profile_errors) ? $posted_profile : ($account ?? accounts()->find($user_id));
 $userArray = $profile + $preferences->get();
-$bgg_default_type = user_bgg_default_type($db, $user_id);
-$types = (new Types($db, $user_id))->all();
+$bgg_default_type = $owner_types->bggDefault();
+$types = $owner_types->all();
 
 ?>
 
@@ -75,10 +83,13 @@ $types = (new Types($db, $user_id))->all();
       } elseif (isset($bgg_message)) {
         echo '<p id="bgg_message">' . h($bgg_message) . '</p>';
       }
-      if (isset($bgg_default_type_result) && !$bgg_default_type_result['ok']) {
-        echo '<p class="errors">' . h($bgg_default_type_result['error']) . ' Your type for BoardGameGeek items did not change.</p>';
-      } elseif (isset($bgg_default_type_result) && $bgg_default_type_result['message'] !== null) {
-        echo '<p id="bgg_default_type_message">' . h($bgg_default_type_result['message']) . '</p>';
+      if (isset($bgg_default_type_error)) {
+        echo '<p class="errors">' . h($bgg_default_type_error) . ' Your type for BoardGameGeek items did not change.</p>';
+      } elseif (!empty($bgg_default_type_changed)) {
+        $bgg_default_type_message = $bgg_default_type === null
+          ? 'You no longer have a type for BoardGameGeek items.'
+          : 'Your type for BoardGameGeek items is now ' . $bgg_default_type['name'] . '.';
+        echo '<p id="bgg_default_type_message">' . h($bgg_default_type_message) . '</p>';
       }
   ?>
 
