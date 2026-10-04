@@ -1,36 +1,12 @@
 <?php
 
-  require_once('../private/initialize.php');
-  header('Content-Type: application/json');
+  require_once('private/initialize.php');
+  require_once('../private/api_request.php');
+  require_once('../private/daily_email_api.php');
+  require_once('../private/classes/SmtpMailer.php');
 
-  $response = new stdClass;
-
-  // Authenticate via JWT cookie and only allow sending the email to the
-  // currently logged-in user.
-  $authentication_response = authenticate();
-  if (!isset($authentication_response->authenticated) || $authentication_response->authenticated !== true) {
-    http_response_code(401);
-    $response->message = 'You are not authenticated.';
-    echo json_encode($response);
-    exit;
-  }
-
-  // Triggering email sends is outside the agent scope (reads plus kept toggle).
-  deny_agent_key_writes($authentication_response);
-
-  $authenticated_user_id = isset($authentication_response->user_id) ? (int) $authentication_response->user_id : null;
-  $requested_user_id = isset($_GET['userID']) ? (int) $_GET['userID'] : null;
-
-  if (!$authenticated_user_id || !$requested_user_id || $authenticated_user_id !== $requested_user_id) {
-    http_response_code(403);
-    $response->message = 'You may only send this email to yourself.';
-    echo json_encode($response);
-    exit;
-  }
-
-  $response->userID = $authenticated_user_id;
-  $response->count_to_notify_about = (new DailyEmail($db, $authenticated_user_id, SmtpMailer::fromEnvironment()))->send();
-
-  echo json_encode($response);
+  emit_api_response(answer_api_request($database, 'send_use_email', [
+    'GET' => fn (ApiCaller $caller, array $request) => send_daily_email_over_api($database, $caller, $request['query'], SmtpMailer::fromEnvironment()),
+  ], api_request_from_globals()));
 
 ?>

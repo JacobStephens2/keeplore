@@ -82,6 +82,22 @@ function find_agent_key_by_token($conn, $token) {
 }
 
 /**
+ * Scope gate: agent keys may read and flip kept, nothing else. The 403
+ * response body when the caller authenticated with an agent key, else null.
+ */
+function agent_key_write_refusal($authentication_response) {
+  if (is_object($authentication_response)
+      && isset($authentication_response->auth_type)
+      && $authentication_response->auth_type === 'agent_key') {
+    return [
+      'authenticated' => true,
+      'message' => 'Agent keys permit reads plus the kept toggle only.',
+    ];
+  }
+  return null;
+}
+
+/**
  * For an endpoint script not yet answered through answer_api_request(),
  * whose handlers ask ApiCaller instead: exits 403 when the caller
  * authenticated with an agent key, which may read and flip kept, nothing
