@@ -22,20 +22,16 @@
   $artifact_record = find_owned_item_or_exit($artifact_id, $is_ajax);
   $artifact_name = $artifact_record['Title'];
 
-  $result = set_artifact_to_get_rid_of($artifact_id, $value);
+  (new Items($db, (int) $_SESSION['user_id']))->setToGetRidOf($artifact_id, $value === 1);
 
-  if ($result) {
-    $message = $value === 1
-      ? $artifact_name . ' marked to get rid of.'
-      : $artifact_name . ' restored to collection.';
-  } else {
-    $message = 'Failed to update item.';
-  }
+  $message = $value === 1
+    ? $artifact_name . ' marked to get rid of.'
+    : $artifact_name . ' restored to collection.';
 
   if ($is_ajax) {
     header('Content-Type: application/json');
     echo json_encode([
-      'ok' => (bool) $result,
+      'ok' => true,
       'value' => $value,
       'artifact_id' => (int) $artifact_id,
       'artifact_name' => $artifact_name,

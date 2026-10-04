@@ -60,22 +60,17 @@
   $id = (int) $requestBody->id;
   $user_id = isset($authentication_response->user_id) ? (int) $authentication_response->user_id : null;
 
-  // Fetch scoped to the authenticated user so agents can only flip their
-  // own user's items. Legacy API keys without a user cannot use this endpoint.
-  if ($user_id) {
-    $stmt = $database->prepare("SELECT * FROM games WHERE id = ? AND user_id = ? LIMIT 1");
-    $stmt->bind_param("ii", $id, $user_id);
-  } else {
+  // The key owner's Items, so agents can only flip their own user's items.
+  // Legacy API keys without a user cannot use this endpoint.
+  if (!$user_id) {
     http_response_code(403);
     $response->message = 'This endpoint requires a user-scoped credential.';
     echo json_encode($response);
     exit;
   }
-  $stmt->execute();
-  $record = $stmt->get_result()->fetch_assoc();
-  $stmt->close();
+  $items = new Items($database, $user_id);
 
-  if (!$record) {
+  if ($items->find($id) === null) {
     http_response_code(404);
     $response->message = 'Item not found.';
     echo json_encode($response);
@@ -83,16 +78,14 @@
   }
 
   // Single kept seam: exactly one kept vocabulary.
-  set_artifact_kept_for_user($database, $user_id, $id, $kept);
-
-  $updated = Artifact::find_by_id_and_user_id($id, $user_id);
-  $row = $updated ? get_object_vars($updated) : $record;
+  $items->setKept($id, $kept === 1);
+  $row = $items->find($id);
 
   $logger->logDataChange('update', 'artifact-kept', $id, ['is_kept' => $kept]);
 
   $response->ok = true;
   $response->artifact_id = $id;
-  $response->artifact_name = $updated ? $updated->Title : ($record['Title'] ?? 'Item');
+  $response->artifact_name = $row['Title'];
   $response->message = $kept === 1
     ? $response->artifact_name . ' is now kept.'
     : $response->artifact_name . ' is no longer kept.';

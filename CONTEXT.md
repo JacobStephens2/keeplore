@@ -68,6 +68,9 @@ A separate overflow collection an item can belong to whether or not it is kept.
 **To get rid of**:
 An item flagged for removal, whether or not it is kept.
 
+**Snoozed**:
+An item hidden from the dashboard's priority queue until its snooze-until date, set for the owner's default snooze days or a number chosen when snoozing. Snoozing changes no use and no use-by date.
+
 **Physical item**:
 An item with a physical form. Independent of whether it is kept.
 

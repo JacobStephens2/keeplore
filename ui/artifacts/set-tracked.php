@@ -22,22 +22,16 @@
   $artifact_record = find_owned_item_or_exit($artifact_id, $is_ajax);
   $artifact_name = $artifact_record['Title'];
 
-  // Single kept seam: flips kept through one setter (dual-writes the new
-  // and legacy columns during the overlap release).
-  $result = set_artifact_kept($artifact_id, $value);
+  (new Items($db, (int) $_SESSION['user_id']))->setKept($artifact_id, $value === 1);
 
-  if ($result) {
-    $message = $value === 1
-      ? $artifact_name . ' is now kept.'
-      : $artifact_name . ' is no longer kept.';
-  } else {
-    $message = 'Failed to update item.';
-  }
+  $message = $value === 1
+    ? $artifact_name . ' is now kept.'
+    : $artifact_name . ' is no longer kept.';
 
   if ($is_ajax) {
     header('Content-Type: application/json');
     echo json_encode([
-      'ok' => (bool) $result,
+      'ok' => true,
       'value' => $value,
       'is_kept' => $value === 1 ? 1 : 0,
       'artifact_id' => (int) $artifact_id,

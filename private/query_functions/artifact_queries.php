@@ -7,37 +7,6 @@ use PHPMailer\PHPMailer\Exception;
 require_once dirname(__DIR__) . '/item_tags.php';
 require_once dirname(__DIR__) . '/classes/UseByQueue.php';
 
-  function set_artifact_to_get_rid_of($artifact_id, $value) {
-    global $db;
-    $user_id = (int) $_SESSION['user_id'];
-    $artifact_id = (int) $artifact_id;
-    $value = (int) $value;
-    $stmt = mysqli_prepare($db, "UPDATE games SET to_get_rid_of = ? WHERE id = ? AND user_id = ? LIMIT 1");
-    mysqli_stmt_bind_param($stmt, "iii", $value, $artifact_id, $user_id);
-    $result = mysqli_stmt_execute($stmt);
-    mysqli_stmt_close($stmt);
-    return $result;
-  }
-
-  // Defer an artifact for $days days by setting snoozed_until to that future
-  // date. While snoozed_until is in the future the artifact is hidden from the
-  // dashboard "Most past due" priority queue. Returns the snooze-until date
-  // (Y-m-d) on success, or false on failure.
-  function snooze_artifact($artifact_id, $days) {
-    global $db;
-    $user_id = (int) $_SESSION['user_id'];
-    $artifact_id = (int) $artifact_id;
-    $days = max(1, (int) $days);
-    $snooze_until = (new DateTime('today'))
-      ->add(DateInterval::createFromDateString("$days days"))
-      ->format('Y-m-d');
-    $stmt = mysqli_prepare($db, "UPDATE games SET snoozed_until = ? WHERE id = ? AND user_id = ? LIMIT 1");
-    mysqli_stmt_bind_param($stmt, "sii", $snooze_until, $artifact_id, $user_id);
-    $result = mysqli_stmt_execute($stmt);
-    mysqli_stmt_close($stmt);
-    return $result ? $snooze_until : false;
-  }
-
   function find_artifacts_to_get_rid_of() {
     global $db;
     $user_id = (int) $_SESSION['user_id'];
@@ -75,17 +44,6 @@ require_once dirname(__DIR__) . '/classes/UseByQueue.php';
     confirm_result_set($result);
     return $result;
   }
-  function find_all_board_artifacts() {
-    global $db;
-
-    $sql = "SELECT * FROM games ";
-    $sql .= "WHERE type = 'board-game' ";
-    $sql .= "ORDER BY is_kept DESC, Acq DESC";
-    $result = mysqli_query($db, $sql);
-    confirm_result_set($result);
-    return $result;
-  }
-
   function find_artifacts_by_user_id($kept, $type, $interval, $tag = '') {
     global $db;
 
@@ -182,48 +140,6 @@ require_once dirname(__DIR__) . '/classes/UseByQueue.php';
     return $result;
   }
 
-  function find_uses_by_artifact_id($artifact_id) {
-    global $db;
-
-    $stmt = mysqli_prepare($db, "SELECT
-      uses.id,
-      uses.use_date,
-      uses.note,
-      GROUP_CONCAT(DISTINCT CONCAT(players.FirstName, ' ', players.LastName)
-        ORDER BY players.FirstName SEPARATOR ', ') AS players
-      FROM uses
-      LEFT JOIN uses_players ON uses_players.use_id = uses.id
-      LEFT JOIN players ON players.id = uses_players.player_id
-      WHERE uses.artifact_id = ?
-      GROUP BY uses.id, uses.use_date, uses.note
-      ORDER BY uses.use_date DESC,
-      uses.id DESC
-    ");
-    mysqli_stmt_bind_param($stmt, "i", $artifact_id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    return $result;
-  }
-
-  function find_artifact_by_id($id) {
-    global $db;
-
-    $stmt = mysqli_prepare($db,
-      "SELECT types.objectType AS type_name, games.*
-      FROM games
-      LEFT JOIN types ON games.type_id = types.id
-      WHERE games.id = ?"
-    );
-    mysqli_stmt_bind_param($stmt, "i", $id);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-
-    $subject = mysqli_fetch_assoc($result);
-    mysqli_stmt_close($stmt);
-
-    return $subject; // returns an assoc. array
-  }
-
   function list_artifacts(int $user_id) {
     global $db;
     $sql = "SELECT games.id, games.Title FROM games WHERE games.user_id = ? ORDER BY games.Title ASC";
@@ -233,100 +149,6 @@ require_once dirname(__DIR__) . '/classes/UseByQueue.php';
     $result = mysqli_stmt_get_result($stmt);
     confirm_result_set($result);
     return $result;
-  }
-
-  function list_artifacts_by_query($query) {
-    global $db;
-    $sql = "SELECT games.id, games.Title FROM games WHERE games.Title LIKE ? ORDER BY games.Title ASC";
-    $like_param = '%' . $query . '%';
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, "s", $like_param);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    confirm_result_set($result);
-    return $result;
-  }
-
-  function first_play_by() {
-    global $db;
-
-      $sql ="SELECT
-      games.Title,
-      games.mnp,
-      games.mxp,
-      games.ss,
-      games.type,
-      CASE
-          WHEN MAX(responses.PlayDate) < games.Acq THEN DATE_ADD(games.Acq, INTERVAL 180 DAY)
-          WHEN MAX(responses.PlayDate) IS NULL THEN DATE_ADD(games.Acq, INTERVAL 180 DAY)
-          ELSE DATE_ADD(MAX(responses.PlayDate), INTERVAL 360 DAY)
-      END PlayBy,
-      games.Acq,
-      MAX(responses.PlayDate) AS MaxPlay,
-      games.is_kept
-    FROM games
-      LEFT JOIN responses ON games.id = responses.Title
-    GROUP BY games.Acq,
-      games.Title,
-      games.is_kept, games.mnp, games.mxp, games.ss, games.type
-
-    HAVING (games.is_kept) = 1
-    and games.type = 'board-game'
-    ORDER BY MostRecentUse DESC, MaxPlay DESC
-    LIMIT 1
-    ";
-
-    $result = mysqli_query($db, $sql);
-    confirm_result_set($result);
-    return $result;
-
-    /* Sample query
-      SELECT
-          games.Title,
-          games.mnp,
-          games.mxp,
-          games.Candidate,
-          games.UsedRecUserCt,
-          games.ss,
-          games.id,
-          games.type,
-          games.user_id,
-          CASE
-              WHEN MAX(responses.PlayDate) < games.Acq THEN DATE_ADD(games.Acq, INTERVAL 180 DAY)
-              WHEN MAX(responses.PlayDate) IS NULL THEN DATE_ADD(games.Acq, INTERVAL 180 DAY)
-              ELSE DATE_ADD(MAX(responses.PlayDate),
-                  INTERVAL 360 DAY)
-          END PlayBy,
-          MAX(responses.PlayDate) AS MaxPlay,
-          games.Acq,
-          games.is_kept
-      FROM
-          games
-              LEFT JOIN
-          responses ON games.id = responses.Title
-      GROUP BY games.Acq , games.Title , games.is_kept , games.mnp , games.mxp , games.ss , games.type , games.id
-      HAVING games.user_id = 8 AND games.is_kept = 1
-          AND games.ss LIKE '%3%'
-          AND games.type IN ('game' , 'board-game',
-          'card-game',
-          'childrens-game',
-          'gambling-game',
-          'miniatures-game',
-          'mobile-game',
-          'role-playing-game',
-          'sport',
-          'vr-game',
-          'book',
-          'audiobook',
-          'drink',
-          'food',
-          'equipment',
-          'film',
-          'instrument',
-          'toy',
-          'other')
-      ORDER BY PlayBy ASC
-    */
   }
 
 function email_artifact_use_notice($user_id) {

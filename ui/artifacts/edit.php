@@ -311,11 +311,11 @@
 
   <section id="interactionsList">
     <?php
-      $usesOfArtifactByUserResultObject = find_uses_by_artifact_id($artifact['id']);
+      $item_uses = (new Uses($db, (int) $_SESSION['user_id']))->all($id);
     ?>
     <h2>
       You have recorded
-      <?php echo $usesOfArtifactByUserResultObject->num_rows; ?>
+      <?php echo count($item_uses); ?>
       interactions with
       <?php echo h($artifact['Title']); ?>
     </h2>
@@ -324,14 +324,14 @@
         <th>Interaction Date</th>
         <th>People</th>
       </tr>
-      <?php foreach ($usesOfArtifactByUserResultObject as $useRow) { ?>
+      <?php foreach ($item_uses as $use) { ?>
         <tr>
           <td>
-            <a href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($useRow['id']))); ?>">
-              <?php echo h(substr($useRow['use_date'] ?? '', 0, 10)); ?>
+            <a href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($use['id']))); ?>">
+              <?php echo h($use['use_date']); ?>
             </a>
           </td>
-          <td><?php echo h($useRow['players'] ?? ''); ?></td>
+          <td><?php echo h(implode(', ', array_column($use['people'], 'name'))); ?></td>
         </tr>
       <?php } ?>
     </table>

@@ -1,8 +1,11 @@
 <?php 
   require_once('../../private/initialize.php');
   require_login_or_guest();
-  $id = $_GET['id'] ?? '1';
-  $object = find_artifact_by_id($id);
+  $id = filter_var($_GET['id'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+  $object = $id ? (new Items($db, (int) $_SESSION['user_id']))->find($id) : null;
+  if ($object === null) {
+    error_404();
+  }
   $page_title = 'Show Item';
   include(SHARED_PATH . '/header.php');
 ?>
@@ -45,10 +48,7 @@
   </dl>
 
   <?php
-    $tag_user_id = (int) ($object['user_id'] ?? ($_SESSION['user_id'] ?? 0));
-    $item_tags = $tag_user_id > 0
-      ? (find_item_tags_for_artifacts($db, [(int) $object['id']], $tag_user_id)[(int) $object['id']] ?? [])
-      : [];
+    $item_tags = find_item_tags_for_artifacts($db, [(int) $object['id']], (int) $object['user_id'])[(int) $object['id']] ?? [];
   ?>
   <dl>
     <dt>Tags</dt>
