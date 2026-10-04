@@ -11,17 +11,11 @@ class ItemBggLinkTest extends TestCase
         return (string) file_get_contents(PROJECT_PATH . $path);
     }
 
-    public function test_create_form_carries_the_bgg_link(): void
-    {
-        $new = $this->source('/ui/artifacts/new.php');
-        $this->assertMatchesRegularExpression('/<input type="hidden" name="bgg_url" id="bgg_url"/', $new);
-        $this->assertStringContainsString('fields.bgg_url', $this->source('/ui/artifacts/new-bgg.js'));
-    }
+    // The Item form's BGG fields on each page: tests/Integration/ItemFormTest.php.
 
-    public function test_edit_form_has_an_editable_bgg_link(): void
+    public function test_the_lookup_fills_the_bgg_link(): void
     {
-        $edit = $this->source('/ui/artifacts/edit.php');
-        $this->assertMatchesRegularExpression('/<input type="url" name="bgg_url" id="bgg_url"/', $edit);
+        $this->assertStringContainsString('fields.bgg_url', $this->source('/ui/artifacts/new-bgg.js'));
     }
 
     public function test_edit_and_show_pages_link_to_the_item(): void
@@ -38,16 +32,14 @@ class ItemBggLinkTest extends TestCase
         foreach (['requestBggData', 'bggLookupStatus', 'bggConfirm', 'bggUseMatch', 'bggOtherMatches'] as $id) {
             $this->assertStringContainsString('id="' . $id . '"', $panel, $id);
         }
+        $this->assertStringContainsString("SHARED_PATH . '/bgg_lookup_panel.php'", $this->source('/private/item_form.php'));
         foreach (['/ui/artifacts/new.php', '/ui/artifacts/edit.php'] as $path) {
-            $page = $this->source($path);
-            $this->assertStringContainsString("SHARED_PATH . '/bgg_lookup_panel.php'", $page, $path);
-            $this->assertStringContainsString("url_for('/artifacts/new-bgg.js')", $page, $path);
+            $this->assertStringContainsString("url_for('/artifacts/new-bgg.js')", $this->source($path), $path);
         }
     }
 
-    public function test_edit_lookup_keeps_the_item_name(): void
+    public function test_the_lookup_can_keep_the_item_name(): void
     {
-        $this->assertStringContainsString("\$bgg_keep_title = true;", $this->source('/ui/artifacts/edit.php'));
         $this->assertStringContainsString('data-keep-title', $this->source('/private/shared/bgg_lookup_panel.php'));
         $this->assertStringContainsString('keepTitle', $this->source('/ui/artifacts/new-bgg.js'));
     }
@@ -59,14 +51,8 @@ class ItemBggLinkTest extends TestCase
         $this->assertSame('https://boardgamegeek.com/boardgame/171', item_bgg_fields_for_storage(['bgg_url' => 'http://boardgamegeek.com/boardgame/171'])['bgg_url']);
     }
 
-    public function test_forms_carry_the_bgg_vote_basis(): void
+    public function test_the_lookup_fills_the_bgg_vote_basis(): void
     {
-        foreach (['/ui/artifacts/new.php', '/ui/artifacts/edit.php'] as $path) {
-            $page = $this->source($path);
-            $this->assertMatchesRegularExpression('/<input type="hidden" name="bgg_player_votes" id="bgg_player_votes"/', $page, $path);
-            $this->assertMatchesRegularExpression('/<input type="hidden" name="bgg_age_basis" id="bgg_age_basis"/', $page, $path);
-            $this->assertMatchesRegularExpression('/<input type="hidden" name="BGG_Rat" id="BGG_Rat"/', $page, $path);
-        }
         $js = $this->source('/ui/artifacts/new-bgg.js');
         $this->assertStringContainsString('fields.bgg_player_votes', $js);
         $this->assertStringContainsString('fields.bgg_age_basis', $js);
@@ -78,17 +64,9 @@ class ItemBggLinkTest extends TestCase
         $this->assertStringContainsString('item_bgg_basis_html($object)', $this->source('/ui/artifacts/show.php'));
     }
 
-    public function test_edit_page_puts_the_vote_basis_under_each_bgg_field(): void
+    public function test_edit_page_has_no_summary_vote_basis(): void
     {
-        $edit = $this->source('/ui/artifacts/edit.php');
-        $this->assertStringNotContainsString('item_bgg_basis_html(', $edit);
-        foreach (['SS' => 'sweet_spot', 'age' => 'age', 'MnP' => 'players', 'MxP' => 'players'] as $id => $group) {
-            $this->assertMatchesRegularExpression(
-                '/id="' . $id . '"[^\n]*aria-describedby="' . $id . '-bgg-basis"[^\n]*\n\s*<\?php echo item_bgg_field_basis_html\(\$artifact, \'' . $group . '\', \'' . $id . '\'\); \?>/',
-                $edit,
-                "{$id} should be described by its {$group} basis"
-            );
-        }
+        $this->assertStringNotContainsString('item_bgg_basis_html(', $this->source('/ui/artifacts/edit.php'));
     }
 
     public function test_bgg_lookup_returns_the_field_bases(): void
