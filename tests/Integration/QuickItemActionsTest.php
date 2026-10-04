@@ -32,6 +32,7 @@ final class QuickItemActionsTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         require_once PRIVATE_PATH . '/quick_item_actions.php';
     }
 
