@@ -1,6 +1,6 @@
 <?php
 
-require_once dirname(__DIR__) . '/items_list.php';
+require_once dirname(__DIR__) . '/item_facts.php';
 require_once dirname(__DIR__) . '/item_types.php';
 require_once dirname(__DIR__) . '/kept_status.php';
 require_once __DIR__ . '/Items.php';
@@ -107,7 +107,7 @@ final class EventPlans
             'id' => (int) $item['id'],
             'Title' => $item['Title'],
             // Players, sweet spot and age, without the play time.
-            'facts' => items_list_play_facts(array_intersect_key($item, array_flip(['MnP', 'MxP', 'SS', 'Age']))),
+            'facts' => item_play_facts($item, false),
             'is_kept' => artifact_is_kept($item),
             'is_game' => item_type_is_game($item['type_name']),
         ], array_values($items));

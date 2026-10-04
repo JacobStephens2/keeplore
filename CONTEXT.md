@@ -113,6 +113,9 @@ The age BoardGameGeek's player-age poll recommends for a game, such as 6 for "6+
 **Best player count**:
 A player count BoardGameGeek's community voted Best for a game. An open-ended vote such as "Best with 9+" counts for every larger group, unless Search BGG is told to leave open-ended Best out; then it counts only at 9.
 
+**Sweet spot**:
+The player counts an item plays best at, recorded on the item from BoardGameGeek's Best votes or by hand, in any spelling such as "03,04", "3, 4" or "06-8". Every page that filters or labels items by it reads it from one rule. Distinct from Best player count, BoardGameGeek's own community vote for a game.
+
 **BGG reviewer**:
 A BoardGameGeek user, such as Gyges, whose ratings and comments on the owner's items are imported or entered by hand. The owner names their own reviewer on Settings, whether their own BGG account or someone else's, and may have older ones from earlier imports. Settings imports all of their ratings in the background as a **BGG import**. Items and Search BGG show one column per reviewer; Search BGG fills it from the owner's items that link to the game, kept or not.
 

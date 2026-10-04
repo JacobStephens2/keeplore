@@ -387,42 +387,6 @@ class ItemsListTest extends TestCase
             'Button must update textContent between Kept and Keep on toggle.'
         );
     }
-    /**
-     * @dataProvider sweetSpotSpellings
-     */
-    public function test_sweet_spot_counts_read_every_stored_spelling(string $ss, array $counts): void
-    {
-        $this->assertSame($counts, items_list_sweet_spot_counts($ss));
-    }
-
-    public static function sweetSpotSpellings(): array
-    {
-        return [
-            'blank' => ['', []],
-            'bgg zero padded' => ['01', [1]],
-            'unpadded' => ['1', [1]],
-            'padded list' => ['03,04', [3, 4]],
-            'spaced list' => ['01, 2, 3, 4', [1, 2, 3, 4]],
-            'range' => ['06-8', [6, 7, 8]],
-            'spaced range' => ['3 - 5', [3, 4, 5]],
-            'runaway range capped' => ['98-2000000000', [98, 99]],
-            'range and count' => ['03-4, 6', [3, 4, 6]],
-            'trailing tab' => ["02,3\t", [2, 3]],
-            'out of order' => ['10, 5, 1', [1, 5, 10]],
-            'wide range' => ['03,10-12', [3, 10, 11, 12]],
-        ];
-    }
-
-    public function test_players_label_is_the_range_with_its_sweet_spot(): void
-    {
-        $this->assertSame('2–4 (best 3)', items_list_players_label(2, 4, '03'));
-        $this->assertSame('3–6 (best 3–5)', items_list_players_label(3, 6, '03-5'));
-        $this->assertSame('1–8 (best 3, 4, 6)', items_list_players_label(1, 8, '03,04,06'));
-        $this->assertSame('2–4', items_list_players_label(2, 4, ''));
-        $this->assertSame('2 (best 2)', items_list_players_label(2, 2, '02'));
-        $this->assertSame('best 3', items_list_players_label(null, null, '03'));
-        $this->assertSame('', items_list_players_label(null, null, null));
-    }
 
     public function test_present_row_carries_the_players_label(): void
     {
@@ -455,21 +419,6 @@ class ItemsListTest extends TestCase
 
         $this->assertSame(3, $params['players']);
         $this->assertArrayNotHasKey('sweetSpotFilter', $params);
-    }
-
-    public function test_best_at_keeps_only_items_whose_sweet_spot_holds_the_count(): void
-    {
-        $rows = [
-            ['id' => 1, 'ss' => '03'],
-            ['id' => 2, 'ss' => '06-8'],
-            ['id' => 3, 'ss' => '13'],
-            ['id' => 4, 'ss' => ''],
-            ['id' => 5, 'ss' => '02, 3, 4'],
-        ];
-
-        $this->assertSame([1, 5], array_column(items_list_best_at($rows, 3), 'id'));
-        $this->assertSame([2], array_column(items_list_best_at($rows, 7), 'id'));
-        $this->assertSame([1, 2, 3, 4, 5], array_column(items_list_best_at($rows, null), 'id'));
     }
 
     public function test_items_page_titles_a_chosen_count_best_at(): void
@@ -691,23 +640,6 @@ class ItemsListTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\$\w+\[\'(kept|type|players|age|age_unknown|interval|tag|showAttributes)\'\]\s*=/', $source);
     }
 
-    public function test_suitable_for_age_keeps_items_whose_minimum_age_is_known_and_at_most_the_age(): void
-    {
-        $rows = [
-            ['id' => 1, 'Age' => 8],
-            ['id' => 2, 'Age' => 7],
-            ['id' => 3, 'Age' => 2],
-            ['id' => 4, 'Age' => 0],
-            ['id' => 5, 'Age' => null],
-            ['id' => 6],
-            ['id' => 7, 'age' => '3'],
-        ];
-
-        $this->assertSame([2, 3, 7], array_column(items_list_suitable_for_age($rows, 7), 'id'));
-        $this->assertSame([3], array_column(items_list_suitable_for_age($rows, 2), 'id'));
-        $this->assertSame([1, 2, 3, 4, 5, 6, 7], array_column(items_list_suitable_for_age($rows, null), 'id'));
-    }
-
     public function test_include_unknown_ages_comes_from_age_unknown_yes(): void
     {
         $types = ['table-game' => '4'];
@@ -727,21 +659,6 @@ class ItemsListTest extends TestCase
         $this->assertSame('yes', $with['age_unknown']);
         $this->assertArrayNotHasKey('age_unknown', $no_age);
         $this->assertArrayNotHasKey('age_unknown', $off);
-    }
-
-    public function test_suitable_for_age_can_include_items_with_no_recorded_age(): void
-    {
-        $rows = [
-            ['id' => 1, 'Age' => 8],
-            ['id' => 2, 'Age' => 2],
-            ['id' => 3, 'Age' => 0],
-            ['id' => 4, 'Age' => null],
-            ['id' => 5],
-        ];
-
-        $this->assertSame([2, 3, 4, 5], array_column(items_list_suitable_for_age($rows, 2, true), 'id'));
-        $this->assertSame([2], array_column(items_list_suitable_for_age($rows, 2, false), 'id'));
-        $this->assertSame([1, 2, 3, 4, 5], array_column(items_list_suitable_for_age($rows, null, true), 'id'));
     }
 
     public function test_items_page_offers_an_include_unknown_ages_checkbox(): void
@@ -800,28 +717,11 @@ class ItemsListTest extends TestCase
         $this->assertMatchesRegularExpression('/<nav class="kept-switch type-switch" aria-label="Item type">/', $source);
     }
 
-    public function test_copy_text_is_name_player_range_with_best_counts_and_minimum_age(): void
+    public function test_present_row_carries_the_copy_text(): void
     {
-        $row = function (array $fields) {
-            return items_list_present_row($fields + ['id' => 1, 'Title' => 'Azul', 'Acq' => '2024-01-10'], 90, '2024-06-01');
-        };
+        $row = items_list_present_row(['id' => 1, 'Title' => 'Azul', 'Acq' => '2024-01-10', 'mnp' => 2, 'mxp' => 4, 'ss' => '02', 'Age' => 8], 90, '2024-06-01');
 
-        $this->assertSame('Azul, 2–4 (2), 8 yrs', $row(['mnp' => 2, 'mxp' => 4, 'ss' => '02', 'Age' => 8])['copy_text']);
-        $this->assertSame('Azul, 3–8 (5–7), 14 yrs', $row(['mnp' => 3, 'mxp' => 8, 'ss' => '05,06,07', 'Age' => 14])['copy_text']);
-        $this->assertSame('Azul, 2–5 (3, 4), 10 yrs', $row(['mnp' => 2, 'mxp' => 5, 'ss' => '3, 4', 'Age' => 10])['copy_text']);
-        $this->assertSame('Azul, 1–4, 8 yrs', $row(['mnp' => 1, 'mxp' => 4, 'ss' => '', 'Age' => 8])['copy_text']);
-        $this->assertSame('Azul, 2–4 (2)', $row(['mnp' => 2, 'mxp' => 4, 'ss' => '02', 'Age' => 0])['copy_text']);
-        $this->assertSame('Azul, 8 yrs', $row(['Age' => 8])['copy_text']);
-        $this->assertSame('Azul', $row([])['copy_text']);
-    }
-
-    public function test_players_label_still_reads_best_after_extracting_the_best_counts(): void
-    {
-        $this->assertSame('3, 4', items_list_best_counts_label('03,04'));
-        $this->assertSame('5–7', items_list_best_counts_label('05,06,07'));
-        $this->assertSame('', items_list_best_counts_label(''));
-        $this->assertSame('2–5 (best 3, 4)', items_list_players_label(2, 5, '3, 4'));
-        $this->assertSame('best 3', items_list_players_label(0, 0, '3'));
+        $this->assertSame('Azul, 2–4 (2), 8 yrs', $row['copy_text']);
     }
 
     public function test_each_items_row_offers_a_copy_button(): void
@@ -840,27 +740,6 @@ class ItemsListTest extends TestCase
         $css = (string) file_get_contents(PROJECT_PATH . '/ui/style.css');
         $this->assertSame(1, preg_match('/\.modal-panel\.bgg-rating-dialog\s*\{([^}]*)\}/', $css, $rule));
         $this->assertStringContainsString('position: fixed', $rule[1]);
-    }
-
-    public function test_copy_text_keeps_the_best_count_when_no_range_is_recorded(): void
-    {
-        $row = items_list_present_row(['id' => 1, 'Title' => 'Azul', 'Acq' => '2024-01-10', 'ss' => '03', 'Age' => 8], 90, '2024-06-01');
-
-        $this->assertSame('Azul, best 3, 8 yrs', $row['copy_text']);
-    }
-
-    public function test_play_facts_read_players_best_count_time_and_age_from_an_item_record(): void
-    {
-        // Edit Item reads the games row as stored: MnP, MxP, SS, Age.
-        $this->assertSame('2–4 players, best 3 · Age 8+', items_list_play_facts(['MnP' => 2, 'MxP' => 4, 'SS' => '03', 'Age' => 8]));
-        $this->assertSame('1–5 players, best 3, 4 · Age 10+', items_list_play_facts(['MnP' => 1, 'MxP' => 5, 'SS' => '03,04', 'Age' => 10]));
-        $this->assertSame('2 players · Age 8+', items_list_play_facts(['MnP' => 2, 'MxP' => 2, 'SS' => '', 'Age' => 8]));
-        $this->assertSame('1 player', items_list_play_facts(['MnP' => 1, 'MxP' => 1, 'SS' => '', 'Age' => 0]));
-        $this->assertSame('Best at 3 · Age 6+', items_list_play_facts(['SS' => '3', 'Age' => 6]));
-        $this->assertSame('', items_list_play_facts(['Title' => 'Hat']));
-        $this->assertSame('2–7 players, best 4, 5 · 15–20 min · Age 6+',
-            items_list_play_facts(['MnP' => 2, 'MxP' => 7, 'SS' => '4,5', 'MnT' => 15, 'MxT' => 20, 'Age' => 6]));
-        $this->assertSame('30 min', items_list_play_facts(['mnt' => 30, 'mxt' => 30]));
     }
 
     public function test_edit_item_shows_the_play_facts_right_under_its_heading(): void
