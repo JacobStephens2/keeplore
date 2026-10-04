@@ -120,7 +120,7 @@ A BGG reviewer's rating, comment or both on one of the owner's items, imported f
 BoardGameGeek's average rating for the game an item links to, copied onto the item by the BGG average import.
 
 **Type for BoardGameGeek items**:
-The owner's type, such as table game, for items filled from a BoardGameGeek match on Create Item, set on Settings. A type the owner already picked on the form stays.
+The owner's type, such as table game, for items filled from a BoardGameGeek match on Create Item, set on Settings. A type the owner already picked on the form stays. Every read and write of it goes through the Types module, scoped to the owner.
 _Avoid_: BGG type (reads like BoardGameGeek's own subtype, such as boardgame or expansion).
 
 **Preferences**:

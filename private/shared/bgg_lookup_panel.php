@@ -1,7 +1,7 @@
 <?php
   // Request BGG Data lookup shared by Create Item and Edit Item. Set
   // $bgg_keep_title = true before including to leave the Name field alone
-  // when a match is used. Set $bgg_default_type (from user_bgg_default_type)
+  // when a match is used. Set $bgg_default_type (from Types::bggDefault())
   // with $bgg_form_default_type_id (the form's own default Type) to give a
   // used match that Type while Type is still that default or blank. Needs
   // ui/artifacts/new-bgg.js on the page.

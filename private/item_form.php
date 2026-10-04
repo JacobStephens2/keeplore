@@ -99,7 +99,7 @@ function item_form_html(string $mode, array $item, $default_interval): string {
       <div class="form-field form-field-span">
         <?php
           global $db;
-          $bgg_default_type = user_bgg_default_type($db, (int) $_SESSION['user_id']);
+          $bgg_default_type = (new Types($db, (int) $_SESSION['user_id']))->bggDefault();
           $bgg_form_default_type_id = DEFAULT_TYPE;
           include SHARED_PATH . '/bgg_lookup_panel.php';
           $preview_url = normalize_item_image_url($item['image_url'] ?? '');

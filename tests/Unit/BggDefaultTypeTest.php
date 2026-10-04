@@ -64,6 +64,7 @@ class BggDefaultTypeTest extends TestCase
         // The Item form puts the type on the button: tests/Integration/ItemFormTest.php.
         $this->assertStringContainsString('bgg-default-type.js', $page);
         $this->assertStringContainsString('data-default-type-id=', $panel);
+        $this->assertStringContainsString("(new Types(\$db, (int) \$_SESSION['user_id']))->bggDefault()", (string) file_get_contents(PROJECT_PATH . '/private/item_form.php'));
         $this->assertStringContainsString('data-form-default-type-id=', $panel);
         $this->assertStringNotContainsString('initialTypeId', (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/new-bgg.js'));
     }
@@ -73,9 +74,10 @@ class BggDefaultTypeTest extends TestCase
         $source = (string) file_get_contents(PROJECT_PATH . '/ui/settings/edit.php');
 
         $this->assertStringContainsString('name="bgg_default_type_id"', $source);
-        $this->assertStringContainsString('user_bgg_default_type_set($db, $user_id,', $source);
-        $this->assertStringContainsString('user_bgg_default_type($db, $user_id)', $source);
-        $this->assertStringContainsString('$types = (new Types($db, $user_id))->all();', $source);
+        $this->assertStringContainsString('$types_module = new Types($db, $user_id);', $source);
+        $this->assertStringContainsString('$types_module->setBggDefault(', $source);
+        $this->assertStringContainsString('$bgg_default_type = $types_module->bggDefault();', $source);
+        $this->assertStringContainsString('$types = $types_module->all();', $source);
         $this->assertStringNotContainsString('artifact_type_array.php', $source);
         $this->assertSame(1, substr_count($source, '$user_id = '), 'Settings sets $user_id once');
     }
