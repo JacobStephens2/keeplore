@@ -4,5 +4,5 @@
   require_login();
 
   $request = quick_item_action_request_from_globals();
-  send_quick_item_action_answer($request, answer_quick_item_action($db, (int) $_SESSION['user_id'], 'get-rid-of', $request));
+  emit_quick_item_action_answer($request, answer_quick_item_action($db, (int) $_SESSION['user_id'], 'get-rid-of', $request));
 ?>

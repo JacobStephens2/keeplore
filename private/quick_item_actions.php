@@ -16,12 +16,53 @@ const QUICK_ITEM_ACTION_RETURN_TO = [
   'new' => '/artifacts/new',
 ];
 
-/** Each action's return_to when the request's is missing or unknown. */
-const QUICK_ITEM_ACTION_DEFAULT_RETURN_TO = [
-  'snooze' => 'dashboard',
-  'kept' => 'useby',
-  'get-rid-of' => 'useby',
-];
+/**
+ * Each Quick item action: its default return_to, used when the request's is
+ * missing or unknown, and what it does to the owner's Item. The change runs
+ * with the Items, the Item's id and name, and the request, and returns the
+ * success body.
+ */
+function quick_item_actions(mysqli $db, int $owner_id): array {
+  return [
+    'snooze' => ['dashboard', function (Items $items, int $id, string $name, array $request) use ($db, $owner_id): array {
+      $days = $request['days'];
+      if ($days === null || $days < 1) {
+        $days = (new Preferences($db, $owner_id))->get()['default_snooze_days'];
+      }
+      $until = $items->snooze($id, $days);
+      return [
+        'ok' => true,
+        'artifact_id' => $id,
+        'artifact_name' => $name,
+        'snoozed_until' => $until,
+        'message' => $name . ' snoozed until ' . $until . '.',
+      ];
+    }],
+    'kept' => ['useby', function (Items $items, int $id, string $name, array $request): array {
+      $value = $request['value'] ?? 0;
+      $items->setKept($id, $value === 1);
+      return [
+        'ok' => true,
+        'value' => $value,
+        'is_kept' => $value === 1 ? 1 : 0,
+        'artifact_id' => $id,
+        'artifact_name' => $name,
+        'message' => $value === 1 ? $name . ' is now kept.' : $name . ' is no longer kept.',
+      ];
+    }],
+    'get-rid-of' => ['useby', function (Items $items, int $id, string $name, array $request): array {
+      $value = $request['value'] ?? 1;
+      $items->setToGetRidOf($id, $value === 1);
+      return [
+        'ok' => true,
+        'value' => $value,
+        'artifact_id' => $id,
+        'artifact_name' => $name,
+        'message' => $value === 1 ? $name . ' marked to get rid of.' : $name . ' restored to collection.',
+      ];
+    }],
+  ];
+}
 
 /**
  * Answers one Quick item action on one of the owner's Items: snooze, kept
@@ -37,11 +78,12 @@ const QUICK_ITEM_ACTION_DEFAULT_RETURN_TO = [
  * message, 'path' => the app path to go back to]. Sends nothing.
  */
 function answer_quick_item_action(mysqli $db, int $owner_id, string $action, array $request): array {
-  if (!isset(QUICK_ITEM_ACTION_DEFAULT_RETURN_TO[$action])) {
+  $actions = quick_item_actions($db, $owner_id);
+  if (!isset($actions[$action])) {
     throw new InvalidArgumentException('Unknown quick item action: ' . $action);
   }
-  $path = QUICK_ITEM_ACTION_RETURN_TO[$request['return_to'] ?? '']
-    ?? QUICK_ITEM_ACTION_RETURN_TO[QUICK_ITEM_ACTION_DEFAULT_RETURN_TO[$action]];
+  [$default_return_to, $change] = $actions[$action];
+  $path = QUICK_ITEM_ACTION_RETURN_TO[$request['return_to'] ?? ''] ?? QUICK_ITEM_ACTION_RETURN_TO[$default_return_to];
 
   if ($request['artifact_id'] === null) {
     return ['status' => 400, 'body' => ['ok' => false, 'message' => 'No item specified.'], 'path' => $path];
@@ -51,47 +93,10 @@ function answer_quick_item_action(mysqli $db, int $owner_id, string $action, arr
   $items = new Items($db, $owner_id);
   $item = $items->find($id);
   if ($item === null) {
-    return ['status' => 404, 'body' => ['ok' => false, 'message' => 'Item not found.'], 'path' => '/artifacts/index.php'];
-  }
-  $name = $item['Title'];
-
-  if ($action === 'snooze') {
-    $days = $request['days'];
-    if ($days === null || $days < 1) {
-      $days = (new Preferences($db, $owner_id))->get()['default_snooze_days'];
-    }
-    $until = $items->snooze($id, $days);
-    $body = [
-      'ok' => true,
-      'artifact_id' => $id,
-      'artifact_name' => $name,
-      'snoozed_until' => $until,
-      'message' => $name . ' snoozed until ' . $until . '.',
-    ];
-  } elseif ($action === 'kept') {
-    $value = $request['value'] ?? 0;
-    $items->setKept($id, $value === 1);
-    $body = [
-      'ok' => true,
-      'value' => $value,
-      'is_kept' => $value === 1 ? 1 : 0,
-      'artifact_id' => $id,
-      'artifact_name' => $name,
-      'message' => $value === 1 ? $name . ' is now kept.' : $name . ' is no longer kept.',
-    ];
-  } else {
-    $value = $request['value'] ?? 1;
-    $items->setToGetRidOf($id, $value === 1);
-    $body = [
-      'ok' => true,
-      'value' => $value,
-      'artifact_id' => $id,
-      'artifact_name' => $name,
-      'message' => $value === 1 ? $name . ' marked to get rid of.' : $name . ' restored to collection.',
-    ];
+    return ['status' => 404, 'body' => ['ok' => false, 'message' => 'Item not found.'], 'path' => QUICK_ITEM_ACTION_RETURN_TO['index']];
   }
 
-  return ['status' => 200, 'body' => $body, 'path' => $path];
+  return ['status' => 200, 'body' => $change($items, $id, $item['Title'], $request), 'path' => $path];
 }
 
 /**
@@ -116,7 +121,7 @@ function quick_item_action_request_from_globals(): array {
  * status and the JSON body; anything else gets the message as the session
  * message and a redirect to the answer's path.
  */
-function send_quick_item_action_answer(array $request, array $answer): void {
+function emit_quick_item_action_answer(array $request, array $answer): void {
   if ($request['is_ajax']) {
     http_response_code($answer['status']);
     header('Content-Type: application/json');
