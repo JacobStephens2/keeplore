@@ -140,6 +140,9 @@ _Avoid_: Group (alone; proposals and event groupings also have groups).
 **Quick record**:
 A use recorded without leaving the page: from the Quick record popup on the dashboard or Use By, or from Edit User's form. A quick record does not change the Use group.
 
+**Quick item action**:
+Snoozing an item, keeping or no longer keeping it, or marking it to get rid of or restoring it, without leaving the page: from the dashboard, Interact By, Items, To get rid of, Create Item's lookup or a Daily email link. Each changes only its own field of the item.
+
 **Number of uses**:
 How many identical uses one Record Use submit saves, from 1 to 20, such as two rounds of Old Maid with the same family on the same day.
 
