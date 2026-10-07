@@ -129,7 +129,7 @@ globalThis.fetch = async (url) => { fetched = url; return { status: 401 }; };
 globalThis.window = {
   Capacitor: {
     isNativePlatform: () => true,
-    Plugins: { LocalNotifications: {} },
+    Plugins: { LocalNotifications: { addListener: async () => ({ remove() {} }) } },
   },
 };
 await import({$url});

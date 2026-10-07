@@ -11,6 +11,22 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
   var API_URL = API_BASE + '/upcoming-interactions.php';
   var DEFAULTS = { enabled: true, hour: 9, lead_days: 3, past_due: true };
 
+  LocalNotifications.addListener('localNotificationActionPerformed', function (action) {
+    if (!action || action.actionId !== 'tap' || !action.notification) return;
+    var itemId = action.notification.extra && action.notification.extra.item_id;
+    // Notifications already on the device use item ID * 10 + 1/2/3.
+    if (itemId == null) {
+      var notificationId = Number(action.notification.id);
+      var kind = notificationId % 10;
+      if (!Number.isSafeInteger(notificationId) || kind < 1 || kind > 3) return;
+      itemId = Math.floor(notificationId / 10);
+    }
+    if (!/^[1-9]\d*$/.test(String(itemId)) || !Number.isSafeInteger(Number(itemId))) return;
+    window.location.href = '/artifacts/edit.php?id=' + itemId;
+  }).catch(function (err) {
+    console.warn('Notification tap listener failed', err);
+  });
+
   function atHour(dateString, hour, offsetDays) {
     var parts = dateString.split('-');
     var d = new Date(
@@ -43,6 +59,7 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
             id: item.id * 10 + 1,
             title: 'Due soon',
             body: item.title + ' is due ' + item.use_by_date,
+            extra: { item_id: item.id },
             schedule: { at: soon, allowWhileIdle: true }
           });
         }
@@ -54,6 +71,7 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
           id: item.id * 10 + 2,
           title: 'Due today',
           body: item.title + ' is due today',
+          extra: { item_id: item.id },
           schedule: { at: due, allowWhileIdle: true }
         });
       }
@@ -65,6 +83,7 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
             id: item.id * 10 + 3,
             title: 'Overdue',
             body: item.title + ' is overdue',
+            extra: { item_id: item.id },
             schedule: { at: past, allowWhileIdle: true }
           });
         } else if (item.status === 'past_due') {
@@ -72,6 +91,7 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
             id: item.id * 10 + 3,
             title: 'Overdue',
             body: item.title + ' is overdue (due ' + item.use_by_date + ')',
+            extra: { item_id: item.id },
             schedule: { at: nextAtHour(prefs.hour), allowWhileIdle: true }
           });
         }
