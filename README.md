@@ -159,6 +159,9 @@ Then open [http://127.0.0.1:8787/](http://127.0.0.1:8787/). Logged-out visitors 
 
 Ports: `KEEPLORE_UI_PORT` (default 8787), `KEEPLORE_API_PORT` (default 8788), `KEEPLORE_DB_PORT` (default 3306). Stop with Ctrl+C; `docker compose down` stops MySQL.
 
+Android builds and publishing signed APK/AAB releases are described in
+[`docs/android-release.md`](docs/android-release.md).
+
 ### Installation
 
 ```bash

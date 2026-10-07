@@ -18,10 +18,10 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file("../../keystore.jks")
-            storePassword "artifact-manager-twa"
+            storeFile file(System.getenv("KEEPLORE_ANDROID_KEYSTORE") ?: "../../keystore.jks")
+            storePassword System.getenv("KEEPLORE_ANDROID_KEYSTORE_PASSWORD") ?: "artifact-manager-twa"
             keyAlias "artifact-manager"
-            keyPassword "artifact-manager-twa"
+            keyPassword System.getenv("KEEPLORE_ANDROID_KEY_PASSWORD") ?: System.getenv("KEEPLORE_ANDROID_KEYSTORE_PASSWORD") ?: "artifact-manager-twa"
         }
     }
     buildTypes {
