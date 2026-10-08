@@ -315,16 +315,17 @@
         onRecorded: handleRecorded
       }) : null;
 
-      document.querySelectorAll('table#useBy td.record a').forEach(function (link) {
-        link.addEventListener('click', function (event) {
-          if (!quickRecord) return;
-          var idMatch = (link.getAttribute('href') || '').match(/artifact_id=(\d+)/);
-          if (!idMatch) return;
-          event.preventDefault();
-          var tr = link.closest('tr');
-          var titleAnchor = tr.querySelector('td.name a');
-          quickRecord.open(idMatch[1], titleAnchor ? titleAnchor.textContent.trim() : '', tr);
-        });
+      // DataTable detaches other pages' rows and brings them back on redraw.
+      // Listen on the table so every visible Record link opens the popup.
+      document.getElementById('useBy').addEventListener('click', function (event) {
+        var link = event.target.closest('td.record a');
+        if (!link || !quickRecord) return;
+        var idMatch = (link.getAttribute('href') || '').match(/artifact_id=(\d+)/);
+        if (!idMatch) return;
+        event.preventDefault();
+        var tr = link.closest('tr');
+        var titleAnchor = tr.querySelector('td.name a');
+        quickRecord.open(idMatch[1], titleAnchor ? titleAnchor.textContent.trim() : '', tr);
       });
 
       // A row no longer overdue leaves the table and the overdue count;
