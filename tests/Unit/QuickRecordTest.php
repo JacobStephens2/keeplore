@@ -277,7 +277,6 @@ JS);
             $source = (string) file_get_contents($path);
             $this->assertStringContainsString("SHARED_PATH . '/quick_record_popup.php'", $source, $path);
             $this->assertStringContainsString('quick-record.js', $source, $path);
-            $this->assertStringContainsString('QuickRecord.init', $source, $path);
             $this->assertStringNotContainsString('id="record-modal-form"', $source, $path);
             $this->assertStringNotContainsString('todayLocal', $source, $path);
             $this->assertStringNotContainsString('recordModalResetUsers', $source, $path);
@@ -293,7 +292,7 @@ JS);
     {
         $submitModule = json_encode(PROJECT_PATH . '/ui/shared/js/record-use-submit.js');
         $module = json_encode(PROJECT_PATH . '/ui/shared/js/quick-record.js');
-        $page = json_encode(PROJECT_PATH . '/ui/artifacts/useby.php');
+        $pageModule = json_encode(PROJECT_PATH . '/ui/artifacts/useby-table.js');
         $useByPageJson = json_encode($useByPage);
         $script = <<<JS
 require({$submitModule});
@@ -486,8 +485,8 @@ let tbody;
 let pageTable;
 if ({$useByPageJson}) {
   tbody = el('tbody');
-  doc.body.appendChild(el('table', { id: 'useBy' }, [tbody]));
-  doc.body.appendChild(el('span', { id: 'totalOverdue' }));
+  doc.body.appendChild(el('table', { id: 'useBy', attrs: { 'data-order': '[]' } }, [tbody]));
+  doc.body.appendChild(el('span', { id: 'totalOverdue', textContent: '3' }));
   for (const [id, name] of [[11, 'Catan'], [12, 'Chess'], [13, 'Azul']]) {
     tbody.appendChild(el('tr', {}, [
       el('td', { className: 'name' }, [el('a', { textContent: name })]),
@@ -523,13 +522,7 @@ if ({$useByPageJson}) {
   global.RecordUseSubmit = window.RecordUseSubmit;
   global.QuickRecord = QuickRecord;
   global.alert = (message) => toasts.push(message);
-  const source = require('node:fs').readFileSync({$page}, 'utf8');
-  const scripts = Array.from(source.matchAll(/<script>([\\s\\S]*?)<\\/script>/g));
-  // Run the page's inline JS, supplying the two server-rendered values.
-  const pageScript = scripts.at(-1)[1]
-    .replace(/<\\?php echo [$]total_overdue; \\?>/g, '3')
-    .replace(/<\\?php echo json_encode\\([\\s\\S]*?\\); \\?>/g, '[]');
-  new Function(pageScript)();
+  require({$pageModule});
 }
 const out = {};
 
