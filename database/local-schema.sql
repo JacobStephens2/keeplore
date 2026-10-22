@@ -266,9 +266,14 @@ CREATE TABLE IF NOT EXISTS bgg_poll_games (
   KEY idx_bgg_poll_games_rank (bgg_rank)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- One row per player count the community voted Best. An open-ended "Best
+-- with 9+" is stored as every count from 9 to 20. open_only is 1 when that
+-- count is only there because an open-ended vote runs past the count the
+-- votes name. The stated count itself is 0.
 CREATE TABLE IF NOT EXISTS bgg_poll_best_players (
   thing_id INT UNSIGNED NOT NULL,
   players TINYINT UNSIGNED NOT NULL,
+  open_only TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (thing_id, players),
   KEY idx_bgg_poll_best_players_players (players),
   CONSTRAINT fk_bgg_poll_best_players_game FOREIGN KEY (thing_id)

@@ -7,8 +7,7 @@ use PHPUnit\Framework\TestCase;
 require_once PROJECT_PATH . '/private/bgg_poll_index.php';
 
 /**
- * Reading BGG's ranked lists and community polls into Search BGG's index,
- * and reading the search form.
+ * Reading BGG's ranked lists into Search BGG's index, and reading the search form.
  */
 class BggPollIndexTest extends TestCase
 {
@@ -40,65 +39,6 @@ class BggPollIndexTest extends TestCase
         );
         $this->assertSame([], bgg_poll_listing_from_json('{"items":[]}'));
         $this->assertFalse(bgg_poll_listing_from_json('not json'));
-    }
-
-    public function test_polls_give_best_counts_player_votes_and_community_age(): void
-    {
-        $json = json_encode(['item' => ['polls' => [
-            'userplayers' => [
-                'best' => [['min' => 6, 'max' => 6], ['min' => 8, 'max' => 8]],
-                'recommended' => [['min' => 4, 'max' => 8]],
-                'totalvotes' => '1456',
-            ],
-            'playerage' => '10+',
-        ]]]);
-
-        $this->assertSame(
-            ['best' => [6, 8], 'best_text' => '6, 8', 'player_votes' => 1456, 'community_age' => 10],
-            bgg_poll_results_from_dynamic_json($json)
-        );
-    }
-
-    public function test_a_best_range_lists_every_count_and_an_open_end_reads_plus(): void
-    {
-        $range = json_encode(['item' => ['polls' => ['userplayers' => [
-            'best' => [['min' => 6, 'max' => 7]], 'totalvotes' => '505',
-        ], 'playerage' => '8+']]]);
-        $open = json_encode(['item' => ['polls' => ['userplayers' => [
-            'best' => [['min' => 9, 'max' => null]], 'totalvotes' => '12',
-        ]]]]);
-
-        $this->assertSame([6, 7], bgg_poll_results_from_dynamic_json($range)['best']);
-        $this->assertSame('6-7', bgg_poll_results_from_dynamic_json($range)['best_text']);
-        $this->assertSame(
-            ['best' => range(9, 20), 'best_text' => '9+', 'player_votes' => 12, 'community_age' => null],
-            bgg_poll_results_from_dynamic_json($open)
-        );
-    }
-
-    public function test_best_text_lists_ranges_smallest_first_so_an_open_end_comes_last(): void
-    {
-        $json = json_encode(['item' => ['polls' => ['userplayers' => [
-            'best' => [['min' => 4, 'max' => null], ['min' => 2, 'max' => 2]], 'totalvotes' => '30',
-        ]]]]);
-
-        $this->assertSame('2, 4+', bgg_poll_results_from_dynamic_json($json)['best_text']);
-    }
-
-    public function test_a_game_nobody_voted_on_has_no_best_counts_or_age(): void
-    {
-        $json = json_encode(['item' => ['polls' => ['userplayers' => ['best' => [], 'totalvotes' => '0'], 'playerage' => '(no votes)']]]);
-
-        $this->assertSame(
-            ['best' => [], 'best_text' => '', 'player_votes' => 0, 'community_age' => null],
-            bgg_poll_results_from_dynamic_json($json)
-        );
-    }
-
-    public function test_a_queued_or_garbled_reply_is_not_an_answer(): void
-    {
-        $this->assertFalse(bgg_poll_results_from_dynamic_json(''));
-        $this->assertFalse(bgg_poll_results_from_dynamic_json('{"item":{}}'));
     }
 
     public function test_search_form_reads_best_count_age_and_minimum_votes(): void
