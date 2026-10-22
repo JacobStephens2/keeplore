@@ -3,10 +3,11 @@
 /**
  * Record-use write seam.
  *
- * Pages that record a use (Record Use, Interact By, dashboard, Edit User)
- * share this module for the AJAX body, the post-save redirect, and who is
- * listed as a participant. The Setting a new use opens with is the Uses
- * module's lastSetting(), falling back to the default Setting Preference.
+ * Record Use, Quick record, Edit User, Edit Use, and the HTTP record share
+ * record_use_input() for the Item, date, Setting, notes, and People. The
+ * pages also share the AJAX body, the post-save redirect, and who is listed
+ * as a participant. The Setting a new use opens with is the Uses module's
+ * lastSetting(), falling back to the default Setting Preference.
  */
 
 require_once __DIR__ . '/classes/Uses.php';
@@ -21,17 +22,65 @@ function record_use_count(array $post): int
     return max(1, min(Uses::MAX_COUNT, $count));
 }
 
-/** The Record Use form's POST in the Uses module's input names. */
+/**
+ * The posted Use in the Uses module's input names. Record Use, Quick record,
+ * Edit User, Edit Use, and the HTTP record all call this map.
+ *
+ * A post with useDate, Note, NotesTwo, or an artifact list is a Record Use
+ * post, and those names win every field. Otherwise the post is Edit Use or
+ * the HTTP record: artifact_id, use_date, note, and notesTwo. The Number of
+ * uses is included only when useCount is posted, and it is not clamped here.
+ *
+ * On a Record Use post every Person id is kept, including a blank name and
+ * a blank id. On Edit Use, a row that is not a list, or whose name is
+ * missing or exactly '', is left off; a name of only spaces stays. A people
+ * value that is not a list records no People.
+ */
 function record_use_input(array $post): array
 {
-    return [
-        'item_id' => $post['artifact']['id'] ?? '',
-        'use_date' => $post['useDate'] ?? '',
-        'setting' => $post['Note'] ?? '',
-        'notes' => $post['NotesTwo'] ?? '',
-        'player_ids' => array_column($post['user'] ?? [], 'id'),
-        'count' => $post['useCount'] ?? 1,
-    ];
+    $record_use = array_key_exists('useDate', $post)
+        || array_key_exists('Note', $post)
+        || array_key_exists('NotesTwo', $post)
+        || is_array($post['artifact'] ?? null);
+
+    if ($record_use) {
+        $artifact = $post['artifact'] ?? null;
+        $input = [
+            'item_id' => is_array($artifact) ? ($artifact['id'] ?? '') : '',
+            'use_date' => $post['useDate'] ?? '',
+            'setting' => $post['Note'] ?? '',
+            'notes' => $post['NotesTwo'] ?? '',
+        ];
+    } else {
+        $input = [
+            'item_id' => $post['artifact_id'] ?? '',
+            'use_date' => $post['use_date'] ?? '',
+            'setting' => $post['note'] ?? '',
+            'notes' => $post['notesTwo'] ?? '',
+        ];
+    }
+
+    $people = $post['user'] ?? null;
+    if (!is_array($people)) {
+        $input['player_ids'] = [];
+    } elseif ($record_use) {
+        $input['player_ids'] = array_column($people, 'id');
+    } else {
+        $personIds = [];
+        foreach ($people as $person) {
+            if (!is_array($person) || !array_key_exists('name', $person) || $person['name'] === '') {
+                continue;
+            }
+            if (array_key_exists('id', $person)) {
+                $personIds[] = $person['id'];
+            }
+        }
+        $input['player_ids'] = $personIds;
+    }
+    if (array_key_exists('useCount', $post)) {
+        $input['count'] = $post['useCount'];
+    }
+    return $input;
 }
 
 function record_use_success_message(array $post): string

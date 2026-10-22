@@ -11,16 +11,8 @@ if ($use === null) {
 }
 
 if(is_post_request()) {
-  // A person row whose name was cleared is no longer on the use.
-  $people = array_filter($_POST['user'] ?? [], fn ($person) => ($person['name'] ?? '') !== '');
   try {
-    $uses->update($id, [
-      'item_id' => $_POST['artifact_id'] ?? '',
-      'use_date' => $_POST['use_date'] ?? '',
-      'setting' => $_POST['note'] ?? '',
-      'notes' => $_POST['notesTwo'] ?? '',
-      'player_ids' => array_column($people, 'id'),
-    ]);
+    $uses->update($id, record_use_input($_POST));
     $_SESSION['message'] = 'The use was updated successfully.';
     $use = $uses->find($id);
   } catch (InvalidArgumentException $error) {

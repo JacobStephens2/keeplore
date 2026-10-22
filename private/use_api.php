@@ -4,6 +4,7 @@ require_once __DIR__ . '/item_api.php';
 require_once __DIR__ . '/app_logger.php';
 require_once __DIR__ . '/classes/ApiCaller.php';
 require_once __DIR__ . '/classes/Uses.php';
+require_once __DIR__ . '/record_use.php';
 
 /** The log action each use write over HTTP records. */
 const USE_API_LOG_ACTIONS = ['POST' => 'create', 'DELETE' => 'delete'];
@@ -73,12 +74,12 @@ function record_use_over_api(mysqli $db, ApiCaller $caller, $body): array {
 
   $uses = new Uses($db, $owner);
   try {
-    [$id] = $uses->record([
-      'item_id' => $body->artifact_id ?? null,
+    [$id] = $uses->record(record_use_input([
+      'artifact_id' => $body->artifact_id ?? null,
       'use_date' => $body->use_date ?? null,
-      'setting' => $body->note ?? '',
-      'notes' => $body->notesTwo ?? '',
-    ]);
+      'note' => $body->note ?? null,
+      'notesTwo' => $body->notesTwo ?? null,
+    ]));
   } catch (InvalidArgumentException $invalid) {
     return [400, ['message' => $invalid->getMessage()]];
   }
