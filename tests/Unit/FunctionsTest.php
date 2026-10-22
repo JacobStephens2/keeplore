@@ -189,11 +189,11 @@ class FunctionsTest extends TestCase
     public function test_field_basis_html_describes_its_input(): void
     {
         $this->assertSame(
-            '<p id="MnP-bgg-basis" class="form-field-hint" data-bgg-basis="players">From 163 BGG community votes</p>',
+            '<p id="MnP-bgg-basis" class="form-field-hint" data-bgg-basis="players" data-bgg-from="bgg_player_votes">From 163 BGG community votes</p>',
             item_bgg_field_basis_html(['bgg_player_votes' => '163'], 'players', 'MnP')
         );
         $this->assertSame(
-            '<p id="SS-bgg-basis" class="form-field-hint" data-bgg-basis="sweet_spot">From 163 BGG community votes</p>',
+            '<p id="SS-bgg-basis" class="form-field-hint" data-bgg-basis="sweet_spot" data-bgg-from="bgg_player_votes">From 163 BGG community votes</p>',
             item_bgg_field_basis_html(['bgg_player_votes' => '163'], 'sweet_spot', 'SS')
         );
     }
@@ -201,8 +201,22 @@ class FunctionsTest extends TestCase
     public function test_field_basis_html_stays_as_a_hidden_slot_without_data(): void
     {
         $this->assertSame(
-            '<p id="age-bgg-basis" class="form-field-hint" data-bgg-basis="age" hidden></p>',
+            '<p id="age-bgg-basis" class="form-field-hint" data-bgg-basis="age" data-bgg-from="bgg_age_basis" hidden></p>',
             item_bgg_field_basis_html([], 'age', 'age')
+        );
+    }
+
+    public function test_hand_edits_name_the_basis_they_drop(): void
+    {
+        $this->assertSame(
+            [
+                'MnP' => ['bgg_player_votes'],
+                'MxP' => ['bgg_player_votes'],
+                'SS' => ['bgg_player_votes'],
+                'age' => ['bgg_age_basis'],
+                'bgg_url' => ['bgg_player_votes', 'bgg_age_basis', 'BGG_Rat'],
+            ],
+            item_bgg_hand_edit_clears()
         );
     }
 

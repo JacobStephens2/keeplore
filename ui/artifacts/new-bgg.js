@@ -1,4 +1,99 @@
 (function () {
+  function showCover(img, url, name) {
+    if (!img) {
+      return;
+    }
+    if (!url) {
+      img.removeAttribute("src");
+      img.alt = "";
+      img.hidden = true;
+      return;
+    }
+    img.src = url;
+    img.alt = name ? name + " cover" : "Game cover";
+    img.hidden = false;
+  }
+
+  // Writes a match onto the Item form. The payload's keys are posted input
+  // names. An input marked keep is skipped. An empty value clears an input
+  // only when that input is marked replace. A picture input names its own
+  // preview. Assigning a value does not fire input, so a match does not
+  // count as the hand edit that drops the basis it just set.
+  function apply(doc, fields) {
+    var previews = [];
+    Object.keys(fields || {}).forEach(function (id) {
+      var input = doc.getElementById(id);
+      if (!input || input.hasAttribute("data-bgg-keep")) {
+        return;
+      }
+      var value = fields[id];
+      var empty = value === undefined || value === null || value === "";
+      if (empty && !input.hasAttribute("data-bgg-replace")) {
+        return;
+      }
+      var written = empty ? "" : String(value);
+      input.value = written;
+      if (input.hasAttribute("data-bgg-preview")) {
+        previews.push({ id: input.getAttribute("data-bgg-preview"), url: written });
+      }
+    });
+    previews.forEach(function (preview) {
+      var title = doc.getElementById("Title");
+      showCover(doc.getElementById(preview.id), preview.url, title ? title.value : "");
+    });
+  }
+
+  // A hand edit drops the inputs named on the edited field, and hides the
+  // hints drawn from those inputs. The script does not list the ids.
+  function bindHandEdits(doc) {
+    doc.querySelectorAll("[data-bgg-clears]").forEach(function (input) {
+      input.addEventListener("input", function () {
+        (input.getAttribute("data-bgg-clears") || "").split(/\s+/).forEach(function (id) {
+          if (id === "") {
+            return;
+          }
+          var target = doc.getElementById(id);
+          if (target) {
+            target.value = "";
+          }
+          doc.querySelectorAll('[data-bgg-from="' + id + '"]').forEach(function (hint) {
+            hint.hidden = true;
+          });
+        });
+      });
+    });
+  }
+
+  function fillBases(doc, bases) {
+    doc.querySelectorAll("[data-bgg-basis]").forEach(function (hint) {
+      var text = (bases && bases[hint.getAttribute("data-bgg-basis")]) || "";
+      hint.textContent = text;
+      hint.hidden = text === "";
+    });
+  }
+
+  // Edit Item's Name is marked keep, so the status says the name was kept.
+  function filledMessage(doc, matchName) {
+    var title = doc.getElementById("Title");
+    if (title && title.hasAttribute("data-bgg-keep")) {
+      return "Filled from " + matchName + " and linked it. Save to keep the changes.";
+    }
+    return "Filled from " + matchName + ".";
+  }
+
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+      apply: apply,
+      bindHandEdits: bindHandEdits,
+      showBases: fillBases,
+      filledMessage: filledMessage,
+    };
+  }
+
+  if (typeof document === "undefined") {
+    return;
+  }
+
   const requestBtn = document.querySelector("#requestBggData");
   const statusEl = document.querySelector("#bggLookupStatus");
   const confirmEl = document.querySelector("#bggConfirm");
@@ -11,47 +106,13 @@
   const useBtn = document.querySelector("#bggUseMatch");
   const othersEl = document.querySelector("#bggOtherMatches");
   const titleInput = document.querySelector("#Title");
-  const pictureInput = document.querySelector("#image_url");
-  const linkInput = document.querySelector("#bgg_url");
-  const picturePreviewEl = document.querySelector("#itemPicturePreview");
 
   if (!requestBtn || !titleInput) {
     return;
   }
 
-  // Edit Item links an existing item, so the owner's name stays put.
-  const keepTitle = requestBtn.hasAttribute("data-keep-title");
+  bindHandEdits(document);
   let pending = null;
-
-  // A hand edit means BGG's votes no longer back that number, so drop the
-  // basis the page would otherwise credit to the community.
-  const playerVotesInput = document.querySelector("#bgg_player_votes");
-  const ageBasisInput = document.querySelector("#bgg_age_basis");
-  const overallRatingInput = document.querySelector("#BGG_Rat");
-  function forgetBasis(input, hintSelector, fieldIds) {
-    fieldIds.forEach(function (id) {
-      const field = document.getElementById(id);
-      if (field && input) {
-        field.addEventListener("input", function () {
-          input.value = "";
-          hideHints(hintSelector);
-        });
-      }
-    });
-  }
-  function hideHints(selector) {
-    document.querySelectorAll(selector).forEach(function (hint) {
-      hint.hidden = true;
-    });
-  }
-  forgetBasis(playerVotesInput, '[data-bgg-basis="players"], [data-bgg-basis="sweet_spot"]', ["MnP", "MxP", "SS", "bgg_url"]);
-  forgetBasis(ageBasisInput, '[data-bgg-basis="age"]', ["age", "bgg_url"]);
-  // The average belongs to the linked thing. A hand-edited link no longer does.
-  if (linkInput && overallRatingInput) {
-    linkInput.addEventListener("input", function () {
-      overallRatingInput.value = "";
-    });
-  }
   let roster = [];
 
   requestBtn.addEventListener("click", function (event) {
@@ -70,14 +131,12 @@
     if (!pending || !pending.fields) {
       return;
     }
-    fillForm(pending.fields);
+    apply(document, pending.fields);
     if (window.BggDefaultType) {
       window.BggDefaultType.apply(document, requestBtn);
     }
     showBases(pending.basis);
-    showStatus(keepTitle
-      ? "Filled from " + pending.match.name + " and linked it. Save to keep the changes."
-      : "Filled from " + pending.match.name + ".");
+    showStatus(filledMessage(document, pending.match.name));
     hideConfirm();
   });
 
@@ -178,66 +237,7 @@
 
   // Replace each field hint with what the chosen match rests on.
   function showBases(bases) {
-    document.querySelectorAll("[data-bgg-basis]").forEach(function (hint) {
-      const text = (bases && bases[hint.getAttribute("data-bgg-basis")]) || "";
-      hint.textContent = text;
-      hint.hidden = text === "";
-    });
-  }
-
-  function fillForm(fields) {
-    if (!keepTitle) {
-      setField("Title", fields.Title);
-    }
-    setField("SS", fields.SS);
-    setField("MnP", fields.MnP);
-    setField("MxP", fields.MxP);
-    setField("MnT", fields.MnT);
-    setField("MxT", fields.MxT);
-    setField("age", fields.Age);
-    setField("Yr", fields.Yr);
-    setPicture(fields.image_url);
-    if (linkInput && fields.bgg_url) {
-      linkInput.value = fields.bgg_url;
-    }
-    setField("bgg_player_votes", fields.bgg_player_votes);
-    setField("bgg_age_basis", fields.bgg_age_basis);
-    if (overallRatingInput) {
-      overallRatingInput.value = fields.BGG_Rat || "";
-    }
-  }
-
-  function showCover(img, url, name) {
-    if (!img) {
-      return;
-    }
-    if (!url) {
-      img.removeAttribute("src");
-      img.alt = "";
-      img.hidden = true;
-      return;
-    }
-    img.src = url;
-    img.alt = name ? name + " cover" : "Game cover";
-    img.hidden = false;
-  }
-
-  function setPicture(url) {
-    if (!pictureInput || !picturePreviewEl) {
-      return;
-    }
-    showCover(picturePreviewEl, url, titleInput.value);
-    pictureInput.value = url || "";
-  }
-
-  function setField(id, value) {
-    if (value === undefined || value === null || value === "") {
-      return;
-    }
-    const el = document.getElementById(id);
-    if (el) {
-      el.value = value;
-    }
+    fillBases(document, bases);
   }
 
   function alternativeLabel(alt) {

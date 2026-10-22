@@ -52,7 +52,7 @@ class BggDefaultTypeTest extends TestCase
     {
         $this->assertSame(
             ['applied' => false, 'type' => '', 'search' => 'boo'],
-            $this->apply(['keepTitle' => ''], '', 'boo')
+            $this->apply([], '', 'boo')
         );
     }
 
