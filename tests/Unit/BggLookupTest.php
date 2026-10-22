@@ -83,6 +83,7 @@ class BggLookupTest extends TestCase
                     'year' => '2023',
                     'url' => 'https://boardgamegeek.com/boardgame/373106/sky-team',
                     'source' => 'BGG',
+                    'site_name' => 'BoardGameGeek',
                     'image' => $cover,
                 ],
                 'fields' => [
@@ -248,6 +249,7 @@ class BggLookupTest extends TestCase
         ]);
         $mapped = bgg_form_fields_from_json($itemJson, '{}');
         $this->assertSame('RPGG', $mapped['match']['source']);
+        $this->assertSame('RPGGeek', $mapped['match']['site_name']);
         $this->assertSame('2014', $mapped['match']['year']);
         $this->assertSame('https://rpggeek.com/rpgitem/161315/ravine', $mapped['match']['url']);
     }
@@ -263,7 +265,9 @@ class BggLookupTest extends TestCase
                 'canonical_link' => 'https://videogamegeek.com/videogame/123/ravine',
             ],
         ]);
-        $this->assertSame('VGG', bgg_form_fields_from_json($itemJson, '{}')['match']['source']);
+        $mapped = bgg_form_fields_from_json($itemJson, '{}');
+        $this->assertSame('VGG', $mapped['match']['source']);
+        $this->assertSame('VideoGameGeek', $mapped['match']['site_name']);
     }
 
     public function test_cover_falls_back_to_preview_then_original(): void
@@ -593,6 +597,7 @@ class BggLookupTest extends TestCase
                 'name' => 'Sky Team: Agon Spiele Insert',
                 'year' => '2024',
                 'source' => 'BGG',
+                'site_name' => 'BoardGameGeek',
             ]],
             $result['alternatives']
         );
@@ -640,9 +645,42 @@ class BggLookupTest extends TestCase
 
         $this->assertTrue($result['ok']);
         $this->assertSame('RPGG', $result['match']['source']);
+        $this->assertSame('RPGGeek', $result['match']['site_name']);
         $this->assertSame('2014', $result['match']['year']);
         $this->assertSame('2018', $result['alternatives'][0]['year']);
         $this->assertSame('RPGG', $result['alternatives'][0]['source']);
+        $this->assertSame('RPGGeek', $result['alternatives'][0]['site_name']);
+    }
+
+    public function test_enrichment_failure_names_boardgamegeek(): void
+    {
+        $enriched = bgg_enrich_candidates(
+            [['id' => 1, 'name' => 'Chess']],
+            function () {
+                return '';
+            }
+        );
+
+        $this->assertSame([[
+            'id' => 1,
+            'name' => 'Chess',
+            'year' => '',
+            'source' => 'BGG',
+            'site_name' => 'BoardGameGeek',
+        ]], $enriched);
+    }
+
+    public function test_create_item_reads_the_site_name_and_does_not_map_codes(): void
+    {
+        $js = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/new-bgg.js');
+        $panel = (string) file_get_contents(PROJECT_PATH . '/private/shared/bgg_lookup_panel.php');
+
+        $this->assertStringContainsString('View on BoardGameGeek', $panel);
+        $this->assertStringContainsString('match.site_name', $js);
+        $this->assertStringContainsString('alt.site_name', $js);
+        $this->assertStringNotContainsString('RPGG', $js);
+        $this->assertStringNotContainsString('VGG', $js);
+        $this->assertStringNotContainsString('sourceSiteName', $js);
     }
 
     public function test_fields_for_id_loads_the_chosen_game(): void

@@ -2,22 +2,13 @@
 
 /**
  * The pure helpers beside the BGG ratings module (classes/BggRatings.php):
- * reading a thing id from an item's link, BGG's users and collection JSON,
- * a rating typed on Edit Item, and a score or an item's ratings for the page.
- * They hold no owner state; the module holds the SQL and the BGG fetches.
+ * BGG's users and collection JSON, a rating typed on Edit Item, and an
+ * item's ratings for the page. The thing id and the score spelling come
+ * from the BoardGameGeek link. They hold no owner state; the module holds
+ * the SQL and the BGG fetches.
  */
 
 require_once __DIR__ . '/bgg_lookup.php';
-
-// The BGG "thing" an item's link names, or 0. Family and person pages such as
-// rpggeek.com/rpg/... are not things and carry no ratings.
-function bgg_thing_id_from_url($url) {
-  $url = normalize_item_bgg_url($url);
-  if ($url === '' || !preg_match('#^https://[^/]+/(boardgame|boardgameexpansion|boardgameaccessory|videogame|rpgitem)/(\d+)(/|$)#i', $url, $match)) {
-    return 0;
-  }
-  return (int) $match[2];
-}
 
 function bgg_user_from_users_json($json, $username) {
   $users = json_decode((string) $json, true);
@@ -70,11 +61,6 @@ function bgg_rating_from_input($raw) {
     return false;
   }
   return (float) $raw;
-}
-
-// A BGG score as people write it: 9.5 reads "9.5", 8 reads "8".
-function bgg_score_text($score) {
-  return rtrim(rtrim(number_format((float) $score, 2, '.', ''), '0'), '.');
 }
 
 // One item's imported ratings, as BggRatings::forItems() keys them, for the

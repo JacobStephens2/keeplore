@@ -120,14 +120,14 @@
       matchYearWrap.hidden = true;
     }
     if (match.source && match.source !== "BGG") {
-      matchSourceEl.textContent = match.source;
+      matchSourceEl.textContent = match.site_name || "";
       matchSourceEl.hidden = false;
     } else {
       matchSourceEl.textContent = "";
       matchSourceEl.hidden = true;
     }
     matchLinkEl.href = match.url || "https://boardgamegeek.com/";
-    matchLinkEl.textContent = "View on " + sourceSiteName(match.source);
+    matchLinkEl.textContent = "View on " + (match.site_name || "BoardGameGeek");
     showAlternatives(roster.filter(function (alt) {
       return alt.id !== match.id;
     }));
@@ -245,19 +245,9 @@
       label += " (" + alt.year + ")";
     }
     if (alt.source && alt.source !== "BGG") {
-      label += " · " + alt.source;
+      label += " · " + (alt.site_name || "");
     }
     return label;
-  }
-
-  function sourceSiteName(source) {
-    if (source === "RPGG") {
-      return "RPGGeek";
-    }
-    if (source === "VGG") {
-      return "VideoGameGeek";
-    }
-    return "BoardGameGeek";
   }
 
   function showStatus(message) {

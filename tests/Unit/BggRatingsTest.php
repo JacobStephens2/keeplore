@@ -24,6 +24,7 @@ class BggRatingsTest extends TestCase
         $this->assertSame(421, bgg_thing_id_from_url('https://boardgamegeek.com/boardgame/421'));
         $this->assertSame(12, bgg_thing_id_from_url('https://www.boardgamegeek.com/boardgameexpansion/12/x'));
         $this->assertSame(55, bgg_thing_id_from_url('https://videogamegeek.com/videogame/55/y'));
+        $this->assertSame(77, bgg_thing_id_from_url('https://boardgamegeek.com/boardgameaccessory/77/insert'));
     }
 
     public function test_links_that_name_no_thing_give_no_id(): void
@@ -149,6 +150,8 @@ class BggRatingsTest extends TestCase
                 'rating' => 9.5,
                 'comment' => 'The best card game ever.',
                 'url' => 'https://boardgamegeek.com/boardgame/147154/blue-moon-legends',
+                'score_text' => '9.5',
+                'site_name' => 'BoardGameGeek',
             ],
         ], $row['bgg_ratings']);
     }

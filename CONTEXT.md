@@ -131,8 +131,12 @@ A full import of all the owner's BGG reviewer's ratings and comments. Settings q
 **BGG rating**:
 A BGG reviewer's rating, comment or both on one of the owner's items, imported from BoardGameGeek or entered by hand on Edit Item. The import never replaces a hand entry; Request data on Edit Item replaces one only when BoardGameGeek has an entry. Every read and write of them goes through one module, scoped to the owner.
 
+**BoardGameGeek link**:
+The page an item points at on boardgamegeek.com, rpggeek.com, or videogamegeek.com. It names one thing, a board game, expansion, accessory, videogame, or RPG item. The BGG average and the vote basis are stored only with a link. A typed http link or a bare host is stored as https. Anything else is no link.
+_Avoid_: BGG URL, geekdo link.
+
 **BGG average**:
-BoardGameGeek's average rating for the game an item links to, copied onto the item by the BGG average import.
+BoardGameGeek's average rating for the game an item links to, copied onto the item by the BGG average import. The shown value has trailing zeros stripped, so 8 not 8.00, and a value outside 1 to 10 is not stored.
 
 **Type for BoardGameGeek items**:
 The owner's type, such as table game, for items filled from a BoardGameGeek match on Create Item, set on Settings. A type the owner already picked on the form stays. Every read and write of it goes through the Types module, scoped to the owner.

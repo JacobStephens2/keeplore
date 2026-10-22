@@ -101,7 +101,7 @@ include(SHARED_PATH . '/header.php');
             <td><?php echo number_format($game['player_votes']); ?></td>
             <td><?php echo $game['community_age'] === null ? '' : h($game['community_age']) . '+'; ?></td>
             <td><?php echo $game['bgg_rank'] === null ? '' : number_format($game['bgg_rank']); ?></td>
-            <td><?php echo $game['average'] === null ? '' : h(number_format($game['average'], 2)); ?></td>
+            <td><?php echo h(bgg_overall_rating_text($game['average'])); ?></td>
             <td>
               <?php if (isset($kept[$game['thing_id']])) { ?>
                 <a href="<?php echo url_for('/artifacts/edit.php?id=' . $kept[$game['thing_id']]); ?>">Kept</a>

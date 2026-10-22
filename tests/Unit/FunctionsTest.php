@@ -114,6 +114,29 @@ class FunctionsTest extends TestCase
         $this->assertStringContainsString('>View on VideoGameGeek<', item_bgg_link_html('https://www.videogamegeek.com/videogame/2'));
     }
 
+    public function test_an_rpggeek_item_link_names_that_thing(): void
+    {
+        $url = 'https://rpggeek.com/rpgitem/161315/ravine';
+
+        $this->assertStringContainsString('>View on RPGGeek<', item_bgg_link_html($url));
+        $this->assertSame(161315, bgg_thing_id_from_url($url));
+        $this->assertSame('https://rpggeek.com/rpgitem/161315', bgg_canonical_url(161315, 'RPGG'));
+        $this->assertSame(0, bgg_thing_id_from_url('https://rpggeek.com/rpg/1234/some-system'));
+    }
+
+    public function test_score_spelling_drops_trailing_zeros_and_the_average_stays_inside_one_to_ten(): void
+    {
+        $this->assertSame('8', bgg_score_text(8.0));
+        $this->assertSame('7.09', bgg_score_text(7.09));
+        $this->assertSame('11', bgg_score_text(11));
+        $this->assertSame('8', bgg_overall_rating_text('8.00'));
+        $this->assertSame('7.09', bgg_overall_rating_text(7.09));
+        $this->assertNull(bgg_overall_rating_text(''));
+        $this->assertNull(bgg_overall_rating_text('nope'));
+        $this->assertNull(bgg_overall_rating_text(0));
+        $this->assertNull(bgg_overall_rating_text(10.5));
+    }
+
     public function test_item_bgg_basis_counts_the_player_votes(): void
     {
         $this->assertSame(
@@ -207,6 +230,7 @@ class FunctionsTest extends TestCase
         $this->assertSame('', normalize_item_bgg_url('https://example.com/'));
         $this->assertSame('', normalize_item_bgg_url('javascript:alert(1)'));
         $this->assertSame('', normalize_item_bgg_url(''));
+        $this->assertSame('', normalize_item_bgg_url('https://boardgamegeek.com/' . str_repeat('a', 1000)));
     }
 
     // -----------------------------------------------------------------
