@@ -160,6 +160,7 @@ class BggRatingsTest extends TestCase
                 'comment' => 'The best card game ever.',
                 'url' => 'https://boardgamegeek.com/boardgame/147154/blue-moon-legends',
                 'score_text' => '9.5',
+                'sort' => 9.5,
                 'site_name' => 'BoardGameGeek',
             ],
         ], $row['bgg_ratings']);

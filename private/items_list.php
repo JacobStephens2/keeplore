@@ -272,7 +272,8 @@ function items_list_type_ids($type) {
 
 /**
  * Reviewer ratings for one Items row. A numeric rating carries score_text
- * in the score spelling; a comment with no score does not. site_name is the
+ * in the score spelling and sort as the stored rating. A comment with no
+ * score does not carry score_text, and its sort is 0. site_name is the
  * site of the item's link, or BoardGameGeek when the item has no link.
  */
 function items_list_present_ratings($ratings) {
@@ -286,11 +287,27 @@ function items_list_present_ratings($ratings) {
         }
         if (isset($rating['rating']) && is_numeric($rating['rating'])) {
             $rating['score_text'] = bgg_score_text($rating['rating']);
+            $rating['sort'] = (float) $rating['rating'];
+        } else {
+            $rating['sort'] = 0;
         }
         $rating['site_name'] = bgg_site_name_from_url($rating['url'] ?? '');
         $presented[$reviewer] = $rating;
     }
     return $presented === [] ? new stdClass() : $presented;
+}
+
+/**
+ * The count Players sorts by: the low end of the player range when one is
+ * recorded, otherwise the lowest Sweet spot count, or null when neither is.
+ */
+function items_list_players_sort(array $item) {
+    $low = item_player_range_low($item);
+    if ($low !== null) {
+        return $low;
+    }
+    $counts = item_sweet_spot_counts($item);
+    return $counts === [] ? null : $counts[0];
 }
 
 /**
@@ -309,6 +326,7 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
     $overdue = $is_kept && $use_by['status'] === 'overdue';
 
     $min_age = item_min_age($artifact);
+    $bgg_average = bgg_overall_rating_text($artifact['BGG_Rat'] ?? $artifact['bgg_rat'] ?? null);
 
     return [
         'id' => (int) ($artifact['id'] ?? 0),
@@ -322,12 +340,16 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
         'use_by_overdue' => $overdue,
         'ss' => (string) ($artifact['ss'] ?? $artifact['SS'] ?? ''),
         'players' => item_players_label($artifact),
+        'players_sort' => items_list_players_sort($artifact),
         'age' => $min_age === null ? '' : $min_age . '+',
+        'age_sort' => $min_age,
         'copy_text' => item_copy_text($artifact),
         'time' => item_play_time($artifact),
+        'time_sort' => item_play_time_low($artifact),
         'avg_time' => item_average_play_time($artifact),
         'candidate' => item_is_candidate($artifact),
-        'bgg_average' => bgg_overall_rating_text($artifact['BGG_Rat'] ?? $artifact['bgg_rat'] ?? null) ?? '',
+        'bgg_average' => $bgg_average ?? '',
+        'bgg_average_sort' => $bgg_average === null ? null : (float) $bgg_average,
         // Keyed by BGG username; an object even when empty so the JSON is {}.
         'bgg_ratings' => items_list_present_ratings($artifact['bgg_ratings'] ?? null),
     ];

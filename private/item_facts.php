@@ -5,7 +5,8 @@
  * spot, recommended minimum age, player range, play time and whether it is a
  * Candidate, and the labels pages show for them. Every page that filters or
  * labels items by these facts reads them here, so the Sweet spot and
- * Candidate rules live in one place.
+ * Candidate rules live in one place. The low end of a recorded player range
+ * or play time is those same ends as a number, for sorting, not a label.
  *
  * Each function takes an item row and reads its columns whichever way they
  * are spelled: games' SS, Age, MnP, MxP, MnT, MxT and Candidate, or the
@@ -65,11 +66,21 @@ function item_player_range(array $item) {
     return item_facts_range(item_facts_column($item, 'MnP'), item_facts_column($item, 'MxP'));
 }
 
+/** The low end of the player range, or null when none is recorded. */
+function item_player_range_low(array $item) {
+    return item_facts_low_end(item_facts_column($item, 'MnP'), item_facts_column($item, 'MxP'));
+}
+
 /** The item's play time, as in "30–60 min", "45 min", or '' when none is recorded. */
 function item_play_time(array $item) {
     // A time range reads like a player range: "30–60", or "45" with one end.
     $range = item_facts_range(item_facts_column($item, 'MnT'), item_facts_column($item, 'MxT'));
     return $range === '' ? '' : $range . ' min';
+}
+
+/** The low end of the play time in minutes, or null when none is recorded. */
+function item_play_time_low(array $item) {
+    return item_facts_low_end(item_facts_column($item, 'MnT'), item_facts_column($item, 'MxT'));
 }
 
 /**
@@ -187,4 +198,15 @@ function item_facts_range($min, $max) {
         return (string) max($min, $max);
     }
     return $min . '–' . $max;
+}
+
+/** Internal. The smaller positive end, the only positive end, or null. */
+function item_facts_low_end($min, $max) {
+    $ends = [];
+    foreach ([(int) $min, (int) $max] as $end) {
+        if ($end > 0) {
+            $ends[] = $end;
+        }
+    }
+    return $ends === [] ? null : min($ends);
 }
