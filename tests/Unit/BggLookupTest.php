@@ -681,6 +681,16 @@ class BggLookupTest extends TestCase
         $this->assertStringNotContainsString('RPGG', $js);
         $this->assertStringNotContainsString('VGG', $js);
         $this->assertStringNotContainsString('sourceSiteName', $js);
+
+        $start = strpos($js, 'function rememberRoster');
+        $end = strpos($js, 'function showAlternatives');
+        $this->assertNotFalse($start);
+        $this->assertNotFalse($end);
+        $remembered = substr($js, (int) $start, (int) $end - (int) $start);
+        $this->assertMatchesRegularExpression(
+            '/roster\.push\(\{[^}]*site_name/',
+            $remembered
+        );
     }
 
     public function test_fields_for_id_loads_the_chosen_game(): void

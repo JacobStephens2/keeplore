@@ -146,6 +146,7 @@
         name: match.name,
         year: match.year || "",
         source: match.source || "BGG",
+        site_name: match.site_name || "",
       });
     }
     data.alternatives.forEach(function (alt) {
