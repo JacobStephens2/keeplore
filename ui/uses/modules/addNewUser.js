@@ -46,7 +46,7 @@ function resetForm() {
 
 // The record form owns this create. Another form on the page has its own token.
 function recordFormToken() {
-  const form = firstInput.closest ? firstInput.closest("form") : null;
+  const form = firstInput.closest("form");
   const field = form ? form.querySelector('input[name="csrf_token"]') : null;
   return field ? field.value : "";
 }

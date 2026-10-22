@@ -2,8 +2,9 @@ import { API_BASE } from "./publicEnvironmentVariables.js";
 
 // Person rows on Record Use and Edit Use. The server renders the rows a
 // form opens with; + adds more with addUserRow. Person search, the result
-// list, and inline create live in person-pick.js, read from the global
-// when a search runs. This adapter fills the picked person onto the row.
+// list, and inline create live in person-pick.js. The row reads that
+// global when it wires a search, and does not import the file. This
+// adapter fills the picked person onto the row.
 // Functions take the document so tests can pass a fake one.
 
 const PEOPLE_SEARCH_URL = API_BASE + "/users.php";

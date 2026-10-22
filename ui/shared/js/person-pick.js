@@ -26,25 +26,8 @@
     return (first + ' ' + last).trim();
   }
 
-  function emptyNode(node) {
-    if (!node) return;
-    if (typeof node.replaceChildren === 'function') {
-      node.replaceChildren();
-      return;
-    }
-    node.innerHTML = '';
-  }
-
-  function appendNode(parent, child) {
-    if (typeof parent.append === 'function') {
-      parent.append(child);
-      return;
-    }
-    parent.appendChild(child);
-  }
-
   function renderResults(doc, list, people, hooks) {
-    emptyNode(list);
+    list.replaceChildren();
     (people || []).slice(0, MAX_RESULTS).forEach(function (person) {
       var li = doc.createElement('li');
       var choice = { id: person.id, name: personName(person) };
@@ -65,7 +48,7 @@
         event.stopPropagation();
         hooks.onPick(choice);
       });
-      appendNode(list, li);
+      list.append(li);
     });
   }
 
@@ -100,7 +83,7 @@
       var thisSearch = ++latest;
       var trimmed = String(query == null ? '' : query).trim();
       if (trimmed === '') {
-        emptyNode(list);
+        list.replaceChildren();
         hide();
         return Promise.resolve();
       }
@@ -112,7 +95,7 @@
           body: JSON.stringify({ query: trimmed, userid: options.userid }),
         });
       } catch (error) {
-        emptyNode(list);
+        list.replaceChildren();
         hide();
         return Promise.resolve();
       }
@@ -123,7 +106,7 @@
           data = data || {};
           if (data.authenticated === false) {
             sendToLogin();
-            emptyNode(list);
+            list.replaceChildren();
             hide();
             return;
           }
@@ -131,7 +114,7 @@
         })
         .catch(function () {
           if (thisSearch !== latest) return;
-          emptyNode(list);
+          list.replaceChildren();
           hide();
         });
     }

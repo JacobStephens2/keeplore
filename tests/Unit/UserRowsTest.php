@@ -179,7 +179,7 @@ JS);
         ], $result);
     }
 
-    public function test_person_pick_is_read_when_a_search_runs(): void
+    public function test_importing_the_row_module_does_not_load_person_pick(): void
     {
         $result = $this->run_(<<<'JS'
 const row = buildUserRow(doc, 1, '7');

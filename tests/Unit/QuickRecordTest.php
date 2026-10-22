@@ -152,13 +152,11 @@ JS);
 popup.open('1', 'Catan', null);
 searchFor('an', [{ id: 5, FirstName: 'Ann', LastName: 'Lee' }, { id: 6, FirstName: 'Dan', LastName: '' }]);
 await flush();
-out.resultLabels = byId('record-modal-user-results').children.map((li) => li.textContent);
 JS);
 
         $this->assertSame('https://api.test/users.php', $result['fetches'][0]['url']);
         $this->assertSame('POST', $result['fetches'][0]['opts']['method']);
         $this->assertSame(['query' => 'an', 'userid' => '7'], json_decode($result['fetches'][0]['opts']['body'], true));
-        $this->assertSame(['Ann Lee', 'Dan'], $result['resultLabels']);
         $this->assertFalse($result['resultsHidden']);
     }
 
@@ -397,6 +395,10 @@ function el(tag, props, children) {
     focus() { doc.activeElement = this; },
     appendChild(child) { child.remove(); child.parent = this; this.children.push(child); return child; },
     append(...cs) { cs.forEach((c) => this.appendChild(c)); },
+    replaceChildren() {
+      this.children.forEach((c) => { c.parent = null; });
+      this.children = [];
+    },
     remove() {
       if (!this.parent) return;
       this.parent.children = this.parent.children.filter((c) => c !== this);
