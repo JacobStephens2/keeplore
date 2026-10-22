@@ -37,8 +37,7 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
     );
   }
 
-  function nextAtHour(hour) {
-    var now = new Date();
+  function nextAtHour(hour, now) {
     var d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, 0, 0, 0);
     if (d <= now) d.setDate(d.getDate() + 1);
     return d;
@@ -60,7 +59,7 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
 
       var at;
       if (reminder.day == null) {
-        at = nextAtHour(hour);
+        at = nextAtHour(hour, now);
       } else {
         if (typeof reminder.day !== 'string') continue;
         at = atHour(reminder.day, hour);

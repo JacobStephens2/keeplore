@@ -104,6 +104,23 @@ final class UpcomingUsesApiTest extends TestCase
         $this->assertSame('due_soon', $byTitle['Due soon']['status']);
         $this->assertSame('upcoming', $byTitle['Upcoming']['status']);
 
+        $dueSoon = $byTitle['Due soon'];
+        $leadReminders = array_values(array_filter(
+            $fields['reminders'],
+            fn (array $reminder) => $reminder['id'] === 301
+        ));
+        $this->assertCount(1, $leadReminders);
+        $this->assertSame(
+            [
+                'id' => 301,
+                'title' => 'Due soon',
+                'body' => 'Due soon is due ' . $dueSoon['use_by_date'],
+                'day' => app_shift_day($dueSoon['use_by_date'], -2),
+                'item_id' => 30,
+            ],
+            $leadReminders[0]
+        );
+
         $queueEntries = array_values(array_filter(
             (new \UseByQueue($this->db, 1))->entries(),
             fn (array $entry) => $entry['use_by_date'] !== null

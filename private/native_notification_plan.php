@@ -37,11 +37,8 @@ function native_notification_reminders(array $entries, array $prefs): array
 
     $reminders = [];
     foreach ($entries as $entry) {
-        if (!is_array($entry)) {
-            continue;
-        }
         $id = $entry['id'] ?? null;
-        $title = $entry['Title'] ?? $entry['title'] ?? null;
+        $title = $entry['Title'] ?? null;
         $useBy = $entry['use_by_date'] ?? null;
         if (empty($id) || empty($title) || empty($useBy)) {
             continue;
