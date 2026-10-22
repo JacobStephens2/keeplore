@@ -9,10 +9,11 @@ require_once PROJECT_PATH . '/private/record_use.php';
 /**
  * Seam: private/record_use.php
  *
- * The record-use write path (AJAX JSON, return URL, participants) is one
- * module so Edit User, Interact By, and Record Use share it instead of each
- * page inventing the same POST contract. The Setting a new use opens with
- * is read through the Uses module (tests/Integration/UsesTest.php).
+ * record_use_input() is the one map Record Use, Quick record, Edit User,
+ * Edit Use, and the HTTP record use for the Item, date, Setting, notes,
+ * and People. The AJAX body, return URL, and participants stay on this
+ * module and still read the Record Use post. The Setting a new use opens
+ * with is read through the Uses module (tests/Integration/UsesTest.php).
  */
 class RecordUseTest extends TestCase
 {
@@ -201,6 +202,115 @@ class RecordUseTest extends TestCase
         ]));
     }
 
+    public function test_input_maps_an_edit_use_post_onto_the_uses_module(): void
+    {
+        $this->assertSame([
+            'item_id' => '12',
+            'use_date' => '2026-10-02',
+            'setting' => 'Cabin',
+            'notes' => 'Close game',
+            'player_ids' => ['1', '2'],
+        ], record_use_input([
+            'artifact_id' => '12',
+            'use_date' => '2026-10-02',
+            'note' => 'Cabin',
+            'notesTwo' => 'Close game',
+            'user' => [
+                ['id' => '1', 'name' => 'Local Dev'],
+                ['id' => '2', 'name' => 'Sam Lee'],
+            ],
+        ]));
+    }
+
+    public function test_input_prefers_record_use_names_when_both_are_posted(): void
+    {
+        $this->assertSame([
+            'item_id' => '12',
+            'use_date' => '',
+            'setting' => '',
+            'notes' => 'Close game',
+            'player_ids' => ['1', '', '2'],
+            'count' => '',
+        ], record_use_input([
+            'artifact' => ['id' => '12', 'name' => 'Old Maid'],
+            'artifact_id' => '99',
+            'user' => [
+                ['id' => '1', 'name' => ''],
+                ['id' => '', 'name' => ''],
+                ['id' => '2', 'name' => 'Sam Lee'],
+            ],
+            'useDate' => '',
+            'use_date' => '1999-01-01',
+            'Note' => '',
+            'note' => 'Cabin',
+            'NotesTwo' => 'Close game',
+            'notesTwo' => 'Other notes',
+            'useCount' => '',
+            'count' => '9',
+        ]));
+    }
+
+    public function test_input_drops_a_blank_edit_use_name_and_keeps_a_blank_record_use_name(): void
+    {
+        $rows = [
+            ['id' => '1', 'name' => ''],
+            ['id' => '9'],
+            'not a person',
+            ['id' => '3', 'name' => '   '],
+            ['id' => '', 'name' => ''],
+            ['id' => '2', 'name' => 'Sam Lee'],
+        ];
+
+        $this->assertSame(['3', '2'], record_use_input([
+            'artifact_id' => '12',
+            'user' => $rows,
+        ])['player_ids']);
+        $this->assertSame(['1', '9', '3', '', '2'], record_use_input([
+            'useDate' => '2026-10-02',
+            'user' => $rows,
+        ])['player_ids']);
+    }
+
+    public function test_input_treats_an_artifact_list_alone_as_a_record_use_post(): void
+    {
+        $this->assertSame([
+            'item_id' => '12',
+            'use_date' => '',
+            'setting' => '',
+            'notes' => '',
+            'player_ids' => [],
+        ], record_use_input([
+            'artifact' => ['id' => '12', 'name' => 'Old Maid'],
+            'artifact_id' => '99',
+            'use_date' => '1999-01-01',
+            'note' => 'Cabin',
+            'notesTwo' => 'Other notes',
+        ]));
+    }
+
+    public function test_input_passes_a_non_text_setting_and_ignores_count(): void
+    {
+        $input = record_use_input([
+            'artifact_id' => 10,
+            'use_date' => '2026-09-12',
+            'note' => ['x'],
+            'notesTwo' => ['y'],
+            'count' => 5,
+            'user_id' => 2,
+        ]);
+
+        $this->assertSame(['x'], $input['setting']);
+        $this->assertSame(['y'], $input['notes']);
+        $this->assertArrayNotHasKey('count', $input);
+        $this->assertSame([], $input['player_ids']);
+    }
+
+    public function test_input_records_no_people_when_the_people_value_is_not_a_list(): void
+    {
+        $this->assertSame([], record_use_input(['useDate' => '2026-10-02', 'user' => 'Sam'])['player_ids']);
+        $this->assertSame([], record_use_input(['artifact_id' => '12', 'user' => 'Sam'])['player_ids']);
+    }
+
     public function test_input_from_a_quick_record_is_one_use_with_blank_notes(): void
     {
         $this->assertSame([
@@ -209,7 +319,6 @@ class RecordUseTest extends TestCase
             'setting' => '',
             'notes' => '',
             'player_ids' => [],
-            'count' => 1,
         ], record_use_input([]));
     }
 
