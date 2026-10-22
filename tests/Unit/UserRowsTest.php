@@ -8,9 +8,10 @@ use PHPUnit\Framework\TestCase;
  * Seam: ui/uses/modules/userRows.js.
  *
  * Every person row on Record Use and Edit Use (server-rendered or added
- * with +) is wired by wireUserRow: live search, picking a result by click
- * or by Tab then Enter, and the remove button. Tests drive it through a
- * small fake DOM and an injected search.
+ * with +) is wired by wireUserRow. Person search itself lives in
+ * person-pick.js. These tests keep the row: filling the picked person,
+ * hiding when focus leaves, Escape in the field, and the remove button.
+ * Tests drive it through a small fake DOM and an injected fetch.
  */
 class UserRowsTest extends TestCase
 {
@@ -29,51 +30,12 @@ class UserRowsTest extends TestCase
         $this->assertSame(1, $this->run_('return nextUserIndex(rowsDoc(["user0name"]))'));
     }
 
-    public function test_results_are_tab_stops(): void
-    {
-        $result = $this->run_(<<<'JS'
-const list = el('ul');
-renderUserResults(doc, list, people(12), { onPick: () => {} });
-return list.children.map((li) => [li.tabIndex, li.textContent]).slice(0, 2).concat([list.children.length]);
-JS);
-
-        $this->assertSame([[0, 'First0 Last0'], [0, 'First1 Last1'], 10], $result);
-    }
-
-    public function test_enter_on_a_result_picks_it(): void
-    {
-        $result = $this->run_(<<<'JS'
-const list = el('ul');
-const picked = [];
-renderUserResults(doc, list, people(3), { onPick: (person) => picked.push(person.id) });
-const enter = key('Enter');
-list.children[1].fire('keydown', enter);
-list.children[2].fire('keydown', key('a'));
-return { picked, prevented: enter.prevented };
-JS);
-
-        $this->assertSame(['picked' => [1], 'prevented' => true], $result);
-    }
-
-    public function test_click_on_a_result_picks_it(): void
-    {
-        $result = $this->run_(<<<'JS'
-const list = el('ul');
-const picked = [];
-renderUserResults(doc, list, people(3), { onPick: (person) => picked.push(person.id) });
-list.children[2].fire('click', {});
-return picked;
-JS);
-
-        $this->assertSame([2], $result);
-    }
-
     public function test_picking_from_a_row_fills_it_and_returns_focus(): void
     {
         $result = $this->run_(<<<'JS'
 const row = buildUserRow(doc, 1, '7');
 const parts = rowParts(row);
-await wireUserRow(doc, row, { search: async () => people(2) }).search('Fi');
+await wireUserRow(doc, row, { fetch: fetchPeople(people(2)) }).search('Fi');
 const resultsShown = parts.results.style.display;
 parts.list.children[1].fire('keydown', key('Enter'));
 return {
@@ -111,7 +73,7 @@ JS);
 const row = buildUserRow(doc, 1, '7');
 let removed = false;
 row.remove = () => { removed = true; };
-wireUserRow(doc, row, { search: async () => [] });
+wireUserRow(doc, row);
 rowParts(row).remove.fire('click', key(''));
 return removed;
 JS);
@@ -119,26 +81,12 @@ JS);
         $this->assertTrue($result);
     }
 
-    public function test_space_on_a_result_picks_it(): void
-    {
-        $result = $this->run_(<<<'JS'
-const list = el('ul');
-const picked = [];
-renderUserResults(doc, list, people(2), { onPick: (person) => picked.push(person.id) });
-const space = key(' ');
-list.children[0].fire('keydown', space);
-return { picked, prevented: space.prevented };
-JS);
-
-        $this->assertSame(['picked' => [0], 'prevented' => true], $result);
-    }
-
     public function test_a_server_placeholder_result_does_not_open_an_empty_box(): void
     {
         $result = $this->run_(<<<'JS'
 const row = buildUserRow(doc, 0, '7');
 rowParts(row).list.append(el('li'));
-wireUserRow(doc, row, { search: async () => [] });
+wireUserRow(doc, row);
 rowParts(row).name.focus();
 return rowParts(row).results.style.display;
 JS);
@@ -151,7 +99,7 @@ JS);
         $result = $this->run_(<<<'JS'
 const row = buildUserRow(doc, 1, '7');
 const parts = rowParts(row);
-await wireUserRow(doc, row, { search: async () => people(2) }).search('Fi');
+await wireUserRow(doc, row, { fetch: fetchPeople(people(2)) }).search('Fi');
 const escape = key('Escape');
 parts.list.children[0].fire('keydown', escape);
 return { shown: parts.results.style.display, focused: doc.activeElement === parts.name, id: parts.id.value };
@@ -165,7 +113,7 @@ JS);
         $result = $this->run_(<<<'JS'
 const row = buildUserRow(doc, 1, '7');
 const parts = rowParts(row);
-await wireUserRow(doc, row, { search: async () => people(2) }).search('Fi');
+await wireUserRow(doc, row, { fetch: fetchPeople(people(2)) }).search('Fi');
 parts.name.value = 'Fi';
 const escape = key('Escape');
 parts.name.fire('keydown', escape);
@@ -198,33 +146,49 @@ JS);
         $result = $this->run_(<<<'JS'
 const row = buildUserRow(doc, 1, '7');
 const parts = rowParts(row);
-await wireUserRow(doc, row, { search: async () => people(2) }).search('Fi');
+await wireUserRow(doc, row, { fetch: fetchPeople(people(2)) }).search('Fi');
 row.fire('focusout', { relatedTarget: parts.list.children[0] });
 const withinRow = parts.results.style.display;
 row.fire('focusout', { relatedTarget: el('input') });
-return [withinRow, parts.results.style.display];
+const hidden = parts.results.style.display;
+const labels = parts.list.children.map((li) => li.textContent);
+parts.name.focus();
+return [withinRow, hidden, parts.results.style.display, labels];
 JS);
 
-        $this->assertSame(['block', 'none'], $result);
+        $this->assertSame(['block', 'none', 'block', ['First0 Last0', 'First1 Last1']], $result);
     }
 
-    public function test_a_slower_earlier_search_does_not_replace_newer_results(): void
+    public function test_a_row_search_uses_the_origin_meta_tag(): void
+    {
+        $result = $this->run_(<<<'JS'
+const row = buildUserRow(doc, 1, '7');
+const calls = [];
+await wireUserRow(doc, row, {
+  fetch: async (url, opts) => {
+    calls.push({ url, body: JSON.parse(opts.body) });
+    return { json: async () => ({ users: [] }) };
+  },
+}).search('Fi');
+return calls[0];
+JS);
+
+        $this->assertSame([
+            'url' => 'https://api.staging.keeplore.app/users.php',
+            'body' => ['query' => 'Fi', 'userid' => '7'],
+        ], $result);
+    }
+
+    public function test_person_pick_is_read_when_a_search_runs(): void
     {
         $result = $this->run_(<<<'JS'
 const row = buildUserRow(doc, 1, '7');
 const parts = rowParts(row);
-let releaseFirst;
-const first = new Promise((resolve) => { releaseFirst = resolve; });
-const search = (query) => (query === 'F' ? first : Promise.resolve([{ id: 9, FirstName: 'Fran', LastName: 'Kay' }]));
-const wired = wireUserRow(doc, row, { search });
-const older = wired.search('F');
-await wired.search('Fr');
-releaseFirst(people(3));
-await older;
-return parts.list.children.map((li) => li.textContent);
-JS);
+await wireUserRow(doc, row, { fetch: fetchPeople(people(1)) }).search('Fi');
+return parts.list.children[0].textContent;
+JS, false);
 
-        $this->assertSame(['Fran Kay'], $result);
+        $this->assertSame('First0 Last0', $result);
     }
 
     public function test_add_user_row_appends_a_wired_row_for_a_new_person(): void
@@ -255,9 +219,11 @@ JS);
     }
 
     /** @return mixed */
-    private function run_(string $body)
+    private function run_(string $body, bool $preloadPersonPick = true)
     {
         $url = json_encode('file://' . PROJECT_PATH . '/ui/uses/modules/userRows.js');
+        $personPick = json_encode('file://' . PROJECT_PATH . '/ui/shared/js/person-pick.js');
+        $preload = $preloadPersonPick ? 'true' : 'false';
         $script = <<<JS
 function el(tag) {
   const listeners = {};
@@ -293,15 +259,39 @@ const doc = {
     ? body.all().filter((n) => n.tagName === 'INPUT' && /\buser\b/.test(n.className))
     : []),
 };
-globalThis.document = { querySelector: () => null };
+globalThis.document = {
+  querySelector: (sel) => sel === 'meta[name="keeplore-api-origin"]'
+    ? { content: 'api.staging.keeplore.app' }
+    : null,
+};
 function rowsDoc(ids) {
   return { querySelectorAll: (sel) => (sel === 'input.user' ? ids.map((id) => ({ id })) : []) };
 }
 function people(n) {
   return Array.from({ length: n }, (_, i) => ({ id: i, FirstName: 'First' + i, LastName: 'Last' + i }));
 }
-function key(k) { const e = { key: k, prevented: false, preventDefault() { e.prevented = true; } }; return e; }
-const { nextUserIndex, renderUserResults, buildUserRow, wireUserRow, addUserRow, rowParts } = await import({$url});
+function fetchPeople(users) {
+  return async () => ({ ok: true, json: async () => ({ users }) });
+}
+function key(k) {
+  const e = {
+    key: k, prevented: false, stopped: false,
+    preventDefault() { e.prevented = true; },
+    stopPropagation() { e.stopped = true; },
+  };
+  return e;
+}
+const preload = {$preload};
+if (preload) await import({$personPick});
+const personPickBeforeRows = typeof globalThis.PersonPick;
+const userRows = await import({$url});
+if (!preload) {
+  if (personPickBeforeRows !== 'undefined' || typeof globalThis.PersonPick !== 'undefined') {
+    throw new Error('person pick loaded with the row module');
+  }
+  await import({$personPick});
+}
+const { nextUserIndex, buildUserRow, wireUserRow, addUserRow, rowParts } = userRows;
 const out = await (async () => { {$body} })();
 process.stdout.write(JSON.stringify(out));
 JS;

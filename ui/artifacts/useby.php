@@ -277,6 +277,7 @@
   </div>
 
   <script src="<?php echo url_for('/shared/js/record-use-submit.js'); ?>"></script>
+  <script src="<?php echo url_for('/shared/js/person-pick.js'); ?>"></script>
   <script src="<?php echo url_for('/shared/js/quick-record.js'); ?>"></script>
   <script src="<?php echo url_for('/shared/js/quick-item-actions.js'); ?>?v=1"></script>
   <script src="<?php echo url_for('/artifacts/useby-table.js'); ?>"></script>

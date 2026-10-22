@@ -44,46 +44,28 @@ function resetForm() {
   showBtn.style.display = "";
 }
 
+// The record form owns this create. Another form on the page has its own token.
+function recordFormToken() {
+  const form = firstInput.closest ? firstInput.closest("form") : null;
+  const field = form ? form.querySelector('input[name="csrf_token"]') : null;
+  return field ? field.value : "";
+}
+
 function createInteractor(event) {
-  event.preventDefault();
-  const first = firstInput.value.trim();
-  const last = lastInput.value.trim();
-  if (first === "" && last === "") {
-    msg.textContent = "Enter a name.";
-    return;
+  if (event && typeof event.preventDefault === "function") {
+    event.preventDefault();
   }
-
-  createBtn.disabled = true;
-  msg.textContent = "Creating…";
-
-  const csrfField = document.querySelector('input[name="csrf_token"]');
-  const body = new FormData();
-  body.append("FirstName", first);
-  body.append("LastName", last);
-  if (csrfField) { body.append("csrf_token", csrfField.value); }
-
-  fetch("/users/new.php", {
-    method: "POST",
-    credentials: "include",
-    headers: { "X-Requested-With": "XMLHttpRequest", Accept: "application/json" },
-    body: body,
-  })
-    .then(function (response) {
-      return response.json().then(function (data) {
-        return { ok: response.ok, data: data };
-      });
-    })
-    .then(function (result) {
-      createBtn.disabled = false;
-      if (result.ok && result.data && result.data.ok) {
-        addUserRow(document, { id: result.data.id, name: result.data.FullName });
-        resetForm();
-      } else {
-        msg.textContent = (result.data && result.data.message) || "Could not create person.";
-      }
-    })
-    .catch(function (error) {
-      createBtn.disabled = false;
-      msg.textContent = "Error: " + error.message;
-    });
+  globalThis.PersonPick.createPerson({
+    url: "/users/new.php",
+    first: firstInput,
+    last: lastInput,
+    button: createBtn,
+    message: msg,
+    token: recordFormToken,
+    fetch: fetch,
+    onSuccess: function (id, fullName) {
+      addUserRow(document, { id: id, name: fullName });
+      resetForm();
+    },
+  });
 }
