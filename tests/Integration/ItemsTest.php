@@ -55,6 +55,10 @@ final class ItemsTest extends TestCase
         $this->runSql("INSERT INTO item_tags (user_id, artifact_id, tag) VALUES
             (1, 10, 'beach-safe'), (1, 10, 'family'), (1, 11, 'family'), (2, 20, 'mine')");
         require_once PRIVATE_PATH . '/classes/Items.php';
+        require_once PRIVATE_PATH . '/classes/Preferences.php';
+        require_once PRIVATE_PATH . '/item_form.php';
+        require_once PRIVATE_PATH . '/use_by_date.php';
+        require_once PRIVATE_PATH . '/item_facts.php';
         (new \Preferences($this->db, 1))->save(['default_use_interval' => 120]);
         $this->items = new Items($this->db, 1);
     }
@@ -87,6 +91,13 @@ final class ItemsTest extends TestCase
     private function column(string $sql): array
     {
         return array_map('intval', array_column($this->db->query($sql)->fetch_all(MYSQLI_NUM), 0));
+    }
+
+    /** The stored Item's use-by date, counted from the owner's current default. */
+    private function useByDate(array $item): ?string
+    {
+        $default = (new \Preferences($this->db, 1))->get()['default_use_interval'];
+        return use_by_status($item, $default, '2024-01-10')['use_by_date'];
     }
 
     private function tagsOf(int $itemId): array
@@ -158,11 +169,12 @@ final class ItemsTest extends TestCase
         $this->assertSame(60, (int) $item['MxT']);
         $this->assertSame(1, (int) $item['MnP']);
         $this->assertSame(1, (int) $item['MxP']);
-        $this->assertSame('01', $item['SS']);
+        $this->assertSame('', $item['SS']);
+        $this->assertFalse(item_plays_best_at($item, 1));
         $this->assertSame(0, (int) $item['Age']);
         $this->assertSame(app_today(), $item['Acq']);
         $this->assertSame(1, (int) $item['is_kept']);
-        $this->assertEquals(120, $item['interaction_frequency_days']);
+        $this->assertNull($item['interaction_frequency_days']);
         $this->assertSame(app_today(), $item['CandidateGroupDate']);
         $this->assertSame('0', $item['UsedRecUserCt']);
         $this->assertNull($item['type_id']);
@@ -172,13 +184,97 @@ final class ItemsTest extends TestCase
         $this->assertSame(0, (int) $item['to_get_rid_of']);
     }
 
-    public function test_create_falls_back_to_90_days_when_the_owner_has_no_default_use_interval(): void
+    public function test_a_blank_frequency_stays_unset_and_the_use_by_date_follows_the_current_default(): void
+    {
+        $id = $this->items->create(item_form_input([
+            'Title' => 'Quelf', 'Acq' => '2024-01-10', 'interaction_frequency_days' => '',
+        ]));
+        $item = $this->items->find($id);
+
+        $this->assertNull($item['interaction_frequency_days']);
+        // 2024-01-10 plus the owner's 120-day default, with no use of its own.
+        $this->assertSame('2024-05-09', $this->useByDate($item));
+
+        (new \Preferences($this->db, 1))->save(['default_use_interval' => 30]);
+
+        $again = $this->items->find($id);
+        $this->assertNull($again['interaction_frequency_days']);
+        $this->assertSame('2024-02-09', $this->useByDate($again));
+    }
+
+    public function test_an_unset_default_use_interval_counts_the_use_by_date_from_90_days(): void
     {
         $this->runSql('UPDATE users SET default_use_interval = NULL WHERE id = 1');
 
-        $item = $this->items->find($this->items->create(['Title' => 'Quelf']));
+        $item = $this->items->find($this->items->create(item_form_input([
+            'Title' => 'Quelf', 'Acq' => '2024-01-10', 'interaction_frequency_days' => '',
+        ])));
 
-        $this->assertEquals(90, $item['interaction_frequency_days']);
+        $this->assertNull($item['interaction_frequency_days']);
+        $this->assertSame('2024-04-09', $this->useByDate($item));
+    }
+
+    public function test_a_typed_frequency_is_the_items_own_and_the_use_by_date_keeps_it(): void
+    {
+        $id = $this->items->create(item_form_input([
+            'Title' => 'Quelf', 'Acq' => '2024-01-10', 'interaction_frequency_days' => '14',
+        ]));
+        $item = $this->items->find($id);
+
+        $this->assertEquals(14, $item['interaction_frequency_days']);
+        $this->assertSame('2024-01-24', $this->useByDate($item));
+
+        $this->items->update($id, item_form_input(['Title' => 'Quelf party']));
+        (new \Preferences($this->db, 1))->save(['default_use_interval' => 30]);
+        $kept = $this->items->find($id);
+        $this->assertSame('Quelf party', $kept['Title']);
+        $this->assertEquals(14, $kept['interaction_frequency_days']);
+        $this->assertSame('2024-01-24', $this->useByDate($kept));
+    }
+
+    public function test_clearing_a_frequency_on_edit_follows_the_default_again(): void
+    {
+        $this->items->update(10, item_form_input([
+            'Acq' => '2024-01-10', 'interaction_frequency_days' => '14',
+        ]));
+        $this->assertSame('2024-01-24', $this->useByDate($this->items->find(10)));
+
+        $this->items->update(10, item_form_input(['interaction_frequency_days' => '']));
+
+        $item = $this->items->find(10);
+        $this->assertNull($item['interaction_frequency_days']);
+        $this->assertSame('04', $item['SS']);
+        $this->assertSame('2024-05-09', $this->useByDate($item));
+    }
+
+    public function test_a_blank_sweet_spot_is_stored_as_none_and_is_not_best_at_1(): void
+    {
+        $blank = $this->items->find($this->items->create(item_form_input([
+            'Title' => 'Quelf', 'SS' => '',
+        ])));
+        $omitted = $this->items->find($this->items->create(item_form_input(['Title' => 'Azul'])));
+        $typed = $this->items->find($this->items->create(item_form_input([
+            'Title' => 'Codenames', 'SS' => '03,04',
+        ])));
+
+        $this->assertSame('', $blank['SS']);
+        $this->assertSame([], item_sweet_spot_counts($blank));
+        $this->assertFalse(item_plays_best_at($blank, 1));
+        $this->assertSame('', $omitted['SS']);
+        $this->assertFalse(item_plays_best_at($omitted, 1));
+        $this->assertSame('03,04', $typed['SS']);
+        $this->assertTrue(item_plays_best_at($typed, 3));
+        $this->assertFalse(item_plays_best_at($typed, 1));
+
+        $this->items->update((int) $typed['id'], item_form_input(['Title' => 'Codenames']));
+        $this->assertSame('03,04', $this->items->find((int) $typed['id'])['SS']);
+
+        $this->items->update(10, item_form_input(['SS' => '']));
+        $cleared = $this->items->find(10);
+        $this->assertSame('', $cleared['SS']);
+        $this->assertSame([], item_sweet_spot_counts($cleared));
+        $this->assertFalse(item_plays_best_at($cleared, 1));
+        $this->assertFalse(item_plays_best_at($cleared, 4));
     }
 
     public function test_create_treats_blank_fields_as_missing(): void
@@ -189,11 +285,12 @@ final class ItemsTest extends TestCase
         ]));
 
         $this->assertSame([30, 60, 1, 1], [(int) $item['MnT'], (int) $item['MxT'], (int) $item['MnP'], (int) $item['MxP']]);
-        $this->assertSame('01', $item['SS']);
+        $this->assertSame('', $item['SS']);
+        $this->assertFalse(item_plays_best_at($item, 1));
         $this->assertSame(0, (int) $item['Age']);
         $this->assertSame(app_today(), $item['Acq']);
         $this->assertSame(1, (int) $item['is_kept']);
-        $this->assertEquals(120, $item['interaction_frequency_days']);
+        $this->assertNull($item['interaction_frequency_days']);
         $this->assertNull($item['type_id']);
         $this->assertNull($item['Yr']);
     }
@@ -356,13 +453,16 @@ final class ItemsTest extends TestCase
         $this->assertNull($item['is_physical']);
     }
 
-    public function test_update_gives_blank_times_counts_sweet_spot_age_and_acquisition_their_create_defaults(): void
+    public function test_update_gives_blank_times_counts_age_and_acquisition_their_create_defaults(): void
     {
-        $this->items->update(10, ['MnT' => '', 'MxT' => '', 'MnP' => '', 'MxP' => '', 'SS' => '', 'Age' => '', 'Acq' => '']);
+        $this->items->update(10, item_form_input([
+            'MnT' => '', 'MxT' => '', 'MnP' => '', 'MxP' => '', 'age' => '', 'Acq' => '', 'SS' => '',
+        ]));
 
         $item = $this->items->find(10);
         $this->assertSame([30, 60, 1, 1], [(int) $item['MnT'], (int) $item['MxT'], (int) $item['MnP'], (int) $item['MxP']]);
-        $this->assertSame('01', $item['SS']);
+        $this->assertSame('', $item['SS']);
+        $this->assertFalse(item_plays_best_at($item, 1));
         $this->assertSame(0, (int) $item['Age']);
         $this->assertSame(app_today(), $item['Acq']);
     }

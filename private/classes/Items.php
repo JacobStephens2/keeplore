@@ -5,7 +5,6 @@ require_once dirname(__DIR__) . '/kept_status.php';
 require_once dirname(__DIR__) . '/item_tags.php';
 require_once dirname(__DIR__) . '/item_types.php';
 require_once dirname(__DIR__) . '/app_day.php';
-require_once __DIR__ . '/Preferences.php';
 
 /** An Item write's input broke the item rules; $errors lists every problem. */
 final class ItemInvalid extends InvalidArgumentException
@@ -51,8 +50,8 @@ final class Items
     public const OWNERS_USES = 'uses JOIN games owner_items
         ON owner_items.id = uses.artifact_id AND owner_items.user_id = uses.user_id';
 
-    /** What create gives a missing or blank field, besides today's date and the owner's interval. */
-    public const DEFAULTS = ['MnT' => 30, 'MxT' => 60, 'MnP' => 1, 'MxP' => 1, 'SS' => '01', 'Age' => 0, 'is_kept' => 1];
+    /** What create gives a missing or blank field, besides today's date. */
+    public const DEFAULTS = ['MnT' => 30, 'MxT' => 60, 'MnP' => 1, 'MxP' => 1, 'Age' => 0, 'is_kept' => 1];
 
     private const WRITABLE = [
         'Title', 'FullTitle', 'Notes', 'image_url',
@@ -66,8 +65,8 @@ final class Items
     /** The BoardGameGeek columns, stored together by item_bgg_fields_for_storage(). */
     private const BGG_COLUMNS = ['bgg_url', 'bgg_player_votes', 'bgg_age_basis', 'BGG_Rat'];
 
-    /** Fields an update gives their create default when blank. */
-    private const BLANK_TAKES_DEFAULT = ['MnT', 'MxT', 'MnP', 'MxP', 'SS', 'Age', 'Acq'];
+    /** Fields an update gives their create default when blank. A blank sweet spot is none, not one of these. */
+    private const BLANK_TAKES_DEFAULT = ['MnT', 'MxT', 'MnP', 'MxP', 'Age', 'Acq'];
 
     /** The list's flag filters and the column each one reads. */
     private const FLAG_FILTERS = [
@@ -115,9 +114,10 @@ final class Items
     public function create(array $input): int
     {
         return $this->transaction(function () use ($input) {
+            // A missing sweet spot is stored as '', not the column's null.
             $item = $this->fillBlanks($this->writable($input), $this->createDefaults() + [
-                'interaction_frequency_days' => (new Preferences($this->db, $this->userId))->get()['default_use_interval'],
                 'type_id' => null,
+                'SS' => '',
             ]);
             $this->validate($item, $item);
             $columns = $this->columns($item, $item) + [
@@ -225,8 +225,10 @@ final class Items
 
     /**
      * Patch the Item with the given fields. A blank time, player count,
-     * sweet spot, age or acquisition date takes its create default; a blank
-     * type keeps the current type; missing tags leave the tags unchanged.
+     * age or acquisition date takes its create default. A blank sweet spot
+     * is stored as none, and a blank interaction frequency clears the Item's
+     * own interval. A blank type keeps the current type; missing tags leave
+     * the tags unchanged.
      */
     public function update(int $id, array $changes): void
     {
@@ -406,7 +408,7 @@ final class Items
             ?? throw new OutOfBoundsException('Item not found.');
     }
 
-    /** Create's default for each blank field it fills, besides the owner's interval and the type. */
+    /** Create's default for each blank field it fills, besides the type. */
     private function createDefaults(): array
     {
         return self::DEFAULTS + ['Acq' => app_today()];
@@ -527,6 +529,7 @@ final class Items
                 'Yr' => normalize_item_year($value),
                 'image_url' => normalize_item_image_url($value),
                 'type_id', 'age_max', 'FavCt', 'interaction_frequency_days' => $this->isBlank($value) ? null : trim((string) $value),
+                'SS' => $this->isBlank($value) ? '' : $value,
                 default => $value,
             };
         }

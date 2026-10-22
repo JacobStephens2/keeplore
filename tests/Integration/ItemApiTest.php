@@ -223,6 +223,52 @@ final class ItemApiTest extends TestCase
         $this->assertSame('Private item', $this->item(20, 2)['Title']);
     }
 
+    public function test_an_omitted_or_blank_frequency_stores_none_and_a_number_is_stored(): void
+    {
+        [$status, $omitted] = write_item_over_api($this->db, $this->session(), 'POST', $this->body(
+            '{"Title": "Quelf"}'
+        ));
+        $this->assertSame(201, $status);
+        $this->assertNull($omitted['artifact']['interaction_frequency_days']);
+        $this->assertSame('', $omitted['artifact']['SS']);
+
+        [$status, $blank] = write_item_over_api($this->db, $this->session(), 'POST', $this->body(
+            '{"Title": "Blank frequency", "interaction_frequency_days": "", "SS": ""}'
+        ));
+        $this->assertSame(201, $status);
+        $this->assertNull($blank['artifact']['interaction_frequency_days']);
+        $this->assertSame('', $blank['artifact']['SS']);
+
+        [$status, $numbered] = write_item_over_api($this->db, $this->session(), 'POST', $this->body(
+            '{"Title": "Fortnight", "interaction_frequency_days": 14, "SS": "03,04"}'
+        ));
+        $this->assertSame(201, $status);
+        $id = (int) $numbered['artifact']['id'];
+        $this->assertEquals(14, $numbered['artifact']['interaction_frequency_days']);
+        $this->assertSame('03,04', $numbered['artifact']['SS']);
+
+        [$status, $patched] = write_item_over_api($this->db, $this->session(), 'PUT', $this->body(
+            '{"id": ' . $id . ', "Notes": "still"}'
+        ));
+        $this->assertSame(200, $status);
+        $this->assertEquals(14, $patched['artifact']['interaction_frequency_days']);
+        $this->assertSame('03,04', $patched['artifact']['SS']);
+
+        [$status, $cleared] = write_item_over_api($this->db, $this->session(), 'PUT', $this->body(
+            '{"id": ' . $id . ', "interaction_frequency_days": "", "SS": ""}'
+        ));
+        $this->assertSame(200, $status);
+        $this->assertNull($cleared['artifact']['interaction_frequency_days']);
+        $this->assertSame('', $cleared['artifact']['SS']);
+
+        [$status, $set] = write_item_over_api($this->db, $this->session(), 'PUT', $this->body(
+            '{"id": ' . $id . ', "interaction_frequency_days": 21}'
+        ));
+        $this->assertSame(200, $status);
+        $this->assertEquals(21, $set['artifact']['interaction_frequency_days']);
+        $this->assertSame('', $set['artifact']['SS']);
+    }
+
     public function test_agent_keys_are_refused_and_write_nothing(): void
     {
         $agent = $this->agentKey();
