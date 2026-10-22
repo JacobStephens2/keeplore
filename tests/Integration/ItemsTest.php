@@ -509,7 +509,7 @@ final class ItemsTest extends TestCase
 
     public function test_snooze_sets_and_returns_today_plus_the_days(): void
     {
-        $until = (new \DateTime('today'))->modify('+5 days')->format('Y-m-d');
+        $until = (new \DateTimeImmutable(app_today()))->modify('+5 days')->format('Y-m-d');
 
         $this->assertSame($until, $this->items->snooze(10, 5));
         $this->assertSame($until, $this->items->find(10)['snoozed_until']);
@@ -517,7 +517,7 @@ final class ItemsTest extends TestCase
 
     public function test_a_snooze_below_one_day_counts_as_one(): void
     {
-        $tomorrow = (new \DateTime('today'))->modify('+1 day')->format('Y-m-d');
+        $tomorrow = (new \DateTimeImmutable(app_today()))->modify('+1 day')->format('Y-m-d');
 
         $this->assertSame($tomorrow, $this->items->snooze(10, 0));
         $this->assertSame($tomorrow, $this->items->find(10)['snoozed_until']);
