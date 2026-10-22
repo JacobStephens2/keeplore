@@ -68,25 +68,25 @@
             </a>
           </td>
     	    <td class="edit name">
-            <a class="table-action" href="<?php echo url_for('/users/edit.php?id=' . h(u($artifact['PlayerID']))); ?>">
-              <?php echo h($artifact['FirstName']) . ' ' . h($artifact['LastName']); ?>
+            <a class="table-action" href="<?php echo url_for('/users/edit.php?id=' . h(u($artifact['person_id']))); ?>">
+              <?php echo h($artifact['name']); ?>
             </a>
           </td>
-    	    <td class="edit"><?php echo ltrim(h($artifact['ss']), '0'); ?></td>
-          <td class="edit"><?php echo h($artifact['MnP']); ?></td>
-          <td class="edit"><?php echo h($artifact['MxP']); ?></td>
-          <td class="edit"><?php echo h($artifact['MxT']); ?></td>
+    	    <td class="edit"><?php echo h($artifact['sweet_spot']); ?></td>
+          <td class="edit"><?php echo h($artifact['minimum_players']); ?></td>
+          <td class="edit"><?php echo h($artifact['maximum_players']); ?></td>
+          <td class="edit"><?php echo h($artifact['maximum_time']); ?></td>
           <td class="edit date">
-            <?php echo h($artifact['MaxOfPlayDate']); ?>
+            <?php echo h($artifact['play_date']); ?>
           </td>
           <td class="edit">
-            <?php if ($artifact['AversionID'] !== null) { ?>
-              <a class="table-action" href="<?php echo url_for('/aversions/edit.php?id=' . h(u($artifact['AversionID']))); ?>">
-                <?php echo h($artifact['MaxOfAversionDate']); ?>
+            <?php if ($artifact['aversion_id'] !== null) { ?>
+              <a class="table-action" href="<?php echo url_for('/aversions/edit.php?id=' . h(u($artifact['aversion_id']))); ?>">
+                <?php echo h($artifact['aversion_date']); ?>
               </a>
             <?php } ?>
           </td>
-          <td class="edit"><?php echo h($artifact['type']); ?></td>
+          <td class="edit"><?php echo h($artifact['type_name']); ?></td>
     	  </tr>
       <?php } ?>
   	</table>
