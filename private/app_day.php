@@ -3,12 +3,15 @@
 /**
  * App day: the calendar day in America/New_York that Keeplore counts today
  * from. Use-by dates, snooze-until dates, the Daily email's hour, the dates
- * forms start with, people-list age, the person page's age, the latest birth
- * year People accepts, an undated Event's year, and the day the Candidates
- * page and the uses-list hint count an interval back from all read it here.
- * That interval is the owner's default use interval. Nothing else names the
- * time zone or changes the process default. The footer copyright year stays
- * on the server clock, and log timestamps stay instants.
+ * forms start with, Quick record's starting date, people-list age, the
+ * person page's age, the latest birth year People accepts, an undated
+ * Event's year, and the day the Candidates page and the uses-list hint
+ * count an interval back from all read it here. That interval is the
+ * owner's default use interval. Quick record's date starts as this day, the
+ * same day Record Use and Edit User's form start with. The browser's
+ * calendar is not a reader of today. Nothing else names the time zone or
+ * changes the process default. The footer copyright year stays on the server
+ * clock, and log timestamps stay instants.
  */
 
 /** The time zone the app's day is counted in. */

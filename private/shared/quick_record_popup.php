@@ -7,7 +7,8 @@
  * otherwise their default Setting from Preferences.
  *
  * ui/shared/js/quick-record.js drives it; the page passes its toast and
- * what to do with its own row once a use is recorded.
+ * what to do with its own row once a use is recorded. The date starts as
+ * the App day, on data-app-day, fixed when this popup is rendered.
  */
 $quick_record_user_id = (int) $user_id;
 $quick_record_setting = (new Uses($db, $quick_record_user_id))->lastSetting()
@@ -18,7 +19,8 @@ $quick_record_owner_name = (string) ($_SESSION['FullName'] ?? '');
 <div id="record-modal" class="modal" hidden aria-hidden="true"
   data-people-search-url="<?php echo h('https://' . API_ORIGIN . '/users.php'); ?>"
   data-new-person-url="<?php echo url_for('/users/new.php'); ?>"
-  data-user-id="<?php echo h((string) $quick_record_user_id); ?>">
+  data-user-id="<?php echo h((string) $quick_record_user_id); ?>"
+  data-app-day="<?php echo h(app_today()); ?>">
   <div class="modal-backdrop" data-modal-close></div>
   <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="record-modal-title">
     <button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button>

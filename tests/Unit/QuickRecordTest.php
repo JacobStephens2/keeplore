@@ -8,8 +8,10 @@ use PHPUnit\Framework\TestCase;
  * Seam: QuickRecord.init(root, options).open(itemId, itemName, context).
  *
  * The Quick record popup on the dashboard and Interact By, including the
- * Interact By page's click and save flow. Tests run the real scripts under
- * node with stub DOM elements, paginated rows and fetch responses.
+ * Interact By page's click and save flow. The date starts as the popup's
+ * data-app-day attribute, the same attribute the popup renders. Tests run
+ * the real scripts under node with stub DOM elements, paginated rows and
+ * fetch responses.
  */
 class QuickRecordTest extends TestCase
 {
@@ -71,6 +73,7 @@ JS, true);
     {
         $result = $this->run_popup(<<<'JS'
 popup.open('12', 'Catan', 'row-12');
+out.openedDate = byId('record-modal-date').value;
 byId('record-modal-notes').value = 'old notes';
 byId('record-modal-date').value = '2020-01-01';
 await addPersonFromSearch('Ann', { id: 5, FirstName: 'Ann', LastName: 'Lee' });
@@ -85,7 +88,8 @@ JS);
         $this->assertSame('2807', $result['itemId']);
         $this->assertSame('Azul', $result['itemName']);
         $this->assertSame('Azul', $result['subtitle']);
-        $this->assertSame('2026-10-04', $result['date']);
+        $this->assertSame('2026-04-15', $result['openedDate']);
+        $this->assertSame('2026-04-15', $result['date']);
         $this->assertSame('', $result['notes']);
         $this->assertSame('Home', $result['setting']);
         $this->assertSame('/uses/record-new.php?artifact_id=2807', $result['fullFormHref']);
@@ -299,6 +303,26 @@ JS);
         $this->assertFalse($result['hidden']);
     }
 
+    public function test_opening_without_a_rendered_day_leaves_the_date_blank(): void
+    {
+        $result = $this->run_popup(<<<'JS'
+byId('record-modal-date').value = '2020-01-01';
+popup.open('1', 'Catan', null);
+JS, false, null);
+
+        $this->assertSame('', $result['date']);
+    }
+
+    public function test_opening_with_a_day_that_is_not_yyyy_mm_dd_leaves_the_date_blank(): void
+    {
+        $result = $this->run_popup(<<<'JS'
+byId('record-modal-date').value = '2020-01-01';
+popup.open('1', 'Catan', null);
+JS, false, 'not-a-day');
+
+        $this->assertSame('', $result['date']);
+    }
+
     public function test_dashboard_and_use_by_open_the_shared_popup(): void
     {
         $pages = [
@@ -315,18 +339,40 @@ JS);
         }
     }
 
+    public function test_the_script_does_not_compute_a_calendar_day_and_callers_do_not_pass_one(): void
+    {
+        $script = (string) file_get_contents(PROJECT_PATH . '/ui/shared/js/quick-record.js');
+        $this->assertDoesNotMatchRegularExpression(
+            '/new\s+Date\b|Date\.now|getFullYear|getMonth\s*\(|getDate\s*\(|todayLocal|options\.today/',
+            $script
+        );
+
+        $callers = [
+            PROJECT_PATH . '/ui/index.php',
+            PROJECT_PATH . '/ui/artifacts/useby-table.js',
+        ];
+        foreach ($callers as $path) {
+            $source = (string) file_get_contents($path);
+            $this->assertDoesNotMatchRegularExpression('/\btoday\s*:/', $source, $path);
+            $this->assertStringNotContainsString('todayLocal', $source, $path);
+            $this->assertStringNotContainsString('data-app-day', $source, $path);
+        }
+    }
+
     /**
      * Runs $scenario against a stub popup and returns the popup's state.
      *
+     * @param ?string $appDay rendered data-app-day; null omits the attribute
      * @return array<string, mixed>
      */
-    private function run_popup(string $scenario, bool $useByPage = false): array
+    private function run_popup(string $scenario, bool $useByPage = false, ?string $appDay = '2026-04-15'): array
     {
         $submitModule = json_encode(PROJECT_PATH . '/ui/shared/js/record-use-submit.js');
         $module = json_encode(PROJECT_PATH . '/ui/shared/js/quick-record.js');
         $pageModule = json_encode(PROJECT_PATH . '/ui/artifacts/useby-table.js');
         $itemActionsModule = json_encode(PROJECT_PATH . '/ui/shared/js/quick-item-actions.js');
         $useByPageJson = json_encode($useByPage);
+        $appDayAttr = $appDay === null ? '' : "'data-app-day': " . json_encode($appDay) . ',';
         $script = <<<JS
 require({$submitModule});
 const QuickRecord = require({$module});
@@ -464,6 +510,7 @@ const root = el('div', {
     'data-people-search-url': 'https://api.test/users.php',
     'data-new-person-url': '/users/new.php',
     'data-user-id': '7',
+    {$appDayAttr}
   },
 }, [
   el('div', { id: 'record-modal-backdrop', attrs: closer }),
@@ -519,7 +566,6 @@ const recorded = [];
 const popup = {$useByPageJson} ? null : QuickRecord.init(root, {
   document: doc,
   fetch: fetchFn,
-  today: () => '2026-10-04',
   toast: (m, k) => toasts.push([m, k]),
   onRecorded: (data, context) => recorded.push([data, context]),
 });
