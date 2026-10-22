@@ -335,9 +335,10 @@ final class BggRatings
 
     /**
      * Fetches one BGG user's entry for one item and stores it, replacing even
-     * a hand entry. Returns the entry (null when they have none, which clears
-     * an imported row but keeps a hand entry), or false when BGG could not be
-     * reached, which leaves the old row alone.
+     * a hand entry. Returns the entry, null when the answer has no entry
+     * (which clears an imported row but keeps a hand entry), or false when
+     * BGG could not be reached or the reply is not a collection answer,
+     * which leaves the old row alone.
      */
     private function refresh(int $itemId, int $thingId, array $bggUser): array|null|false
     {
@@ -347,13 +348,10 @@ final class BggRatings
         } catch (BggUnreachable $e) {
             return false;
         }
-        // Only a real {"items": [...]} answer may clear a rating. An empty or
-        // garbled body, as BGG sends while it queues a request, counts as a failure.
-        $data = json_decode((string) $json, true);
-        if (!is_array($data) || !is_array($data['items'] ?? null)) {
+        $entry = bgg_rating_from_collection_json($json);
+        if ($entry === false) {
             return false;
         }
-        $entry = bgg_rating_from_collection_json($json);
         if ($entry === null) {
             $this->delete($itemId, $bggUser['username'], true);
             return null;

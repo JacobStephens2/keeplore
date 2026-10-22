@@ -133,7 +133,7 @@ A BoardGameGeek user, such as Gyges, whose ratings and comments on the owner's i
 A full import of all the owner's BGG reviewer's ratings and comments. Settings queues it, it runs in the background one at a time, and Settings shows its progress. Every read and write of it goes through one module, scoped to the owner.
 
 **BGG rating**:
-A BGG reviewer's rating, comment or both on one of the owner's items, imported from BoardGameGeek or entered by hand on Edit Item. The import never replaces a hand entry; Request data on Edit Item replaces one only when BoardGameGeek has an entry. Every read and write of them goes through one module, scoped to the owner.
+A BGG reviewer's rating, comment or both on one of the owner's items, imported from BoardGameGeek or entered by hand on Edit Item. The import never replaces a hand entry; Request data on Edit Item replaces one only when BoardGameGeek has an entry. A collection reply that is not an answer, including one BoardGameGeek has only queued, leaves the stored rating alone. An answer whose first item has neither a rating nor a comment clears an imported rating. Every read and write of them goes through one module, scoped to the owner.
 
 **BoardGameGeek link**:
 The page an item points at on boardgamegeek.com, rpggeek.com, or videogamegeek.com. It names one thing, a board game, expansion, accessory, videogame, or RPG item. The BGG average and the vote basis are stored only with a link. A typed http link or a bare host is stored as https. Anything else is no link.

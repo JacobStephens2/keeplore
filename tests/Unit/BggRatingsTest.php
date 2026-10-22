@@ -12,7 +12,8 @@ require_once PROJECT_PATH . '/private/items_list.php';
  * Seams:
  * - bgg_thing_id_from_url(): the BGG object an item's link names
  * - bgg_user_from_users_json(): a BGG username resolved to its id and spelling
- * - bgg_rating_from_collection_json(): one BGG user's rating and comment on one thing
+ * - bgg_rating_from_collection_json(): one collection body is false (not an answer),
+ *   null (an answer with no entry), or the entry
  * - bgg_rating_from_input(): a rating typed on Edit Item
  * - items_list_present_row(): carries each imported BGG rating to /artifacts/
  */
@@ -87,10 +88,18 @@ class BggRatingsTest extends TestCase
         ], bgg_rating_from_collection_json($json));
     }
 
+    public function test_a_body_that_is_not_a_collection_answer_is_not_an_entry(): void
+    {
+        $this->assertFalse(bgg_rating_from_collection_json('not json'));
+        $this->assertFalse(bgg_rating_from_collection_json(''));
+        $this->assertFalse(bgg_rating_from_collection_json('{"queued":true}'));
+        $this->assertFalse(bgg_rating_from_collection_json('{"items":"no"}'));
+    }
+
     public function test_entry_with_neither_rating_nor_comment_is_null(): void
     {
         $this->assertNull(bgg_rating_from_collection_json('{"items":[]}'));
-        $this->assertNull(bgg_rating_from_collection_json('not json'));
+        $this->assertNull(bgg_rating_from_collection_json('{"items":[null]}'));
         $this->assertNull(bgg_rating_from_collection_json(json_encode(['items' => [[
             'rating' => 0,
             'status' => ['own' => true],
