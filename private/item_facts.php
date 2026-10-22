@@ -2,10 +2,11 @@
 
 /**
  * Item facts: an item's play facts read from its row. These are its sweet
- * spot, recommended minimum age, player range, play time, the low end of a
- * recorded range, and whether it is a Candidate, and the labels pages show
- * for them. Every page that filters or labels items by these facts reads
- * them here, so the Sweet spot and Candidate rules live in one place.
+ * spot, recommended minimum age, player range, play time and whether it is a
+ * Candidate, and the labels pages show for them. Every page that filters or
+ * labels items by these facts reads them here, so the Sweet spot and
+ * Candidate rules live in one place. The low end of a recorded player range
+ * or play time is those same ends as a number, for sorting, not a label.
  *
  * Each function takes an item row and reads its columns whichever way they
  * are spelled: games' SS, Age, MnP, MxP, MnT, MxT and Candidate, or the
