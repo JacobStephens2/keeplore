@@ -10,6 +10,9 @@
   var RecordUseSubmit = typeof window !== 'undefined' && window.RecordUseSubmit
     ? window.RecordUseSubmit
     : (typeof require === 'function' ? require('./record-use-submit.js') : null);
+  var PersonPick = typeof window !== 'undefined' && window.PersonPick
+    ? window.PersonPick
+    : (typeof require === 'function' ? require('./person-pick.js') : null);
 
   // The browser's local date as YYYY-MM-DD.
   function todayLocal() {
@@ -62,6 +65,8 @@
       results.innerHTML = '';
       results.hidden = true;
     }
+
+    var peopleSearch;
 
     function hasPerson(id) {
       if (String(id) === ownerPersonId) return true;
@@ -152,76 +157,47 @@
       if (event.key === 'Escape' && !root.hidden) close();
     });
 
-    search.addEventListener('input', function () {
-      var query = search.value.trim();
-      if (query === '') { hideResults(); return; }
-      fetchFn(peopleSearchUrl, {
-        method: 'POST',
-        credentials: 'include',
-        body: JSON.stringify({ query: query, userid: ownerUserId }),
-      })
-        .then(function (response) { return response.json(); })
-        .then(function (data) {
-          if (data.authenticated === false) { window.location.href = '/login.php'; return; }
-          results.innerHTML = '';
-          var people = (data.users || []).slice(0, 10);
-          if (!people.length) { results.hidden = true; return; }
-          results.hidden = false;
-          people.forEach(function (person) {
-            var name = (person.FirstName + ' ' + person.LastName).trim();
-            var li = doc.createElement('li');
-            li.textContent = name;
-            li.addEventListener('click', function () {
-              addPerson(person.id, name);
-              search.value = '';
-              hideResults();
-              search.focus();
-            });
-            results.appendChild(li);
-          });
-        })
-        .catch(hideResults);
+    peopleSearch = PersonPick.bindSearch({
+      document: doc,
+      input: search,
+      list: results,
+      url: peopleSearchUrl,
+      userid: ownerUserId,
+      fetch: fetchFn,
+      onPick: function (person) {
+        addPerson(person.id, person.name);
+        search.value = '';
+        peopleSearch.hide();
+        search.focus();
+      },
+      onEscape: function () {
+        peopleSearch.hide();
+        search.focus();
+      },
+      setOpen: function (open) { results.hidden = !open; },
     });
 
     // Tapping outside the search box dismisses the results so the
     // "+ New person" button underneath becomes tappable.
     doc.addEventListener('pointerdown', function (event) {
       if (results.hidden) return;
-      if (!searchWrap.contains(event.target)) hideResults();
+      if (!searchWrap.contains(event.target)) peopleSearch.hide();
     });
 
     function createPerson() {
-      var first = newFirst.value.trim();
-      var last = newLast.value.trim();
-      if (first === '' && last === '') { newMsg.textContent = 'Enter a name.'; return; }
-      newCreate.disabled = true;
-      newMsg.textContent = 'Creating…';
-      var body = new FormData();
-      body.append('FirstName', first);
-      body.append('LastName', last);
-      body.append('csrf_token', csrfInput ? csrfInput.value : '');
-      fetchFn(newPersonUrl, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-        body: body,
-      })
-        .then(function (response) {
-          return response.json().then(function (data) { return { ok: response.ok, data: data }; });
-        })
-        .then(function (result) {
-          newCreate.disabled = false;
-          if (result.ok && result.data && result.data.ok) {
-            addPerson(result.data.id, result.data.FullName);
-            resetNewPersonForm();
-          } else {
-            newMsg.textContent = (result.data && result.data.message) || 'Could not create person.';
-          }
-        })
-        .catch(function (error) {
-          newCreate.disabled = false;
-          newMsg.textContent = 'Error: ' + error.message;
-        });
+      PersonPick.createPerson({
+        url: newPersonUrl,
+        first: newFirst,
+        last: newLast,
+        button: newCreate,
+        message: newMsg,
+        token: function () { return csrfInput ? csrfInput.value : ''; },
+        fetch: fetchFn,
+        onSuccess: function (id, fullName) {
+          addPerson(id, fullName);
+          resetNewPersonForm();
+        },
+      });
     }
 
     newToggle.addEventListener('click', function () {

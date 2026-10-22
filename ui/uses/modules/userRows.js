@@ -1,12 +1,21 @@
 import { API_BASE } from "./publicEnvironmentVariables.js";
 
 // Person rows on Record Use and Edit Use. The server renders the rows a
-// form opens with; + adds more with addUserRow. Every row, either way, is
-// wired here: live search, picking a result by click or Tab then Enter,
-// and its remove button. Functions take the document so tests can pass a
-// fake one.
+// form opens with; + adds more with addUserRow. Person search, the result
+// list, and inline create live in person-pick.js. The row reads that
+// global when it wires a search, and does not import the file. This
+// adapter fills the picked person onto the row.
+// Functions take the document so tests can pass a fake one.
 
-const MAX_RESULTS = 10;
+const PEOPLE_SEARCH_URL = API_BASE + "/users.php";
+
+function personPick() {
+  const pick = typeof globalThis !== "undefined" ? globalThis.PersonPick : null;
+  if (!pick) {
+    throw new Error("Person pick is not loaded");
+  }
+  return pick;
+}
 
 // One past the highest user<i>name on the page, so a removed row's index
 // is never handed out twice.
@@ -17,34 +26,6 @@ export function nextUserIndex(doc) {
     if (match) highest = Math.max(highest, Number(match[1]));
   });
   return highest + 1;
-}
-
-function displayName(user) {
-  return user.FirstName + " " + user.LastName;
-}
-
-// Fill list with up to 10 people. Each is a tab stop; click, Enter, or
-// Space picks it, and Escape calls onEscape.
-export function renderUserResults(doc, list, users, { onPick, onEscape = () => {} }) {
-  list.replaceChildren();
-  users.slice(0, MAX_RESULTS).forEach((user) => {
-    const li = doc.createElement("li");
-    li.tabIndex = 0;
-    li.textContent = displayName(user);
-    li.addEventListener("click", () => onPick(user));
-    li.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onEscape();
-        return;
-      }
-      if (event.key !== "Enter" && event.key !== " ") return;
-      // Also stops Record Use's Enter-submits-the-form keypress.
-      event.preventDefault();
-      onPick(user);
-    });
-    list.append(li);
-  });
 }
 
 // A row added with +, matching the person-row markup Record Use and Edit
@@ -108,68 +89,47 @@ export function rowParts(row) {
   };
 }
 
-// The signed-in user's people matching query, or [] after sending a
-// signed-out visitor to log in.
-export async function searchPeople(query, userid) {
-  const response = await fetch(API_BASE + "/users.php", {
-    method: "POST",
-    credentials: "include",
-    body: JSON.stringify({ query, userid }),
-  });
-  const data = await response.json();
-  if (data.authenticated == false) {
-    location.href = "/login.php";
-    return [];
-  }
-  return data.users || [];
-}
-
 // Wire one row. Returns { search } so callers (and tests) can run a
-// search and wait for its results.
-export function wireUserRow(doc, row, { search = searchPeople } = {}) {
+// search and wait for its results. fetch is the call the row already
+// used; tests pass a fake one.
+export function wireUserRow(doc, row, { fetch: fetchFn } = {}) {
   const parts = rowParts(row);
-  let latestSearch = 0;
 
   function hideResults() {
     parts.results.style.display = "none";
   }
 
   // Clear, not just hide, so refocusing the search doesn't reopen them.
+  // Escape in the field keeps what was typed (type=search would clear it).
   function closeResultsAndReturnToSearch() {
     parts.list.replaceChildren();
     hideResults();
     parts.name.focus();
   }
 
-  function pick(user) {
-    parts.id.value = String(user.id);
-    parts.name.value = displayName(user);
+  function pick(person) {
+    parts.id.value = String(person.id);
+    parts.name.value = person.name;
     closeResultsAndReturnToSearch();
-  }
-
-  async function runSearch(query) {
-    const thisSearch = ++latestSearch;
-    if (query.length === 0) {
-      parts.list.replaceChildren();
-      hideResults();
-      return;
-    }
-    const users = await search(query, parts.name.dataset.userid);
-    // A slower earlier search must not replace newer results.
-    if (thisSearch !== latestSearch) return;
-    renderUserResults(doc, parts.list, users, {
-      onPick: pick,
-      onEscape: closeResultsAndReturnToSearch,
-    });
-    parts.results.style.display = users.length > 0 ? "block" : "none";
   }
 
   // Server markup may carry a placeholder result; start empty.
   parts.list.replaceChildren();
 
-  parts.name.addEventListener("input", () => runSearch(parts.name.value));
-  // Escape closes the results but keeps what was typed (type=search would
-  // otherwise clear the field).
+  const bound = personPick().bindSearch({
+    document: doc,
+    input: parts.name,
+    list: parts.list,
+    url: PEOPLE_SEARCH_URL,
+    userid: parts.name.dataset.userid,
+    fetch: fetchFn,
+    onPick: pick,
+    onEscape: closeResultsAndReturnToSearch,
+    setOpen(open) {
+      parts.results.style.display = open ? "block" : "none";
+    },
+  });
+
   parts.name.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || parts.list.children.length === 0) return;
     event.preventDefault();
@@ -179,7 +139,7 @@ export function wireUserRow(doc, row, { search = searchPeople } = {}) {
     if (parts.list.children.length > 0) parts.results.style.display = "block";
   });
   row.addEventListener("focusout", (event) => {
-    if (!row.contains(event.relatedTarget)) hideResults();
+    if (!row.contains(event.relatedTarget)) bound.hide();
   });
   if (parts.remove) {
     parts.remove.addEventListener("click", (event) => {
@@ -188,7 +148,7 @@ export function wireUserRow(doc, row, { search = searchPeople } = {}) {
     });
   }
 
-  return { search: runSearch };
+  return { search: bound.search };
 }
 
 // + : append an empty row (or one for a just-created person) and focus it.

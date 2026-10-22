@@ -93,6 +93,7 @@
   include(SHARED_PATH . '/header.php'); 
 ?>
 
+<script src="<?php echo url_for('/shared/js/person-pick.js'); ?>"></script>
 <script type="module" src="modules/searchArtifactsList.js"></script>
 <script type="module" src="modules/getUsers.js"></script>
 <script type="module" src="modules/addNewUser.js"></script>

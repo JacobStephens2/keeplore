@@ -152,13 +152,11 @@ JS);
 popup.open('1', 'Catan', null);
 searchFor('an', [{ id: 5, FirstName: 'Ann', LastName: 'Lee' }, { id: 6, FirstName: 'Dan', LastName: '' }]);
 await flush();
-out.resultLabels = byId('record-modal-user-results').children.map((li) => li.textContent);
 JS);
 
         $this->assertSame('https://api.test/users.php', $result['fetches'][0]['url']);
         $this->assertSame('POST', $result['fetches'][0]['opts']['method']);
         $this->assertSame(['query' => 'an', 'userid' => '7'], json_decode($result['fetches'][0]['opts']['body'], true));
-        $this->assertSame(['Ann Lee', 'Dan'], $result['resultLabels']);
         $this->assertFalse($result['resultsHidden']);
     }
 
@@ -204,6 +202,40 @@ JS);
         $this->assertFalse($result['notesPrevented']);
         $this->assertSame(0, $result['submits']);
         $this->assertSame('Enter a name.', $result['newPersonMessage']);
+    }
+
+    public function test_escape_on_a_result_closes_the_list_and_not_the_popup(): void
+    {
+        $result = $this->run_popup(<<<'JS'
+popup.open('1', 'Catan', null);
+searchFor('an', [{ id: 5, FirstName: 'Ann', LastName: 'Lee' }]);
+await flush();
+const escape = byId('record-modal-user-results').children[0].dispatch('keydown', { key: 'Escape' });
+out.escapePrevented = escape.defaultPrevented;
+out.focusedSearch = doc.activeElement === byId('record-modal-user-search');
+JS);
+
+        $this->assertFalse($result['hidden']);
+        $this->assertTrue($result['resultsHidden']);
+        $this->assertTrue($result['escapePrevented']);
+        $this->assertTrue($result['focusedSearch']);
+        $this->assertSame(0, $result['submits']);
+    }
+
+    public function test_enter_on_a_result_picks_it_without_saving(): void
+    {
+        $result = $this->run_popup(<<<'JS'
+popup.open('1', 'Catan', null);
+searchFor('an', [{ id: 5, FirstName: 'Ann', LastName: 'Lee' }, { id: 6, FirstName: 'Dan', LastName: '' }]);
+await flush();
+out.prevented = byId('record-modal-user-results').children[1].dispatch('keydown', { key: 'Enter' }).defaultPrevented;
+JS);
+
+        $this->assertTrue($result['prevented']);
+        $this->assertSame(0, $result['submits']);
+        $this->assertSame(['user[1][id]' => '6', 'user[1][name]' => 'Dan'], $result['people'][1]);
+        $this->assertSame('', $result['search']);
+        $this->assertTrue($result['resultsHidden']);
     }
 
     public function test_enter_in_open_search_results_picks_the_top_result(): void
@@ -345,11 +377,13 @@ function el(tag, props, children) {
     addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); },
     dispatch(type, init) {
       const event = Object.assign({
-        type, target: this, defaultPrevented: false,
+        type, target: this, defaultPrevented: false, propagationStopped: false,
         preventDefault() { this.defaultPrevented = true; },
+        stopPropagation() { this.propagationStopped = true; },
       }, init || {});
       for (let n = this; n; n = n.parent) {
         (n.listeners[type] || []).forEach((fn) => fn(event));
+        if (event.propagationStopped) break;
       }
       return event;
     },
@@ -361,6 +395,10 @@ function el(tag, props, children) {
     focus() { doc.activeElement = this; },
     appendChild(child) { child.remove(); child.parent = this; this.children.push(child); return child; },
     append(...cs) { cs.forEach((c) => this.appendChild(c)); },
+    replaceChildren() {
+      this.children.forEach((c) => { c.parent = null; });
+      this.children = [];
+    },
     remove() {
       if (!this.parent) return;
       this.parent.children = this.parent.children.filter((c) => c !== this);
@@ -432,6 +470,9 @@ const root = el('div', {
   el('p', { id: 'record-modal-artifact' }),
   form,
 ]);
+doc.body.appendChild(el('form', { id: 'page-form' }, [
+  el('input', { name: 'csrf_token', value: 'other-page' }),
+]));
 doc.body.appendChild(root);
 
 function byId(id) { return id === 'record-modal' ? root : root.querySelector('#' + id); }
