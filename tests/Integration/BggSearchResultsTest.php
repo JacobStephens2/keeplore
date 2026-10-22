@@ -81,7 +81,7 @@ final class BggSearchResultsTest extends TestCase
         $this->insertGame(301, 'Kept Game', 2018, 100, 8.0, 'Party, Family', '6-7', 100, 8, [6, 7]);
         $this->insertGame(302, 'Comment Only', null, 200, 7.5, 'Party', '6, 8', 1456, 10, [6, 8]);
         $this->insertGame(305, 'Blank Best', null, 300, null, '', '', 12, 4, []);
-        $this->insertGame(303, 'Open Ended', 1999, 1500, 11.5, 'Strategy', '9+', 40, 8, range(9, 20));
+        $this->insertGame(303, 'Open Ended', 1999, 1500, 11.5, 'Strategy', '9+', 40, 8, range(9, 20), range(10, 20));
         $this->insertGame(306, 'No Rank', null, null, 5.5, '', '4', 80, 6, [4]);
         $this->insertGame(307, 'No Community Age', null, 50, 6.0, '', '6-7', 9, null, [6, 7]);
         $this->insertGame(308, 'Too Old', null, 1, 6.0, '', '2', 5000, 13, [2]);
@@ -100,6 +100,12 @@ final class BggSearchResultsTest extends TestCase
         $this->assertSame($this->commentOnlyRow(), $byAge['rows'][1]);
         $this->assertSame($this->blankBestRow(), $byAge['rows'][2]);
         $this->assertSame($this->openEndedRow(), $byAge['rows'][3]);
+        $openOnly = array_map('intval', array_column(
+            $this->db->query('SELECT players FROM bgg_poll_best_players WHERE thing_id = 303 AND open_only = 1 ORDER BY players')->fetch_all(MYSQLI_ASSOC),
+            'players'
+        ));
+        $this->assertSame([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], $openOnly);
+        $this->assertSame('0', (string) $this->db->query('SELECT open_only FROM bgg_poll_best_players WHERE thing_id = 303 AND players = 9')->fetch_assoc()['open_only']);
         $this->assertSame($this->noRankRow(), $byAge['rows'][4]);
 
         $byBest = bgg_search_results($this->db, 1, $this->filters(6, null));
@@ -167,6 +173,7 @@ final class BggSearchResultsTest extends TestCase
 
     /**
      * @param list<int> $bestCounts
+     * @param list<int> $openOnlyCounts counts only there because an open-ended vote runs past the count the votes name
      */
     private function insertGame(
         int $thingId,
@@ -178,7 +185,8 @@ final class BggSearchResultsTest extends TestCase
         string $best,
         int $votes,
         ?int $age,
-        array $bestCounts
+        array $bestCounts,
+        array $openOnlyCounts = []
     ): void {
         $this->db->query(sprintf(
             "INSERT INTO bgg_poll_games (thing_id, name, year_published, bgg_rank, average, users_rated, subdomains, best_players, player_votes, community_age, polls_fetched_at) VALUES (%d, '%s', %s, %s, %s, 0, '%s', '%s', %d, %s, NOW())",
@@ -193,7 +201,11 @@ final class BggSearchResultsTest extends TestCase
             $age === null ? 'NULL' : (string) $age
         ));
         foreach ($bestCounts as $count) {
-            $this->db->query('INSERT INTO bgg_poll_best_players (thing_id, players) VALUES (' . $thingId . ', ' . (int) $count . ')');
+            $openOnly = in_array($count, $openOnlyCounts, true) ? 1 : 0;
+            $this->db->query(
+                'INSERT INTO bgg_poll_best_players (thing_id, players, open_only) VALUES ('
+                . $thingId . ', ' . (int) $count . ', ' . $openOnly . ')'
+            );
         }
     }
 

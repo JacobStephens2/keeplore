@@ -120,7 +120,7 @@ A full import of an owner's `users.bgg_username` into `item_bgg_ratings`, queued
 
 ### `bgg_poll_games` and `bgg_poll_best_players`
 
-BoardGameGeek's ranked games with their community poll results, for `/bgg-search`. BGG has no search on its polls, so `bin/refresh-bgg-poll-index [per-subdomain]` lists the top 500 games (by default) of each BGG subdomain from the geekdo JSON API and copies each game's polls from `dynamicinfo`. Rerunning refreshes the lists, refetches polls older than 30 days, and, when every list page answered, drops games no longer on any list. The index describes BGG, not an owner's collection, so it has no `user_id`. Apply [`add-bgg-poll-index.sql`](../database/migrations/add-bgg-poll-index.sql); it is safe to rerun.
+BoardGameGeek's ranked games with their community poll results, for `/bgg-search`. BGG has no search on its polls, so `bin/refresh-bgg-poll-index [per-subdomain]` lists the top 500 games (by default) of each BGG subdomain from the geekdo JSON API and copies each game's polls from `dynamicinfo`. Rerunning refreshes the lists, refetches polls older than 30 days, and, when every list page answered, drops games no longer on any list. The index describes BGG, not an owner's collection, so it has no `user_id`. Apply [`add-bgg-poll-index.sql`](../database/migrations/add-bgg-poll-index.sql); it is safe to rerun. An index created before `open_only` existed applies [`add-bgg-poll-best-open-only.sql`](../database/migrations/add-bgg-poll-best-open-only.sql), which adds the column and backfills it from the Best text. That migration is safe to rerun, including when the fresh create already added the column.
 
 `bgg_poll_games`:
 
@@ -139,7 +139,7 @@ BoardGameGeek's ranked games with their community poll results, for `/bgg-search
 | `community_age` | TINYINT UNSIGNED | YES | Community poll age, `6` for "6+"; NULL when nobody voted. BGG's JSON gives no vote count for it |
 | `polls_fetched_at` | DATETIME | YES | When the polls were last fetched; NULL until they are |
 
-`bgg_poll_best_players`: one row `(thing_id, players)` per player count voted Best, cascading from `bgg_poll_games`. An open-ended Best such as 9+ is stored as every count from 9 to 20.
+`bgg_poll_best_players`: one row `(thing_id, players, open_only)` per player count voted Best, cascading from `bgg_poll_games`. An open-ended Best such as 9+ is stored as every count from 9 to 20. `open_only` is 1 when that count is only there because an open-ended vote runs past the count the votes name, and 0 when the votes name it, including the stated end of an open-ended vote. It is not null and defaults to 0.
 
 ---
 

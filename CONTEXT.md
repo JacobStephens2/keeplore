@@ -119,6 +119,10 @@ A player count BoardGameGeek's community voted Best for a game. An open-ended vo
 **Sweet spot**:
 The player counts an item plays best at, recorded on the item from BoardGameGeek's Best votes or by hand, in any spelling such as "03,04", "3, 4" or "06-8". Every page that filters or labels items by it reads it from one rule. An item with no recorded sweet spot is not best at any count, and a blank sweet spot is not the count 1. Distinct from Best player count, BoardGameGeek's own community vote for a game.
 
+**BoardGameGeek polls**:
+What one BoardGameGeek poll reply says the community voted: the Best player counts, the text of those votes, the player-poll vote count, the Community age, the Sweet spot an Item records from the Best votes, and the recommended player range used to fill an Item's player counts. An open-ended vote records only its stated minimum on the Sweet spot. Create Item and the Search BGG index both read this from one module. The module does not fetch BoardGameGeek and does not store the index.
+_Avoid_: BGG poll index (the stored Search BGG index).
+
 **Candidate**:
 An item's free-text note of the group and setting it is earmarked for, as in '03: Ann, Ben at home'. Blank or '0' means the item is not a candidate. Explore's Candidates page lists them, and every page that marks an item as a Candidate reads it from one rule.
 

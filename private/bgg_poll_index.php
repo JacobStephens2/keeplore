@@ -8,11 +8,9 @@
  * search reads that. The index describes BGG, so every owner shares it.
  */
 
+require_once __DIR__ . '/bgg_polls.php';
 require_once __DIR__ . '/bgg_lookup.php';
 require_once __DIR__ . '/classes/BggRatings.php';
-
-// An open-ended Best such as "9+" counts as Best at every count up to this.
-const BGG_POLL_OPEN_BEST_UP_TO = 20;
 
 // Search BGG lists at most this many games.
 const BGG_POLL_SEARCH_LIMIT = 200;
@@ -71,47 +69,6 @@ function bgg_poll_listing_from_json($json) {
   return array_values($games);
 }
 
-/**
- * The polls in a dynamicinfo body: ['best' => player counts, 'best_text' as
- * people write it ("6, 8", "6-7", "9+"), 'player_votes' => everyone who
- * voted on the player-count poll, 'community_age' => int or null]. False when
- * the body is not that answer, as while BGG queues a request. BGG's JSON
- * gives no vote count for the age poll.
- */
-function bgg_poll_results_from_dynamic_json($json) {
-  $data = json_decode((string) $json, true);
-  $polls = $data['item']['polls'] ?? null;
-  if (!is_array($polls)) {
-    return false;
-  }
-  $best = [];
-  $parts = [];
-  $ranges = $polls['userplayers']['best'] ?? [];
-  $ranges = is_array($ranges) ? array_filter($ranges, 'is_array') : [];
-  // Smallest first, so an open-ended range is always the last part of
-  // best_text; the search's open-ended filter reads it from there.
-  usort($ranges, fn ($a, $b) => (int) ($a['min'] ?? 0) <=> (int) ($b['min'] ?? 0));
-  foreach ($ranges as $range) {
-    $min = (int) ($range['min'] ?? 0);
-    if ($min <= 0) {
-      continue;
-    }
-    $open = !isset($range['max']);
-    $max = $open ? max($min, BGG_POLL_OPEN_BEST_UP_TO) : max($min, (int) $range['max']);
-    $best = array_merge($best, range($min, $max));
-    $parts[] = $open ? $min . '+' : ($min === $max ? (string) $min : $min . '-' . $max);
-  }
-  $best = array_values(array_unique($best));
-  sort($best);
-  $age = bgg_community_age_from_polls(['polls' => $polls]);
-  return [
-    'best' => $best,
-    'best_text' => implode(', ', $parts),
-    'player_votes' => max(0, (int) ($polls['userplayers']['totalvotes'] ?? 0)),
-    'community_age' => $age === null ? null : (int) $age,
-  ];
-}
-
 // The search form: a Best player count, a youngest age, the fewest
 // player-poll votes worth trusting, and whether to leave out games Best at
 // the count only through an open-ended vote. Anything else reads as not set.
@@ -151,8 +108,7 @@ function bgg_poll_search($conn, array $filters, $limit = BGG_POLL_SEARCH_LIMIT) 
     $types = 'i' . $types;
     array_unshift($params, (int) $filters['best']);
     if (!empty($filters['skip_open'])) {
-      // An open-ended vote can only be the last part of best_players ("3, 4+").
-      $where[] = "NOT (g.best_players LIKE '%+' AND b.players > CAST(REPLACE(SUBSTRING_INDEX(g.best_players, ' ', -1), '+', '') AS UNSIGNED))";
+      $where[] = 'b.open_only = 0';
     }
   }
   if (($filters['age'] ?? null) !== null) {
@@ -236,12 +192,17 @@ function bgg_poll_write_results($conn, $thing_id, array $polls) {
   mysqli_stmt_execute($delete);
   mysqli_stmt_close($delete);
 
-  $insert = mysqli_prepare($conn, 'INSERT INTO bgg_poll_best_players (thing_id, players) VALUES (?, ?)');
-  foreach ($polls['best'] as $players) {
+  $insert = mysqli_prepare($conn, 'INSERT INTO bgg_poll_best_players (thing_id, players, open_only) VALUES (?, ?, ?)');
+  $players = 0;
+  $open_only = 0;
+  foreach ($polls['best'] as $count) {
+    $players = (int) $count['players'];
+    // A storage limit. The open-ended cap keeps a Best count well under it.
     if ($players > 255) {
       continue;
     }
-    mysqli_stmt_bind_param($insert, 'ii', $thing_id, $players);
+    $open_only = empty($count['open_only']) ? 0 : 1;
+    mysqli_stmt_bind_param($insert, 'iii', $thing_id, $players, $open_only);
     mysqli_stmt_execute($insert);
   }
   mysqli_stmt_close($insert);
@@ -318,7 +279,7 @@ function bgg_poll_index_refresh($conn, array $options = [], $get_json = null) {
       continue;
     }
     try {
-      $polls = bgg_poll_results_from_dynamic_json($fetch(bgg_dynamic_info_url($thing_id)));
+      $polls = bgg_polls_from_dynamic_json($fetch(bgg_dynamic_info_url($thing_id)));
     } catch (Throwable $e) {
       $polls = false;
     }

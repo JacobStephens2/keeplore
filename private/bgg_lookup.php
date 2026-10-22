@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/bgg_link.php';
+require_once __DIR__ . '/bgg_polls.php';
 
 function bgg_search_candidates_from_json($json) {
   $data = json_decode((string) $json, true);
@@ -81,19 +82,22 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
   $image = bgg_image_url_from_item($item);
 
   $fields = ['Title' => $name];
-  $sweet_spot = bgg_sweet_spot_from_polls($dynamic);
+  // A body that is not a poll answer still fills the publisher's box numbers.
+  // The BGG average below is read from the rest of the body.
+  $polls = bgg_polls_from_dynamic_json($dynamic_json);
+  $sweet_spot = $polls === false ? null : $polls['sweet_spot'];
   if ($sweet_spot !== null) {
     $fields['SS'] = $sweet_spot;
   }
   // Community polls describe who the game is worth playing with; the
   // publisher's box numbers only fill in when nobody has voted.
-  $players = bgg_recommended_players_from_polls($dynamic);
+  $players = $polls === false ? null : $polls['recommended'];
   $fields['MnP'] = $players !== null ? (string) $players[0] : bgg_scalar_string($item['minplayers'] ?? '');
   $fields['MxP'] = $players !== null ? (string) $players[1] : bgg_scalar_string($item['maxplayers'] ?? '');
   $fields['MnT'] = bgg_scalar_string($item['minplaytime'] ?? '');
   $fields['MxT'] = bgg_scalar_string($item['maxplaytime'] ?? '');
-  $community_age = bgg_community_age_from_polls($dynamic);
-  $fields['Age'] = $community_age ?? bgg_scalar_string($item['minage'] ?? '');
+  $community_age = $polls === false ? null : $polls['community_age'];
+  $fields['Age'] = $community_age !== null ? (string) $community_age : bgg_scalar_string($item['minage'] ?? '');
   if ($year !== '') {
     $fields['Yr'] = $year;
   }
@@ -105,9 +109,7 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
     $fields['bgg_url'] = $link;
   }
   // Player counts rest on the poll only when it produced a recommended range.
-  $fields['bgg_player_votes'] = $players !== null
-    ? (string) max(0, (int) ($dynamic['polls']['userplayers']['totalvotes'] ?? 0))
-    : '0';
+  $fields['bgg_player_votes'] = $players !== null ? (string) $polls['player_votes'] : '0';
   $fields['bgg_age_basis'] = $community_age !== null ? 'community' : 'publisher';
   $overall = bgg_overall_rating_text($dynamic['stats']['average'] ?? null);
   if ($overall !== null) {
@@ -166,68 +168,6 @@ function bgg_scalar_string($value) {
     return '';
   }
   return trim((string) $value);
-}
-
-function bgg_sweet_spot_from_polls($dynamic) {
-  $best = $dynamic['polls']['userplayers']['best'] ?? null;
-  if (!is_array($best) || $best === []) {
-    return null;
-  }
-
-  $counts = [];
-  foreach ($best as $range) {
-    if (!is_array($range)) {
-      continue;
-    }
-    $min = isset($range['min']) ? (int) $range['min'] : 0;
-    $max = isset($range['max']) ? (int) $range['max'] : $min;
-    if ($min <= 0) {
-      continue;
-    }
-    if ($max < $min) {
-      $max = $min;
-    }
-    for ($n = $min; $n <= $max; $n++) {
-      $counts[$n] = true;
-    }
-  }
-  if ($counts === []) {
-    return null;
-  }
-  ksort($counts);
-  return implode(',', array_map(function ($n) {
-    return str_pad((string) $n, 2, '0', STR_PAD_LEFT);
-  }, array_keys($counts)));
-}
-
-function bgg_recommended_players_from_polls($dynamic) {
-  $recommended = $dynamic['polls']['userplayers']['recommended'] ?? null;
-  if (!is_array($recommended)) {
-    return null;
-  }
-  $low = null;
-  $high = null;
-  foreach ($recommended as $range) {
-    if (!is_array($range)) {
-      continue;
-    }
-    $min = isset($range['min']) ? (int) $range['min'] : 0;
-    $max = isset($range['max']) ? (int) $range['max'] : $min;
-    if ($min <= 0) {
-      continue;
-    }
-    $low = $low === null ? $min : min($low, $min);
-    $high = $high === null ? max($min, $max) : max($high, $min, $max);
-  }
-  return $low === null ? null : [$low, $high];
-}
-
-function bgg_community_age_from_polls($dynamic) {
-  $age = $dynamic['polls']['playerage'] ?? null;
-  if (!is_string($age) || !preg_match('/^(\d+)/', trim($age), $match) || (int) $match[1] <= 0) {
-    return null;
-  }
-  return (string) (int) $match[1];
 }
 
 function bgg_api_root() {

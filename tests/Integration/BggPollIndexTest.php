@@ -325,4 +325,57 @@ final class BggPollIndexTest extends TestCase
         $this->assertSame(['Nine Plus', 'Up To Nine'], array_column($stated, 'name'));
         $this->assertSame(['Four Plus', 'Three And Four Plus'], array_column($atFour, 'name'));
     }
+
+    public function test_backfill_marks_counts_only_an_open_ended_vote_runs_past(): void
+    {
+        $column = $this->db->query(
+            "SELECT IS_NULLABLE, COLUMN_DEFAULT, DATA_TYPE FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bgg_poll_best_players' AND COLUMN_NAME = 'open_only'"
+        )->fetch_assoc();
+        $this->assertSame('NO', $column['IS_NULLABLE']);
+        $this->assertSame('0', $column['COLUMN_DEFAULT']);
+        $this->assertSame('tinyint', $column['DATA_TYPE']);
+
+        // The table as it looked before the flag: every expanded count is
+        // present, and none is marked. Six Seven is marked by hand so the
+        // backfill has something to clear.
+        $this->db->query(
+            "INSERT INTO bgg_poll_games (thing_id, name, bgg_rank, best_players, player_votes, community_age, polls_fetched_at)
+             VALUES (1, 'Nine Plus', 20, '9+', 40, 10, NOW()),
+                    (2, 'Two And Four Plus', 30, '2, 4+', 40, 10, NOW()),
+                    (3, 'Six Seven', 10, '6-7', 40, 10, NOW())"
+        );
+        foreach (range(9, 20) as $count) {
+            $this->db->query('INSERT INTO bgg_poll_best_players (thing_id, players) VALUES (1, ' . $count . ')');
+        }
+        foreach ([2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] as $count) {
+            $this->db->query('INSERT INTO bgg_poll_best_players (thing_id, players) VALUES (2, ' . $count . ')');
+        }
+        $this->db->query('INSERT INTO bgg_poll_best_players (thing_id, players, open_only) VALUES (3, 6, 1), (3, 7, 1)');
+
+        $atTwelve = ['best' => 12, 'age' => null, 'min_votes' => 0, 'skip_open' => true];
+        $atNine = ['best' => 9, 'age' => null, 'min_votes' => 0, 'skip_open' => true];
+        $atSeven = ['best' => 7, 'age' => null, 'min_votes' => 0, 'skip_open' => true];
+        $atFour = ['best' => 4, 'age' => null, 'min_votes' => 0, 'skip_open' => true];
+        $this->assertSame(['Nine Plus', 'Two And Four Plus'], array_column(bgg_poll_search($this->db, $atTwelve), 'name'));
+        // 7 on "2, 4+" is still unmarked, so it counts. The closed "6-7" was marked by hand, so it does not.
+        $this->assertSame(['Two And Four Plus'], array_column(bgg_poll_search($this->db, $atSeven), 'name'));
+
+        $migration = file_get_contents(PROJECT_PATH . '/database/migrations/add-bgg-poll-best-open-only.sql');
+        $this->runSql($migration);
+
+        $this->assertSame(['Nine Plus'], array_column(bgg_poll_search($this->db, $atNine), 'name'));
+        $this->assertSame([], array_column(bgg_poll_search($this->db, $atTwelve), 'name'));
+        $this->assertSame(['Two And Four Plus'], array_column(bgg_poll_search($this->db, $atFour), 'name'));
+        $this->assertSame(['Six Seven'], array_column(bgg_poll_search($this->db, $atSeven), 'name'));
+        $this->assertSame(
+            ['Nine Plus', 'Two And Four Plus'],
+            array_column(bgg_poll_search($this->db, ['best' => 12, 'age' => null, 'min_votes' => 0, 'skip_open' => false]), 'name')
+        );
+
+        $this->runSql($migration);
+        $this->assertSame(['Nine Plus'], array_column(bgg_poll_search($this->db, $atNine), 'name'));
+        $this->assertSame([], array_column(bgg_poll_search($this->db, $atTwelve), 'name'));
+        $this->assertSame(['Six Seven'], array_column(bgg_poll_search($this->db, $atSeven), 'name'));
+    }
 }
