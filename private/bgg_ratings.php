@@ -26,10 +26,15 @@ function bgg_user_from_users_json($json, $username) {
   return null;
 }
 
-// One user's collection entry for one thing, reduced to what the Items list
-// shows. Null when the user neither rated nor commented on it.
+// One user's collection entry for one thing: the rating, the comment, and
+// the rating date. False when the body is not a collection answer (it does
+// not decode to an array, or items is not an array), which is what BGG
+// sends while a request is still queued. Null when the answer has no entry.
 function bgg_rating_from_collection_json($json) {
   $data = json_decode((string) $json, true);
+  if (!is_array($data) || !is_array($data['items'] ?? null)) {
+    return false;
+  }
   $entry = $data['items'][0] ?? null;
   if (!is_array($entry)) {
     return null;
