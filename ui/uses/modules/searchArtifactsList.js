@@ -1,8 +1,8 @@
 import { API_BASE } from "./publicEnvironmentVariables.js";
 
 // Record Use's item search. Item pick owns the list, the exact match,
-// and the keyboard. This adapter asks the collection list, and it closes
-// that list when the first person field is focused.
+// and the keyboard. This adapter passes the collection-list address,
+// and it closes the list when the first person field is focused.
 
 function loadItemPick() {
   const pick = typeof globalThis !== "undefined" ? globalThis.ItemPick : null;

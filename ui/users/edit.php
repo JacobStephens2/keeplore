@@ -177,7 +177,6 @@
 
   </div>
 
-  <script src="<?php echo url_for('/shared/js/item-pick.js'); ?>"></script>
   <?php include(SHARED_PATH . '/user_interactions.php'); ?>
 
 </main>

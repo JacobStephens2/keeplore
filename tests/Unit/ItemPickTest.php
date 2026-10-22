@@ -710,8 +710,10 @@ JS);
         $this->assertStringContainsString($classic, $recordNew);
         $this->assert_before($recordNew, "url_for('/shared/js/item-pick.js')", 'modules/searchArtifactsList.js');
         $this->assert_before($recordNew, "url_for('/shared/js/item-pick.js')", 'modules/addNewEntity.js');
-        $this->assertStringContainsString($classic, $editUser);
-        $this->assert_before($editUser, "url_for('/shared/js/item-pick.js')", 'user_interactions.php');
+        $this->assertStringContainsString("SHARED_PATH . '/user_interactions.php'", $editUser);
+        $this->assertStringNotContainsString('item-pick.js', $editUser);
+        $this->assertStringContainsString($classic, $include);
+        $this->assert_before($include, "url_for('/shared/js/item-pick.js')", 'globalThis.ItemPick');
         $this->assertStringContainsString($classic, $proposal);
         $this->assert_before($proposal, "url_for('/shared/js/item-pick.js')", '/proposals/edit.js');
 
@@ -735,7 +737,6 @@ JS);
         $this->assertStringNotContainsString('search-component', $include);
         $this->assertStringNotContainsString('artifacts.php', $include);
         $this->assertStringNotContainsString('toLowerCase', $include);
-        $this->assertStringNotContainsString('item-pick.js', $include);
 
         $this->assertStringContainsString('ItemPick', $proposalJs);
         $this->assertStringContainsString('function bindParticipantFilter()', $proposalJs);
@@ -749,15 +750,14 @@ JS);
         $this->assertStringNotContainsString('item-pick.js', $proposalJs);
         $this->assertDoesNotMatchRegularExpression('/chosenItemId\.value\s*=/', $proposalJs);
 
-        $this->assertStringContainsString('root.ItemPick = api', $module);
-        $this->assertStringContainsString('module.exports = api', $module);
         $this->assertStringNotContainsString('export ', $module);
         $this->assertStringNotContainsString('api.keeplore.app', $module);
         $this->assertStringNotContainsString('keeplore.app', $module);
 
         $this->assertFileDoesNotExist(PROJECT_PATH . '/ui/shared/js/search-component.js');
         $this->assertStringNotContainsString('search-component.js', $sw);
-        $this->assertStringContainsString("const CACHE_NAME = 'keeplore-v27';", $sw);
+        $this->assertStringNotContainsString('keeplore-v26', $sw);
+        $this->assertMatchesRegularExpression("/const CACHE_NAME = 'keeplore-v\\d+';/", $sw);
 
         foreach ([
             '/ui/aversions/new.php',

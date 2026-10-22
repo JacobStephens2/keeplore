@@ -120,6 +120,7 @@
     </tbody>
   </table>
 
+  <script src="<?php echo url_for('/shared/js/item-pick.js'); ?>"></script>
   <script>
     (function () {
       var optionsEl = document.getElementById('record-use-item-options');
