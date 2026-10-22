@@ -12,12 +12,11 @@
   $kept = $_SESSION['kept'] ?? 0;
   $playgroup = new Playgroup($db, (int) $_SESSION['user_id']);
   $artifacts = $playgroup->choose($type_filter['selected'], $range == 'true', $kept == 1);
-  $group_size = count($playgroup->members());
 ?>
 
 <main>
   <div class="objects listing">
-    <h1>Choose Items for Group of <?php echo $group_size; ?> Users</h1>
+    <h1><?php echo h($playgroup->heading()); ?></h1>
     <p>
       The dates represent the most recent instance of the type of response indicated by the column header. SS = sweet spot, Mnp = minimum player count, Mxp = maximum player count.
     </p>

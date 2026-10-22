@@ -6,8 +6,9 @@ use Playgroup;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Seam: Playgroup, the owner's playgroup. Owner 1 has Sam Lee (100) and Jo
- * Smith (101) in slots 1 and 2; owner 2 has Other Person (200) in slot 3.
+ * Seam: Playgroup, the owner's playgroup. Size and the Choose for group
+ * heading are read here. Owner 1 has Sam Lee (100) and Jo Smith (101) in
+ * slots 1 and 2; owner 2 has Other Person (200) in slot 3.
  */
 final class PlaygroupTest extends TestCase
 {
@@ -299,6 +300,58 @@ final class PlaygroupTest extends TestCase
             ['id', 'title', 'sweet_spot', 'minimum_players', 'maximum_players', 'maximum_time', 'person_id', 'name', 'play_date', 'aversion_id', 'aversion_date', 'type_name'],
             array_keys($rows[0])
         );
+    }
+
+    public function test_one_person_in_two_slots_is_a_playgroup_of_one(): void
+    {
+        $this->db->query('UPDATE playgroup SET FullName = 100 WHERE user_id = 1');
+
+        $this->assertSame(1, $this->playgroup->size());
+    }
+
+    public function test_choose_for_group_heading_shows_one_when_one_person_fills_two_slots(): void
+    {
+        $this->db->query('UPDATE playgroup SET FullName = 100 WHERE user_id = 1');
+
+        $this->assertSame('Choose Items for Group of 1 Users', $this->playgroup->heading());
+    }
+
+    public function test_one_person_in_two_slots_is_still_two_rows(): void
+    {
+        $this->db->query('UPDATE playgroup SET FullName = 100 WHERE user_id = 1');
+
+        $this->assertCount(2, $this->playgroup->members());
+    }
+
+    public function test_another_owners_slots_are_not_part_of_the_size(): void
+    {
+        $this->runSql("INSERT INTO playgroup (FullName, user_id) VALUES (200, 2), (200, 2)");
+
+        $this->assertSame(2, $this->playgroup->size());
+        $this->assertSame('Choose Items for Group of 2 Users', $this->playgroup->heading());
+    }
+
+    public function test_a_person_off_the_owners_list_does_not_count(): void
+    {
+        $this->db->query('INSERT INTO playgroup (FullName, user_id) VALUES (200, 1)');
+
+        $this->assertSame(2, $this->playgroup->size());
+    }
+
+    public function test_a_slot_whose_person_is_gone_does_not_count(): void
+    {
+        $this->db->query('DELETE FROM players WHERE id = 101');
+
+        $this->assertSame(1, $this->playgroup->size());
+        $this->assertCount(2, $this->playgroup->members());
+    }
+
+    public function test_an_empty_playgroup_is_size_zero(): void
+    {
+        $this->db->query('DELETE FROM playgroup WHERE user_id = 1');
+
+        $this->assertSame(0, $this->playgroup->size());
+        $this->assertSame('Choose Items for Group of 0 Users', $this->playgroup->heading());
     }
 
     public function test_matching_count_uses_the_owners_distinct_group_size(): void

@@ -42,6 +42,28 @@ final class Playgroup
     }
 
     /**
+     * The number of distinct people from the owner's list who fill a slot.
+     * One person in two slots counts once. Another owner's slots do not
+     * count. A slot whose person is gone does not count. An empty
+     * playgroup is 0.
+     */
+    public function size(): int
+    {
+        return (int) $this->rows(
+            'SELECT COUNT(DISTINCT playgroup.FullName) AS size FROM playgroup
+             JOIN players ON players.id = playgroup.FullName AND players.user_id = playgroup.user_id
+             WHERE playgroup.user_id = ?',
+            'i', [$this->userId]
+        )[0]['size'];
+    }
+
+    /** Choose for group's heading, naming this playgroup by its size. */
+    public function heading(): string
+    {
+        return 'Choose Items for Group of ' . $this->size() . ' Users';
+    }
+
+    /**
      * Put each chosen person in a new slot, all or none. Blank choices, as
      * from Add to group's unused selects, are skipped.
      */
@@ -167,17 +189,6 @@ final class Playgroup
     private function storedNumber(mixed $value): string
     {
         return $value === null ? '' : (string) $value;
-    }
-
-    /** The number of distinct people from the owner's list in their playgroup. */
-    private function size(): int
-    {
-        return (int) $this->rows(
-            'SELECT COUNT(DISTINCT playgroup.FullName) AS size FROM playgroup
-             JOIN players ON players.id = playgroup.FullName AND players.user_id = playgroup.user_id
-             WHERE playgroup.user_id = ?',
-            'i', [$this->userId]
-        )[0]['size'];
     }
 
     private function requireSlot(int $slotId): void
