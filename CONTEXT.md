@@ -84,7 +84,7 @@ _Avoid_: Interaction queue.
 The email listing the owner's overdue items, items due today and items due in the coming week from the Use-by queue, sent at the hour set in their Preferences while it is on. Nothing is sent when nothing is due.
 
 **Interaction frequency**:
-An item's own interval in days, used for its use-by date in place of the default use interval, one of the owner's Preferences. A page's interval setting changes only the default, never an item's own frequency.
+An item's own interval in days. When it has one, the use-by date uses it in place of the default use interval; when it has none, the use-by date uses the owner's default use interval, including after that default changes. Saving Create Item or Edit Item without typing an interval does not give the item one. A page's interval setting changes only the default, never an item's own frequency.
 
 **Kept**:
 An item the user has chosen to keep in the primary collection.
@@ -117,7 +117,7 @@ The age BoardGameGeek's player-age poll recommends for a game, such as 6 for "6+
 A player count BoardGameGeek's community voted Best for a game. An open-ended vote such as "Best with 9+" counts for every larger group, unless Search BGG is told to leave open-ended Best out; then it counts only at 9.
 
 **Sweet spot**:
-The player counts an item plays best at, recorded on the item from BoardGameGeek's Best votes or by hand, in any spelling such as "03,04", "3, 4" or "06-8". Every page that filters or labels items by it reads it from one rule. Distinct from Best player count, BoardGameGeek's own community vote for a game.
+The player counts an item plays best at, recorded on the item from BoardGameGeek's Best votes or by hand, in any spelling such as "03,04", "3, 4" or "06-8". Every page that filters or labels items by it reads it from one rule. An item with no recorded sweet spot is not best at any count, and a blank sweet spot is not the count 1. Distinct from Best player count, BoardGameGeek's own community vote for a game.
 
 **Candidate**:
 An item's free-text note of the group and setting it is earmarked for, as in '03: Ann, Ben at home'. Blank or '0' means the item is not a candidate. Explore's Candidates page lists them, and every page that marks an item as a Candidate reads it from one rule.

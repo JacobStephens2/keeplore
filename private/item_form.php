@@ -14,7 +14,9 @@ require_once __DIR__ . '/classes/Items.php';
  * Item's values: the stored Item (or item_form_create_values()) with the
  * typed values laid over it after a rejected save. Tags may be a list
  * (stored) or the typed string. Every value is escaped. An Interaction
- * frequency of null shows the owner's default use interval.
+ * frequency the Item does not have of its own, including a blank post,
+ * leaves the value empty and shows the owner's default use interval as
+ * the placeholder. The hint says a blank keeps following that default.
  *
  * Create only: Name autofocuses; the BGG lookup panel follows Name, with
  * the owner's Type for BoardGameGeek items, a hidden picture and link, and
@@ -87,6 +89,7 @@ function item_form_html(string $mode, array $item, $default_interval): string {
         <input type="hidden" name="bgg_age_basis" id="bgg_age_basis" value="' . $value('bgg_age_basis') . '">
         <input type="hidden" name="BGG_Rat" id="BGG_Rat" value="' . h((string) (bgg_overall_rating_text($item['BGG_Rat'] ?? null) ?? '')) . '">' . "\n";
   $interval = $item['interaction_frequency_days'] ?? null;
+  $own_interval = $interval !== null && trim((string) $interval) !== '';
 
   ob_start();
 ?>
@@ -142,8 +145,11 @@ function item_form_html(string $mode, array $item, $default_interval): string {
         <label for="interaction_frequency_days">Interaction Frequency (Days)</label>
         <input type="number" step="0.1" name="interaction_frequency_days" id="interaction_frequency_days"
           onwheel="this.blur()"
-          value="<?php echo h((string) ($interval ?? $default_interval)); ?>"
+          aria-describedby="interaction_frequency_days-hint"
+          placeholder="<?php echo h((string) $default_interval); ?>"
+          value="<?php echo $own_interval ? h((string) $interval) : ''; ?>"
         >
+        <p id="interaction_frequency_days-hint" class="form-field-hint">Leave this blank to follow your default. It keeps following that default after you change it.</p>
       </div>
 
       <div class="form-field">

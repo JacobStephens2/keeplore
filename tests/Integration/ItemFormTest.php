@@ -84,10 +84,13 @@ final class ItemFormTest extends TestCase
 
         $this->assertMatchesRegularExpression('/id="is_kept" value="1" checked/', $html);
         $this->assertStringContainsString('id="Acq" value="' . app_today() . '"', $html);
-        $this->assertMatchesRegularExpression('/id="interaction_frequency_days"[^>]*value="90"/', $html);
+        $this->assertBlankFrequency($html, '90');
         $this->assertStringContainsString('id="MnT" value="30"', $html);
         $this->assertStringContainsString('id="MxT" value="60"', $html);
-        $this->assertStringContainsString('id="SS" aria-describedby="ss-hint" value="01"', $html);
+        $this->assertStringContainsString('id="MnP" value="1"', $html);
+        $this->assertStringContainsString('id="MxP" value="1"', $html);
+        $this->assertStringContainsString('id="age" value="0"', $html);
+        $this->assertStringContainsString('id="SS" aria-describedby="ss-hint" value=""', $html);
     }
 
     public function test_edit_renders_its_fields_in_the_shared_order(): void
@@ -140,11 +143,37 @@ final class ItemFormTest extends TestCase
         $this->assertStringContainsString('id="is_in_secondary_collection" value="1" checked />', $html);
     }
 
-    public function test_edit_shows_the_default_interval_when_the_item_has_none(): void
+    public function test_edit_shows_the_default_interval_as_a_placeholder_when_the_item_has_none(): void
     {
         $html = item_form_html('edit', ['interaction_frequency_days' => null] + $this->storedItem(), 45);
 
-        $this->assertMatchesRegularExpression('/id="interaction_frequency_days"[^>]*value="45"/', $html);
+        $this->assertBlankFrequency($html, '45');
+    }
+
+    public function test_edit_shows_a_stored_interval_as_the_value(): void
+    {
+        $html = item_form_html('edit', $this->storedItem(), 90);
+
+        $this->assertMatchesRegularExpression('/id="interaction_frequency_days"[^>]*value="60"/', $html);
+        $this->assertDoesNotMatchRegularExpression('/id="interaction_frequency_days"[^>]*value=""/', $html);
+    }
+
+    public function test_edit_shows_a_stored_interval_even_when_it_equals_the_default(): void
+    {
+        $html = item_form_html('edit', ['interaction_frequency_days' => 90] + $this->storedItem(), 90);
+
+        $this->assertMatchesRegularExpression('/id="interaction_frequency_days"[^>]*value="90"/', $html);
+        $this->assertDoesNotMatchRegularExpression('/id="interaction_frequency_days"[^>]*value=""/', $html);
+    }
+
+    /** @dataProvider modes */
+    public function test_a_rejected_blank_frequency_stays_empty(string $mode): void
+    {
+        $typed = item_form_input(['interaction_frequency_days' => '']);
+        $base = $mode === 'create' ? item_form_create_values() : $this->storedItem();
+        $html = item_form_html($mode, array_replace($base, $typed), 45);
+
+        $this->assertBlankFrequency($html, '45');
     }
 
     /** @dataProvider modes */
@@ -198,6 +227,20 @@ final class ItemFormTest extends TestCase
             'bgg_player_votes' => 9, 'bgg_age_basis' => 'community', 'BGG_Rat' => '6.10',
             'is_kept' => 1, 'to_get_rid_of' => 0, 'is_in_secondary_collection' => 0,
         ];
+    }
+
+    private function assertBlankFrequency(string $html, string $default): void
+    {
+        $this->assertMatchesRegularExpression(
+            '/id="interaction_frequency_days"[^>]*aria-describedby="interaction_frequency_days-hint"[^>]*placeholder="'
+                . preg_quote($default, '/') . '"[^>]*value=""/',
+            $html
+        );
+        $this->assertStringContainsString(
+            '<p id="interaction_frequency_days-hint" class="form-field-hint">Leave this blank to follow your default. It keeps following that default after you change it.</p>',
+            $html
+        );
+        $this->assertSame(1, substr_count($html, 'name="interaction_frequency_days"'));
     }
 
     private function assertFieldOrder(array $ids, string $html): void
