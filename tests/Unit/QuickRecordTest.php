@@ -293,6 +293,7 @@ JS);
         $submitModule = json_encode(PROJECT_PATH . '/ui/shared/js/record-use-submit.js');
         $module = json_encode(PROJECT_PATH . '/ui/shared/js/quick-record.js');
         $pageModule = json_encode(PROJECT_PATH . '/ui/artifacts/useby-table.js');
+        $itemActionsModule = json_encode(PROJECT_PATH . '/ui/shared/js/quick-item-actions.js');
         $useByPageJson = json_encode($useByPage);
         $script = <<<JS
 require({$submitModule});
@@ -519,6 +520,7 @@ if ({$useByPageJson}) {
   global.document = doc;
   global.fetch = fetchFn;
   global.window = { RecordUseSubmit: require({$submitModule}), QuickRecord };
+  global.QuickItemActions = require({$itemActionsModule});
   global.RecordUseSubmit = window.RecordUseSubmit;
   global.QuickRecord = QuickRecord;
   global.alert = (message) => toasts.push(message);

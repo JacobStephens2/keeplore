@@ -278,6 +278,7 @@
 
   <script src="<?php echo url_for('/shared/js/record-use-submit.js'); ?>"></script>
   <script src="<?php echo url_for('/shared/js/quick-record.js'); ?>"></script>
+  <script src="<?php echo url_for('/shared/js/quick-item-actions.js'); ?>?v=1"></script>
   <script src="<?php echo url_for('/artifacts/useby-table.js'); ?>"></script>
 
   <a href="https://www.flaticon.com/free-icons/copy" title="copy icons">Copy icons created by Anggara - Flaticon</a>
