@@ -3,8 +3,9 @@
 // init(root, options) drives private/shared/quick_record_popup.php and
 // returns open(itemId, itemName, context). The page passes its toast and
 // onRecorded(data, context), which handles the page's own row; context is
-// whatever the page passed to open. Callers pass fetch, today (a function
-// returning YYYY-MM-DD) and document so tests can supply them.
+// whatever the page passed to open. Callers pass fetch and document so
+// tests can supply them. The date starts as the popup's data-app-day
+// attribute, a YYYY-MM-DD string rendered with the page.
 
 (function () {
   var RecordUseSubmit = typeof window !== 'undefined' && window.RecordUseSubmit
@@ -14,19 +15,10 @@
     ? window.PersonPick
     : (typeof require === 'function' ? require('./person-pick.js') : null);
 
-  // The browser's local date as YYYY-MM-DD.
-  function todayLocal() {
-    var d = new Date();
-    return d.getFullYear() + '-'
-      + String(d.getMonth() + 1).padStart(2, '0') + '-'
-      + String(d.getDate()).padStart(2, '0');
-  }
-
   function init(root, options) {
     options = options || {};
     var doc = options.document || document;
     var fetchFn = options.fetch || fetch;
-    var today = options.today || todayLocal;
     var toast = options.toast;
     var onRecorded = options.onRecorded || function () {};
 
@@ -55,6 +47,11 @@
     var peopleSearchUrl = root.getAttribute('data-people-search-url');
     var newPersonUrl = root.getAttribute('data-new-person-url');
     var ownerUserId = root.getAttribute('data-user-id');
+    // A missing day, or one that is not YYYY-MM-DD, stays blank. The field
+    // is required, so the use is not recorded on a browser-local day. A real
+    // calendar day is the App day module's check, which rendered the attribute.
+    var appDay = root.getAttribute('data-app-day') || '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(appDay)) appDay = '';
 
     // People added beyond the owner, as { id, chip }. The owner is user[0].
     var added = [];
@@ -131,7 +128,7 @@
       itemIdInput.value = itemId;
       itemNameInput.value = itemName;
       subtitle.textContent = itemName;
-      dateInput.value = today();
+      dateInput.value = appDay;
       notesInput.value = '';
       resetPeople();
       saveBtn.disabled = false;

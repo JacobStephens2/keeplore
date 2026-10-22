@@ -33,6 +33,7 @@ final class QuickRecordPopupTest extends TestCase
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
         require_once PRIVATE_PATH . '/classes/Uses.php';
         require_once PRIVATE_PATH . '/classes/Preferences.php';
+        require_once PRIVATE_PATH . '/app_day.php';
         if (!defined('API_ORIGIN')) {
             define('API_ORIGIN', 'api.example.test');
         }
@@ -87,6 +88,20 @@ final class QuickRecordPopupTest extends TestCase
     public function test_the_setting_is_empty_with_neither(): void
     {
         $this->assertSame('', $this->setting($this->render()));
+    }
+
+    public function test_the_popup_carries_the_app_day(): void
+    {
+        $zone = date_default_timezone_get();
+        try {
+            date_default_timezone_set('Pacific/Auckland');
+            $html = $this->render();
+        } finally {
+            date_default_timezone_set($zone);
+        }
+
+        $appDay = (new \DateTimeImmutable('now', new \DateTimeZone('America/New_York')))->format('Y-m-d');
+        $this->assertStringContainsString('data-app-day="' . $appDay . '"', $html);
     }
 
     private function setting(string $html): string

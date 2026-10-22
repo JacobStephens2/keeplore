@@ -73,6 +73,21 @@ class AppDayTest extends TestCase
         $this->assertSame([], $offending);
     }
 
+    public function test_quick_record_starts_on_the_app_day_and_the_browser_calendar_is_not_a_reader(): void
+    {
+        $sentence = "Quick record's date starts as this day, the same day Record Use and Edit User's form start with.";
+        $notAReader = "The browser's calendar is not a reader of today.";
+        foreach ([
+            PROJECT_PATH . '/CONTEXT.md',
+            PROJECT_PATH . '/private/app_day.php',
+        ] as $path) {
+            $source = preg_replace('/^\s*\*\s?/m', ' ', (string) file_get_contents($path)) ?? '';
+            $source = preg_replace('/\s+/', ' ', $source) ?? '';
+            $this->assertStringContainsString($sentence, $source, $path);
+            $this->assertStringContainsString($notAReader, $source, $path);
+        }
+    }
+
     public static function daysBefore(): array
     {
         return [
