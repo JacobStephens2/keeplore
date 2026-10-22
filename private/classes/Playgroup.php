@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/People.php';
+require_once dirname(__DIR__) . '/item_facts.php';
 
 /**
  * The owner's playgroup: the people from their people list whom they are
@@ -80,18 +81,20 @@ final class Playgroup
 
     /**
      * Choose for group's rows: one per item of the Types in $typeIds (none
-     * when it is empty) and member who has a legacy play or aversion date for
-     * it, with their latest play, aversion, pass and request dates. With
-     * $matchGroupSize, only items whose player counts include the
-     * playgroup's size; with $keptOnly, only kept items.
+     * when it is empty) and member who has a legacy play or an Aversion for
+     * it. With $matchGroupSize, only items whose player counts include the
+     * playgroup's size; with $keptOnly, only kept items. A recorded Use
+     * does not add a row.
      *
-     * Each row keeps the legacy page's columns: the item's title, id, ss,
-     * MnP, MxP, MxT, Age, type and is_kept; the member's FullName (their
-     * person id), PlayerID, FirstName, LastName, G and Priority; and
-     * MaxOfAversionDate, MaxOfPlayDate, MaxOfPassDate and MaxOfRequestDate.
-     * AversionID is the id of one of the member's Aversions of the item (the
-     * highest), or null when they have none. Rows are in the member's G and
-     * Priority order, then oldest aversion and newest play first.
+     * Each row is the item id, title, Sweet spot label, minimum players,
+     * maximum players and maximum time, the person id and name, the latest
+     * play date or none, the aversion id or none, the latest aversion date
+     * or none, and the type name. Ids are integers. Dates are the query's
+     * date strings, or null. Player counts and maximum time are the stored
+     * numbers as text, or '' when blank. The type name is '' when the item
+     * has no Type. The aversion id is the highest of that member's Aversions
+     * of the item. Rows follow the member's G and Priority, then oldest
+     * aversion and newest play, then the legacy pass and request dates.
      */
     public function choose(array $typeIds, bool $matchGroupSize, bool $keptOnly): array
     {
@@ -99,18 +102,17 @@ final class Playgroup
             return [];
         }
         $sql = 'SELECT
-              games.title, games.id, games.ss, games.MnP, games.MxP, games.MxT, games.Age, games.type, games.is_kept,
-              playgroup.FullName,
-              players.id AS PlayerID, players.FirstName, players.LastName, players.G, players.Priority,
-              MAX(CASE WHEN ' . Aversions::IS_AVERSION . ' THEN responses.id END) AS AversionID,
-              MAX(responses.AversionDate) AS MaxOfAversionDate,
-              MAX(responses.PlayDate) AS MaxOfPlayDate,
-              MAX(responses.PassDate) AS MaxOfPassDate,
-              MAX(responses.RequestDate) AS MaxOfRequestDate
+              games.id, games.title, games.ss, games.MnP, games.MxP, games.MxT,
+              players.id AS person_id, players.FirstName, players.LastName,
+              MAX(CASE WHEN ' . Aversions::IS_AVERSION . ' THEN responses.id END) AS aversion_id,
+              MAX(responses.AversionDate) AS aversion_date,
+              MAX(responses.PlayDate) AS play_date,
+              types.objectType AS type_name
             FROM playgroup
             JOIN players ON players.id = playgroup.FullName AND players.user_id = playgroup.user_id
             JOIN responses ON responses.Player = players.id AND responses.user_id = playgroup.user_id
             JOIN games ON games.id = responses.Title AND games.user_id = playgroup.user_id
+            LEFT JOIN types ON types.id = games.type_id
             WHERE playgroup.user_id = ?
               AND games.type_id IN (' . implode(',', array_fill(0, count($typeIds), '?')) . ')';
         $types = 'i' . str_repeat('i', count($typeIds));
@@ -124,8 +126,8 @@ final class Playgroup
         if ($keptOnly) {
             $sql .= ' AND games.is_kept = 1';
         }
-        $sql .= ' GROUP BY games.id, players.id, playgroup.FullName
-            HAVING MaxOfPlayDate IS NOT NULL OR MaxOfAversionDate IS NOT NULL
+        $sql .= ' GROUP BY games.id, players.id, playgroup.FullName, types.objectType
+            HAVING play_date IS NOT NULL OR aversion_date IS NOT NULL
             ORDER BY
               players.G,
               players.Priority DESC,
@@ -133,7 +135,38 @@ final class Playgroup
               MAX(responses.PlayDate) DESC,
               MAX(responses.PassDate) ASC,
               MAX(responses.RequestDate) DESC';
-        return $this->rows($sql, $types, $params);
+        return array_map([$this, 'choice'], $this->rows($sql, $types, $params));
+    }
+
+    /** One Choose for group row, as the page prints it. */
+    private function choice(array $row): array
+    {
+        return [
+            'id' => (int) $row['id'],
+            'title' => (string) $row['title'],
+            'sweet_spot' => item_best_counts_label($row),
+            'minimum_players' => $this->storedNumber($row['MnP']),
+            'maximum_players' => $this->storedNumber($row['MxP']),
+            'maximum_time' => $this->storedNumber($row['MxT']),
+            'person_id' => (int) $row['person_id'],
+            'name' => $this->personName($row),
+            'play_date' => $row['play_date'],
+            'aversion_id' => $row['aversion_id'] === null ? null : (int) $row['aversion_id'],
+            'aversion_date' => $row['aversion_date'],
+            'type_name' => (string) ($row['type_name'] ?? ''),
+        ];
+    }
+
+    /** The Person name: first and last joined and trimmed. */
+    private function personName(array $row): string
+    {
+        return trim((string) $row['FirstName'] . ' ' . (string) $row['LastName']);
+    }
+
+    /** A stored player count or time as the cell prints it, including 0. */
+    private function storedNumber(mixed $value): string
+    {
+        return $value === null ? '' : (string) $value;
     }
 
     /** The number of distinct people from the owner's list in their playgroup. */
@@ -169,7 +202,7 @@ final class Playgroup
         return [
             'id' => (int) $row['ID'],
             'person_id' => (int) $row['FullName'],
-            'name' => trim($row['FirstName'] . ' ' . $row['LastName']),
+            'name' => $this->personName($row),
         ];
     }
 

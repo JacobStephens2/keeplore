@@ -159,6 +159,48 @@ final class PlaygroupTest extends TestCase
         }
     }
 
+    public function test_choose_presents_the_row_the_page_prints(): void
+    {
+        $this->db->query("UPDATE games SET ss = '03,04', mnp = 0, mxp = 4, mxt = NULL, type = 'stale name' WHERE id = 10");
+        $this->db->query("UPDATE players SET LastName = '' WHERE id = 101");
+        $this->db->query("INSERT INTO responses (id, Title, user_id, Player, PlayDate, AversionDate) VALUES
+            (1, 10, 1, 100, '2026-02-01', NULL),
+            (2, 10, 1, 100, '2026-03-01', NULL),
+            (3, 10, 1, 101, NULL, '2026-01-05'),
+            (4, 10, 1, 101, NULL, '2025-12-01')");
+
+        $this->assertSame([
+            [
+                'id' => 10,
+                'title' => 'Catan',
+                'sweet_spot' => '3, 4',
+                'minimum_players' => '0',
+                'maximum_players' => '4',
+                'maximum_time' => '',
+                'person_id' => 100,
+                'name' => 'Sam Lee',
+                'play_date' => '2026-03-01',
+                'aversion_id' => null,
+                'aversion_date' => null,
+                'type_name' => 'board-game',
+            ],
+            [
+                'id' => 10,
+                'title' => 'Catan',
+                'sweet_spot' => '3, 4',
+                'minimum_players' => '0',
+                'maximum_players' => '4',
+                'maximum_time' => '',
+                'person_id' => 101,
+                'name' => 'Jo',
+                'play_date' => null,
+                'aversion_id' => 4,
+                'aversion_date' => '2026-01-05',
+                'type_name' => 'board-game',
+            ],
+        ], $this->playgroup->choose(['1'], false, false));
+    }
+
     public function test_choose_filtered_on_a_type_is_the_owners_items_of_that_type_id(): void
     {
         $this->db->query("UPDATE games SET type = 'stale name'");
@@ -173,6 +215,7 @@ final class PlaygroupTest extends TestCase
 
     public function test_choose_keeps_only_kept_items_when_asked(): void
     {
+        $this->db->query('UPDATE games SET is_digital = 1, is_physical = 1 WHERE id IN (10, 12)');
         $this->db->query("INSERT INTO responses (Title, user_id, Player, PlayDate) VALUES (10, 1, 100, '2026-02-01'), (12, 1, 100, '2026-02-02')");
 
         $this->assertSame(['Catan'], array_column($this->playgroup->choose(['1', '2'], false, true), 'title'));
@@ -186,10 +229,10 @@ final class PlaygroupTest extends TestCase
         $rows = $this->playgroup->choose(['1'], false, false);
 
         $this->assertSame([[10, 100, '2026-03-01', null], [10, 101, null, '2026-01-05']], array_map(
-            fn (array $row) => [(int) $row['id'], (int) $row['PlayerID'], $row['MaxOfPlayDate'], $row['MaxOfAversionDate']],
+            fn (array $row) => [$row['id'], $row['person_id'], $row['play_date'], $row['aversion_date']],
             $rows
         ));
-        $this->assertSame('Sam', $rows[0]['FirstName']);
+        $this->assertSame('Sam Lee', $rows[0]['name']);
     }
 
     public function test_choose_links_each_member_to_their_highest_aversion_id_of_the_item_or_to_nothing(): void
@@ -199,7 +242,7 @@ final class PlaygroupTest extends TestCase
             (3, 10, 1, 101, '2026-02-01', NULL), (4, 10, 1, 101, NULL, '2025-12-01'), (5, 10, 1, 101, '2026-03-01', NULL)");
 
         $this->assertSame([[100, null], [101, 4]], array_map(
-            fn (array $row) => [(int) $row['PlayerID'], $row['AversionID']],
+            fn (array $row) => [$row['person_id'], $row['aversion_id']],
             $this->playgroup->choose(['1'], false, false)
         ));
     }
@@ -217,7 +260,45 @@ final class PlaygroupTest extends TestCase
 
         $rows = $this->playgroup->choose(['1'], false, false);
 
-        $this->assertSame([[10, 100]], array_map(fn (array $row) => [(int) $row['id'], (int) $row['PlayerID']], $rows));
+        $this->assertSame([[10, 100]], array_map(fn (array $row) => [$row['id'], $row['person_id']], $rows));
+    }
+
+    public function test_choose_leaves_a_blank_sweet_spot_blank_and_a_missing_type_unnamed(): void
+    {
+        $this->db->query("UPDATE games SET ss = '', mnp = 2, mxp = 2, mxt = 0, type_id = 99, type = 'also stale' WHERE id = 11");
+        $this->db->query("INSERT INTO responses (Title, user_id, Player, PlayDate) VALUES (11, 1, 100, '2026-02-01')");
+
+        $row = $this->playgroup->choose(['99'], false, false)[0];
+
+        $this->assertSame('', $row['sweet_spot']);
+        $this->assertSame('', $row['type_name']);
+        $this->assertSame('2', $row['minimum_players']);
+        $this->assertSame('0', $row['maximum_time']);
+    }
+
+    public function test_a_recorded_use_does_not_add_a_choose_row(): void
+    {
+        $this->db->query("INSERT INTO uses (artifact_id, user_id, use_date) VALUES (11, 1, '2026-04-01')");
+        $this->db->query("INSERT INTO responses (Title, user_id, Player, PlayDate) VALUES (10, 1, 100, '2026-02-01')");
+
+        $this->assertSame(['Catan'], array_column($this->playgroup->choose(['1'], false, false), 'title'));
+    }
+
+    public function test_choose_orders_by_pass_and_request_dates_without_returning_them(): void
+    {
+        $this->db->query("UPDATE players SET G = 'A', Priority = 1 WHERE id = 100");
+        $this->db->query("INSERT INTO responses (Title, user_id, Player, PlayDate, PassDate, RequestDate) VALUES
+            (10, 1, 100, '2026-01-01', '2026-05-01', '2026-06-01'),
+            (11, 1, 100, '2026-01-01', '2026-05-01', '2026-07-01'),
+            (13, 1, 100, '2026-01-01', '2026-04-01', '2026-01-01')");
+
+        $rows = $this->playgroup->choose(['1'], false, false);
+
+        $this->assertSame(['Former possession', 'Azul', 'Catan'], array_column($rows, 'title'));
+        $this->assertSame(
+            ['id', 'title', 'sweet_spot', 'minimum_players', 'maximum_players', 'maximum_time', 'person_id', 'name', 'play_date', 'aversion_id', 'aversion_date', 'type_name'],
+            array_keys($rows[0])
+        );
     }
 
     public function test_matching_count_uses_the_owners_distinct_group_size(): void
