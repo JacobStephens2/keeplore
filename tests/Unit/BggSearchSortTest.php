@@ -29,4 +29,19 @@ class BggSearchSortTest extends TestCase
         // game with no Best vote leaves it blank so it sorts last.
         $this->assertStringContainsString("\$game['best_players'] === '' ? '' : (int) \$game['best_players']", $page);
     }
+
+    public function test_average_column_uses_the_bgg_average_spelling(): void
+    {
+        $this->assertSame('8', bgg_overall_rating_text('8.00'));
+        $this->assertSame('7.09', bgg_overall_rating_text(7.09));
+        $this->assertNull(bgg_overall_rating_text(''));
+        $this->assertNull(bgg_overall_rating_text(null));
+        $this->assertNull(bgg_overall_rating_text(0));
+        $this->assertNull(bgg_overall_rating_text(11));
+
+        $page = (string) file_get_contents(PROJECT_PATH . '/ui/bgg-search/index.php');
+        $this->assertStringContainsString("bgg_overall_rating_text(\$game['average'])", $page);
+        $this->assertStringNotContainsString("number_format(\$game['average'], 2)", $page);
+        $this->assertStringContainsString("data-average=\"<?php echo h((string) \$game['average']); ?>\"", $page);
+    }
 }

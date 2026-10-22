@@ -321,6 +321,41 @@ class ItemsListTest extends TestCase
         $this->assertStringContainsString("key === 'bgg_average'", $js);
     }
 
+    public function test_list_row_spells_a_reviewer_score_and_the_script_does_not(): void
+    {
+        $row = items_list_present_row([
+            'id' => 15,
+            'Title' => 'Ravine',
+            'Acq' => '2024-01-10',
+            'bgg_ratings' => [
+                'Gyges' => [
+                    'rating' => 8.0,
+                    'comment' => 'Fine.',
+                    'url' => 'https://rpggeek.com/rpgitem/161315/ravine',
+                ],
+                'Ada' => [
+                    'rating' => null,
+                    'comment' => 'Just a note.',
+                    'url' => '',
+                ],
+            ],
+        ], 90, '2024-06-01');
+
+        $this->assertSame('8', $row['bgg_ratings']['Gyges']['score_text']);
+        $this->assertSame('RPGGeek', $row['bgg_ratings']['Gyges']['site_name']);
+        $this->assertArrayNotHasKey('score_text', $row['bgg_ratings']['Ada']);
+        $this->assertSame('BoardGameGeek', $row['bgg_ratings']['Ada']['site_name']);
+
+        $js = (string) file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
+        $this->assertStringContainsString('rating.score_text', $js);
+        $this->assertStringContainsString('rating.site_name', $js);
+        $this->assertStringNotContainsString('String(Number(rating.rating))', $js);
+        $this->assertStringContainsString("'Comment'", $js);
+        $this->assertStringContainsString('Commented without a rating', $js);
+        $this->assertStringContainsString('(entered by hand)', $js);
+        $this->assertStringContainsString('Number(ar.rating)', $js);
+    }
+
     public function test_items_page_draws_headers_and_cells_from_the_one_column_list(): void
     {
         $page = (string) file_get_contents(PROJECT_PATH . '/ui/artifacts/index.php');

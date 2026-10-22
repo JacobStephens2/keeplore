@@ -271,6 +271,29 @@ function items_list_type_ids($type) {
 }
 
 /**
+ * Reviewer ratings for one Items row. A numeric rating carries score_text
+ * in the score spelling; a comment with no score does not. site_name is the
+ * site of the item's link, or BoardGameGeek when the item has no link.
+ */
+function items_list_present_ratings($ratings) {
+    if (empty($ratings) || !is_array($ratings)) {
+        return new stdClass();
+    }
+    $presented = [];
+    foreach ($ratings as $reviewer => $rating) {
+        if (!is_array($rating)) {
+            continue;
+        }
+        if (isset($rating['rating']) && is_numeric($rating['rating'])) {
+            $rating['score_text'] = bgg_score_text($rating['rating']);
+        }
+        $rating['site_name'] = bgg_site_name_from_url($rating['url'] ?? '');
+        $presented[$reviewer] = $rating;
+    }
+    return $presented === [] ? new stdClass() : $presented;
+}
+
+/**
  * One Items row for display. $artifact is a row from Items::list: its
  * last_use is Recent Interaction and its type_name the Type. $today is a
  * Y-m-d day, the app's day when omitted.
@@ -306,7 +329,7 @@ function items_list_present_row(array $artifact, $default_interval, $today = nul
         'candidate' => item_is_candidate($artifact),
         'bgg_average' => bgg_overall_rating_text($artifact['BGG_Rat'] ?? $artifact['bgg_rat'] ?? null) ?? '',
         // Keyed by BGG username; an object even when empty so the JSON is {}.
-        'bgg_ratings' => empty($artifact['bgg_ratings']) ? new stdClass() : $artifact['bgg_ratings'],
+        'bgg_ratings' => items_list_present_ratings($artifact['bgg_ratings'] ?? null),
     ];
 }
 

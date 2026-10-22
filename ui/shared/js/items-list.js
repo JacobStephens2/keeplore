@@ -97,9 +97,9 @@
     return (item.bgg_ratings || {})[reviewer] || null;
   }
 
-  // 9.5 reads "9.5" and 8 reads "8"; a comment with no score reads "Comment".
+  // A numeric rating shows the row's score_text. A comment with no score reads "Comment".
   function bggRatingLabel(rating) {
-    return rating.rating == null ? 'Comment' : String(Number(rating.rating));
+    return rating.rating == null ? 'Comment' : rating.score_text;
   }
 
   function compareItems(a, b, key, dir) {
@@ -219,7 +219,7 @@
     var link = document.getElementById('bgg-rating-dialog-link');
     link.hidden = !rating.url;
     link.href = rating.url || '#';
-    link.textContent = item.title + ' on BoardGameGeek';
+    link.textContent = item.title + ' on ' + rating.site_name;
     dialog.showModal();
   }
 

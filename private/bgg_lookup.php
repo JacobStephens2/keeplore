@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/bgg_link.php';
+
 function bgg_search_candidates_from_json($json) {
   $data = json_decode((string) $json, true);
   if (!is_array($data) || !isset($data['items']) || !is_array($data['items'])) {
@@ -118,6 +120,7 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
     'year' => $year,
     'url' => $url,
     'source' => $source,
+    'site_name' => bgg_site_name_for_source($source),
   ];
   if ($image !== '') {
     $match['image'] = $image;
@@ -156,32 +159,6 @@ function bgg_image_url_from_item($item) {
     }
   }
   return '';
-}
-
-function bgg_source_from_item($item) {
-  $subtype = strtolower(trim((string) ($item['subtype'] ?? '')));
-  if ($subtype === '' && isset($item['subtypes'][0])) {
-    $subtype = strtolower(trim((string) $item['subtypes'][0]));
-  }
-  $url = (string) ($item['canonical_link'] ?? $item['href'] ?? '');
-  if ($subtype === 'rpgitem' || str_contains($url, 'rpggeek.com') || str_contains($url, '/rpgitem/')) {
-    return 'RPGG';
-  }
-  if ($subtype === 'videogame' || str_contains($url, 'videogamegeek.com') || str_contains($url, '/videogame/')) {
-    return 'VGG';
-  }
-  return 'BGG';
-}
-
-function bgg_canonical_url($id, $source) {
-  $id = (int) $id;
-  if ($source === 'RPGG') {
-    return 'https://rpggeek.com/rpgitem/' . $id;
-  }
-  if ($source === 'VGG') {
-    return 'https://videogamegeek.com/videogame/' . $id;
-  }
-  return 'https://boardgamegeek.com/boardgame/' . $id;
 }
 
 function bgg_scalar_string($value) {
@@ -464,11 +441,13 @@ function bgg_candidate_from_item_json($json, $fallback) {
   $match = $mapped['match'];
   $id = $match['id'] > 0 ? $match['id'] : (int) $fallback['id'];
   $name = $match['name'] !== '' ? $match['name'] : (string) $fallback['name'];
+  $source = $match['source'] ?? 'BGG';
   return [
     'id' => $id,
     'name' => $name,
     'year' => $match['year'],
-    'source' => $match['source'] ?? 'BGG',
+    'source' => $source,
+    'site_name' => bgg_site_name_for_source($source),
   ];
 }
 
@@ -506,6 +485,7 @@ function bgg_enrich_candidates($candidates, $get_json = null) {
         'name' => $candidate['name'],
         'year' => '',
         'source' => 'BGG',
+        'site_name' => bgg_site_name_for_source('BGG'),
       ];
       continue;
     }
