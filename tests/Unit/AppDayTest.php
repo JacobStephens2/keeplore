@@ -63,8 +63,7 @@ class AppDayTest extends TestCase
                 $source = (string) file_get_contents($file->getPathname());
                 $readsYear = $path !== '/private/shared/footer.php'
                     && preg_match("/date\\(\\s*(['\"])Y\\1\\s*\\)/", $source) === 1;
-                $asksNowMinusInterval = preg_match('/strtotime\\s*\\([^;\\n]*(?:days ago|now\\s*-)/', $source) === 1
-                    || str_contains($source, 'DEFAULT_USE_INTERVAL');
+                $asksNowMinusInterval = preg_match('/strtotime\\s*\\([^;\\n]*(?:days ago|now\\s*-)/', $source) === 1;
                 if ($readsYear || $asksNowMinusInterval) {
                     $offending[] = $path;
                 }

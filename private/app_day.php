@@ -33,12 +33,12 @@ function app_now(): DateTimeImmutable
 }
 
 /**
- * The calendar day $days before $day (Y-m-d). $days is taken as hours,
- * rounded to the nearest hour, from midnight UTC, then read back as a
- * calendar date, the same way a use-by date adds an interval. A $day that
- * is not a real calendar day is refused; callers pass the app day.
+ * The calendar day $days after midnight UTC on $day (Y-m-d). Negative $days
+ * counts back. $days is taken as hours, rounded to the nearest hour, so a
+ * daylight-saving change cannot move the result a day. A use-by date adds
+ * its interval through here. A $day that is not a real calendar day is refused.
  */
-function app_days_before(string $day, float $days): string
+function app_shift_day(string $day, float $days): string
 {
     $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $day, new DateTimeZone('UTC'));
     if ($parsed === false || $parsed->format('Y-m-d') !== $day) {
@@ -46,5 +46,15 @@ function app_days_before(string $day, float $days): string
     }
     $hours = (int) round($days * 24);
 
-    return $parsed->modify("-{$hours} hours")->format('Y-m-d');
+    return $parsed->modify(sprintf('%+d hours', $hours))->format('Y-m-d');
+}
+
+/**
+ * The calendar day $days before $day (Y-m-d). A $day that is not a real
+ * calendar day is refused; callers pass the app day. A silent fallback
+ * would hide a bad caller.
+ */
+function app_days_before(string $day, float $days): string
+{
+    return app_shift_day($day, -$days);
 }

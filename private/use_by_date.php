@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/app_day.php';
+
 /**
  * Use-by date ("Interact by" in the UI): the date by which an item should
  * next be used, and whether it is overdue, due today or upcoming. Every page
@@ -56,10 +58,10 @@ function use_by_view_interval($value, $default_interval) {
  *
  * Never used, or last used before acquisition: acquisition + $interval.
  * Otherwise: last use + 2 × $interval. Intervals are days and keep their
- * fraction, rounded to the nearest hour.
+ * fraction. The day itself moves through app_shift_day, so a daylight-saving
+ * change cannot move the result a day.
  *
- * Dates are read and added to in UTC so a daylight-saving change cannot move
- * the result a day.
+ * Dates are read in UTC. A datetime is read by its date.
  */
 function use_by_date($acquired, $last_use, float $interval) {
     // Midnight UTC on the date that starts $value, or null if it holds no valid date.
@@ -81,6 +83,5 @@ function use_by_date($acquired, $last_use, float $interval) {
         return null;
     }
 
-    $hours = (int) round($days * 24);
-    return $base->modify("+$hours hours")->format('Y-m-d');
+    return app_shift_day($base->format('Y-m-d'), $days);
 }
