@@ -110,6 +110,7 @@ $page_title = 'Create Item';include(SHARED_PATH . '/header.php');
     'pageLength' => 10,
   ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
 ?></script>
-<script src="<?php echo url_for('/shared/js/create-item-lookup.js'); ?>?v=1"></script>
+<script src="<?php echo url_for('/shared/js/quick-item-actions.js'); ?>?v=1"></script>
+<script src="<?php echo url_for('/shared/js/create-item-lookup.js'); ?>?v=2"></script>
 
 <?php include(SHARED_PATH . '/footer.php'); ?>

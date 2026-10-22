@@ -1,5 +1,6 @@
 (function () {
   var ListTable = window.KeeploreListTable;
+  var QuickItemActions = window.QuickItemActions;
   var el = ListTable.el;
   var SORT_FALLBACK = [
     { column: 'Tracking Start', dir: 'desc' },
@@ -377,51 +378,12 @@
       });
     }
 
-    tbody.addEventListener('submit', function (event) {
-      var form = event.target.closest('.kept-toggle-form');
-      if (!form) {
-        return;
-      }
-      event.preventDefault();
-      var cell = form.closest('td.kept');
-      var button = form.querySelector('.kept-toggle-btn');
-      var valueInput = form.querySelector('input[name="value"]');
-      var artifactId = Number((cell && cell.dataset.artifactId) || 0);
-      button.disabled = true;
-      fetch(form.action, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-        body: new FormData(form),
-      })
-        .then(function (response) {
-          return response.json().then(function (data) {
-            return { ok: response.ok, data: data };
-          });
-        })
-        .then(function (result) {
-          if (result.ok && result.data && result.data.ok) {
-            var isKept = result.data.is_kept === 1;
-            var item = items.find(function (row) {
-              return row.id === artifactId;
-            });
-            if (item) {
-              item.is_kept = isKept;
-            }
-            cell.dataset.kept = isKept ? '1' : '0';
-            button.textContent = isKept ? 'Kept' : 'Keep';
-            button.setAttribute('aria-pressed', isKept ? 'true' : 'false');
-            valueInput.value = isKept ? '0' : '1';
-            showToast(toastEl, result.data.message || 'Updated.', 'success');
-          } else {
-            showToast(toastEl, (result.data && result.data.message) || 'Request failed', 'error');
-          }
-          button.disabled = false;
-        })
-        .catch(function (error) {
-          showToast(toastEl, 'Network error: ' + error.message, 'error');
-          button.disabled = false;
-        });
+    QuickItemActions.bindKept(tbody, {
+      toast: function (message, kind) { showToast(toastEl, message, kind); },
+      onChanged: function (itemId, isKept) {
+        var item = items.find(function (row) { return row.id === itemId; });
+        if (item) item.is_kept = isKept;
+      },
     });
 
     fetch(config.dataUrl, { credentials: 'include', headers: { Accept: 'application/json' } })

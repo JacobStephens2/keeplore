@@ -26,7 +26,7 @@
 
     <div class="surface-panel">
     <div class="table-scroll">
-    <table class="list">
+    <table class="list" id="rid-of-table">
       <thead>
         <tr id="headerRow">
           <th>Name (<?php echo count($artifacts); ?>)</th>
@@ -93,6 +93,7 @@
   <?php } ?>
 
   <div id="rid-of-toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="<?php echo url_for('/shared/js/quick-item-actions.js'); ?>?v=1"></script>
   <script>
     (function () {
       var toastEl = document.getElementById('rid-of-toast');
@@ -110,51 +111,11 @@
         }, 3500);
       }
 
-      document.querySelectorAll('form.kept-toggle-form').forEach(function (form) {
-        form.addEventListener('submit', function (event) {
-          event.preventDefault();
-          var cell = form.closest('td.kept');
-          var button = form.querySelector('.kept-toggle-btn');
-          var valueInput = form.querySelector('input[name="value"]');
-          var nameInput = form.querySelector('input[name="artifact_name"]');
-          var name = (nameInput && nameInput.value) ? nameInput.value : 'this item';
-          if (valueInput && valueInput.value === '0') {
-            if (!confirm('Remove ' + name + ' from kept?')) {
-              return;
-            }
-          }
-          if (button) { button.disabled = true; }
-          fetch(form.action, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
-            body: new FormData(form),
-          })
-            .then(function (response) {
-              return response.json().then(function (data) {
-                return { ok: response.ok, data: data };
-              });
-            })
-            .then(function (result) {
-              if (result.ok && result.data && result.data.ok) {
-                var isKept = result.data.is_kept === 1;
-                if (cell) { cell.dataset.kept = isKept ? '1' : '0'; }
-                if (button) {
-                  button.textContent = isKept ? 'Kept' : 'Keep';
-                  button.setAttribute('aria-pressed', isKept ? 'true' : 'false');
-                }
-                if (valueInput) { valueInput.value = isKept ? '0' : '1'; }
-                showToast(result.data.message || 'Updated.', 'success');
-              } else {
-                showToast((result.data && result.data.message) || 'Request failed', 'error');
-              }
-              if (button) { button.disabled = false; }
-            })
-            .catch(function (error) {
-              showToast('Network error: ' + error.message, 'error');
-              if (button) { button.disabled = false; }
-            });
-        });
+      QuickItemActions.bindKept(document.getElementById('rid-of-table'), {
+        toast: showToast,
+        confirmUnkeep: function (name) {
+          return confirm('Remove ' + name + ' from kept?');
+        },
       });
     })();
   </script>

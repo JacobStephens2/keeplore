@@ -40,8 +40,6 @@ class ToGetRidOfPageTest extends TestCase
         $this->assertStringContainsString('kept-toggle-btn', $page);
         $this->assertStringContainsString('return_to" value="to-get-rid-of"', $page);
         $this->assertStringContainsString('artifact_is_kept', $page);
-        $this->assertStringContainsString('X-Requested-With', $page);
-        $this->assertStringContainsString('response.json', $page);
     }
 
     public function test_unkeep_asks_for_confirm(): void

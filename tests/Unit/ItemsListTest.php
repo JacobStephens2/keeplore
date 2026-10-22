@@ -374,18 +374,6 @@ class ItemsListTest extends TestCase
             $js,
             'Button must initialize aria-pressed attribute based on item.is_kept.'
         );
-
-        // Updates aria-pressed and text on toggle
-        $this->assertMatchesRegularExpression(
-            "/button\.setAttribute\(\s*'aria-pressed',\s*isKept\s*\?\s*'true'\s*:\s*'false'\s*\)/",
-            $js,
-            'Button must update aria-pressed attribute when toggle response is received.'
-        );
-        $this->assertMatchesRegularExpression(
-            "/button\.textContent\s*=\s*isKept\s*\?\s*'Kept'\s*:\s*'Keep'/",
-            $js,
-            'Button must update textContent between Kept and Keep on toggle.'
-        );
     }
 
     public function test_present_row_carries_the_players_label(): void

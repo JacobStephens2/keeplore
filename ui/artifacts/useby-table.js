@@ -72,55 +72,14 @@
       if (!isNaN(n) && n > 0) overdueSpan.textContent = (n - 1);
     }
 
-    function wireRowRemovalForm(form, options) {
-      form.addEventListener('submit', function (event) {
-        event.preventDefault();
-        var btn = form.querySelector('button');
-        var originalLabel = btn ? btn.textContent : '';
-        var tr = form.closest('tr');
-        var wasOverdue = tr && tr.querySelector('td.overdue')
-          && tr.querySelector('td.overdue').textContent.trim() === 'Yes';
-
-        if (btn) { btn.disabled = true; btn.textContent = options.pendingLabel || 'Removing…'; }
-        fetch(form.action, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
-          body: new FormData(form),
-        })
-          .then(function (response) {
-            return response.json().then(function (data) {
-              return { ok: response.ok, data: data };
-            });
-          })
-          .then(function (result) {
-            if (result.ok && result.data && result.data.ok) {
-              if (typeof table !== 'undefined' && table && tr) {
-                table.row(tr).remove().draw(false);
-              } else if (tr) {
-                tr.remove();
-              }
-              if (wasOverdue) decrementOverdueCount();
-              showToast(result.data.message || options.successFallback, 'success');
-            } else {
-              var msg = (result.data && result.data.message) || ('Request failed (HTTP ' + (result.ok ? 'OK' : 'error') + ')');
-              showToast(msg, 'error');
-              if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
-            }
-          })
-          .catch(function (error) {
-            showToast('Network error: ' + error.message, 'error');
-            if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
-          });
-      });
-    }
-
-    document.querySelectorAll('table#useBy td.get-rid-of form.get-rid-of-form').forEach(function (form) {
-      wireRowRemovalForm(form, { pendingLabel: 'Removing…', successFallback: 'Marked to get rid of.' });
-    });
-
-    document.querySelectorAll('table#useBy td.get-rid-of form.untrack-form').forEach(function (form) {
-      wireRowRemovalForm(form, { pendingLabel: 'Removing…', successFallback: 'Removed from tracked collection.' });
+    QuickItemActions.bindRemovals(tableElement, {
+      toast: showToast,
+      onRemoved: function (tr) {
+        var overdueCell = tr.querySelector('td.overdue');
+        var wasOverdue = overdueCell && overdueCell.textContent.trim() === 'Yes';
+        table.row(tr).remove().draw(false);
+        if (wasOverdue) decrementOverdueCount();
+      },
     });
   })();
 
