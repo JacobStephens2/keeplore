@@ -149,12 +149,18 @@ final class Playgroup
             'maximum_players' => $this->storedNumber($row['MxP']),
             'maximum_time' => $this->storedNumber($row['MxT']),
             'person_id' => (int) $row['person_id'],
-            'name' => trim((string) $row['FirstName'] . ' ' . (string) $row['LastName']),
+            'name' => $this->personName($row),
             'play_date' => $row['play_date'],
             'aversion_id' => $row['aversion_id'] === null ? null : (int) $row['aversion_id'],
             'aversion_date' => $row['aversion_date'],
             'type_name' => (string) ($row['type_name'] ?? ''),
         ];
+    }
+
+    /** The Person name: first and last joined and trimmed. */
+    private function personName(array $row): string
+    {
+        return trim((string) $row['FirstName'] . ' ' . (string) $row['LastName']);
     }
 
     /** A stored player count or time as the cell prints it, including 0. */
@@ -196,7 +202,7 @@ final class Playgroup
         return [
             'id' => (int) $row['ID'],
             'person_id' => (int) $row['FullName'],
-            'name' => trim($row['FirstName'] . ' ' . $row['LastName']),
+            'name' => $this->personName($row),
         ];
     }
 
