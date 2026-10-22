@@ -1,6 +1,6 @@
 <?php
   require_once('../../private/initialize.php');
-  require_once(PRIVATE_PATH . '/item_facts.php');
+  require_once(PRIVATE_PATH . '/item_interactions.php');
   require_login_or_guest();
   $page_title = 'Item Interactions';
   include(SHARED_PATH . '/header.php');
@@ -27,12 +27,10 @@
   } catch (InvalidArgumentException $invalid) {
     $uses_error = $invalid->getMessage();
   }
-  $total_rows = count($uses_array);
 
   // Candidate, sweet spot and "Candidate spot used" read the owner's Items,
   // loaded once and only when the attributes are shown.
   $items = $showAttributes === 'yes' ? (new Items($db, (int) $_SESSION['user_id']))->list() : [];
-  $items_by_id = array_column($items, null, 'id');
 ?>
 
 <script defer src="/shared/filter_button.js"></script>
@@ -90,12 +88,19 @@
 
     <?php if ($uses_error !== null) { ?>
     <p class="form-error"><?php echo h($uses_error); ?></p>
-    <?php } else { ?>
+    <?php } else {
+      $interactions = item_interactions(
+        $uses_array,
+        $items,
+        $hide_online_setting === 'yes',
+        $hide_duplicate_group_settings === 'yes'
+      );
+    ?>
     <div class="table-scroll">
   	<table class="list" id="uses" data-page-length='100'>
       <thead>
         <tr id="headerRow">
-          <th>Interaction Date <?php if ($hide_duplicate_group_settings === 'no') { echo '(' . $total_rows . ')'; } ?></th>
+          <th>Interaction Date <?php if ($hide_duplicate_group_settings === 'no') { echo '(' . $interactions['use_count'] . ')'; } ?></th>
           <th>Item</th>
           <th class="group_setting">Group Setting</th>
           <th>Type</th>
@@ -114,149 +119,64 @@
       </thead>
 
       <tbody>
-        <?php
-          $group_setting_game_array = array();
-          $group_and_setting_array = array();
-
-          foreach ($uses_array as $use) {
-
-            // Hide online setting uses
-            if ($hide_online_setting === 'yes') {
-              if (h($use['setting']) === 'online') {
-                continue;
-              }
-            }
-
-            $players = $use['people'];
-            $player_count = count($players);
-
-            $i = 0;
-            $situation = '';
-            if ($player_count < 10) {
-              $situation .= '0';
-            }
-
-            $situation .= $player_count . ': ';
-
-            $usersArray = [];
-            foreach ($players as $player) {
-              $usersArray[$player['id']] = $player['first_name'] . ' ' . $player['last_name'];
-            }
-
-            // sort by the key ascending
-            ksort($usersArray);
-
-            $i = 0;
-            foreach ($usersArray as $user) {
-              $i++;
-              $situation .= $user;
-              if ($i != $player_count) {
-                $situation .= ', ';
-              }
-            }
-
-            if ($use['setting'] != 'online') {
-              $situation .= ' at';
-            }
-
-            $situation .= ' ' . $use['setting'];
-
-            $group_and_setting = $situation;
-            if (!in_array($group_and_setting, $group_and_setting_array)) {
-              $group_and_setting_array[] = $group_and_setting;
-            }
-
-            $situation .= ' (';
-            $situation .= h($use['item_title']);
-
-            $group_setting_game = $situation;
-
-            if (!in_array($group_setting_game, $group_setting_game_array)) {
-              $group_setting_game_array[] = $group_setting_game;
-            } elseif ($hide_duplicate_group_settings === 'yes') {
-              continue;
-            }
-
-            $candidate_artifact = '';
-            $item = $items_by_id[$use['item_id']] ?? [];
-            foreach ($items as $candidate_item) {
-              if (str_starts_with(mb_strtolower((string) $candidate_item['Candidate']), mb_strtolower($group_setting_game))) {
-                $candidate_artifact = $candidate_item['Title'];
-                break;
-              }
-            }
-
-            $situation .= ' on ' . h(substr($use['use_date'],0,10));
-            $situation .= ')';
-
-            ?>
+        <?php foreach ($interactions['rows'] as $row) { ?>
             <tr>
               <td class="date">
                 <?php if (!is_guest()) { ?>
                 <a
                   class="action"
-                  href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($use['id']))); ?>"
+                  href="<?php echo url_for('/uses/record-edit.php?id=' . h(u($row['id']))); ?>"
                   >
-                  <?php echo h(substr($use['use_date'],0,10)); ?>
+                  <?php echo h($row['use_date']); ?>
                 </a>
-                <?php } else { echo h(substr($use['use_date'],0,10)); } ?>
+                <?php } else { echo h($row['use_date']); } ?>
               </td>
 
               <td class="title">
                 <a
                   class="action"
-                  href="<?php echo url_for('/artifacts/' . (is_guest() ? 'show' : 'edit') . '.php?id=' . h(u($use['item_id']))); ?>"
+                  href="<?php echo url_for('/artifacts/' . (is_guest() ? 'show' : 'edit') . '.php?id=' . h(u($row['item_id']))); ?>"
                   >
-                  <?php echo h($use['item_title']); ?>
+                  <?php echo h($row['item_title']); ?>
                 </a>
               </td>
 
               <td class="group_setting">
-                <?php echo $situation; ?>
+                <?php echo h($row['group_setting']); ?>
               </td>
 
               <td class="type">
-                <?php echo h($use['item_type']); ?>
+                <?php echo h($row['item_type']); ?>
               </td>
 
               <td class="setting">
-                <?php echo h($use['setting']); ?>
+                <?php echo h($row['setting']); ?>
               </td>
 
-              <?php
-                if ($showAttributes === 'yes') {
-                  ?>
+              <?php if ($showAttributes === 'yes') { ?>
                   <td class="candidate">
-                    <?php
-                      if (item_is_candidate($item)) {
-                        echo 'Yes';
-                      }
-                    ?>
+                    <?php if ($row['candidate']) { echo 'Yes'; } ?>
                   </td>
 
                   <td class="sweet_spot">
-                    <?php echo h($item['SS'] ?? ''); ?>
+                    <?php echo h($row['sweet_spot']); ?>
                   </td>
 
                   <td class="user_count">
-                    <?php echo $player_count; ?>
+                    <?php echo $row['person_count']; ?>
                   </td>
 
-                  <td class="canidate_spot_used"><?php echo h($candidate_artifact); ?></td>
-                  <?php
-                }
-              ?>
+                  <td class="canidate_spot_used"><?php echo h($row['candidate_spot']); ?></td>
+              <?php } ?>
 
             </tr>
-            <?php
-          }
-        ?>
+        <?php } ?>
       </tbody>
   	</table>
     </div>
 
-    <p>Group, setting, and game combinations: <?php echo count($group_setting_game_array); ?></p>
-    <p>Group and setting combinations: <?php echo count($group_and_setting_array); ?></p>
+    <p>Group, setting, and game combinations: <?php echo $interactions['group_setting_game_count']; ?></p>
+    <p>Group and setting combinations: <?php echo $interactions['group_and_setting_count']; ?></p>
 
     <script>
 
@@ -264,8 +184,8 @@
       <?php
       if ($hide_duplicate_group_settings === 'yes' || $hide_online_setting === 'yes') {
         ?>
-        document.querySelector('h1').innerText += ' (<?php echo count($group_setting_game_array); ?> group settings)';
-        document.querySelector('.group_setting').innerText += ' (<?php echo count($group_setting_game_array); ?>)';
+        document.querySelector('h1').innerText += ' (<?php echo $interactions['group_setting_game_count']; ?> group settings)';
+        document.querySelector('.group_setting').innerText += ' (<?php echo $interactions['group_setting_game_count']; ?>)';
         let table = new DataTable('#uses', {
           // options
           order: [
