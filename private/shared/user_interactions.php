@@ -120,54 +120,28 @@
     </tbody>
   </table>
 
-  <script type="module">
-    import SearchComponent from '/shared/js/search-component.js';
-
-    const optionsEl = document.getElementById('record-use-item-options');
-    const nameInput = document.getElementById('record-use-artifact-name');
-    const idInput = document.getElementById('record-use-artifact-id');
-    const resultsList = document.getElementById('record-use-artifact-results-list');
-    if (optionsEl && nameInput && idInput) {
-      const items = JSON.parse(optionsEl.textContent);
-
-      function setItem(item) {
-        idInput.value = String(item.id);
-        nameInput.value = item.label;
-      }
-
-      nameInput.addEventListener('input', function () {
-        idInput.value = '';
-        const typed = nameInput.value.toLowerCase();
-        const match = items.find((item) => item.label.toLowerCase() === typed);
-        if (match) {
-          idInput.value = String(match.id);
+  <script>
+    (function () {
+      var optionsEl = document.getElementById('record-use-item-options');
+      var nameInput = document.getElementById('record-use-artifact-name');
+      var idInput = document.getElementById('record-use-artifact-id');
+      var results = document.getElementById('record-use-artifact-results');
+      var resultsList = document.getElementById('record-use-artifact-results-list');
+      if (!optionsEl || !nameInput || !idInput || !results || !resultsList) return;
+      var pick = globalThis.ItemPick;
+      if (!pick) throw new Error('Item pick is not loaded');
+      // Items already on the page. This form does not call the collection list.
+      pick.bind({
+        document: document,
+        input: nameInput,
+        idInput: idInput,
+        list: resultsList,
+        items: JSON.parse(optionsEl.textContent),
+        setOpen: function (open) {
+          results.style.display = open ? 'block' : 'none';
         }
       });
-
-      nameInput.addEventListener('keydown', function (event) {
-        if (event.key !== 'Enter' || !resultsList) {
-          return;
-        }
-        const first = resultsList.querySelector('li');
-        if (first) {
-          event.preventDefault();
-          first.click();
-        }
-      });
-
-      SearchComponent.create({
-        inputSelector: '#record-use-artifact-name',
-        resultsSelector: '#record-use-artifact-results-list',
-        wrapperSelector: '#record-use-artifact-results',
-        fetchResults: async (query) => {
-          const needle = query.toLowerCase();
-          return items.filter((item) => item.label.toLowerCase().includes(needle));
-        },
-        onSelect: setItem,
-        maxResults: 10,
-        debounceMs: 0,
-      });
-    }
+    })();
   </script>
   <script src="<?php echo url_for('/shared/js/record-use-submit.js'); ?>"></script>
   <script>

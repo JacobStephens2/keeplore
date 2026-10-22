@@ -1,3 +1,5 @@
+import { itemPick } from "./searchArtifactsList.js";
+
 // Lets you create a brand-new item without leaving the page.
 // On success the new item is selected in the search box, mirroring a search-result click.
 
@@ -39,8 +41,7 @@ function resetForm() {
 }
 
 function selectEntity(id, title) {
-  document.querySelector("input#SearchTitleSubmission").value = id;
-  document.querySelector("input#SearchTitles").value = title;
+  itemPick.select(id, title);
 }
 
 function createEntity(event) {

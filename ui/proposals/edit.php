@@ -110,7 +110,8 @@ include(SHARED_PATH . '/header.php');
                     array_map(static fn($item) => ['id' => (int) $item['id'], 'label' => $item['Title']], $items),
                     JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE
                 ); ?></script>
-                <script type="module" src="<?php echo url_for('/proposals/edit.js?v=2'); ?>"></script>
+                <script src="<?php echo url_for('/shared/js/item-pick.js'); ?>"></script>
+                <script type="module" src="<?php echo url_for('/proposals/edit.js?v=3'); ?>"></script>
                 <label for="chosen_item_name">Or enter a name</label>
                 <input type="text" id="chosen_item_name" name="chosen_item_name" maxlength="255" value="<?php echo h($values['chosen_item_id'] ? '' : $values['chosen_item_name']); ?>" aria-describedby="alternative-help">
                 <p id="alternative-help" class="menu-support">An existing selection takes precedence over a typed name. A typed name does not add an item to your collection. Record actual use separately.</p>
