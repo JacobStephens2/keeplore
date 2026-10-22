@@ -22,8 +22,8 @@ require_once __DIR__ . '/classes/Items.php';
  * the owner's Type for BoardGameGeek items, a hidden picture and link, and
  * the picture preview; Notes then Tags close the form.
  * Edit only: To get rid of, Secondary collection, the visible BoardGameGeek
- * link with a lookup panel that keeps the name, and the BGG vote basis
- * under each BGG-filled field.
+ * link, the Name input marked keep so a match does not replace it, and the
+ * BGG vote basis under each BGG-filled field.
  *
  * Every checkbox posts an explicit 0 through a hidden input, so
  * item_form_input() needs no mode. Rendering reads the session owner's
@@ -84,10 +84,18 @@ function item_form_html(string $mode, array $item, $default_interval): string {
       </div>';
   $basis = fn($group, $id) => $create ? '' : item_bgg_field_basis_html($item, $group, $id);
   $bgg_link = h(normalize_item_bgg_url($item['bgg_url'] ?? ''));
+  $hand_edits = item_bgg_hand_edit_clears();
+  $clears = function ($id) use ($hand_edits) {
+    if (!isset($hand_edits[$id])) {
+      return '';
+    }
+    return ' data-bgg-clears="' . h(implode(' ', $hand_edits[$id])) . '"';
+  };
   // What the lookup fills besides the visible fields: the vote basis and BGG's average.
+  // The average is replaced by a match, including cleared when the match has none.
   $bgg_basis_inputs = '<input type="hidden" name="bgg_player_votes" id="bgg_player_votes" value="' . $value('bgg_player_votes') . '">
         <input type="hidden" name="bgg_age_basis" id="bgg_age_basis" value="' . $value('bgg_age_basis') . '">
-        <input type="hidden" name="BGG_Rat" id="BGG_Rat" value="' . h((string) (bgg_overall_rating_text($item['BGG_Rat'] ?? null) ?? '')) . '">' . "\n";
+        <input type="hidden" name="BGG_Rat" id="BGG_Rat" data-bgg-replace value="' . h((string) (bgg_overall_rating_text($item['BGG_Rat'] ?? null) ?? '')) . '">' . "\n";
   $interval = $item['interaction_frequency_days'] ?? null;
   $own_interval = $interval !== null && trim((string) $interval) !== '';
 
@@ -95,7 +103,7 @@ function item_form_html(string $mode, array $item, $default_interval): string {
 ?>
       <div class="form-field form-field-span">
         <label for="Title">Name</label>
-        <input type="text" name="Title" id="Title"<?php if ($create) { ?> autofocus<?php } ?> value="<?php echo $value('Title'); ?>" />
+        <input type="text" name="Title" id="Title"<?php if ($create) { ?> autofocus<?php } ?> value="<?php echo $value('Title'); ?>"<?php if (!$create) { ?> data-bgg-keep<?php } ?> />
       </div>
 <?php if ($create) { ?>
 
@@ -107,8 +115,8 @@ function item_form_html(string $mode, array $item, $default_interval): string {
           include SHARED_PATH . '/bgg_lookup_panel.php';
           $preview_url = normalize_item_image_url($item['image_url'] ?? '');
         ?>
-        <input type="hidden" name="image_url" id="image_url" value="<?php echo h($preview_url); ?>">
-        <input type="hidden" name="bgg_url" id="bgg_url" value="<?php echo $bgg_link; ?>">
+        <input type="hidden" name="image_url" id="image_url" data-bgg-replace data-bgg-preview="itemPicturePreview" value="<?php echo h($preview_url); ?>">
+        <input type="hidden" name="bgg_url" id="bgg_url" value="<?php echo $bgg_link; ?>"<?php echo $clears('bgg_url'); ?>>
         <?php echo $bgg_basis_inputs; ?>
         <img id="itemPicturePreview" class="item-picture-preview"
           alt="<?php echo $preview_url !== '' ? $value('Title') . ' cover' : ''; ?>"
@@ -154,7 +162,7 @@ function item_form_html(string $mode, array $item, $default_interval): string {
 
       <div class="form-field">
         <label for="SS">Sweet Spot(s)</label>
-        <input type="text" name="SS" id="SS" aria-describedby="<?php echo $create ? 'ss-hint' : 'SS-bgg-basis'; ?>" value="<?php echo $value('SS'); ?>">
+        <input type="text" name="SS" id="SS" aria-describedby="<?php echo $create ? 'ss-hint' : 'SS-bgg-basis'; ?>" value="<?php echo $value('SS'); ?>"<?php echo $clears('SS'); ?>>
 <?php if ($create) { ?>
         <p id="ss-hint" class="form-field-hint">Ideal player counts, comma-separated. Example: 2, 3, 4</p>
 <?php } ?>
@@ -163,19 +171,19 @@ function item_form_html(string $mode, array $item, $default_interval): string {
 
       <div class="form-field">
         <label for="age">Minimum Age</label>
-        <input type="number" name="age" id="age"<?php if (!$create) { ?> aria-describedby="age-bgg-basis"<?php } ?> value="<?php echo $value('Age'); ?>">
+        <input type="number" name="age" id="age"<?php if (!$create) { ?> aria-describedby="age-bgg-basis"<?php } ?> value="<?php echo $value('Age'); ?>"<?php echo $clears('age'); ?>>
         <?php echo $basis('age', 'age'); ?>
       </div>
 
       <div class="form-field">
         <label for="MnP">Minimum User Count</label>
-        <input type="number" name="MnP" id="MnP"<?php if (!$create) { ?> aria-describedby="MnP-bgg-basis"<?php } ?> value="<?php echo $value('MnP'); ?>">
+        <input type="number" name="MnP" id="MnP"<?php if (!$create) { ?> aria-describedby="MnP-bgg-basis"<?php } ?> value="<?php echo $value('MnP'); ?>"<?php echo $clears('MnP'); ?>>
         <?php echo $basis('players', 'MnP'); ?>
       </div>
 
       <div class="form-field">
         <label for="MxP">Maximum User Count</label>
-        <input type="number" name="MxP" id="MxP"<?php if (!$create) { ?> aria-describedby="MxP-bgg-basis"<?php } ?> value="<?php echo $value('MxP'); ?>">
+        <input type="number" name="MxP" id="MxP"<?php if (!$create) { ?> aria-describedby="MxP-bgg-basis"<?php } ?> value="<?php echo $value('MxP'); ?>"<?php echo $clears('MxP'); ?>>
         <?php echo $basis('players', 'MxP'); ?>
       </div>
 
@@ -196,12 +204,12 @@ function item_form_html(string $mode, array $item, $default_interval): string {
 <?php if (!$create) { ?>
 
       <div class="form-field form-field-span">
-        <?php $bgg_keep_title = true; include SHARED_PATH . '/bgg_lookup_panel.php'; ?>
+        <?php include SHARED_PATH . '/bgg_lookup_panel.php'; ?>
         <?php echo $bgg_basis_inputs; ?>
         <label for="bgg_url">BoardGameGeek Link</label>
         <input type="url" name="bgg_url" id="bgg_url" maxlength="1024"
           placeholder="https://boardgamegeek.com/boardgame/..."
-          value="<?php echo $bgg_link; ?>"
+          value="<?php echo $bgg_link; ?>"<?php echo $clears('bgg_url'); ?>
         >
       </div>
 

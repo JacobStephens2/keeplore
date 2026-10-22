@@ -97,13 +97,15 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
   $fields['MnT'] = bgg_scalar_string($item['minplaytime'] ?? '');
   $fields['MxT'] = bgg_scalar_string($item['maxplaytime'] ?? '');
   $community_age = $polls === false ? null : $polls['community_age'];
-  $fields['Age'] = $community_age !== null ? (string) $community_age : bgg_scalar_string($item['minage'] ?? '');
+  // Posted Item form names. Minimum age is `age`; the form maps that to the
+  // stored Age column when the item is saved. Picture and BGG average are
+  // always present, empty when this match has none, so a replace mark can
+  // clear the previous match. A missing link or sweet spot is left out.
+  $fields['age'] = $community_age !== null ? (string) $community_age : bgg_scalar_string($item['minage'] ?? '');
   if ($year !== '') {
     $fields['Yr'] = $year;
   }
-  if ($image !== '') {
-    $fields['image_url'] = $image;
-  }
+  $fields['image_url'] = $image;
   $link = normalize_item_bgg_url($url);
   if ($link !== '') {
     $fields['bgg_url'] = $link;
@@ -111,10 +113,7 @@ function bgg_form_fields_from_json($item_json, $dynamic_json) {
   // Player counts rest on the poll only when it produced a recommended range.
   $fields['bgg_player_votes'] = $players !== null ? (string) $polls['player_votes'] : '0';
   $fields['bgg_age_basis'] = $community_age !== null ? 'community' : 'publisher';
-  $overall = bgg_overall_rating_text($dynamic['stats']['average'] ?? null);
-  if ($overall !== null) {
-    $fields['BGG_Rat'] = $overall;
-  }
+  $fields['BGG_Rat'] = bgg_overall_rating_text($dynamic['stats']['average'] ?? null) ?? '';
 
   $match = [
     'id' => $id,

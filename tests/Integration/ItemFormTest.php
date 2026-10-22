@@ -105,7 +105,8 @@ final class ItemFormTest extends TestCase
         );
         $this->assertStringNotContainsString('autofocus', $html);
         $this->assertStringContainsString('<label for="Title">Name</label>', $html);
-        $this->assertStringContainsString('data-keep-title', $html);
+        $this->assertMatchesRegularExpression('/id="Title"[^>]*data-bgg-keep/', $html);
+        $this->assertStringNotContainsString('data-keep-title', $html);
         $this->assertStringNotContainsString('ss-hint', $html);
         $this->assertStringNotContainsString('data-default-type-id', $html);
         $this->assertMatchesRegularExpression('/<input type="url" name="bgg_url" id="bgg_url"/', $html);
@@ -115,6 +116,32 @@ final class ItemFormTest extends TestCase
         $this->assertStringContainsString('id="tags" value="loud, party"', $html);
         $this->assertStringContainsString('<input type="hidden" name="type" id="type" value="1" />', $html);
         $this->assertStringContainsString('<label for="MxT">Maximum Time</label>', $html);
+    }
+
+    public function test_the_form_marks_what_a_match_keeps_replaces_and_a_hand_edit_clears(): void
+    {
+        $create = item_form_html('create', item_form_create_values(), 90);
+        $edit = item_form_html('edit', $this->storedItem(), 90);
+
+        $this->assertDoesNotMatchRegularExpression('/id="Title"[^>]*data-bgg-keep/', $create);
+        $this->assertMatchesRegularExpression('/id="Title"[^>]*data-bgg-keep/', $edit);
+        $this->assertStringNotContainsString('data-keep-title', $create . $edit);
+        $this->assertStringNotContainsString('data-bgg-preview', $edit);
+        $this->assertStringNotContainsString('name="image_url"', $edit);
+
+        $this->assertMatchesRegularExpression('/id="image_url"[^>]*data-bgg-replace[^>]*data-bgg-preview="itemPicturePreview"/', $create);
+        foreach ([$create, $edit] as $html) {
+            $this->assertMatchesRegularExpression('/id="BGG_Rat"[^>]*data-bgg-replace/', $html);
+            $this->assertMatchesRegularExpression('/id="MnP"[^>]*data-bgg-clears="bgg_player_votes"/', $html);
+            $this->assertMatchesRegularExpression('/id="MxP"[^>]*data-bgg-clears="bgg_player_votes"/', $html);
+            $this->assertMatchesRegularExpression('/id="SS"[^>]*data-bgg-clears="bgg_player_votes"/', $html);
+            $this->assertMatchesRegularExpression('/id="age"[^>]*data-bgg-clears="bgg_age_basis"/', $html);
+            $this->assertMatchesRegularExpression('/name="bgg_url"[^>]*data-bgg-clears="bgg_player_votes bgg_age_basis BGG_Rat"/', $html);
+        }
+        $this->assertStringContainsString('data-bgg-basis="players" data-bgg-from="bgg_player_votes"', $edit);
+        $this->assertStringContainsString('data-bgg-basis="sweet_spot" data-bgg-from="bgg_player_votes"', $edit);
+        $this->assertStringContainsString('data-bgg-basis="age" data-bgg-from="bgg_age_basis"', $edit);
+        $this->assertStringNotContainsString('data-bgg-from', $create);
     }
 
     public function test_edit_puts_the_vote_basis_under_each_bgg_field(): void

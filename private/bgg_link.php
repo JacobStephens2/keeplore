@@ -241,6 +241,31 @@ function item_bgg_basis_html($item) {
 // basis when the player counts fell back to the publisher.
 const ITEM_BGG_FIELD_GROUPS = ['players', 'sweet_spot', 'age'];
 
+// The stored input a hint is drawn from. Player counts and Sweet spot share
+// the player-vote basis. Create Item does not render the hints, so the
+// hand-edit rule cannot be learned from them.
+function item_bgg_basis_from($group) {
+  if ($group === 'players' || $group === 'sweet_spot') {
+    return 'bgg_player_votes';
+  }
+  return $group === 'age' ? 'bgg_age_basis' : null;
+}
+
+// Which posted inputs a hand edit drops. The Item form renders this onto
+// those inputs for Create Item and Edit Item. Minimum players, maximum
+// players, and Sweet spot drop the player-vote basis. Minimum age drops the
+// age basis. The link drops both bases and the BGG average, the same columns
+// an item with no link stores empty.
+function item_bgg_hand_edit_clears() {
+  return [
+    'MnP' => ['bgg_player_votes'],
+    'MxP' => ['bgg_player_votes'],
+    'SS' => ['bgg_player_votes'],
+    'age' => ['bgg_age_basis'],
+    'bgg_url' => ['bgg_player_votes', 'bgg_age_basis', 'BGG_Rat'],
+  ];
+}
+
 function item_bgg_field_basis_text($item, $group) {
   if ($group === 'age') {
     $age = item_bgg_age_basis_phrase($item['bgg_age_basis'] ?? null);
@@ -271,6 +296,8 @@ function item_bgg_field_bases($item) {
 // resolves and Request BGG Data can fill it in place.
 function item_bgg_field_basis_html($item, $group, $input_id) {
   $text = item_bgg_field_basis_text($item, $group);
+  $from = item_bgg_basis_from($group);
   return '<p id="' . h($input_id) . '-bgg-basis" class="form-field-hint" data-bgg-basis="' . h($group) . '"'
+    . ($from === null ? '' : ' data-bgg-from="' . h($from) . '"')
     . ($text === '' ? ' hidden' : '') . '>' . h($text) . '</p>';
 }

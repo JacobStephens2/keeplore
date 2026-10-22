@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use PHPUnit\Framework\TestCase;
 
 require_once PROJECT_PATH . '/private/bgg_lookup.php';
+require_once PROJECT_PATH . '/private/item_form.php';
 
 class BggLookupTest extends TestCase
 {
@@ -93,12 +94,13 @@ class BggLookupTest extends TestCase
                     'MxP' => '2',
                     'MnT' => '20',
                     'MxT' => '20',
-                    'Age' => '10',
+                    'age' => '10',
                     'Yr' => '2023',
                     'image_url' => $cover,
                     'bgg_url' => 'https://boardgamegeek.com/boardgame/373106/sky-team',
                     'bgg_player_votes' => '0',
                     'bgg_age_basis' => 'publisher',
+                    'BGG_Rat' => '',
                 ],
             ],
             bgg_form_fields_from_json($itemJson, $dynamicJson)
@@ -130,7 +132,7 @@ class BggLookupTest extends TestCase
         ]);
 
         $fields = bgg_form_fields_from_json($itemJson, $dynamicJson)['fields'];
-        $this->assertSame('8', $fields['Age']);
+        $this->assertSame('8', $fields['age']);
         $this->assertSame('2', $fields['MnP']);
         $this->assertSame('5', $fields['MxP']);
         $this->assertSame('03,04', $fields['SS']);
@@ -159,7 +161,7 @@ class BggLookupTest extends TestCase
         ]);
 
         $fields = bgg_form_fields_from_json($itemJson, $dynamicJson)['fields'];
-        $this->assertSame('10', $fields['Age']);
+        $this->assertSame('10', $fields['age']);
         $this->assertSame('1', $fields['MnP']);
         $this->assertSame('4', $fields['MxP']);
         $this->assertSame('0', $fields['bgg_player_votes']);
@@ -301,7 +303,8 @@ class BggLookupTest extends TestCase
             'item' => ['objectid' => 1, 'name' => 'No Art'],
         ]), '{}');
         $this->assertArrayNotHasKey('image', $missing['match']);
-        $this->assertArrayNotHasKey('image_url', $missing['fields']);
+        $this->assertSame('', $missing['fields']['image_url']);
+        $this->assertSame('', $missing['fields']['BGG_Rat']);
 
         $insecure = bgg_form_fields_from_json(json_encode([
             'item' => [
@@ -311,7 +314,46 @@ class BggLookupTest extends TestCase
             ],
         ]), '{}');
         $this->assertArrayNotHasKey('image', $insecure['match']);
-        $this->assertArrayNotHasKey('image_url', $insecure['fields']);
+        $this->assertSame('', $insecure['fields']['image_url']);
+    }
+
+    public function test_lookup_fields_are_item_form_input_names(): void
+    {
+        $fields = bgg_form_fields_from_json(json_encode([
+            'item' => [
+                'objectid' => 13,
+                'name' => 'Catan',
+                'yearpublished' => 1995,
+                'minplayers' => 3,
+                'maxplayers' => 4,
+                'minplaytime' => 60,
+                'maxplaytime' => 120,
+                'minage' => 10,
+                'canonical_link' => 'https://boardgamegeek.com/boardgame/13/catan',
+                'imageurl' => 'https://cf.geekdo-images.com/catan.jpg',
+            ],
+        ]), json_encode([
+            'item' => [
+                'polls' => [
+                    'userplayers' => [
+                        'best' => [['min' => 4, 'max' => 4]],
+                        'recommended' => [['min' => 3, 'max' => 4]],
+                        'totalvotes' => '19',
+                    ],
+                    'playerage' => '10+',
+                ],
+                'stats' => ['average' => '7.09'],
+            ],
+        ]))['fields'];
+
+        foreach (array_keys($fields) as $name) {
+            $this->assertArrayHasKey($name, ITEM_FORM_FIELDS, $name . ' is not an Item form input');
+        }
+        $this->assertArrayNotHasKey('Age', $fields);
+        $this->assertSame('10', $fields['age']);
+        $this->assertSame('https://cf.geekdo-images.com/catan.jpg', $fields['image_url']);
+        $this->assertSame('7.09', $fields['BGG_Rat']);
+        $this->assertSame('https://boardgamegeek.com/boardgame/13/catan', $fields['bgg_url']);
     }
 
     public function test_sweet_spot_is_omitted_when_the_poll_is_missing(): void
