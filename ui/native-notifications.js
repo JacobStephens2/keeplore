@@ -9,7 +9,6 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
   if (!LocalNotifications) return;
 
   var API_URL = API_BASE + '/upcoming-interactions.php';
-  var DEFAULTS = { enabled: true, hour: 9, lead_days: 3, past_due: true };
 
   LocalNotifications.addListener('localNotificationActionPerformed', function (action) {
     if (!action || action.actionId !== 'tap' || !action.notification) return;
@@ -27,16 +26,15 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
     console.warn('Notification tap listener failed', err);
   });
 
-  function atHour(dateString, hour, offsetDays) {
-    var parts = dateString.split('-');
-    var d = new Date(
+  // That calendar day at the device-local hour.
+  function atHour(dayString, hour) {
+    var parts = dayString.split('-');
+    return new Date(
       parseInt(parts[0], 10),
       parseInt(parts[1], 10) - 1,
       parseInt(parts[2], 10),
       hour, 0, 0, 0
     );
-    if (offsetDays) d.setDate(d.getDate() + offsetDays);
-    return d;
   }
 
   function nextAtHour(hour) {
@@ -46,56 +44,37 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
     return d;
   }
 
-  function buildNotifications(items, prefs, now) {
+  // The reminders in order. A dated reminder's instant is that day at the
+  // device-local hour; a catch-up (no day) is the next time that hour comes
+  // around. An instant that is not strictly ahead is skipped, and an id
+  // already scheduled is skipped, so a dated overdue reminder that is still
+  // ahead wins and the catch-up does not double it.
+  function buildNotifications(reminders, hour, now) {
     var out = [];
-    for (var i = 0; i < items.length; i++) {
-      var item = items[i];
-      if (!item || !item.id || !item.use_by_date || !item.title) continue;
+    var scheduledIds = {};
+    for (var i = 0; i < reminders.length; i++) {
+      var reminder = reminders[i];
+      if (!reminder || reminder.id == null || !reminder.title || !reminder.body || reminder.item_id == null) continue;
+      var id = Number(reminder.id);
+      if (!Number.isSafeInteger(id) || scheduledIds[id]) continue;
 
-      if (prefs.lead_days > 0) {
-        var soon = atHour(item.use_by_date, prefs.hour, -prefs.lead_days);
-        if (soon > now) {
-          out.push({
-            id: item.id * 10 + 1,
-            title: 'Due soon',
-            body: item.title + ' is due ' + item.use_by_date,
-            extra: { item_id: item.id },
-            schedule: { at: soon, allowWhileIdle: true }
-          });
-        }
+      var at;
+      if (reminder.day == null) {
+        at = nextAtHour(hour);
+      } else {
+        if (typeof reminder.day !== 'string') continue;
+        at = atHour(reminder.day, hour);
       }
+      if (!(at > now)) continue;
 
-      var due = atHour(item.use_by_date, prefs.hour, 0);
-      if (due > now) {
-        out.push({
-          id: item.id * 10 + 2,
-          title: 'Due today',
-          body: item.title + ' is due today',
-          extra: { item_id: item.id },
-          schedule: { at: due, allowWhileIdle: true }
-        });
-      }
-
-      if (prefs.past_due) {
-        var past = atHour(item.use_by_date, prefs.hour, 1);
-        if (past > now) {
-          out.push({
-            id: item.id * 10 + 3,
-            title: 'Overdue',
-            body: item.title + ' is overdue',
-            extra: { item_id: item.id },
-            schedule: { at: past, allowWhileIdle: true }
-          });
-        } else if (item.status === 'past_due') {
-          out.push({
-            id: item.id * 10 + 3,
-            title: 'Overdue',
-            body: item.title + ' is overdue (due ' + item.use_by_date + ')',
-            extra: { item_id: item.id },
-            schedule: { at: nextAtHour(prefs.hour), allowWhileIdle: true }
-          });
-        }
-      }
+      scheduledIds[id] = true;
+      out.push({
+        id: id,
+        title: reminder.title,
+        body: reminder.body,
+        extra: { item_id: reminder.item_id },
+        schedule: { at: at, allowWhileIdle: true }
+      });
     }
     return out;
   }
@@ -115,8 +94,8 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
       if (res.status === 401) return;
       if (!res.ok) return;
       var data = await res.json();
-      var items = (data && data.items) || [];
-      var prefs = Object.assign({}, DEFAULTS, (data && data.notification_prefs) || {});
+      var reminders = (data && data.reminders) || [];
+      var prefs = (data && data.notification_prefs) || {};
 
       if (!prefs.enabled) {
         await cancelAllPending();
@@ -131,7 +110,9 @@ import { API_BASE } from './uses/modules/publicEnvironmentVariables.js';
 
       await cancelAllPending();
 
-      var toSchedule = buildNotifications(items, prefs, new Date());
+      var toSchedule = Number.isSafeInteger(prefs.hour)
+        ? buildNotifications(reminders, prefs.hour, new Date())
+        : [];
       if (toSchedule.length > 0) {
         await LocalNotifications.schedule({ notifications: toSchedule });
       }
