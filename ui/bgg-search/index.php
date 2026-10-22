@@ -2,16 +2,10 @@
 require_once('../../private/initialize.php');
 require_login();
 require_once(PRIVATE_PATH . '/bgg_poll_index.php');
+require_once(PRIVATE_PATH . '/bgg_search_results.php');
 
 $filters = bgg_poll_search_filters($_GET);
-$searched = $filters['best'] !== null || $filters['age'] !== null;
-$games = $searched ? bgg_poll_search($db, $filters, BGG_POLL_SEARCH_LIMIT + 1) : [];
-$more = count($games) > BGG_POLL_SEARCH_LIMIT;
-$games = array_slice($games, 0, BGG_POLL_SEARCH_LIMIT);
-$bgg_ratings = new BggRatings($db, (int) $_SESSION['user_id']);
-$kept = $searched ? bgg_poll_kept_things($bgg_ratings) : [];
-$reviewers = $searched ? $bgg_ratings->reviewers() : [];
-$reviews = $reviewers !== [] ? $bgg_ratings->byThing() : [];
+$result = bgg_search_results($db, (int) $_SESSION['user_id'], $filters);
 $summary = bgg_poll_index_summary($db);
 
 $page_title = 'Search BGG';
@@ -55,12 +49,12 @@ include(SHARED_PATH . '/header.php');
 
   <?php if ($summary['polled'] === 0) { ?>
     <div class="empty-state"><p>The BGG index is empty. Run <code>bin/refresh-bgg-poll-index</code> on the server to fill it.</p></div>
-  <?php } elseif (!$searched) { ?>
+  <?php } elseif (!$result['searched']) { ?>
     <p>Choose a Best player count, an age, or both.</p>
-  <?php } elseif ($games === []) { ?>
+  <?php } elseif ($result['rows'] === []) { ?>
     <div class="empty-state"><p>No indexed game matches.</p></div>
   <?php } else { ?>
-    <p><?php echo $more ? 'The ' . BGG_POLL_SEARCH_LIMIT . ' best-ranked of more than ' . BGG_POLL_SEARCH_LIMIT . ' games.' : count($games) . ' ' . (count($games) === 1 ? 'game.' : 'games.'); ?></p>
+    <p><?php echo $result['more'] ? 'The ' . $result['cap'] . ' best-ranked of more than ' . $result['cap'] . ' games.' : count($result['rows']) . ' ' . (count($result['rows']) === 1 ? 'game.' : 'games.'); ?></p>
     <p class="list-sort-hint">Click a column heading to sort by it; Shift-click adds a tie-breaker.</p>
     <p class="list-sort-summary" id="bgg-search-sort-summary" aria-live="polite"></p>
     <div class="surface-panel">
@@ -75,46 +69,37 @@ include(SHARED_PATH . '/header.php');
           <th data-sort="rank">BGG rank</th>
           <th data-sort="average">Average</th>
           <th data-sort="kept">Kept</th>
-          <?php foreach ($reviewers as $reviewer) { ?>
+          <?php foreach ($result['reviewers'] as $reviewer) { ?>
             <th data-sort="bgg_rating:<?php echo h($reviewer); ?>"><?php echo h($reviewer); ?></th>
           <?php } ?>
         </tr>
       </thead>
       <tbody>
-        <?php foreach ($games as $game) { ?>
-          <tr
-            data-name="<?php echo h($game['name']); ?>"
-            data-best="<?php echo $game['best_players'] === '' ? '' : (int) $game['best_players']; ?>"
-            data-votes="<?php echo h((string) $game['player_votes']); ?>"
-            data-age="<?php echo h((string) $game['community_age']); ?>"
-            data-rank="<?php echo h((string) $game['bgg_rank']); ?>"
-            data-average="<?php echo h((string) $game['average']); ?>"
-            data-kept="<?php echo isset($kept[$game['thing_id']]) ? '1' : '0'; ?>"
-            data-ratings="<?php echo h(json_encode(array_map(fn ($review) => $review['rating'], $reviews[$game['thing_id']] ?? []), JSON_FORCE_OBJECT)); ?>"
-          >
+        <?php foreach ($result['rows'] as $row) { ?>
+          <tr>
             <td class="name">
-              <a href="<?php echo h($game['url']); ?>" target="_blank" rel="noopener"><?php echo h($game['name']); ?></a>
-              <?php if ($game['year_published'] !== null) { ?><span class="menu-support">(<?php echo h($game['year_published']); ?>)</span><?php } ?>
-              <?php if ($game['subdomains'] !== '') { ?><small class="menu-support"><?php echo h($game['subdomains']); ?></small><?php } ?>
+              <a href="<?php echo h($row['url']); ?>" target="_blank" rel="noopener"><?php echo h($row['name']); ?></a>
+              <?php if ($row['year'] !== null) { ?><span class="menu-support">(<?php echo h($row['year']); ?>)</span><?php } ?>
+              <?php if ($row['subdomains'] !== '') { ?><small class="menu-support"><?php echo h($row['subdomains']); ?></small><?php } ?>
             </td>
-            <td><?php echo h($game['best_players']); ?></td>
-            <td><?php echo number_format($game['player_votes']); ?></td>
-            <td><?php echo $game['community_age'] === null ? '' : h($game['community_age']) . '+'; ?></td>
-            <td><?php echo $game['bgg_rank'] === null ? '' : number_format($game['bgg_rank']); ?></td>
-            <td><?php echo h(bgg_overall_rating_text($game['average'])); ?></td>
+            <td><?php echo h($row['best_text']); ?></td>
+            <td><?php echo h($row['votes_text']); ?></td>
+            <td><?php echo h($row['age_text']); ?></td>
+            <td><?php echo h($row['rank_text']); ?></td>
+            <td><?php echo h($row['average_text']); ?></td>
             <td>
-              <?php if (isset($kept[$game['thing_id']])) { ?>
-                <a href="<?php echo url_for('/artifacts/edit.php?id=' . $kept[$game['thing_id']]); ?>">Kept</a>
+              <?php if ($row['kept_item_id'] !== null) { ?>
+                <a href="<?php echo url_for('/artifacts/edit.php?id=' . $row['kept_item_id']); ?>"><?php echo h($row['kept_text']); ?></a>
               <?php } ?>
             </td>
-            <?php foreach ($reviewers as $reviewer) {
-              $review = $reviews[$game['thing_id']][$reviewer] ?? null; ?>
+            <?php foreach ($result['reviewers'] as $reviewer) {
+              $review = $row['reviews'][$reviewer] ?? null; ?>
               <td class="bgg-search-review">
-                <?php if ($review !== null) { ?>
-                  <?php if ($review['rating'] !== null) { ?>
-                    <a href="<?php echo url_for('/artifacts/edit.php?id=' . $review['artifact_id']); ?>"><?php echo h(bgg_score_text($review['rating'])); ?></a>
+                <?php if (is_array($review)) { ?>
+                  <?php if ($review['text'] !== '') { ?>
+                    <a href="<?php echo url_for('/artifacts/edit.php?id=' . $review['item_id']); ?>"><?php echo h($review['text']); ?></a>
                   <?php } ?>
-                  <?php if ((string) $review['comment'] !== '') { ?>
+                  <?php if ($review['comment'] !== '') { ?>
                     <details><summary>Comment</summary><p><?php echo h($review['comment']); ?></p></details>
                   <?php } ?>
                 <?php } ?>
@@ -126,13 +111,14 @@ include(SHARED_PATH . '/header.php');
     </table>
     </div>
     </div>
+    <script type="application/json" id="bgg-search-rows"><?php echo json_encode($result['rows'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?></script>
     <script src="<?php echo url_for('/shared/js/list-table.js'); ?>?v=3"></script>
-    <script src="<?php echo url_for('/bgg-search/bgg-search.js'); ?>?v=2"></script>
+    <script src="<?php echo url_for('/bgg-search/bgg-search.js'); ?>?v=3"></script>
   <?php } ?>
 
   <p class="menu-support bgg-search-source">
     Covers the top-ranked games of each BGG subdomain: <?php echo number_format($summary['polled']); ?> games with polls<?php if ($summary['last_fetched'] !== null) { ?>, last fetched <?php echo h(substr($summary['last_fetched'], 0, 10)); ?><?php } ?>.
-    Player-poll votes count everyone who voted on the game's player-count poll.<?php if ($reviewers !== []) { ?> The <?php echo h(implode(' and ', $reviewers)); ?> <?php echo count($reviewers) === 1 ? 'column shows' : 'columns show'; ?> the ratings and comments on your Keeplore items that link to the game.<?php } ?> BGG's data does not give a vote count for the age poll.
+    Player-poll votes count everyone who voted on the game's player-count poll.<?php if ($result['reviewers'] !== []) { ?> The <?php echo h(implode(' and ', $result['reviewers'])); ?> <?php echo count($result['reviewers']) === 1 ? 'column shows' : 'columns show'; ?> the ratings and comments on your Keeplore items that link to the game.<?php } ?> BGG's data does not give a vote count for the age poll.
     Data from <a href="https://boardgamegeek.com" target="_blank" rel="noopener">BoardGameGeek</a>.
   </p>
 </main>

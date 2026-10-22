@@ -1,5 +1,6 @@
 // Search BGG adapter for KeeploreListTable: click a column header to sort
-// the results. Rows stay server-rendered; each carries its values as data-*.
+// the results. Rows stay server-rendered. The sort reads the same row
+// records, embedded as JSON, and pairs each with the row in that position.
 (function (root, factory) {
   var listTable = root.KeeploreListTable;
   if (!listTable && typeof require === 'function') {
@@ -13,17 +14,7 @@
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (ListTable) {
   'use strict';
 
-  var NUMBER_KEYS = ['best', 'votes', 'age', 'rank', 'average'];
-
-  function numberOrNull(raw) {
-    if (raw == null || String(raw).trim() === '') {
-      return null;
-    }
-    var n = Number(raw);
-    return Number.isNaN(n) ? null : n;
-  }
-
-  // A game with no rank, age or average sorts last whichever way.
+  // A game with no rank, age, average, Best or score sorts last whichever way.
   function compareGames(a, b, key, dir) {
     var av = a[key];
     var bv = b[key];
@@ -49,36 +40,51 @@
     return ListTable.sortRecords(games, sorts, compareGames);
   }
 
-  // $index keeps the server's order (best BGG rank first) for ties.
-  function gameFromRow(tr, index) {
-    var game = { id: index, name: tr.getAttribute('data-name') || '' };
-    NUMBER_KEYS.forEach(function (key) {
-      game[key] = numberOrNull(tr.getAttribute('data-' + key));
+  // The embedded records, each paired with the row in the same position.
+  // A count that disagrees, or JSON that is not a list, is not sorted.
+  function recordsForTable(doc) {
+    var table = doc.getElementById('bgg-search-results');
+    var tbody = table && table.querySelector('tbody');
+    var node = doc.getElementById('bgg-search-rows');
+    if (!tbody || !node) {
+      return null;
+    }
+    var records;
+    try {
+      records = JSON.parse(node.textContent || '');
+    } catch (error) {
+      return null;
+    }
+    if (!Array.isArray(records)) {
+      return null;
+    }
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    if (records.length !== rows.length) {
+      return null;
+    }
+    return records.map(function (record, index) {
+      var game = {};
+      Object.keys(record).forEach(function (key) {
+        game[key] = record[key];
+      });
+      game.row = rows[index];
+      return game;
     });
-    game.kept = tr.getAttribute('data-kept') === '1';
-    // data-ratings maps each imported reviewer, such as Gyges, to a score or
-    // null for a comment alone; each sorts under its own column's key.
-    var ratings = JSON.parse(tr.getAttribute('data-ratings') || '{}');
-    Object.keys(ratings).forEach(function (reviewer) {
-      game['bgg_rating:' + reviewer] = numberOrNull(ratings[reviewer]);
-    });
-    game.row = tr;
-    return game;
   }
 
   function bind(doc) {
     var table = doc.getElementById('bgg-search-results');
     var tbody = table && table.querySelector('tbody');
-    if (!tbody || !ListTable) {
+    var records = recordsForTable(doc);
+    if (!tbody || !ListTable || !records) {
       return;
     }
-    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
     ListTable.mount({
       document: doc,
       table: table,
       tbody: tbody,
       sortSummary: doc.getElementById('bgg-search-sort-summary'),
-      records: rows.map(gameFromRow),
+      records: records,
       match: function () {
         return true;
       },
@@ -88,7 +94,7 @@
         return game.row;
       },
       columnCount: table.querySelectorAll('thead th').length,
-      pageLength: rows.length || 1,
+      pageLength: records.length || 1,
     });
   }
 
@@ -105,6 +111,6 @@
   return {
     compareGames: compareGames,
     sortGames: sortGames,
-    gameFromRow: gameFromRow,
+    recordsForTable: recordsForTable,
   };
 }));
