@@ -9,7 +9,10 @@ require_once PROJECT_PATH . '/private/items_list.php';
 
 /**
  * Seams:
- * - items_list_present_row(): display record for one item on /artifacts/
+ * - items_list_present_row(): display record for one item on /artifacts/,
+ *   including the sort values beside the cell text
+ * - sortItems() in ui/shared/js/items-list.js: the Items list comparator,
+ *   the same surface Search BGG tests with sortGames()
  * - items_list_filters_from_request(): kept/type/interval/tag state for the page
  * - items_list_filter_query(): the page's filters, with changes, as a GET query
  * - items_list_hidden_fields(): a query as hidden-field name/value pairs
@@ -309,6 +312,16 @@ class ItemsListTest extends TestCase
             'BGG_Rat' => '7.09024',
         ], 90, '2024-06-01');
         $this->assertSame('7.09', $row['bgg_average']);
+        $this->assertSame(7.09, $row['bgg_average_sort']);
+
+        $whole = items_list_present_row([
+            'id' => 16,
+            'Title' => 'Whole',
+            'Acq' => '2024-01-10',
+            'BGG_Rat' => '8.00',
+        ], 90, '2024-06-01');
+        $this->assertSame('8', $whole['bgg_average']);
+        $this->assertSame(8.0, $whole['bgg_average_sort']);
 
         $blank = items_list_present_row([
             'id' => 14,
@@ -316,9 +329,16 @@ class ItemsListTest extends TestCase
             'Acq' => '2024-01-10',
         ], 90, '2024-06-01');
         $this->assertSame('', $blank['bgg_average']);
+        $this->assertNull($blank['bgg_average_sort']);
 
-        $js = (string) file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
-        $this->assertStringContainsString("key === 'bgg_average'", $js);
+        $out_of_range = items_list_present_row([
+            'id' => 17,
+            'Title' => 'Out of range',
+            'Acq' => '2024-01-10',
+            'BGG_Rat' => '0',
+        ], 90, '2024-06-01');
+        $this->assertSame('', $out_of_range['bgg_average']);
+        $this->assertNull($out_of_range['bgg_average_sort']);
     }
 
     public function test_list_row_spells_a_reviewer_score_and_the_script_does_not(): void
@@ -338,13 +358,22 @@ class ItemsListTest extends TestCase
                     'comment' => 'Just a note.',
                     'url' => '',
                 ],
+                'Bea' => [
+                    'rating' => 0,
+                    'comment' => null,
+                    'url' => '',
+                ],
             ],
         ], 90, '2024-06-01');
 
         $this->assertSame('8', $row['bgg_ratings']['Gyges']['score_text']);
+        $this->assertSame(8.0, $row['bgg_ratings']['Gyges']['sort']);
         $this->assertSame('RPGGeek', $row['bgg_ratings']['Gyges']['site_name']);
         $this->assertArrayNotHasKey('score_text', $row['bgg_ratings']['Ada']);
+        $this->assertSame(0, $row['bgg_ratings']['Ada']['sort']);
         $this->assertSame('BoardGameGeek', $row['bgg_ratings']['Ada']['site_name']);
+        $this->assertSame('0', $row['bgg_ratings']['Bea']['score_text']);
+        $this->assertSame(0.0, $row['bgg_ratings']['Bea']['sort']);
 
         $js = (string) file_get_contents(PROJECT_PATH . '/ui/shared/js/items-list.js');
         $this->assertStringContainsString('rating.score_text', $js);
@@ -353,7 +382,14 @@ class ItemsListTest extends TestCase
         $this->assertStringContainsString("'Comment'", $js);
         $this->assertStringContainsString('Commented without a rating', $js);
         $this->assertStringContainsString('(entered by hand)', $js);
-        $this->assertStringContainsString('Number(ar.rating)', $js);
+    }
+
+    public function test_items_sort_by_the_values_on_the_row(): void
+    {
+        // PHPUnit has no JS runner; this is the suite hook for the node tests.
+        $script = PROJECT_PATH . '/tests/Unit/items-list.test.js';
+        exec('node --test ' . escapeshellarg($script) . ' 2>&1', $output, $code);
+        $this->assertSame(0, $code, implode("\n", $output));
     }
 
     public function test_items_page_draws_headers_and_cells_from_the_one_column_list(): void
@@ -423,6 +459,63 @@ class ItemsListTest extends TestCase
         ], 90, '2024-06-01');
 
         $this->assertSame('2–4 (best 2)', $row['players']);
+        $this->assertSame(2, $row['players_sort']);
+    }
+
+    public function test_row_carries_the_players_sort_beside_the_player_label(): void
+    {
+        $base = ['Acq' => '2024-01-10'];
+
+        $range = items_list_present_row($base + [
+            'id' => 1,
+            'Title' => 'Azul',
+            'MnP' => 2,
+            'MxP' => 4,
+            'SS' => '03',
+        ], 90, '2024-06-01');
+        $this->assertSame('2–4 (best 3)', $range['players']);
+        $this->assertSame(2, $range['players_sort']);
+
+        $best = items_list_present_row($base + [
+            'id' => 2,
+            'Title' => 'Codenames',
+            'SS' => '03',
+        ], 90, '2024-06-01');
+        $this->assertSame('best 3', $best['players']);
+        $this->assertSame(3, $best['players_sort']);
+
+        $sweet = items_list_present_row($base + [
+            'id' => 6,
+            'Title' => 'The Mind',
+            'SS' => '04,03',
+        ], 90, '2024-06-01');
+        $this->assertSame('best 3, 4', $sweet['players']);
+        $this->assertSame(3, $sweet['players_sort']);
+
+        $only_end = items_list_present_row($base + [
+            'id' => 3,
+            'Title' => 'Hanabi',
+            'MxP' => 5,
+        ], 90, '2024-06-01');
+        $this->assertSame('5', $only_end['players']);
+        $this->assertSame(5, $only_end['players_sort']);
+
+        $reversed = items_list_present_row($base + [
+            'id' => 4,
+            'Title' => 'Reversed',
+            'MnP' => 4,
+            'MxP' => 2,
+            'SS' => '03',
+        ], 90, '2024-06-01');
+        $this->assertSame('4–2 (best 3)', $reversed['players']);
+        $this->assertSame(2, $reversed['players_sort']);
+
+        $neither = items_list_present_row($base + [
+            'id' => 5,
+            'Title' => 'Book',
+        ], 90, '2024-06-01');
+        $this->assertSame('', $neither['players']);
+        $this->assertNull($neither['players_sort']);
     }
 
     public function test_players_count_comes_from_players_or_the_legacy_sweet_spot_parameter(): void
@@ -699,6 +792,23 @@ class ItemsListTest extends TestCase
         $this->assertSame('', items_list_present_row($base, 90, '2024-06-01')['age']);
     }
 
+    public function test_row_carries_the_age_sort_beside_the_minimum_age(): void
+    {
+        $base = ['id' => 1, 'Title' => 'Azul', 'Acq' => '2024-01-10'];
+
+        $aged = items_list_present_row($base + ['Age' => 8], 90, '2024-06-01');
+        $this->assertSame('8+', $aged['age']);
+        $this->assertSame(8, $aged['age_sort']);
+
+        $zero = items_list_present_row($base + ['age' => 0], 90, '2024-06-01');
+        $this->assertSame('', $zero['age']);
+        $this->assertNull($zero['age_sort']);
+
+        $none = items_list_present_row($base, 90, '2024-06-01');
+        $this->assertSame('', $none['age']);
+        $this->assertNull($none['age_sort']);
+    }
+
     public function test_type_switch_offers_all_games_and_other(): void
     {
         $types = ['book' => '4', 'card game' => '81', 'other' => '44', 'table game' => '26'];
@@ -797,5 +907,26 @@ class ItemsListTest extends TestCase
         $this->assertSame('45–60 min', items_list_present_row($base + ['MnT' => 45, 'MxT' => 60], 90, '2024-06-01')['time']);
         $this->assertSame('30 min', items_list_present_row($base + ['mnt' => 30, 'mxt' => 30], 90, '2024-06-01')['time']);
         $this->assertSame('', items_list_present_row($base, 90, '2024-06-01')['time']);
+    }
+
+    public function test_row_carries_the_time_sort_beside_the_play_time(): void
+    {
+        $base = ['id' => 1, 'Title' => 'Ra', 'Acq' => '2024-01-10'];
+
+        $range = items_list_present_row($base + ['MnT' => 30, 'MxT' => 60], 90, '2024-06-01');
+        $this->assertSame('30–60 min', $range['time']);
+        $this->assertSame(30, $range['time_sort']);
+
+        $single = items_list_present_row($base + ['MnT' => 45, 'MxT' => 45], 90, '2024-06-01');
+        $this->assertSame('45 min', $single['time']);
+        $this->assertSame(45, $single['time_sort']);
+
+        $only_end = items_list_present_row($base + ['MxT' => 90], 90, '2024-06-01');
+        $this->assertSame('90 min', $only_end['time']);
+        $this->assertSame(90, $only_end['time_sort']);
+
+        $none = items_list_present_row($base, 90, '2024-06-01');
+        $this->assertSame('', $none['time']);
+        $this->assertNull($none['time_sort']);
     }
 }

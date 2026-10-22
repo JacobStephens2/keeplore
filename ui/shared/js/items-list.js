@@ -1,6 +1,22 @@
-(function () {
-  var ListTable = window.KeeploreListTable;
-  var QuickItemActions = window.QuickItemActions;
+// Items list adapter for KeeploreListTable. The row carries the sort values
+// beside the cell text; this compares the values and does not read the labels.
+(function (root, factory) {
+  var listTable = root.KeeploreListTable;
+  if (!listTable && typeof require === 'function') {
+    listTable = require('./list-table.js');
+  }
+  var quickItemActions = root.QuickItemActions;
+  if (!quickItemActions && typeof require === 'function') {
+    quickItemActions = require('./quick-item-actions.js');
+  }
+  var api = factory(listTable, quickItemActions);
+  if (typeof module === 'object' && module.exports) {
+    module.exports = api;
+  }
+  root.KeeploreItemsList = api;
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (ListTable, QuickItemActions) {
+  'use strict';
+
   var el = ListTable.el;
   var SORT_FALLBACK = [
     { column: 'Tracking Start', dir: 'desc' },
@@ -86,12 +102,28 @@
     ], query);
   }
 
-  function fewestPlayers(label) {
-    var match = /\d+/.exec(label || '');
-    return match ? Number(match[0]) : Infinity;
+  var BGG_RATING_KEY = 'bgg_rating:';
+
+  // A missing Players, Time or Age sorts last whichever way. One number
+  // cannot mean last in both directions.
+  function missingSortsLast(av, bv, dir) {
+    if (av == null && bv == null) {
+      return 0;
+    }
+    if (av == null) {
+      return 1;
+    }
+    if (bv == null) {
+      return -1;
+    }
+    return ListTable.compareValues(av, bv, dir);
   }
 
-  var BGG_RATING_KEY = 'bgg_rating:';
+  // A missing average or rating is below every score, so a descending sort
+  // still leads with the best and an ascending sort still leads with unrated rows.
+  function belowEveryScore(value) {
+    return value == null || !isFinite(Number(value)) ? -1 : Number(value);
+  }
 
   function bggRating(item, reviewer) {
     return (item.bgg_ratings || {})[reviewer] || null;
@@ -106,28 +138,19 @@
     var av = a[key];
     var bv = b[key];
     if (key.indexOf(BGG_RATING_KEY) === 0) {
-      // Unrated sorts below every score, so a descending sort leads with the best.
       var reviewer = key.slice(BGG_RATING_KEY.length);
       var ar = bggRating(a, reviewer);
       var br = bggRating(b, reviewer);
-      av = ar && ar.rating != null ? Number(ar.rating) : (ar ? 0 : -1);
-      bv = br && br.rating != null ? Number(br.rating) : (br ? 0 : -1);
+      av = belowEveryScore(ar ? ar.sort : null);
+      bv = belowEveryScore(br ? br.sort : null);
+    } else if (key === 'players' || key === 'time' || key === 'age') {
+      return missingSortsLast(a[key + '_sort'], b[key + '_sort'], dir);
     } else if (key === 'is_kept') {
       av = av ? 1 : 0;
       bv = bv ? 1 : 0;
     } else if (key === 'tags') {
       av = (av || []).join(', ');
       bv = (bv || []).join(', ');
-    } else if (key === 'players' || key === 'time') {
-      // By the smallest number the label names, so "2–4" sorts before "10–12"
-      // and "20 min" before "120 min".
-      av = fewestPlayers(av);
-      bv = fewestPlayers(bv);
-    } else if (key === 'age') {
-      // "8+" sorts as 8; an unrecorded age sorts after every known one either way.
-      var unknownAge = dir === 'desc' ? -Infinity : Infinity;
-      av = parseInt(av, 10) || unknownAge;
-      bv = parseInt(bv, 10) || unknownAge;
     } else if (key === 'title' || key === 'type') {
       av = String(av || '').toLowerCase();
       bv = String(bv || '').toLowerCase();
@@ -138,9 +161,8 @@
       av = Number(av) || 0;
       bv = Number(bv) || 0;
     } else if (key === 'bgg_average') {
-      // Unrated sorts below every score, so a descending sort leads with the best.
-      av = av === '' || av == null || !isFinite(Number(av)) ? -1 : Number(av);
-      bv = bv === '' || bv == null || !isFinite(Number(bv)) ? -1 : Number(bv);
+      av = belowEveryScore(a.bgg_average_sort);
+      bv = belowEveryScore(b.bgg_average_sort);
     } else if (key === 'candidate') {
       av = av ? 1 : 0;
       bv = bv ? 1 : 0;
@@ -149,6 +171,10 @@
       bv = bv == null ? '' : bv;
     }
     return ListTable.compareValues(av, bv, dir);
+  }
+
+  function sortItems(items, sorts) {
+    return ListTable.sortRecords(items, sorts, compareItems);
   }
 
   function renderKeptCell(item, config) {
@@ -402,9 +428,16 @@
       });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mount);
-  } else {
-    mount();
+  if (typeof document !== 'undefined' && typeof module === 'undefined') {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', mount);
+    } else {
+      mount();
+    }
   }
-})();
+
+  return {
+    compareItems: compareItems,
+    sortItems: sortItems,
+  };
+}));

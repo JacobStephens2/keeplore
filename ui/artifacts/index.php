@@ -317,7 +317,7 @@
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>
     <script src="<?php echo url_for('/shared/js/quick-item-actions.js'); ?>?v=1"></script>
-    <script src="/shared/js/items-list.js?v=16"></script>
+    <script src="/shared/js/items-list.js?v=17"></script>
   </div>
 </main>
 
