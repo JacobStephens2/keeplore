@@ -30,6 +30,11 @@ function record_use_count(array $post): int
  * post, and those names win every field. Otherwise the post is Edit Use or
  * the HTTP record: artifact_id, use_date, note, and notesTwo. The Number of
  * uses is included only when useCount is posted, and it is not clamped here.
+ *
+ * On a Record Use post every Person id is kept, including a blank name and
+ * a blank id. On Edit Use, a row that is not a list, or whose name is
+ * missing or exactly '', is left off; a name of only spaces stays. A people
+ * value that is not a list records no People.
  */
 function record_use_input(array $post): array
 {
@@ -61,16 +66,16 @@ function record_use_input(array $post): array
     } elseif ($record_use) {
         $input['player_ids'] = array_column($people, 'id');
     } else {
-        $kept = [];
+        $personIds = [];
         foreach ($people as $person) {
             if (!is_array($person) || !array_key_exists('name', $person) || $person['name'] === '') {
                 continue;
             }
             if (array_key_exists('id', $person)) {
-                $kept[] = $person['id'];
+                $personIds[] = $person['id'];
             }
         }
-        $input['player_ids'] = $kept;
+        $input['player_ids'] = $personIds;
     }
     if (array_key_exists('useCount', $post)) {
         $input['count'] = $post['useCount'];
