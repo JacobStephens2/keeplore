@@ -83,6 +83,10 @@ _Avoid_: Interaction queue.
 **Daily email**:
 The email listing the owner's overdue items, items due today and items due in the coming week from the Use-by queue, sent at the hour set in their Preferences while it is on. Nothing is sent when nothing is due.
 
+**Native notification**:
+A reminder the owner's device schedules for an item, either that many days before the use-by date, on the use-by date, or overdue (the next day, or the next device-local hour when that day has passed and the item is already overdue). The days are counted on the app day. The hour is the device's own clock, the native notification hour from Preferences. Tapping one opens Edit Item. The browser's calendar does not choose the day.
+_Avoid_: push notification.
+
 **Interaction frequency**:
 An item's own interval in days. When it has one, the use-by date uses it in place of the default use interval; when it has none, the use-by date uses the owner's default use interval, including after that default changes. Saving Create Item or Edit Item without typing an interval does not give the item one. A page's interval setting changes only the default, never an item's own frequency.
 

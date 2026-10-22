@@ -103,6 +103,33 @@ final class UpcomingUsesApiTest extends TestCase
         $this->assertSame(10.0, $byTitle['Due soon']['interval_days']);
         $this->assertSame('due_soon', $byTitle['Due soon']['status']);
         $this->assertSame('upcoming', $byTitle['Upcoming']['status']);
+
+        $dueSoon = $byTitle['Due soon'];
+        $leadReminders = array_values(array_filter(
+            $fields['reminders'],
+            fn (array $reminder) => $reminder['id'] === 301
+        ));
+        $this->assertCount(1, $leadReminders);
+        $this->assertSame(
+            [
+                'id' => 301,
+                'title' => 'Due soon',
+                'body' => 'Due soon is due ' . $dueSoon['use_by_date'],
+                'day' => app_shift_day($dueSoon['use_by_date'], -2),
+                'item_id' => 30,
+            ],
+            $leadReminders[0]
+        );
+
+        $queueEntries = array_values(array_filter(
+            (new \UseByQueue($this->db, 1))->entries(),
+            fn (array $entry) => $entry['use_by_date'] !== null
+                && $entry['days_until'] <= UPCOMING_USES_HORIZON_DAYS
+        ));
+        $this->assertSame(
+            native_notification_reminders($queueEntries, ['lead_days' => 2, 'past_due' => false]),
+            $fields['reminders']
+        );
     }
 
     public function test_the_master_key_is_refused(): void

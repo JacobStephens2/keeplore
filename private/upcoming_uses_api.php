@@ -4,6 +4,7 @@ require_once __DIR__ . '/classes/ApiCaller.php';
 require_once __DIR__ . '/classes/Preferences.php';
 require_once __DIR__ . '/app_day.php';
 require_once __DIR__ . '/classes/UseByQueue.php';
+require_once __DIR__ . '/native_notification_plan.php';
 
 /** How many days ahead upcoming uses reach. */
 const UPCOMING_USES_HORIZON_DAYS = 60;
@@ -25,10 +26,12 @@ function list_upcoming_uses_over_api(mysqli $db, ApiCaller $caller): array {
   $queue = new UseByQueue($db, $owner);
 
   $items = [];
+  $reminderEntries = [];
   foreach ($queue->entries() as $entry) {
     if ($entry['use_by_date'] === null || $entry['days_until'] > UPCOMING_USES_HORIZON_DAYS) {
       continue;
     }
+    $reminderEntries[] = $entry;
 
     $items[] = [
       'id' => (int) $entry['id'],
@@ -58,6 +61,10 @@ function list_upcoming_uses_over_api(mysqli $db, ApiCaller $caller): array {
       'past_due' => $preferences['native_notify_past_due'],
     ],
     'items' => $items,
+    'reminders' => native_notification_reminders($reminderEntries, [
+      'lead_days' => $preferences['native_notify_lead_days'],
+      'past_due' => $preferences['native_notify_past_due'],
+    ]),
   ]];
 }
 
