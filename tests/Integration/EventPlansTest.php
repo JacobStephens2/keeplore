@@ -365,7 +365,7 @@ final class EventPlansTest extends TestCase
 
         $this->assertSame([12, null], array_column($this->plans()->find($dated)['players'], 'age'));
         // An undated event counts from this year.
-        $this->assertSame((int) date('Y') - 2015, $this->plans()->playersToAdd($undated)[1]['age']);
+        $this->assertSame(app_year() - 2015, $this->plans()->playersToAdd($undated)[1]['age']);
     }
 
     public function test_an_events_players_come_back_youngest_first_and_unknown_ages_last(): void

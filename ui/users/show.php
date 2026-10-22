@@ -24,7 +24,7 @@ include(SHARED_PATH . '/header.php');
     </dl>
     <dl>
       <dt>Age</dt>
-      <dd><?php echo $person['birth_year'] ? (date('Y') - $person['birth_year']) : ''; ?></dd>
+      <dd><?php echo $person['birth_year'] ? (app_year() - $person['birth_year']) : ''; ?></dd>
     </dl>
     <dl>
       <dt>Birth Year</dt>

@@ -5,6 +5,8 @@ namespace Tests\Integration;
 use People;
 use PHPUnit\Framework\TestCase;
 
+require_once PRIVATE_PATH . '/app_day.php';
+
 final class PeopleTest extends TestCase
 {
     /** What seedLinks gives each person: one of everything that points at a person. */
@@ -200,7 +202,7 @@ final class PeopleTest extends TestCase
 
     public static function badBirthYears(): array
     {
-        $nextYear = (int) date('Y') + 1;
+        $nextYear = app_year() + 1;
         return [
             'too early' => ['1899'],
             'after next year' => [(string) ($nextYear + 1)],
@@ -221,7 +223,7 @@ final class PeopleTest extends TestCase
 
     public function test_create_accepts_the_birth_year_bounds(): void
     {
-        $nextYear = (int) date('Y') + 1;
+        $nextYear = app_year() + 1;
         $this->assertSame(1900, $this->people->find($this->people->create(['first_name' => 'Old', 'birth_year' => '1900']))['birth_year']);
         $this->assertSame($nextYear, $this->people->find($this->people->create(['first_name' => 'New', 'birth_year' => $nextYear]))['birth_year']);
     }

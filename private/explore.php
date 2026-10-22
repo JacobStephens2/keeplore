@@ -105,6 +105,21 @@ function explore_sorted(array $rows, array $order): array
   return $rows;
 }
 
+/**
+ * Whether a Candidate group date or a Last use is old enough to mark: a real
+ * calendar day on or before $cutoff (Y-m-d). A blank or unreadable date is
+ * not older than the interval, so it is not marked. Both columns share this.
+ */
+function candidate_date_is_marked($date, string $cutoff): bool
+{
+  if (!is_scalar($date)) {
+    return false;
+  }
+  $day = substr(trim((string) $date), 0, 10);
+  $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $day, new DateTimeZone('UTC'));
+  return $parsed !== false && $parsed->format('Y-m-d') === $day && $day <= $cutoff;
+}
+
 function explore_sort_value($value, string $kind): string|float|null
 {
   if ($kind === 'number') {

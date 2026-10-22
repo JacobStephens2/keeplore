@@ -11,7 +11,8 @@
     'online' => ['showOnlyOnline' => 'only', 'hideOnline' => 'hide'][$_POST['showOnline'] ?? ''] ?? null,
     'exclude_names' => [(string) ($_POST['removeUserByName'] ?? ''), (string) ($_POST['removeUserByNameTwo'] ?? '')],
   ]);
-  $interval_time_ago = strtotime('now - ' . DEFAULT_USE_INTERVAL . ' days');
+  $default_use_interval = (new Preferences($db, (int) $_SESSION['user_id']))->get()['default_use_interval'];
+  $interval_cutoff = app_days_before(app_today(), (float) $default_use_interval);
 
   include(SHARED_PATH . '/header.php');
   include(SHARED_PATH . '/dataTable.html'); 
@@ -108,21 +109,8 @@
             <?php echo substr(h($row['Candidate']),3); ?>
           </td>
           
-          <td class="date group_date"
-            <?php 
-              $candidate_group_date = substr(h($row['CandidateGroupDate']), 0, 10);
-              
-              $candidate_group_date_time = strtotime($candidate_group_date);
-
-              if ($candidate_group_date_time < $interval_time_ago) {
-                  echo ' style="color: red;" ';
-              }
-              ?>
-              >
-              <?php
-
-              echo $candidate_group_date; 
-            ?>
+          <td class="date group_date"<?php if (candidate_date_is_marked($row['CandidateGroupDate'] ?? null, $interval_cutoff)) { echo ' style="color: red;"'; } ?>>
+            <?php echo h(substr((string) ($row['CandidateGroupDate'] ?? ''), 0, 10)); ?>
           </td>
           
           <td class="artifact">
@@ -131,7 +119,7 @@
             </a>
           </td>
 
-          <td class="mostRecentUse date"<?php if ($row['last_use'] !== null && strtotime($row['last_use']) < $interval_time_ago) { echo ' style="color: red;"'; } ?>>
+          <td class="mostRecentUse date"<?php if (candidate_date_is_marked($row['last_use'] ?? null, $interval_cutoff)) { echo ' style="color: red;"'; } ?>>
             <?php echo h($row['last_use'] ?? ''); ?>
           </td>
 

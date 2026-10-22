@@ -70,7 +70,7 @@ The number of an item's proposals recorded as “chose something else” within 
 The alternative selected by the group, optionally recorded as an existing item or a name without adding it to the collection. Selection does not establish actual use, so recording it does not create a use or change the alternative's use history.
 
 **App day**:
-The calendar day in America/New_York that Keeplore counts today from: use-by dates, snooze-until dates, the Daily email's hour, and the dates forms start with. Every reader of today goes through one module.
+The calendar day in America/New_York that Keeplore counts today from. Every reader of today goes through one module: use-by dates, snooze-until dates, the Daily email's hour, the dates forms start with, people-list age, the person page's age, the latest birth year People accepts, an undated Event's year, and the day the Candidates page and the uses-list hint count an interval back from. That interval is the owner's default use interval.
 
 **Use-by date**:
 The date by which an item should next be used, shown as "Interact by". With no recorded use, or a most recent use before acquisition, it is the acquisition date plus the item's interval; otherwise the most recent use plus twice the interval. An item with neither an acquisition date nor a use has none. A use-by date before today is overdue.

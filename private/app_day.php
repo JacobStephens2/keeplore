@@ -2,9 +2,13 @@
 
 /**
  * App day: the calendar day in America/New_York that Keeplore counts today
- * from. Use-by dates, snooze-until dates, the Daily email's hour and the
- * dates forms start with all read it here; nothing else names the time zone
- * or changes the process default.
+ * from. Use-by dates, snooze-until dates, the Daily email's hour, the dates
+ * forms start with, people-list age, the person page's age, the latest birth
+ * year People accepts, an undated Event's year, and the day the Candidates
+ * page and the uses-list hint count an interval back from all read it here.
+ * That interval is the owner's default use interval. Nothing else names the
+ * time zone or changes the process default. The footer copyright year stays
+ * on the server clock, and log timestamps stay instants.
  */
 
 /** The time zone the app's day is counted in. */
@@ -16,8 +20,31 @@ function app_today(): string
     return app_now()->format('Y-m-d');
 }
 
+/** The year of the app day. */
+function app_year(): int
+{
+    return (int) app_now()->format('Y');
+}
+
 /** The current moment in the app's time zone. */
 function app_now(): DateTimeImmutable
 {
     return new DateTimeImmutable('now', new DateTimeZone(APP_TIME_ZONE));
+}
+
+/**
+ * The calendar day $days before $day (Y-m-d). $days is taken as hours,
+ * rounded to the nearest hour, from midnight UTC, then read back as a
+ * calendar date, the same way a use-by date adds an interval. A $day that
+ * is not a real calendar day is refused; callers pass the app day.
+ */
+function app_days_before(string $day, float $days): string
+{
+    $parsed = DateTimeImmutable::createFromFormat('!Y-m-d', $day, new DateTimeZone('UTC'));
+    if ($parsed === false || $parsed->format('Y-m-d') !== $day) {
+        throw new InvalidArgumentException('Not a real calendar day.');
+    }
+    $hours = (int) round($days * 24);
+
+    return $parsed->modify("-{$hours} hours")->format('Y-m-d');
 }
