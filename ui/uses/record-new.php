@@ -94,6 +94,7 @@
 ?>
 
 <script src="<?php echo url_for('/shared/js/person-pick.js'); ?>"></script>
+<script src="<?php echo url_for('/shared/js/item-pick.js'); ?>"></script>
 <script type="module" src="modules/searchArtifactsList.js"></script>
 <script type="module" src="modules/getUsers.js"></script>
 <script type="module" src="modules/addNewUser.js"></script>
@@ -136,9 +137,7 @@
       value="<?php echo h($artifact_id ?? ''); ?>"
     >
     <div class="searchResults" style="display: none;">
-      <ul class="searchResults" style="margin-top: 0;">
-        <li></li>
-      </ul>
+      <ul class="searchResults" style="margin-top: 0;"></ul>
     </div>
 
     <div id="newEntityForm" class="new-interactor-form" style="display: none;">
