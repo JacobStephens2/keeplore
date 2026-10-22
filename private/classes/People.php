@@ -1,5 +1,6 @@
 <?php
 
+require_once dirname(__DIR__) . '/app_day.php';
 require_once __DIR__ . '/Aversions.php';
 require_once __DIR__ . '/Uses.php';
 
@@ -286,7 +287,7 @@ final class People
         } else {
             $birthYear = filter_var($birthYear, FILTER_VALIDATE_INT, ['options' => [
                 'min_range' => 1900,
-                'max_range' => (int) date('Y') + 1,
+                'max_range' => app_year() + 1,
             ]]);
             if ($birthYear === false) {
                 throw new InvalidArgumentException('Please enter a real birth year.');

@@ -9,6 +9,10 @@
   $type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
 
   $minimumDate = $_POST['minimumDate'] ?? '';
+  $default_use_interval = (new Preferences($db, (int) $_SESSION['user_id']))->get()['default_use_interval'];
+  $interval_cutoff = app_days_before(app_today(), (float) $default_use_interval);
+  [$cutoff_year, $cutoff_month, $cutoff_day] = explode('-', $interval_cutoff);
+  $interval_label = rtrim(rtrim(number_format((float) $default_use_interval, 2, '.', ''), '0'), '.');
   $showAttributes = $_POST['showAttributes'] ?? 'no';
   $hide_duplicate_group_settings = $_POST['hide_duplicate_group_settings'] ?? 'no';
   $hide_online_setting = $_POST['hide_online_setting'] ?? 'no';
@@ -52,7 +56,7 @@
         <?php require_once SHARED_PATH . '/artifact_type_checkboxes.php'; ?>
       </section>
 
-      <label for="minimumDate">Minimum Date (<?php echo DEFAULT_USE_INTERVAL; ?> days ago: <?php echo date('m/d/Y', strtotime(DEFAULT_USE_INTERVAL . ' days ago')); ?>)</label>
+      <label for="minimumDate">Minimum Date (<?php echo h($interval_label); ?> days ago: <?php echo h($cutoff_month . '/' . $cutoff_day . '/' . $cutoff_year); ?>)</label>
       <input type="date" name="minimumDate" id="minimumDate" value="<?php echo h((string) $minimumDate); ?>">
 
       <label for="showAttributes">Show item attributes</label>

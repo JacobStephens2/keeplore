@@ -1,5 +1,6 @@
 <?php
 
+require_once dirname(__DIR__) . '/app_day.php';
 require_once dirname(__DIR__) . '/item_facts.php';
 require_once dirname(__DIR__) . '/item_types.php';
 require_once dirname(__DIR__) . '/kept_status.php';
@@ -246,10 +247,10 @@ final class EventPlans
         ], $players);
     }
 
-    /** The year an event starting on $startsOn is counted in: that year, or this one undated. */
+    /** The year an event starting on $startsOn is counted in: that year, or the app day's year when undated. */
     private function year(?string $startsOn): int
     {
-        return (int) ($startsOn === null ? date('Y') : substr($startsOn, 0, 4));
+        return $startsOn === null ? app_year() : (int) substr($startsOn, 0, 4);
     }
 
     /**

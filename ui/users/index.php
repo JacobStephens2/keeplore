@@ -49,7 +49,7 @@ include(SHARED_PATH . '/header.php');
       <tbody id="users-list-body">
         <?php foreach ($people as $person) { ?>
           <?php
-            $user_age = $person['birth_year'] ? (date('Y') - $person['birth_year']) : '';
+            $user_age = $person['birth_year'] ? (app_year() - $person['birth_year']) : '';
           ?>
           <tr
             data-name="<?php echo h($person['name']); ?>"
