@@ -93,12 +93,6 @@ final class ItemsTest extends TestCase
         return array_map('intval', array_column($this->db->query($sql)->fetch_all(MYSQLI_NUM), 0));
     }
 
-    /** The Item form's posted fields, as Items create and update take them. */
-    private function posted(array $form): array
-    {
-        return item_form_input($form);
-    }
-
     /** The stored Item's use-by date, counted from the owner's current default. */
     private function useByDate(array $item): ?string
     {
@@ -192,7 +186,7 @@ final class ItemsTest extends TestCase
 
     public function test_a_blank_frequency_stays_unset_and_the_use_by_date_follows_the_current_default(): void
     {
-        $id = $this->items->create($this->posted([
+        $id = $this->items->create(item_form_input([
             'Title' => 'Quelf', 'Acq' => '2024-01-10', 'interaction_frequency_days' => '',
         ]));
         $item = $this->items->find($id);
@@ -212,7 +206,7 @@ final class ItemsTest extends TestCase
     {
         $this->runSql('UPDATE users SET default_use_interval = NULL WHERE id = 1');
 
-        $item = $this->items->find($this->items->create($this->posted([
+        $item = $this->items->find($this->items->create(item_form_input([
             'Title' => 'Quelf', 'Acq' => '2024-01-10', 'interaction_frequency_days' => '',
         ])));
 
@@ -222,7 +216,7 @@ final class ItemsTest extends TestCase
 
     public function test_a_typed_frequency_is_the_items_own_and_the_use_by_date_keeps_it(): void
     {
-        $id = $this->items->create($this->posted([
+        $id = $this->items->create(item_form_input([
             'Title' => 'Quelf', 'Acq' => '2024-01-10', 'interaction_frequency_days' => '14',
         ]));
         $item = $this->items->find($id);
@@ -230,7 +224,7 @@ final class ItemsTest extends TestCase
         $this->assertEquals(14, $item['interaction_frequency_days']);
         $this->assertSame('2024-01-24', $this->useByDate($item));
 
-        $this->items->update($id, $this->posted(['Title' => 'Quelf party']));
+        $this->items->update($id, item_form_input(['Title' => 'Quelf party']));
         (new \Preferences($this->db, 1))->save(['default_use_interval' => 30]);
         $kept = $this->items->find($id);
         $this->assertSame('Quelf party', $kept['Title']);
@@ -240,12 +234,12 @@ final class ItemsTest extends TestCase
 
     public function test_clearing_a_frequency_on_edit_follows_the_default_again(): void
     {
-        $this->items->update(10, $this->posted([
+        $this->items->update(10, item_form_input([
             'Acq' => '2024-01-10', 'interaction_frequency_days' => '14',
         ]));
         $this->assertSame('2024-01-24', $this->useByDate($this->items->find(10)));
 
-        $this->items->update(10, $this->posted(['interaction_frequency_days' => '']));
+        $this->items->update(10, item_form_input(['interaction_frequency_days' => '']));
 
         $item = $this->items->find(10);
         $this->assertNull($item['interaction_frequency_days']);
@@ -255,11 +249,11 @@ final class ItemsTest extends TestCase
 
     public function test_a_blank_sweet_spot_is_stored_as_none_and_is_not_best_at_1(): void
     {
-        $blank = $this->items->find($this->items->create($this->posted([
+        $blank = $this->items->find($this->items->create(item_form_input([
             'Title' => 'Quelf', 'SS' => '',
         ])));
-        $omitted = $this->items->find($this->items->create($this->posted(['Title' => 'Azul'])));
-        $typed = $this->items->find($this->items->create($this->posted([
+        $omitted = $this->items->find($this->items->create(item_form_input(['Title' => 'Azul'])));
+        $typed = $this->items->find($this->items->create(item_form_input([
             'Title' => 'Codenames', 'SS' => '03,04',
         ])));
 
@@ -272,10 +266,10 @@ final class ItemsTest extends TestCase
         $this->assertTrue(item_plays_best_at($typed, 3));
         $this->assertFalse(item_plays_best_at($typed, 1));
 
-        $this->items->update((int) $typed['id'], $this->posted(['Title' => 'Codenames']));
+        $this->items->update((int) $typed['id'], item_form_input(['Title' => 'Codenames']));
         $this->assertSame('03,04', $this->items->find((int) $typed['id'])['SS']);
 
-        $this->items->update(10, $this->posted(['SS' => '']));
+        $this->items->update(10, item_form_input(['SS' => '']));
         $cleared = $this->items->find(10);
         $this->assertSame('', $cleared['SS']);
         $this->assertSame([], item_sweet_spot_counts($cleared));
@@ -461,7 +455,7 @@ final class ItemsTest extends TestCase
 
     public function test_update_gives_blank_times_counts_age_and_acquisition_their_create_defaults(): void
     {
-        $this->items->update(10, $this->posted([
+        $this->items->update(10, item_form_input([
             'MnT' => '', 'MxT' => '', 'MnP' => '', 'MxP' => '', 'age' => '', 'Acq' => '', 'SS' => '',
         ]));
 
