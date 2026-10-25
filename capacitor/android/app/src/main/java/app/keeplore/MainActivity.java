@@ -7,16 +7,13 @@ import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 
 /**
- * Loads the tapped https://keeplore.app/... URL into the WebView when
- * the app is opened via an App Link (e.g. a link in the "interact by" email).
+ * Opens an App Link in the WebView on a cold start and on a warm resume.
  *
- * Capacitor points the WebView at the remote site (server.url) but does not
- * navigate it to the deep-linked path on its own — onNewIntent only notifies
- * plugins — so we do it here for both cold start and warm resume.
+ * Capacitor points the WebView at server.url and does not follow the tapped
+ * path itself, so this activity does. An App Link loads only when its scheme
+ * is https and its host is keeplore.app.
  */
 public class MainActivity extends BridgeActivity {
-
-    private static final String APP_HOST = "keeplore.app";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -38,11 +35,16 @@ public class MainActivity extends BridgeActivity {
             return;
         }
         Uri data = intent.getData();
-        if (data == null || !APP_HOST.equalsIgnoreCase(data.getHost())) {
+        if (data == null) {
             return;
         }
-        final String url = data.toString();
-        if (getBridge() == null || getBridge().getWebView() == null) {
+        final String url = AppLink.urlToLoad(
+                data.getScheme(),
+                data.getHost(),
+                data.getEncodedPath(),
+                data.getEncodedQuery(),
+                data.getEncodedFragment());
+        if (url == null || getBridge() == null || getBridge().getWebView() == null) {
             return;
         }
         getBridge().getWebView().post(() -> getBridge().getWebView().loadUrl(url));
