@@ -81,10 +81,6 @@ function logoutReachedServer(response) {
   return response.status >= 200 && response.status < 400;
 }
 
-function dropStoredPages() {
-  return caches.delete(CACHE_NAME).then(() => restorePublicShell());
-}
-
 self.addEventListener('install', event => {
   event.waitUntil(precachePublicAssets());
   self.skipWaiting();
@@ -102,14 +98,19 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
 
-  // A logout the server answered drops stored pages, then restores the public
-  // shell. A network failure is not a logout: leave the cache alone.
+  // A logout the server answered deletes this cache before the navigation
+  // continues. The public shell is filled again in the background. A network
+  // failure is not a logout: leave the cache alone.
   if (isLogoutRequest(request)) {
+    const outcome = fetch(request).then(response => {
+      if (!logoutReachedServer(response)) return { response, cleared: false };
+      return caches.delete(CACHE_NAME).then(() => ({ response, cleared: true }));
+    });
+    event.waitUntil(
+      outcome.then(({ cleared }) => (cleared ? restorePublicShell() : undefined)).catch(() => undefined)
+    );
     event.respondWith(
-      fetch(request).then(response => {
-        if (!logoutReachedServer(response)) return response;
-        return dropStoredPages().then(() => response);
-      }).catch(() => matchCacheable(OFFLINE_PAGE))
+      outcome.then(({ response }) => response).catch(() => matchCacheable(OFFLINE_PAGE))
     );
     return;
   }

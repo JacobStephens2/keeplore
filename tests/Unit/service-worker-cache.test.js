@@ -47,21 +47,6 @@ function loadWorker(fetchImpl) {
     delete(request) {
       return track(Promise.resolve().then(() => this.entries.delete(requestUrl(request))));
     }
-
-    // Browser addAll stores the fetched response, Cache-Control included.
-    addAll(requests) {
-      return track((async () => {
-        const fetched = [];
-        for (const request of requests) {
-          const response = await fetchImpl(request);
-          if (!response || !response.ok) throw new TypeError('Request failed');
-          fetched.push([request, response]);
-        }
-        for (const [request, response] of fetched) {
-          this.entries.set(requestUrl(request), response.clone());
-        }
-      })());
-    }
   }
 
   const caches = {
@@ -135,12 +120,14 @@ function loadWorker(fetchImpl) {
     async fetch(url, init = {}) {
       const request = { url, method: 'GET', mode: 'cors', ...init };
       let responsePromise;
+      const waits = [];
       await dispatch('fetch', {
         request,
         respondWith(promise) { responsePromise = promise; },
-        waitUntil() {},
+        waitUntil(promise) { waits.push(promise); },
       });
       const response = responsePromise ? await responsePromise : undefined;
+      await Promise.all(waits.map((promise) => Promise.resolve(promise).then(() => {}, () => {})));
       await idle();
       return response;
     },
