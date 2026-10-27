@@ -30,6 +30,9 @@ function isLogoutRequest(request) {
   } catch {
     return false;
   }
+  // Item links and outbound navigations use other origins. Only this
+  // origin's logout may delete the cache.
+  if (url.origin !== self.location.origin) return false;
   const path = url.pathname.replace(/\/+$/, '').toLowerCase();
   if (path === '/logout' || path === '/logout.php') return true;
   if (path === '/login' || path === '/login.php') {

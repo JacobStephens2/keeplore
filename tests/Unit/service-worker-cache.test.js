@@ -75,6 +75,7 @@ function loadWorker(fetchImpl) {
 
   const context = vm.createContext({
     self: {
+      location: { origin: ORIGIN },
       addEventListener(type, fn) {
         if (!listeners[type]) listeners[type] = [];
         listeners[type].push(fn);
@@ -318,6 +319,44 @@ test('a failed logout leaves the service worker cache in place', async () => {
   const response = await worker.fetch(ORIGIN + '/logout', { mode: 'navigate' });
   assert.equal(await body(response), 'offline-shell');
   assert.equal(await body(await worker.caches.match(PRIVATE_PAGE)), 'secret');
+});
+
+test('a cross-origin logout path does not delete the service worker cache', async () => {
+  for (const logoutUrl of [
+    'https://attacker.test/logout',
+    'https://attacker.test/logout.php',
+    'https://attacker.test/login.php?action=logout',
+  ]) {
+    const worker = loadWorker((request) => {
+      const url = requestUrl(request);
+      if (url === PRIVATE_PAGE) {
+        return new Response('secret', { status: 200, headers: { 'Cache-Control': 'max-age=60' } });
+      }
+      if (url === logoutUrl) return new Response('elsewhere', { status: 200 });
+      return shellResponse(url);
+    });
+
+    await worker.fetch(PRIVATE_PAGE);
+    const response = await worker.fetch(logoutUrl, { mode: 'navigate' });
+    assert.equal(await body(response), 'elsewhere', logoutUrl);
+    assert.equal(await body(await worker.caches.match(PRIVATE_PAGE)), 'secret', logoutUrl);
+  }
+});
+
+test('a failed cross-origin logout path is not the offline page', async () => {
+  const logoutUrl = 'https://attacker.test/logout';
+  const worker = loadWorker((request) => {
+    const url = requestUrl(request);
+    if (url === logoutUrl) return Promise.reject(new Error('offline'));
+    if (url === ORIGIN + '/offline.html') return new Response('offline-shell', { status: 200 });
+    return new Response('public', { status: 200 });
+  });
+
+  const cache = await worker.caches.open(cacheName);
+  await cache.put(ORIGIN + '/offline.html', new Response('offline-shell', { status: 200 }));
+
+  const response = await worker.fetch(logoutUrl, { mode: 'cors' });
+  assert.equal(await body(response), null);
 });
 
 test('opening the login page does not delete the service worker cache', async () => {
