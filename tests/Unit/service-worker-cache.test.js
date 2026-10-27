@@ -237,46 +237,100 @@ test('a cacheable asset is still served from the service worker cache when the n
   assert.equal(await body(second), 'body{color:black}');
 });
 
-test('logout deletes the current service worker cache', async () => {
-  const asset = ORIGIN + '/style.css';
+const PRIVATE_PAGE = ORIGIN + '/artifacts/secret.php';
+
+function shellResponse(url) {
+  if (url.endsWith('/offline.html')) {
+    return new Response('offline-shell', { status: 200 });
+  }
+  return new Response('public', {
+    status: 200,
+    headers: { 'Cache-Control': 'max-age=3600' },
+  });
+}
+
+test('logout drops stored pages and keeps the offline page', async () => {
   const worker = loadWorker((request) => {
-    if (requestUrl(request) === asset) {
-      return new Response('body{color:black}', {
+    const url = requestUrl(request);
+    if (url === PRIVATE_PAGE) {
+      return new Response('secret', {
         status: 200,
-        headers: { 'Cache-Control': 'max-age=3600' },
+        headers: { 'Cache-Control': 'max-age=60' },
       });
     }
-    return new Response('', { status: 302, headers: { Location: '/login.php' } });
+    if (url === ORIGIN + '/logout') {
+      return new Response('', { status: 302, headers: { Location: '/login.php' } });
+    }
+    return shellResponse(url);
   });
 
-  await worker.fetch(asset);
-  assert.deepEqual(await worker.caches.keys(), [cacheName]);
+  await worker.fetch(PRIVATE_PAGE);
+  assert.equal(await body(await worker.caches.match(PRIVATE_PAGE)), 'secret');
 
   const response = await worker.fetch(ORIGIN + '/logout', { mode: 'navigate' });
   assert.equal(response.status, 302);
-  assert.deepEqual(await worker.caches.keys(), []);
-  assert.equal(await worker.caches.match(asset), undefined);
+  assert.equal(await worker.caches.match(PRIVATE_PAGE), undefined);
+  assert.equal(await body(await worker.caches.match(ORIGIN + '/offline.html')), 'offline-shell');
 });
 
-test('logout.php and guest exit delete the current service worker cache', async () => {
+test('an opaque logout redirect drops stored pages and keeps the offline page', async () => {
+  const worker = loadWorker((request) => {
+    const url = requestUrl(request);
+    if (url === PRIVATE_PAGE) {
+      return new Response('secret', { status: 200, headers: { 'Cache-Control': 'max-age=60' } });
+    }
+    if (url === ORIGIN + '/logout.php') {
+      return { status: 0, type: 'opaqueredirect' };
+    }
+    return shellResponse(url);
+  });
+
+  await worker.fetch(PRIVATE_PAGE);
+  const response = await worker.fetch(ORIGIN + '/logout.php', { mode: 'navigate' });
+  assert.equal(response.type, 'opaqueredirect');
+  assert.equal(await worker.caches.match(PRIVATE_PAGE), undefined);
+  assert.equal(await body(await worker.caches.match(ORIGIN + '/offline.html')), 'offline-shell');
+});
+
+test('logout.php and guest exit drop stored pages', async () => {
   for (const logoutUrl of [
     ORIGIN + '/logout.php',
     ORIGIN + '/login.php?action=logout',
     ORIGIN + '/login?action=logout',
   ]) {
-    const asset = ORIGIN + '/shared/js/theme.js';
     const worker = loadWorker((request) => {
-      if (requestUrl(request) === asset) {
-        return new Response('theme', { status: 200, headers: { 'Cache-Control': 'max-age=60' } });
+      const url = requestUrl(request);
+      if (url === PRIVATE_PAGE) {
+        return new Response('secret', { status: 200, headers: { 'Cache-Control': 'max-age=60' } });
       }
-      return new Response('login-form', { status: 200 });
+      if (url === logoutUrl) return new Response('login-form', { status: 200 });
+      return shellResponse(url);
     });
 
-    await worker.fetch(asset);
+    await worker.fetch(PRIVATE_PAGE);
     const response = await worker.fetch(logoutUrl, { mode: 'navigate' });
     assert.equal(await body(response), 'login-form', logoutUrl);
-    assert.deepEqual(await worker.caches.keys(), [], logoutUrl);
+    assert.equal(await worker.caches.match(PRIVATE_PAGE), undefined, logoutUrl);
   }
+});
+
+test('a failed logout leaves the service worker cache in place', async () => {
+  const worker = loadWorker((request) => {
+    const url = requestUrl(request);
+    if (url === PRIVATE_PAGE) {
+      return new Response('secret', { status: 200, headers: { 'Cache-Control': 'max-age=60' } });
+    }
+    if (url === ORIGIN + '/offline.html') return new Response('offline-shell', { status: 200 });
+    return Promise.reject(new Error('offline'));
+  });
+
+  await worker.fetch(PRIVATE_PAGE);
+  const cache = await worker.caches.open(cacheName);
+  await cache.put(ORIGIN + '/offline.html', new Response('offline-shell', { status: 200 }));
+
+  const response = await worker.fetch(ORIGIN + '/logout', { mode: 'navigate' });
+  assert.equal(await body(response), 'offline-shell');
+  assert.equal(await body(await worker.caches.match(PRIVATE_PAGE)), 'secret');
 });
 
 test('opening the login page does not delete the service worker cache', async () => {

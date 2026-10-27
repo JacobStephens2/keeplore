@@ -15,6 +15,7 @@ const STATIC_ASSETS = [
 ];
 
 const OFFLINE_PAGE = '/offline.html';
+const PUBLIC_SHELL = [...STATIC_ASSETS, OFFLINE_PAGE];
 
 function isNoStore(response) {
   if (!response || !response.headers) return false;
@@ -51,18 +52,41 @@ function storeIfCacheable(request, response) {
   return caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
 }
 
-self.addEventListener('install', event => {
-  const urls = [...STATIC_ASSETS, OFFLINE_PAGE];
-  event.waitUntil(
-    Promise.all(urls.map(url =>
-      fetch(url).then(response => {
-        if (!response.ok) throw new TypeError('Request failed');
-        return { url, response };
-      })
-    )).then(fetched =>
-      Promise.all(fetched.map(({ url, response }) => storeIfCacheable(url, response)))
-    )
+// Install stores nothing unless every public asset loaded. A no-store asset is skipped.
+function precachePublicAssets() {
+  return Promise.all(PUBLIC_SHELL.map(url =>
+    fetch(url).then(response => {
+      if (!response || !response.ok) throw new TypeError('Request failed');
+      return { url, response };
+    })
+  )).then(fetched =>
+    Promise.all(fetched.map(({ url, response }) => storeIfCacheable(url, response)))
   );
+}
+
+// After logout, one asset failing to load should not drop the rest of the shell.
+function restorePublicShell() {
+  return Promise.all(PUBLIC_SHELL.map(url =>
+    fetch(url).then(response => {
+      if (!response || !response.ok) return undefined;
+      return storeIfCacheable(url, response);
+    }).catch(() => undefined)
+  ));
+}
+
+// A navigation to logout.php is an opaque redirect (status 0). Guest exit is 200.
+function logoutReachedServer(response) {
+  if (!response) return false;
+  if (response.type === 'opaqueredirect') return true;
+  return response.status >= 200 && response.status < 400;
+}
+
+function dropStoredPages() {
+  return caches.delete(CACHE_NAME).then(() => restorePublicShell());
+}
+
+self.addEventListener('install', event => {
+  event.waitUntil(precachePublicAssets());
   self.skipWaiting();
 });
 
@@ -78,17 +102,14 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
 
-  // Logout clears the cache this worker is using, including anything stored
-  // before no-store was refused. The navigation response itself is not cached.
+  // A logout the server answered drops stored pages, then restores the public
+  // shell. A network failure is not a logout: leave the cache alone.
   if (isLogoutRequest(request)) {
     event.respondWith(
-      fetch(request).then(response =>
-        caches.delete(CACHE_NAME).then(() => response)
-      ).catch(() =>
-        matchCacheable(OFFLINE_PAGE).then(offline =>
-          caches.delete(CACHE_NAME).then(() => offline)
-        )
-      )
+      fetch(request).then(response => {
+        if (!logoutReachedServer(response)) return response;
+        return dropStoredPages().then(() => response);
+      }).catch(() => matchCacheable(OFFLINE_PAGE))
     );
     return;
   }
