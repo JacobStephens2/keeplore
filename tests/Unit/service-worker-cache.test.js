@@ -204,6 +204,62 @@ test('install does not precache a no-store asset', async () => {
   assert.equal(await body(manifest), 'public');
 });
 
+test('a cross-origin response is not stored or later served from the service worker cache', async () => {
+  const url = 'https://api.staging.keeplore.app/artifacts.php';
+  let calls = 0;
+  const worker = loadWorker(() => {
+    calls += 1;
+    if (calls === 1) {
+      return new Response('{"items":["secret"]}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response('{"authenticated":false}', {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  const first = await worker.fetch(url);
+  assert.equal(await body(first), '{"items":["secret"]}');
+  assert.equal(await worker.caches.match(url), undefined);
+
+  const second = await worker.fetch(url);
+  assert.equal(second.status, 401);
+  assert.equal(await body(second), '{"authenticated":false}');
+});
+
+test('a same-origin request does not store or later serve a response from another host', async () => {
+  const url = ORIGIN + '/style.css';
+  let calls = 0;
+  const worker = loadWorker(() => {
+    calls += 1;
+    if (calls === 1) {
+      const response = new Response('{"items":["secret"]}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+      Object.defineProperty(response, 'url', {
+        value: 'https://api.staging.keeplore.app/artifacts.php',
+      });
+      return response;
+    }
+    return new Response('{"authenticated":false}', {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  const first = await worker.fetch(url);
+  assert.equal(await body(first), '{"items":["secret"]}');
+  assert.equal(await worker.caches.match(url), undefined);
+
+  const second = await worker.fetch(url);
+  assert.equal(second.status, 401);
+  assert.equal(await body(second), '{"authenticated":false}');
+});
+
 test('a cacheable asset is still served from the service worker cache when the network fails', async () => {
   const url = ORIGIN + '/style.css';
   let calls = 0;
