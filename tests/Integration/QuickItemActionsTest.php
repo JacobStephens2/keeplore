@@ -72,16 +72,18 @@ final class QuickItemActionsTest extends TestCase
             'days' => null,
             'return_to' => null,
             'is_ajax' => false,
+            'method' => 'GET',
+            'may_change' => false,
         ];
     }
 
     /** The change, as a POST whose CSRF token already matches the session. */
     private function answer(string $action, array $fields, int $ownerId = 1): array
     {
-        $_SERVER['REQUEST_METHOD'] = 'POST';
-        $_SESSION['csrf_token'] = 'tok';
-        $_POST['csrf_token'] = 'tok';
-        return answer_quick_item_action($this->db, $ownerId, $action, $this->request($fields));
+        return answer_quick_item_action($this->db, $ownerId, $action, $this->request($fields + [
+            'method' => 'POST',
+            'may_change' => true,
+        ]));
     }
 
     private function column(int $id, string $column): mixed
@@ -264,12 +266,28 @@ final class QuickItemActionsTest extends TestCase
         $this->answer('delete', ['artifact_id' => 10]);
     }
 
+    public function test_a_bad_csrf_post_is_the_same_result_on_both_seams(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_SESSION['csrf_token'] = 'tok';
+        $_POST = ['csrf_token' => 'other', 'artifact_id' => '10'];
+        $_REQUEST = $_POST;
+
+        $request = quick_item_action_request_from_globals();
+        $answer = answer_quick_item_action($this->db, 1, 'snooze', $request);
+        $response = quick_item_action_response($this->db, 1, 'snooze', $request);
+
+        $this->assertSame(['answer' => $answer], $response);
+    }
+
     public function test_answering_a_get_does_not_change_the_item(): void
     {
         $_SERVER['REQUEST_METHOD'] = 'GET';
+        $_GET = ['artifact_id' => '10', 'days' => '3'];
         $_POST = [];
+        $_REQUEST = $_GET;
 
-        $answer = answer_quick_item_action($this->db, 1, 'snooze', $this->request(['artifact_id' => 10, 'days' => 3]));
+        $answer = answer_quick_item_action($this->db, 1, 'snooze', quick_item_action_request_from_globals());
 
         $this->assertNull($this->column(10, 'snoozed_until'));
         $this->assertSame(405, $answer['status']);
@@ -283,9 +301,10 @@ final class QuickItemActionsTest extends TestCase
     {
         $_SERVER['REQUEST_METHOD'] = 'POST';
         $_SESSION['csrf_token'] = 'tok';
-        $_POST['csrf_token'] = 'other';
+        $_POST = ['csrf_token' => 'other', 'artifact_id' => '10'];
+        $_REQUEST = $_POST;
 
-        $answer = answer_quick_item_action($this->db, 1, 'get-rid-of', $this->request(['artifact_id' => 10]));
+        $answer = answer_quick_item_action($this->db, 1, 'get-rid-of', quick_item_action_request_from_globals());
 
         $this->assertSame(0, (int) $this->column(10, 'to_get_rid_of'));
         $this->assertSame(403, $answer['status']);
@@ -381,8 +400,9 @@ final class QuickItemActionsTest extends TestCase
         $response = $this->respond('snooze', 'POST', ['artifact_id' => '10', 'days' => '3'], 'other');
 
         $this->assertNull($this->column(10, 'snoozed_until'));
-        $this->assertArrayHasKey('page', $response);
-        $this->assertArrayNotHasKey('answer', $response);
+        $this->assertSame(403, $response['answer']['status']);
+        $this->assertSame(['ok' => false, 'message' => 'Invalid CSRF token.'], $response['answer']['body']);
+        $this->assertArrayNotHasKey('page', $response);
     }
 
     public function test_a_csrf_token_in_the_query_string_does_not_let_a_post_snooze_the_item(): void
@@ -396,7 +416,8 @@ final class QuickItemActionsTest extends TestCase
         $response = quick_item_action_response($this->db, 1, 'snooze', quick_item_action_request_from_globals());
 
         $this->assertNull($this->column(10, 'snoozed_until'));
-        $this->assertArrayHasKey('page', $response);
+        $this->assertSame(403, $response['answer']['status']);
+        $this->assertArrayNotHasKey('page', $response);
     }
 
     public function test_a_post_with_the_sessions_csrf_token_snoozes_the_item(): void
