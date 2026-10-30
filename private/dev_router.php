@@ -9,16 +9,11 @@
  * - string: PHP script to require
  * - null: 404
  *
- * An extensionless script or a directory index is returned only when its
- * real path stays inside the docroot. A candidate that resolves outside
- * returns null. The root index path is unchanged.
+ * An extensionless script or a directory index, including the docroot
+ * index for "/", is returned only when that file's real path stays inside
+ * the docroot. A candidate that resolves outside returns null.
  */
 function keeplore_ui_router_script($uri, $docroot) {
-  $path = parse_url((string) $uri, PHP_URL_PATH);
-  if (!is_string($path) || $path === '' || $path === '/') {
-    return rtrim($docroot, '/') . '/index.php';
-  }
-
   $docroot = rtrim($docroot, '/');
   $scriptInsideDocroot = function ($candidate) use ($docroot) {
     $realCandidate = realpath($candidate);
@@ -28,6 +23,15 @@ function keeplore_ui_router_script($uri, $docroot) {
     }
     return str_starts_with($realCandidate, $realDocroot . '/');
   };
+
+  $path = parse_url((string) $uri, PHP_URL_PATH);
+  if (!is_string($path) || $path === '' || $path === '/') {
+    $index = $docroot . '/index.php';
+    if (is_file($index) && !$scriptInsideDocroot($index)) {
+      return null;
+    }
+    return $index;
+  }
 
   $direct = $docroot . $path;
   if (is_file($direct)) {

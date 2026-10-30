@@ -38,6 +38,17 @@ class DevRouterTest extends TestCase
         );
     }
 
+    public function test_root_index_outside_the_docroot_is_not_found(): void
+    {
+        [$outside, $target, $link] = $this->linkScriptOutsideDocroot($this->docroot . '/index.php');
+        try {
+            $this->assertRealScriptIsOutsideDocroot($link);
+            $this->assertNull(keeplore_ui_router_script('/', $this->docroot));
+        } finally {
+            $this->removeOutsideScript($outside, $target, $link);
+        }
+    }
+
     public function test_extensionless_path_maps_to_php(): void
     {
         $this->assertSame(
@@ -92,49 +103,56 @@ class DevRouterTest extends TestCase
 
     public function test_extensionless_script_outside_the_docroot_is_not_found(): void
     {
-        $outside = sys_get_temp_dir() . '/keeplore_router_outside_' . bin2hex(random_bytes(4));
-        mkdir($outside);
-        $target = $outside . '/secret.php';
-        $link = $this->docroot . '/secret.php';
-        file_put_contents($target, '<?php echo "secret";');
-        symlink($target, $link);
+        [$outside, $target, $link] = $this->linkScriptOutsideDocroot($this->docroot . '/secret.php');
         try {
-            $realDocroot = realpath($this->docroot);
-            $realScript = realpath($link);
-            $this->assertNotFalse($realDocroot);
-            $this->assertNotFalse($realScript);
-            $this->assertFalse(str_starts_with($realScript, $realDocroot . '/'));
+            $this->assertRealScriptIsOutsideDocroot($link);
             $this->assertNull(keeplore_ui_router_script('/secret', $this->docroot));
         } finally {
-            unlink($link);
-            unlink($target);
-            rmdir($outside);
+            $this->removeOutsideScript($outside, $target, $link);
         }
     }
 
     public function test_directory_index_outside_the_docroot_is_not_found(): void
     {
-        $outside = sys_get_temp_dir() . '/keeplore_router_outside_' . bin2hex(random_bytes(4));
-        mkdir($outside);
-        $target = $outside . '/index.php';
         $dir = $this->docroot . '/pocket';
-        $link = $dir . '/index.php';
         mkdir($dir);
-        file_put_contents($target, '<?php echo "secret";');
-        symlink($target, $link);
+        [$outside, $target, $link] = $this->linkScriptOutsideDocroot($dir . '/index.php');
         try {
-            $realDocroot = realpath($this->docroot);
-            $realScript = realpath($link);
-            $this->assertNotFalse($realDocroot);
-            $this->assertNotFalse($realScript);
-            $this->assertFalse(str_starts_with($realScript, $realDocroot . '/'));
+            $this->assertRealScriptIsOutsideDocroot($link);
             $this->assertNull(keeplore_ui_router_script('/pocket/', $this->docroot));
             $this->assertNull(keeplore_ui_router_script('/pocket', $this->docroot));
         } finally {
-            unlink($link);
-            unlink($target);
+            $this->removeOutsideScript($outside, $target, $link);
             rmdir($dir);
-            rmdir($outside);
         }
+    }
+
+    private function linkScriptOutsideDocroot(string $link): array
+    {
+        $outside = sys_get_temp_dir() . '/keeplore_router_outside_' . bin2hex(random_bytes(4));
+        mkdir($outside);
+        $target = $outside . '/' . basename($link);
+        file_put_contents($target, '<?php echo "secret";');
+        if (is_file($link)) {
+            unlink($link);
+        }
+        symlink($target, $link);
+        return [$outside, $target, $link];
+    }
+
+    private function assertRealScriptIsOutsideDocroot(string $link): void
+    {
+        $realDocroot = realpath($this->docroot);
+        $realScript = realpath($link);
+        $this->assertNotFalse($realDocroot);
+        $this->assertNotFalse($realScript);
+        $this->assertFalse(str_starts_with($realScript, $realDocroot . '/'));
+    }
+
+    private function removeOutsideScript(string $outside, string $target, string $link): void
+    {
+        @unlink($link);
+        @unlink($target);
+        @rmdir($outside);
     }
 }
