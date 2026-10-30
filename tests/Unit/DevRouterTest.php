@@ -89,4 +89,52 @@ class DevRouterTest extends TestCase
     {
         $this->assertNull(keeplore_ui_router_script('/does-not-exist', $this->docroot));
     }
+
+    public function test_extensionless_script_outside_the_docroot_is_not_found(): void
+    {
+        $outside = sys_get_temp_dir() . '/keeplore_router_outside_' . bin2hex(random_bytes(4));
+        mkdir($outside);
+        $target = $outside . '/secret.php';
+        $link = $this->docroot . '/secret.php';
+        file_put_contents($target, '<?php echo "secret";');
+        symlink($target, $link);
+        try {
+            $realDocroot = realpath($this->docroot);
+            $realScript = realpath($link);
+            $this->assertNotFalse($realDocroot);
+            $this->assertNotFalse($realScript);
+            $this->assertFalse(str_starts_with($realScript, $realDocroot . '/'));
+            $this->assertNull(keeplore_ui_router_script('/secret', $this->docroot));
+        } finally {
+            unlink($link);
+            unlink($target);
+            rmdir($outside);
+        }
+    }
+
+    public function test_directory_index_outside_the_docroot_is_not_found(): void
+    {
+        $outside = sys_get_temp_dir() . '/keeplore_router_outside_' . bin2hex(random_bytes(4));
+        mkdir($outside);
+        $target = $outside . '/index.php';
+        $dir = $this->docroot . '/pocket';
+        $link = $dir . '/index.php';
+        mkdir($dir);
+        file_put_contents($target, '<?php echo "secret";');
+        symlink($target, $link);
+        try {
+            $realDocroot = realpath($this->docroot);
+            $realScript = realpath($link);
+            $this->assertNotFalse($realDocroot);
+            $this->assertNotFalse($realScript);
+            $this->assertFalse(str_starts_with($realScript, $realDocroot . '/'));
+            $this->assertNull(keeplore_ui_router_script('/pocket/', $this->docroot));
+            $this->assertNull(keeplore_ui_router_script('/pocket', $this->docroot));
+        } finally {
+            unlink($link);
+            unlink($target);
+            rmdir($dir);
+            rmdir($outside);
+        }
+    }
 }
