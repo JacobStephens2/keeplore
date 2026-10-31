@@ -9,13 +9,14 @@
  * - string: PHP script to require
  * - null: 404
  *
- * An extensionless script or a directory index, including the docroot
- * index for "/", is returned only when that file's real path stays inside
- * the docroot. A candidate that resolves outside returns null.
+ * An existing file is left to the server, and a script path is returned for
+ * an extensionless script or a directory index (including the docroot index
+ * for "/"), only when that file's real path stays inside the docroot. A
+ * candidate that resolves outside returns null.
  */
 function keeplore_ui_router_script($uri, $docroot) {
   $docroot = rtrim($docroot, '/');
-  $scriptInsideDocroot = function ($candidate) use ($docroot) {
+  $realPathInsideDocroot = function ($candidate) use ($docroot) {
     $realCandidate = realpath($candidate);
     $realDocroot = realpath($docroot);
     if (!is_string($realCandidate) || !is_string($realDocroot)) {
@@ -27,7 +28,7 @@ function keeplore_ui_router_script($uri, $docroot) {
   $path = parse_url((string) $uri, PHP_URL_PATH);
   if (!is_string($path) || $path === '' || $path === '/') {
     $index = $docroot . '/index.php';
-    if (is_file($index) && !$scriptInsideDocroot($index)) {
+    if (is_file($index) && !$realPathInsideDocroot($index)) {
       return null;
     }
     return $index;
@@ -35,19 +36,19 @@ function keeplore_ui_router_script($uri, $docroot) {
 
   $direct = $docroot . $path;
   if (is_file($direct)) {
-    return false;
+    return $realPathInsideDocroot($direct) ? false : null;
   }
   if (is_dir($direct)) {
     $index = rtrim($direct, '/') . '/index.php';
     if (is_file($index)) {
-      return $scriptInsideDocroot($index) ? $index : null;
+      return $realPathInsideDocroot($index) ? $index : null;
     }
   }
 
   if (!str_contains(basename($path), '.')) {
     $php = $direct . '.php';
     if (is_file($php)) {
-      return $scriptInsideDocroot($php) ? $php : null;
+      return $realPathInsideDocroot($php) ? $php : null;
     }
   }
 

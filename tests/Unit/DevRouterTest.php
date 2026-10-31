@@ -80,6 +80,47 @@ class DevRouterTest extends TestCase
         $this->assertFalse(keeplore_ui_router_script('/api-docs.php', $this->docroot));
     }
 
+    public function test_existing_file_outside_the_docroot_is_not_found(): void
+    {
+        [$outside, $target, $link] = $this->linkScriptOutsideDocroot($this->docroot . '/style.css');
+        try {
+            $this->assertRealScriptIsOutsideDocroot($link);
+            $this->assertNull(keeplore_ui_router_script('/style.css', $this->docroot));
+        } finally {
+            $this->removeOutsideScript($outside, $target, $link);
+        }
+    }
+
+    public function test_existing_file_reached_through_dotdot_outside_the_docroot_is_not_found(): void
+    {
+        $outside = dirname($this->docroot) . '/keeplore_router_sibling_' . bin2hex(random_bytes(4));
+        mkdir($outside);
+        $target = $outside . '/secret.txt';
+        file_put_contents($target, 'secret');
+        $escaped = $this->docroot . '/../' . basename($outside) . '/secret.txt';
+        try {
+            $this->assertRealScriptIsOutsideDocroot($escaped);
+            $this->assertNull(
+                keeplore_ui_router_script('/../' . basename($outside) . '/secret.txt', $this->docroot)
+            );
+        } finally {
+            @unlink($target);
+            @rmdir($outside);
+        }
+    }
+
+    public function test_existing_file_whose_real_path_stays_inside_still_resolves(): void
+    {
+        $alias = $this->docroot . '/alias.css';
+        symlink($this->docroot . '/style.css', $alias);
+        try {
+            $this->assertFalse(keeplore_ui_router_script('/alias.css', $this->docroot));
+            $this->assertFalse(keeplore_ui_router_script('/assets/../style.css', $this->docroot));
+        } finally {
+            @unlink($alias);
+        }
+    }
+
     public function test_directory_path_serves_index_php(): void
     {
         mkdir($this->docroot . '/artifacts', 0777, true);
