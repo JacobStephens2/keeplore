@@ -37,7 +37,7 @@ final class ApiCallerTest extends TestCase
         $this->databaseName = 'keeplore_test_' . bin2hex(random_bytes(6));
         $this->db->query('CREATE DATABASE ' . $this->databaseName);
         $this->db->select_db($this->databaseName);
-        $this->db->query('CREATE TABLE users (id INT PRIMARY KEY)');
+        $this->db->query('CREATE TABLE users (id INT PRIMARY KEY, password_changed_at INT UNSIGNED NULL)');
         $this->db->query('INSERT INTO users (id) VALUES (1), (2)');
         $this->db->query('CREATE TABLE games (id INT PRIMARY KEY, user_id INT NOT NULL)');
         $this->db->query('INSERT INTO games (id, user_id) VALUES (10, 1), (20, 2)');
@@ -76,6 +76,31 @@ final class ApiCallerTest extends TestCase
     private function fromCredentials(?string $accessToken, ?string $authorization): ?ApiCaller
     {
         return ApiCaller::fromCredentials($this->db, $accessToken, $authorization);
+    }
+
+    public function test_an_access_token_issued_before_the_password_changed_authenticates_no_one(): void
+    {
+        $changedAt = time() - 10;
+        $this->db->query('UPDATE users SET password_changed_at = ' . $changedAt . ' WHERE id = 1');
+        $before = JWT::encode([
+            'iat' => $changedAt - 1,
+            'nbf' => $changedAt - 1,
+            'exp' => time() + 3600,
+            'user_id' => 1,
+        ], JWT_SECRET, 'HS256');
+        $atTheChange = JWT::encode([
+            'iat' => $changedAt,
+            'nbf' => $changedAt,
+            'exp' => time() + 3600,
+            'user_id' => 1,
+        ], JWT_SECRET, 'HS256');
+        $withoutIssuedAt = JWT::encode(['exp' => time() + 3600, 'user_id' => 1], JWT_SECRET, 'HS256');
+
+        $this->assertNull($this->fromCredentials($before, $this->agentKeyHeader(1)));
+        $this->assertNull($this->fromCredentials($before, ARTIFACTS_API_KEY));
+        $this->assertNull($this->fromCredentials($withoutIssuedAt, null));
+        $this->assertSame(1, $this->fromCredentials($atTheChange, null)->owner());
+        $this->assertSame(2, $this->fromCredentials($this->sessionToken(2), null)->owner(1));
     }
 
     public function test_a_valid_session_token_acts_for_its_user(): void

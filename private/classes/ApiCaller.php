@@ -4,6 +4,7 @@ use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
 require_once __DIR__ . '/AgentKeys.php';
+require_once __DIR__ . '/Accounts.php';
 
 /**
  * Who an HTTP API request is, from the credentials it carries, and whose
@@ -33,9 +34,10 @@ final class ApiCaller
      * The caller a request's credentials name, or null when they don't
      * authenticate. $accessToken is the session cookie's access token and
      * $authorization the Authorization header, each null when absent. An
-     * access token means a session or nothing; otherwise a Bearer header
-     * means an agent key or nothing; otherwise the header must be the master
-     * key.
+     * access token means a session or nothing. A token issued before the
+     * account's password last changed authenticates no one, and does not
+     * fall through to another credential. Otherwise a Bearer header means an
+     * agent key or nothing; otherwise the header must be the master key.
      */
     public static function fromCredentials(mysqli $db, ?string $accessToken, ?string $authorization): ?self
     {
@@ -45,7 +47,14 @@ final class ApiCaller
             } catch (Exception $e) {
                 return null;
             }
-            return isset($session->user_id) ? self::session($db, (int) $session->user_id) : null;
+            if (!isset($session->user_id)) {
+                return null;
+            }
+            $issuedAt = isset($session->iat) ? (int) $session->iat : 0;
+            if (!Accounts::issuedAtAuthenticates($db, (int) $session->user_id, $issuedAt)) {
+                return null;
+            }
+            return self::session($db, (int) $session->user_id);
         }
         if ($authorization !== null && strncasecmp($authorization, 'Bearer ', 7) === 0) {
             $token = trim(substr($authorization, 7));

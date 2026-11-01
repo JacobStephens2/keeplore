@@ -26,7 +26,7 @@ The number of an item's uses in a period, or in all recorded history: the owner'
 The date of an item's most recent use, or none if it has never been used. The use-by date, the Items page, To get rid of, Candidates, Analysis and the agent collection list all read it from one rule.
 
 **Account**:
-The Keeplore account someone registers and logs in to, holding their name, email, username and password; it owns the people list, items and Preferences. A password reset needs the key emailed to the account's address, which lasts one day and is used up by the reset.
+The Keeplore account someone registers and logs in to, holding their name, email, username and password; it owns the people list, items and Preferences. A password reset needs the key emailed to the account's address, which lasts one day and is used up by the reset. A successful reset records when the password changed. A session or access token issued before that time no longer authenticates the account, including the browser that completed the reset. A login after the reset still signs the account in.
 _Avoid_: User (except in the table's name).
 
 **Agent key**:

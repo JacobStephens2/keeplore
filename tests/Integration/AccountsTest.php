@@ -135,6 +135,34 @@ final class AccountsTest extends TestCase
         $this->assertTrue($this->passwordIs(2, self::OLD_PASSWORD));
     }
 
+    public function test_a_successful_reset_rejects_a_credential_issued_before_the_password_changed(): void
+    {
+        $changedAt = strtotime(self::NOW);
+        $issuedBefore = $changedAt - 1;
+        $this->assertTrue(Accounts::issuedAtAuthenticates($this->db, 1, $issuedBefore));
+
+        [$email, $key] = $this->requestLink('owner@keeplore.app');
+        $this->accounts()->resetPassword($email, $key, self::NEW_PASSWORD, self::NEW_PASSWORD);
+
+        $this->assertFalse(Accounts::issuedAtAuthenticates($this->db, 1, $issuedBefore));
+        $this->assertTrue(Accounts::issuedAtAuthenticates($this->db, 1, $changedAt));
+        $this->assertTrue(Accounts::issuedAtAuthenticates($this->db, 1, $changedAt + 1));
+        $this->assertTrue(Accounts::issuedAtAuthenticates($this->db, 2, $issuedBefore));
+        $this->assertTrue($this->passwordIs(1, self::NEW_PASSWORD));
+    }
+
+    public function test_a_refused_reset_does_not_reject_a_credential_issued_before_it(): void
+    {
+        [$email, $key] = $this->requestLink('owner@keeplore.app');
+
+        $this->invalid(fn () => $this->accounts()->resetPassword($email, $key, 'short', 'short'));
+        $this->invalid(fn () => $this->accounts()->resetPassword($email, 'made-up', self::NEW_PASSWORD, self::NEW_PASSWORD));
+
+        $this->assertTrue(Accounts::issuedAtAuthenticates($this->db, 1, strtotime(self::NOW) - 1));
+        $this->assertTrue($this->passwordIs(1, self::OLD_PASSWORD));
+        $this->assertTrue($this->accounts()->resetLinkIsValid($email, $key));
+    }
+
     public function test_a_reset_without_a_key_or_with_a_made_up_one_is_refused(): void
     {
         foreach (['', str_repeat('a', 64)] as $key) {
