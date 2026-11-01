@@ -36,7 +36,7 @@ final class AccountInvalid extends InvalidArgumentException
  * one day, and a successful reset uses up every key for that address, as
  * does changing the account's email. A successful reset records when the
  * password changed, in the same update as the new password. A session or
- * access token issued before that time no longer authenticates the account.
+ * access token authenticates only when it was issued after that time.
  */
 final class Accounts
 {
@@ -203,11 +203,14 @@ final class Accounts
 
     /**
      * Whether a session or access token issued at $issuedAt still
-     * authenticates the account. Issued before the password last changed, it
-     * does not. No recorded change, including a missing account, accepts
-     * every issued time: this check is only the password-reset cutoff.
+     * authenticates the account. It does only when that time is after the
+     * password last changed. The same second does not: the reset request can
+     * restore an older token and stamp a last-login in the second the
+     * password changes. A missing issued time is not after the change. No
+     * recorded change, including a missing account, accepts every issued
+     * time: this check is only the password-reset cutoff.
      */
-    public static function issuedAtAuthenticates(\mysqli $db, int $userId, int $issuedAt): bool
+    public static function issuedAtAuthenticates(\mysqli $db, int $userId, mixed $issuedAt): bool
     {
         $stmt = $db->prepare('SELECT password_changed_at FROM users WHERE id = ?');
         $stmt->bind_param('i', $userId);
@@ -217,7 +220,7 @@ final class Accounts
         if ($row === null || $row['password_changed_at'] === null) {
             return true;
         }
-        return $issuedAt >= (int) $row['password_changed_at'];
+        return $issuedAt !== null && $issuedAt !== '' && (int) $issuedAt > (int) $row['password_changed_at'];
     }
 
     /** Whether $key is an unexpired reset key for $email, locking the email's keys when $lock. */

@@ -145,7 +145,7 @@ final class AccountsTest extends TestCase
         $this->accounts()->resetPassword($email, $key, self::NEW_PASSWORD, self::NEW_PASSWORD);
 
         $this->assertFalse(Accounts::issuedAtAuthenticates($this->db, 1, $issuedBefore));
-        $this->assertTrue(Accounts::issuedAtAuthenticates($this->db, 1, $changedAt));
+        $this->assertFalse(Accounts::issuedAtAuthenticates($this->db, 1, $changedAt));
         $this->assertTrue(Accounts::issuedAtAuthenticates($this->db, 1, $changedAt + 1));
         $this->assertTrue(Accounts::issuedAtAuthenticates($this->db, 2, $issuedBefore));
         $this->assertTrue($this->passwordIs(1, self::NEW_PASSWORD));

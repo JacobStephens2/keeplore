@@ -50,8 +50,7 @@ final class ApiCaller
             if (!isset($session->user_id)) {
                 return null;
             }
-            $issuedAt = isset($session->iat) ? (int) $session->iat : 0;
-            if (!Accounts::issuedAtAuthenticates($db, (int) $session->user_id, $issuedAt)) {
+            if (!Accounts::issuedAtAuthenticates($db, (int) $session->user_id, $session->iat ?? null)) {
                 return null;
             }
             return self::session($db, (int) $session->user_id);

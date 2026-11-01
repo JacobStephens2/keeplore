@@ -102,8 +102,9 @@ function is_logged_in() {
     // An account session with no last-login was not issued by a login; once a
     // password change is recorded it cannot be shown to be later.
     if (empty($_SESSION['guest_mode'])) {
-      $issuedAt = isset($_SESSION['last_login']) ? (int) $_SESSION['last_login'] : 0;
-      if (!Accounts::issuedAtAuthenticates($db, (int) $_SESSION['user_id'], $issuedAt)) {
+      if (!Accounts::issuedAtAuthenticates($db, (int) $_SESSION['user_id'], $_SESSION['last_login'] ?? null)) {
+        // The header reads this flag, not is_logged_in's return, for the nav.
+        $_SESSION['logged_in'] = false;
         return false;
       }
     }
@@ -113,13 +114,13 @@ function is_logged_in() {
     return true;
   }
   // Restore session from JWT if PHP session expired but token is still valid.
-  // Compare the token's issued-at before restoring: restoring stamps last_login
-  // as now, which would accept a token issued before the password change.
+  // Keep the token's issued-at as last-login. Stamping now would make the
+  // reset request's own restore look newer than the password change.
   if (isset($_COOKIE['access_token'])) {
     try {
       $decoded = JWT::decode($_COOKIE['access_token'], new Key(JWT_SECRET, 'HS256'));
       if (isset($decoded->user_id)) {
-        $issuedAt = isset($decoded->iat) ? (int) $decoded->iat : 0;
+        $issuedAt = $decoded->iat ?? null;
         if (!Accounts::issuedAtAuthenticates($db, (int) $decoded->user_id, $issuedAt)) {
           return false;
         }
@@ -127,6 +128,10 @@ function is_logged_in() {
         if ($account) {
           session_regenerate_id();
           put_account_in_session($account);
+          // The restored session was issued when the token was, not now.
+          if ($issuedAt !== null) {
+            $_SESSION['last_login'] = (int) $issuedAt;
+          }
           return true;
         }
       }

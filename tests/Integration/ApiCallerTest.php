@@ -94,12 +94,19 @@ final class ApiCallerTest extends TestCase
             'exp' => time() + 3600,
             'user_id' => 1,
         ], JWT_SECRET, 'HS256');
+        $afterTheChange = JWT::encode([
+            'iat' => $changedAt + 1,
+            'nbf' => $changedAt + 1,
+            'exp' => time() + 3600,
+            'user_id' => 1,
+        ], JWT_SECRET, 'HS256');
         $withoutIssuedAt = JWT::encode(['exp' => time() + 3600, 'user_id' => 1], JWT_SECRET, 'HS256');
 
         $this->assertNull($this->fromCredentials($before, $this->agentKeyHeader(1)));
         $this->assertNull($this->fromCredentials($before, ARTIFACTS_API_KEY));
         $this->assertNull($this->fromCredentials($withoutIssuedAt, null));
-        $this->assertSame(1, $this->fromCredentials($atTheChange, null)->owner());
+        $this->assertNull($this->fromCredentials($atTheChange, null));
+        $this->assertSame(1, $this->fromCredentials($afterTheChange, null)->owner());
         $this->assertSame(2, $this->fromCredentials($this->sessionToken(2), null)->owner(1));
     }
 

@@ -133,6 +133,8 @@ final class LoginSessionTest extends TestCase
         $this->assertFalse(is_logged_in());
 
         $_SESSION['last_login'] = $changedAt;
+        $this->assertFalse(is_logged_in());
+        $_SESSION['last_login'] = $changedAt + 1;
         $this->assertTrue(is_logged_in());
         $_SESSION['user_id'] = 2;
         $_SESSION['last_login'] = $changedAt - 1;
@@ -153,8 +155,11 @@ final class LoginSessionTest extends TestCase
         $this->assertArrayNotHasKey('user_id', $_SESSION);
 
         $_COOKIE['access_token'] = $this->accessToken($changedAt);
+        $this->assertFalse(is_logged_in());
+        $_COOKIE['access_token'] = $this->accessToken($changedAt + 1);
         $this->assertTrue(is_logged_in());
         $this->assertSame(1, $_SESSION['user_id']);
+        $this->assertSame($changedAt + 1, $_SESSION['last_login']);
     }
 
     public function test_a_session_without_a_password_change_still_authenticates(): void
@@ -209,5 +214,43 @@ final class LoginSessionTest extends TestCase
 
         $this->assertTrue(is_logged_in());
         $this->assertGreaterThanOrEqual(time() - 5, $_SESSION['last_login']);
+    }
+
+    public function test_a_rejected_session_is_not_still_shown_as_signed_in(): void
+    {
+        defined('API_ORIGIN') || define('API_ORIGIN', 'api.example.test');
+        $changedAt = time() - 60;
+        $this->passwordChangedAt(1, $changedAt);
+        $_SESSION = [
+            'user_id' => 1,
+            'player_id' => 5,
+            'last_login' => $changedAt - 1,
+            'username' => 'ownerusername',
+            'user_group' => 1,
+            'logged_in' => true,
+        ];
+
+        $this->assertFalse(is_logged_in());
+        ob_start();
+        include PRIVATE_PATH . '/shared/header.php';
+        $html = ob_get_clean();
+
+        $this->assertStringNotContainsString('>Logout<', $html);
+        $this->assertStringContainsString('Log&nbsp;in', $html);
+    }
+
+    public function test_restoring_a_pre_reset_token_on_the_reset_request_does_not_keep_the_browser_signed_in(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        $_SESSION = [];
+        $_COOKIE['access_token'] = $this->accessToken(time() - 3600);
+
+        // reset-password.php includes header.php (is_logged_in) before resetPassword().
+        $this->assertTrue(is_logged_in());
+        $this->passwordChangedAt(1, (int) $_SESSION['last_login']);
+
+        $this->assertFalse(is_logged_in());
     }
 }
