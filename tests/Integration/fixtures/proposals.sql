@@ -5,6 +5,7 @@ CREATE TABLE users (
     email VARCHAR(255) DEFAULT NULL,
     username VARCHAR(255) DEFAULT NULL,
     hashed_password VARCHAR(255) DEFAULT NULL,
+    password_changed_at INT UNSIGNED NULL DEFAULT NULL,
     user_group INT DEFAULT 1,
     default_use_interval DECIMAL(8,2) DEFAULT 90,
     default_snooze_days INT NOT NULL DEFAULT 7,

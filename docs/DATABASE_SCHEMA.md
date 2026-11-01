@@ -183,6 +183,7 @@ Authentication and account records for application users.
 | `email` | VARCHAR(255) | NO | Email address |
 | `username` | VARCHAR(255) | NO | Login username (unique, min 8 chars) |
 | `hashed_password` | VARCHAR(255) | NO | Bcrypt-hashed password |
+| `password_changed_at` | INT UNSIGNED | YES | Unix time the password last changed on a successful reset. NULL until then. A session's last-login time or an access token's issued-at time at or before this no longer authenticates the account. Apply [`add-password-changed-at.sql`](../database/migrations/add-password-changed-at.sql); safe to rerun |
 | `user_group` | INT | YES | Authorization group (1 = regular user, 2 = admin) |
 | `default_use_interval` | DECIMAL/FLOAT | YES | Default interaction interval in days for use-by calculations |
 | `default_setting` | VARCHAR(255) | YES | Default UI setting preference |

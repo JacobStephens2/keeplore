@@ -34,7 +34,7 @@ final class ApiRequestTest extends TestCase
         $this->databaseName = 'keeplore_test_' . bin2hex(random_bytes(6));
         $this->db->query('CREATE DATABASE ' . $this->databaseName);
         $this->db->select_db($this->databaseName);
-        $this->db->query('CREATE TABLE users (id INT PRIMARY KEY)');
+        $this->db->query('CREATE TABLE users (id INT PRIMARY KEY, password_changed_at INT UNSIGNED NULL)');
         $this->db->query('INSERT INTO users (id) VALUES (1), (2)');
         $this->db->query('CREATE TABLE agent_api_keys (
             id INT AUTO_INCREMENT PRIMARY KEY,

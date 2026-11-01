@@ -34,7 +34,9 @@ final class AccountInvalid extends InvalidArgumentException
  *
  * A password reset needs a key emailed to the account's address. A key lasts
  * one day, and a successful reset uses up every key for that address, as
- * does changing the account's email.
+ * does changing the account's email. A successful reset records when the
+ * password changed, in the same update as the new password. A session or
+ * access token authenticates only when it was issued after that time.
  */
 final class Accounts
 {
@@ -186,9 +188,10 @@ final class Accounts
             if ($errors !== []) {
                 throw new AccountInvalid($errors);
             }
+            $changedAt = $this->now();
             $this->statement(
-                'UPDATE users SET hashed_password = ? WHERE email = ?',
-                'ss', [password_hash($password, PASSWORD_BCRYPT), $email]
+                'UPDATE users SET hashed_password = ?, password_changed_at = ? WHERE email = ?',
+                'sis', [password_hash($password, PASSWORD_BCRYPT), $changedAt, $email]
             )->close();
             $this->statement('DELETE FROM password_reset_temp WHERE email = ?', 's', [$email])->close();
             $this->db->commit();
@@ -196,6 +199,28 @@ final class Accounts
             $this->db->rollback();
             throw $failure;
         }
+    }
+
+    /**
+     * Whether a session or access token issued at $issuedAt still
+     * authenticates the account. It does only when that time is after the
+     * password last changed. The same second does not: the reset request can
+     * restore an older token and stamp a last-login in the second the
+     * password changes. A missing issued time is not after the change. No
+     * recorded change, including a missing account, accepts every issued
+     * time: this check is only the password-reset cutoff.
+     */
+    public static function issuedAtAuthenticates(\mysqli $db, int $userId, mixed $issuedAt): bool
+    {
+        $stmt = $db->prepare('SELECT password_changed_at FROM users WHERE id = ?');
+        $stmt->bind_param('i', $userId);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($row === null || $row['password_changed_at'] === null) {
+            return true;
+        }
+        return $issuedAt !== null && $issuedAt !== '' && (int) $issuedAt > (int) $row['password_changed_at'];
     }
 
     /** Whether $key is an unexpired reset key for $email, locking the email's keys when $lock. */
