@@ -37,9 +37,9 @@ if(is_post_request()) {
       $remember = isset($_POST['remember_me']);
       log_in_user($account, $remember);
       if (isset($_POST['redirectURL'])) {
-        redirect_to(url_for(urldecode($_POST['redirectURL'])));      
+        redirect_to(url_for(login_return_path($_POST['redirectURL'])));
       } else {
-        redirect_to(url_for('/index.php'));      
+        redirect_to(url_for('/index.php'));
       }
     } else {
       // An unknown name and a wrong password fail alike.

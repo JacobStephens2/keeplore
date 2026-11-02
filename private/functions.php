@@ -28,6 +28,24 @@ function url_for($script_path) {
   return WWW_ROOT . $script_path;
 }
 
+// Where login sends the browser after an Account logs in. Follow the
+// posted return path only when it is a same-origin path: one leading
+// slash, no scheme, and not protocol-relative. A scheme has no leading
+// slash. Do not decode the value: a browser drops control characters and
+// reads \ as /, and a decoded %2F would become a second slash. Any other
+// posted value is the dashboard.
+function login_return_path($posted): string {
+  if (!is_string($posted)) {
+    return '/index.php';
+  }
+  $as_browser = str_replace('\\', '/', preg_replace('/[[:cntrl:]]/', '', $posted) ?? '');
+  $same_origin = $posted === $as_browser
+    && $as_browser !== ''
+    && $as_browser[0] === '/'
+    && (!isset($as_browser[1]) || $as_browser[1] !== '/');
+  return $same_origin ? $posted : '/index.php';
+}
+
 function u($string="") {
   return urlencode($string);
 }
