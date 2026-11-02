@@ -35,6 +35,18 @@ class LoginReturnPathTest extends TestCase
             'protocol-relative' => ['//evil.example/phish', '/index.php'],
             'three leading slashes' => ['///evil.example', '/index.php'],
             'backslash a browser reads as protocol-relative' => ['/\\evil.example', '/index.php'],
+            'backslash in the query is still the posted path' => [
+                "/artifacts/show.php?q=a\\b",
+                "/artifacts/show.php?q=a\\b",
+            ],
+            'backslash after a segment stays on this host' => [
+                '/foo/\\evil.example',
+                '/foo/\\evil.example',
+            ],
+            'trailing tab is still the posted path' => [
+                "/artifacts/show.php?id=12\t",
+                "/artifacts/show.php?id=12\t",
+            ],
             'tab a browser drops before the second slash' => ["/\t/evil.example", '/index.php'],
             'header split' => ["/index.php\r\nLocation: https://evil.example", '/index.php'],
             'no leading slash' => ['index.php', '/index.php'],

@@ -31,18 +31,19 @@ function url_for($script_path) {
 // Where login sends the browser after an Account logs in. Follow the
 // posted return path only when it is a same-origin path: one leading
 // slash, no scheme, and not protocol-relative. A scheme has no leading
-// slash. Do not decode the value: a browser drops control characters and
-// reads \ as /, and a decoded %2F would become a second slash. Any other
-// posted value is the dashboard.
+// slash. Do not decode the value: a decoded %2F would become a second
+// slash. $probe is only the host decision (tabs dropped, \ read as /),
+// not the path we send. A backslash later in the path stays. A CR, LF,
+// or NUL cannot be a Location. Anything else is the dashboard.
 function login_return_path($posted): string {
-  if (!is_string($posted)) {
+  if (!is_string($posted) || strpbrk($posted, "\r\n\0") !== false) {
     return '/index.php';
   }
-  $as_browser = str_replace('\\', '/', preg_replace('/[[:cntrl:]]/', '', $posted) ?? '');
-  $same_origin = $posted === $as_browser
-    && $as_browser !== ''
-    && $as_browser[0] === '/'
-    && (!isset($as_browser[1]) || $as_browser[1] !== '/');
+  // Host decision only. Not the path we send.
+  $probe = str_replace('\\', '/', str_replace("\t", '', $posted));
+  $same_origin = $posted !== ''
+    && $posted[0] === '/'
+    && (!isset($probe[1]) || $probe[1] !== '/');
   return $same_origin ? $posted : '/index.php';
 }
 
