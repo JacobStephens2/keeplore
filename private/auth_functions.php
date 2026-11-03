@@ -60,16 +60,10 @@ function log_in_user($account, $remember = false) {
   return true;
 }
 
-// Performs all actions necessary to log out an admin
-function log_out() {
-  global $logger;
-  if (isset($logger)) {
-    $logger->logAuth('logout', ['user_id' => isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null]);
-  }
-  $_SESSION = [];
-  session_destroy();
-
-  // Clear the JWT access token cookie
+// Logging out and browsing as guest both leave the Account, so both drop
+// its access token cookie. An empty value in the past is the cookie the
+// browser deletes.
+function expire_access_token() {
   setcookie(
     "access_token",
     "",
@@ -79,6 +73,17 @@ function log_out() {
     COOKIE_SECURE,
     true
   );
+}
+
+// Performs all actions necessary to log out an admin
+function log_out() {
+  global $logger;
+  if (isset($logger)) {
+    $logger->logAuth('logout', ['user_id' => isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null]);
+  }
+  $_SESSION = [];
+  session_destroy();
+  expire_access_token();
 
   return true;
 }
@@ -154,6 +159,9 @@ function require_login() {
 }
 
 function start_guest_session() {
+  // The Account's access token must not authenticate the next request
+  // once the browser is only a guest.
+  expire_access_token();
   $_SESSION = [];
   session_regenerate_id();
   $_SESSION['user_id'] = DEMO_USER_ID;
