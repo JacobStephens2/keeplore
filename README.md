@@ -195,6 +195,22 @@ chmod 777 logs/ cache/
 | `APP_NAME` | Product name for emails and copy (`Keeplore`) |
 | `APP_ENV` | `development` or `production` |
 
+### Release health check
+
+Configure release promotion to check `/api/health` on the API host (for example,
+`https://api.keeplore.app/api/health`). `/health` on that host is an alias. A ready
+schema returns HTTP 200 with `{"healthy":true}`; a missing required migration
+column or table returns HTTP 503 with `{"healthy":false,"message":"..."}` so
+promotion can roll back. The API root remains the discovery catalog.
+
+The health check only resolves the required columns and tables using `SELECT ...
+LIMIT 0`. It reads no account data and applies no migrations or backfills. Apply
+the release's migrations separately before promoting, then retry health. When
+code starts relying on a migration, add its columns and tables to
+`private/release_health.php` in the same change and test health against the older
+schema. This list checks schema availability, not column types, indexes or data
+backfills; destructive and one-off `migrate-*.sql` scripts are never run by health.
+
 ### Running Tests
 
 ```bash
