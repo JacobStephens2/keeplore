@@ -48,16 +48,8 @@ function log_in_user($account, $remember = false) {
       'HS256'
   );
 
-  // The options array is what can set SameSite. Strict keeps this cookie
-  // off a cross-site request, including a top-level GET.
-  setcookie('access_token', $access_token, [
-      'expires' => time() + $expiry_seconds,
-      'path' => '/',
-      'domain' => ARTIFACTS_DOMAIN,
-      'secure' => COOKIE_SECURE,
-      'httponly' => true,
-      'samesite' => 'Strict',
-  ]);
+  // Strict keeps this cookie off a cross-site request, including a top-level GET.
+  set_access_token_cookie($access_token, time() + $expiry_seconds);
   return true;
 }
 
@@ -65,8 +57,14 @@ function log_in_user($account, $remember = false) {
 // its access token cookie. An empty value in the past is the cookie the
 // browser deletes.
 function expire_access_token() {
-  setcookie('access_token', '', [
-    'expires' => time() - 3600,
+  set_access_token_cookie('', time() - 3600);
+}
+
+// Login and logout share one access-token cookie. The options array is
+// what can set SameSite, and both calls have to stay Strict.
+function set_access_token_cookie($value, $expires) {
+  setcookie('access_token', $value, [
+    'expires' => $expires,
     'path' => '/',
     'domain' => ARTIFACTS_DOMAIN,
     'secure' => COOKIE_SECURE,
