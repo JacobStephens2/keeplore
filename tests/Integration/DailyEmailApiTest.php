@@ -10,8 +10,10 @@ require_once __DIR__ . '/RecordingMailer.php';
 /**
  * Seam: send_daily_email_over_api(), the HTTP Daily email trigger's GET. It
  * sends the signed-in owner their Daily email now, through the Mailer it is
- * given, and only when the query's userID is that owner. Agent keys are
- * refused (ADR-0002). The result is the status code and the response fields.
+ * given, and only when the query's userID is that owner. A request whose
+ * Sec-Fetch-Site is cross-site is refused before that email is sent; a
+ * same-site request still sends. Agent keys are refused (ADR-0002). The
+ * result is the status code and the response fields.
  */
 final class DailyEmailApiTest extends TestCase
 {
@@ -45,6 +47,7 @@ final class DailyEmailApiTest extends TestCase
         $this->db->query("UPDATE users SET email = 'owner@keeplore.app' WHERE id = 1");
         $this->db->query("UPDATE users SET email = 'other@keeplore.app' WHERE id = 2");
         $this->mailer = new RecordingMailer();
+        unset($_SERVER['HTTP_SEC_FETCH_SITE']);
     }
 
     protected function tearDown(): void
@@ -91,6 +94,28 @@ final class DailyEmailApiTest extends TestCase
         $this->assertSame('owner@keeplore.app', $to);
         $this->assertSame('Interactions Due', $subject);
         $this->assertStringContainsString('Catan', $html);
+    }
+
+    public function test_a_cross_site_request_is_refused_before_the_daily_email_is_sent(): void
+    {
+        $_SERVER['HTTP_SEC_FETCH_SITE'] = 'cross-site';
+
+        [$status, $fields] = send_daily_email_over_api($this->db, $this->session(), ['userID' => '1'], $this->mailer);
+
+        $this->assertSame(403, $status);
+        $this->assertSame('A cross-site request cannot send the Daily email.', $fields['message']);
+        $this->assertSame([], $this->mailer->sent);
+    }
+
+    public function test_a_same_site_request_still_sends_the_daily_email(): void
+    {
+        $_SERVER['HTTP_SEC_FETCH_SITE'] = 'same-site';
+
+        [$status, $fields] = send_daily_email_over_api($this->db, $this->session(), ['userID' => '1'], $this->mailer);
+
+        $this->assertSame(200, $status);
+        $this->assertSame(['userID' => 1, 'count_to_notify_about' => 1], $fields);
+        $this->assertCount(1, $this->mailer->sent);
     }
 
     public function test_an_agent_key_is_refused(): void
