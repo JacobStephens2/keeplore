@@ -6,7 +6,13 @@
   require_once('../private/classes/SmtpMailer.php');
 
   emit_api_response(answer_api_request($database, 'send_use_email', [
-    'GET' => fn (ApiCaller $caller, array $request) => send_daily_email_over_api($database, $caller, $request['query'], SmtpMailer::fromEnvironment()),
+    'GET' => fn (ApiCaller $caller, array $request) => send_daily_email_over_api(
+      $database,
+      $caller,
+      $request['query'],
+      SmtpMailer::fromEnvironment(),
+      $request['sec_fetch_site'] ?? null
+    ),
   ], api_request_from_globals()));
 
 ?>

@@ -10,8 +10,10 @@ require_once __DIR__ . '/RecordingMailer.php';
 /**
  * Seam: send_daily_email_over_api(), the HTTP Daily email trigger's GET. It
  * sends the signed-in owner their Daily email now, through the Mailer it is
- * given, and only when the query's userID is that owner. Agent keys are
- * refused (ADR-0002). The result is the status code and the response fields.
+ * given, and only when the query's userID is that owner. The caller passes
+ * Sec-Fetch-Site: cross-site is refused before that email is sent, and
+ * same-site still sends. Agent keys are refused (ADR-0002). The result is
+ * the status code and the response fields.
  */
 final class DailyEmailApiTest extends TestCase
 {
@@ -82,7 +84,7 @@ final class DailyEmailApiTest extends TestCase
 
     public function test_the_signed_in_owner_is_sent_their_email(): void
     {
-        [$status, $fields] = send_daily_email_over_api($this->db, $this->session(), ['userID' => '1'], $this->mailer);
+        [$status, $fields] = send_daily_email_over_api($this->db, $this->session(), ['userID' => '1'], $this->mailer, null);
 
         $this->assertSame(200, $status);
         $this->assertSame(['userID' => 1, 'count_to_notify_about' => 1], $fields);
@@ -93,9 +95,27 @@ final class DailyEmailApiTest extends TestCase
         $this->assertStringContainsString('Catan', $html);
     }
 
+    public function test_a_cross_site_request_is_refused_before_the_daily_email_is_sent(): void
+    {
+        [$status, $fields] = send_daily_email_over_api($this->db, $this->session(), ['userID' => '1'], $this->mailer, 'cross-site');
+
+        $this->assertSame(403, $status);
+        $this->assertSame('A cross-site request cannot send the Daily email.', $fields['message']);
+        $this->assertSame([], $this->mailer->sent);
+    }
+
+    public function test_a_same_site_request_still_sends_the_daily_email(): void
+    {
+        [$status, $fields] = send_daily_email_over_api($this->db, $this->session(), ['userID' => '1'], $this->mailer, 'same-site');
+
+        $this->assertSame(200, $status);
+        $this->assertSame(['userID' => 1, 'count_to_notify_about' => 1], $fields);
+        $this->assertCount(1, $this->mailer->sent);
+    }
+
     public function test_an_agent_key_is_refused(): void
     {
-        [$status, $fields] = send_daily_email_over_api($this->db, $this->agentKey(), ['userID' => '1'], $this->mailer);
+        [$status, $fields] = send_daily_email_over_api($this->db, $this->agentKey(), ['userID' => '1'], $this->mailer, null);
 
         $this->assertSame(403, $status);
         $this->assertSame('Agent keys permit reads plus the kept toggle only.', $fields['message']);
@@ -114,7 +134,7 @@ final class DailyEmailApiTest extends TestCase
     /** @dataProvider notTheSignedInUser */
     public function test_only_the_signed_in_user_may_be_sent_the_email(array $query): void
     {
-        [$status, $fields] = send_daily_email_over_api($this->db, $this->session(), $query, $this->mailer);
+        [$status, $fields] = send_daily_email_over_api($this->db, $this->session(), $query, $this->mailer, null);
 
         $this->assertSame(403, $status);
         $this->assertSame('You may only send this email to yourself.', $fields['message']);
@@ -123,7 +143,7 @@ final class DailyEmailApiTest extends TestCase
 
     public function test_the_master_key_has_no_signed_in_user(): void
     {
-        [$status, $fields] = send_daily_email_over_api($this->db, $this->masterKey(), ['userID' => '1'], $this->mailer);
+        [$status, $fields] = send_daily_email_over_api($this->db, $this->masterKey(), ['userID' => '1'], $this->mailer, null);
 
         $this->assertSame(403, $status);
         $this->assertSame('You may only send this email to yourself.', $fields['message']);

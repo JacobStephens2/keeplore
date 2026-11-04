@@ -48,15 +48,8 @@ function log_in_user($account, $remember = false) {
       'HS256'
   );
 
-  setcookie(
-      "access_token",         // name
-      $access_token,          // value
-      time() + $expiry_seconds,
-      "/",                    // path
-      ARTIFACTS_DOMAIN,       // domain
-      COOKIE_SECURE,         // if true, send cookie only to https requests
-      true                    // httponly
-  ); // End of JWT Access Token Cookie creation
+  // Strict keeps this cookie off a cross-site request, including a top-level GET.
+  set_access_token_cookie($access_token, time() + $expiry_seconds);
   return true;
 }
 
@@ -64,15 +57,20 @@ function log_in_user($account, $remember = false) {
 // its access token cookie. An empty value in the past is the cookie the
 // browser deletes.
 function expire_access_token() {
-  setcookie(
-    "access_token",
-    "",
-    time() - 3600,
-    "/",
-    ARTIFACTS_DOMAIN,
-    COOKIE_SECURE,
-    true
-  );
+  set_access_token_cookie('', time() - 3600);
+}
+
+// Login and logout share one access-token cookie. The options array is
+// what can set SameSite, and both calls have to stay Strict.
+function set_access_token_cookie($value, $expires) {
+  setcookie('access_token', $value, [
+    'expires' => $expires,
+    'path' => '/',
+    'domain' => ARTIFACTS_DOMAIN,
+    'secure' => COOKIE_SECURE,
+    'httponly' => true,
+    'samesite' => 'Strict',
+  ]);
 }
 
 // Performs all actions necessary to log out an admin
