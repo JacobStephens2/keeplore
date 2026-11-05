@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -100,13 +101,74 @@ JS));
         );
     }
 
-    public function test_api_allows_the_ui_origin_that_matches_its_own_host(): void
+    /**
+     * @return array<string, array{0: string, 1: ?string}>
+     */
+    public static function apiHostUiOrigins(): array
+    {
+        return [
+            'production api host' => ['api.keeplore.app', 'https://keeplore.app'],
+            'staging api host' => ['api.staging.keeplore.app', 'https://staging.keeplore.app'],
+            'sibling under the parent site' => ['api.evil.keeplore.app', null],
+            'other api host' => ['api.evil.example.test', null],
+            'production host with an extra label' => ['api.keeplore.app.evil.com', null],
+            'staging host with an extra label' => ['api.staging.keeplore.app.evil.com', null],
+            'host an unescaped dot would allow' => ['apiXkeeploreXapp', null],
+            'production host with a port' => ['api.keeplore.app:443', null],
+            'the ui host itself' => ['keeplore.app', null],
+        ];
+    }
+
+    #[DataProvider('apiHostUiOrigins')]
+    public function test_api_allows_only_the_two_named_ui_origins(string $host, ?string $origin): void
+    {
+        $this->assertSame($origin, $this->uiOriginAllowedForHost($host));
+    }
+
+    /**
+     * The origin api/.htaccess would send for $host: each SetEnvIf Host rule
+     * in order, and only when the allow-origin header is the env-gated one.
+     * A host with no matching rule has no allow-origin.
+     */
+    private function uiOriginAllowedForHost(string $host): ?string
     {
         $source = (string) file_get_contents(PROJECT_PATH . '/api/.htaccess');
+        $allowOrigin = 'Header set Access-Control-Allow-Origin "%{KEEPLORE_UI_ORIGIN}e" env=KEEPLORE_UI_ORIGIN';
+        $directives = [];
+        foreach (preg_split('/\R/', $source) as $line) {
+            $trimmed = trim($line);
+            if (stripos($trimmed, 'Access-Control-Allow-Origin') !== false && !str_starts_with($trimmed, '#')) {
+                $directives[] = $trimmed;
+            }
+        }
+        if ($directives !== [$allowOrigin]) {
+            return null;
+        }
 
-        $this->assertStringNotContainsString('Access-Control-Allow-Origin "https://keeplore.app"', $source);
-        $this->assertMatchesRegularExpression('/SetEnvIf Host "\^api\\\\\.\(\.\+\)\$" KEEPLORE_UI_ORIGIN=https:\/\/\$1/', $source);
-        $this->assertStringContainsString('Header set Access-Control-Allow-Origin "%{KEEPLORE_UI_ORIGIN}e" env=KEEPLORE_UI_ORIGIN', $source);
+        $origin = null;
+        preg_match_all(
+            '/^[ \t]*SetEnvIf(NoCase)?[ \t]+Host[ \t]+"([^"]+)"[ \t]+KEEPLORE_UI_ORIGIN=(\S+)[ \t]*$/mi',
+            $source,
+            $rules,
+            PREG_SET_ORDER
+        );
+        foreach ($rules as $rule) {
+            $pattern = str_replace('~', '\~', $rule[2]);
+            $flags = $rule[1] === 'NoCase' ? 'i' : '';
+            $matched = preg_match('~' . $pattern . '~' . $flags, $host, $captures);
+            $this->assertNotFalse($matched, 'SetEnvIf Host pattern is not a valid regex: ' . $rule[2]);
+            if ($matched === 1) {
+                $origin = preg_replace_callback(
+                    '/\$(\d+)/',
+                    static function (array $ref) use ($captures): string {
+                        return $captures[(int) $ref[1]] ?? '';
+                    },
+                    $rule[3]
+                );
+            }
+        }
+
+        return $origin;
     }
 
     private function apiOrigin(?string $metaContent): string
