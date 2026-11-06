@@ -40,11 +40,11 @@ class RateLimiter {
   public function isRateLimited($endpoint, $max_attempts, $window_seconds) {
     $ip = $this->getClientIp();
 
-    // Clean old entries
+    // Only this endpoint. Another endpoint's rows stay, even past this window.
     $stmt = $this->db->prepare(
-      "DELETE FROM rate_limits WHERE attempted_at < DATE_SUB(NOW(), INTERVAL ? SECOND)"
+      "DELETE FROM rate_limits WHERE endpoint = ? AND attempted_at < DATE_SUB(NOW(), INTERVAL ? SECOND)"
     );
-    $stmt->bind_param("i", $window_seconds);
+    $stmt->bind_param("si", $endpoint, $window_seconds);
     $stmt->execute();
     $stmt->close();
 
