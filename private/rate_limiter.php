@@ -19,23 +19,23 @@ class RateLimiter {
     )");
   }
 
-  // Connection peer. X-Forwarded-For is client-supplied and is not a rate-limit key.
-  private function getClientIp() {
+  // X-Forwarded-For is client-supplied and is not a rate-limit key.
+  private function connectionPeerAddress() {
     return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
   }
 
   public function recordAttempt($endpoint) {
-    $ip = $this->getClientIp();
+    $peer = $this->connectionPeerAddress();
     $stmt = $this->db->prepare(
       "INSERT INTO rate_limits (ip_address, endpoint, attempted_at) VALUES (?, ?, NOW())"
     );
-    $stmt->bind_param("ss", $ip, $endpoint);
+    $stmt->bind_param("ss", $peer, $endpoint);
     $stmt->execute();
     $stmt->close();
   }
 
   public function isRateLimited($endpoint, $max_attempts, $window_seconds) {
-    $ip = $this->getClientIp();
+    $peer = $this->connectionPeerAddress();
 
     // Only this endpoint. Another endpoint's rows stay, even past this window.
     $stmt = $this->db->prepare(
@@ -51,7 +51,7 @@ class RateLimiter {
        WHERE ip_address = ? AND endpoint = ?
        AND attempted_at > DATE_SUB(NOW(), INTERVAL ? SECOND)"
     );
-    $stmt->bind_param("ssi", $ip, $endpoint, $window_seconds);
+    $stmt->bind_param("ssi", $peer, $endpoint, $window_seconds);
     $stmt->execute();
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
