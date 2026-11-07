@@ -5,8 +5,9 @@ namespace Tests\Integration;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Seam: RateLimiter::isRateLimited(). A check deletes expired rate_limits
- * rows only for the endpoint passed in. Every other endpoint's rows stay.
+ * Seams: RateLimiter::isRateLimited() and RateLimiter::recordAttempt().
+ * A check deletes expired rate_limits rows only for the endpoint passed in.
+ * Counts and inserts use the connection peer address, not X-Forwarded-For.
  */
 final class RateLimiterTest extends TestCase
 {
@@ -34,6 +35,8 @@ final class RateLimiterTest extends TestCase
 
     protected function tearDown(): void
     {
+        $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+        unset($_SERVER['HTTP_X_FORWARDED_FOR']);
         if ($this->db !== null) {
             $this->db->query('DROP DATABASE ' . $this->databaseName);
             $this->db->close();
@@ -54,6 +57,58 @@ final class RateLimiterTest extends TestCase
 
         $this->assertSame('1', $this->countFor('login'));
         $this->assertSame('1', $this->countFor('api'));
+    }
+
+    public function test_a_recorded_attempt_stores_the_connection_peer_address_not_x_forwarded_for(): void
+    {
+        $_SERVER['REMOTE_ADDR'] = '203.0.113.10';
+        $_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.20, 203.0.113.10';
+
+        $limiter = new \RateLimiter($this->db);
+        $limiter->recordAttempt('login');
+
+        $this->assertSame('203.0.113.10', $this->recordedAddress('login'));
+    }
+
+    public function test_a_check_counts_the_connection_peer_address_not_x_forwarded_for(): void
+    {
+        $_SERVER['REMOTE_ADDR'] = '203.0.113.10';
+        $_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.20';
+        $limiter = new \RateLimiter($this->db);
+        $this->db->query(
+            "INSERT INTO rate_limits (ip_address, endpoint, attempted_at) VALUES
+             ('198.51.100.20', 'login', NOW()),
+             ('198.51.100.20', 'login', NOW()),
+             ('198.51.100.20', 'login', NOW()),
+             ('198.51.100.20', 'login', NOW()),
+             ('198.51.100.20', 'login', NOW())"
+        );
+
+        $this->assertFalse($limiter->isRateLimited('login', 5, 900));
+
+        $this->db->query(
+            "INSERT INTO rate_limits (ip_address, endpoint, attempted_at) VALUES
+             ('203.0.113.10', 'login', NOW()),
+             ('203.0.113.10', 'login', NOW()),
+             ('203.0.113.10', 'login', NOW()),
+             ('203.0.113.10', 'login', NOW()),
+             ('203.0.113.10', 'login', NOW())"
+        );
+
+        $this->assertTrue($limiter->isRateLimited('login', 5, 900));
+    }
+
+    private function recordedAddress(string $endpoint): string
+    {
+        $statement = $this->db->prepare(
+            'SELECT ip_address FROM rate_limits WHERE endpoint = ?'
+        );
+        $statement->bind_param('s', $endpoint);
+        $statement->execute();
+        $address = $statement->get_result()->fetch_row()[0];
+        $statement->close();
+
+        return $address;
     }
 
     private function countFor(string $endpoint): string

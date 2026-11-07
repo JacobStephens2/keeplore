@@ -19,11 +19,8 @@ class RateLimiter {
     )");
   }
 
+  // Connection peer. X-Forwarded-For is client-supplied and is not a rate-limit key.
   private function getClientIp() {
-    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-      $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-      return trim($ips[0]);
-    }
     return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
   }
 
