@@ -76,6 +76,7 @@ as well, applied after `add-events.sql`. It only creates the `event_players` tab
 
 - Per-user agent keys (`Authorization: Bearer`) for remote agents: collection, uses, and proposal reads plus the kept toggle
 - Public docs at [`/api-docs`](https://keeplore.app/api-docs) (JSON at `/api-docs?format=json`)
+- Agent skill and CLI helper at [`skills/keeplore/SKILL.md`](skills/keeplore/SKILL.md) (`skills/keeplore/scripts/keeplore.py`)
 - JWT session cookies and a legacy shared API key for the web app
 - CRUD endpoints for items, uses, types, and users
 - Cursor-based and offset-based pagination
