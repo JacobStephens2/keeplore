@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - "capacitor/**"
+      - "docs/android-release.md"
       - ".github/workflows/android-icons.yml"
   push:
     branches: [main]
     paths:
       - "capacitor/**"
+      - "docs/android-release.md"
       - ".github/workflows/android-icons.yml"
 
 permissions:
@@ -65,3 +67,6 @@ jobs:
         run: |
           gh release download 2.1.0 --pattern keeplore-v2.1.0.apk --dir "$RUNNER_TEMP"
           python3 capacitor/test-android-icons.py "$RUNNER_TEMP/keeplore-v2.1.0.apk"
+
+      - name: Reject a download whose bundle signer is not the release certificate
+        run: python3 capacitor/test-android-release-download.py

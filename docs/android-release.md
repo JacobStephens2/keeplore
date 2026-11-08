@@ -89,23 +89,33 @@ Then verify the files GitHub actually serves, using a fresh download directory
 and the Android SDK and Pillow setup described below and above:
 
 ```bash
+set -euo pipefail
 release_dir=$(mktemp -d /tmp/keeplore-2.1.1.XXXXXX)
 gh release download 2.1.1 --repo JacobStephens2/keeplore \
   --pattern keeplore-v2.1.1.apk --pattern keeplore-v2.1.1.aab \
   --pattern SHA256SUMS --dir "$release_dir"
-(cd "$release_dir" && sha256sum --check SHA256SUMS)
+(cd "$release_dir" && sha256sum --check --strict SHA256SUMS)
 "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
   "$release_dir/keeplore-v2.1.1.apk"
+expected=$(python3 -c 'import json; print(next(link["target"]["sha256_cert_fingerprints"][0] for link in json.load(open("ui/.well-known/assetlinks.json")) if link["target"].get("package_name") == "app.keeplore").replace(":", "").lower(), end="")')
+aab_digest=$(keytool -printcert -jarfile "$release_dir/keeplore-v2.1.1.aab" | python3 -c 'import sys,re; text=sys.stdin.read(); match=re.search(r"SHA256:\s*([0-9A-Fa-f:]+)", text); print(match.group(1).replace(":", "").lower() if match else "", end="")')
+if [[ "$aab_digest" != "$expected" ]]; then
+  echo "AAB signer ${aab_digest:-unsigned} does not match the app.keeplore certificate" >&2
+  exit 1
+fi
 python3 capacitor/verify-android-icons.py "$release_dir/keeplore-v2.1.1.apk"
 ```
 
-Compare the printed signer certificate SHA-256 digest with the `app.keeplore`
+Compare the printed APK signer certificate SHA-256 digest with the `app.keeplore`
 fingerprint in `ui/.well-known/assetlinks.json` (ignoring colons and letter case).
-Finally, install that APK over an existing 2.1.0 installation and check that the
-app retains its data and shows the K launcher icon. Leave #293 open until this
-signed update is published and the upgrade is verified. As of the check above,
-`gh release view 2.1.1 --repo JacobStephens2/keeplore` returns `release not found`;
-none of these publication or device checks has passed yet.
+The commands reject the AAB unless its signer digest is that same fingerprint.
+`SHA256SUMS` is downloaded from the same release as the files, so a checksum
+match does not say which key signed the bundle. Finally, install that APK over
+an existing 2.1.0 installation and check that the app retains its data and shows
+the K launcher icon. Leave #293 open until this signed update is published and
+the upgrade is verified. As of the check above, `gh release view 2.1.1 --repo
+JacobStephens2/keeplore` returns `release not found`; none of these publication
+or device checks has passed yet.
 
 For later releases, increase `versionCode` in `capacitor/android/app/build.gradle`
 and update `versionName`, `capacitor/package.json` and `capacitor/package-lock.json`
