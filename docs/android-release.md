@@ -21,11 +21,12 @@ still pending the signing setup below.
 The **Verify Keeplore Android icons** workflow builds and checks a debug APK on
 Android changes without release credentials. Both it and the release workflow
 run `capacitor/verify-android-icons.py` on the built APK. The check compares the
-decoded pixels of all six densities of regular, round, foreground and background
-launcher resources with the approved K resources in
-`capacitor/android/app/src/main/res/`, and checks the manifest and adaptive icon
-references. It rejects the published A-icon APK even though its label says
-Keeplore. PNG compression differences do not affect the check.
+decoded pixels and dimensions of all six densities of regular, round, foreground
+and background launcher resources with independent approved K fingerprints in
+the verifier, and checks the manifest and adaptive icon references. It rejects
+the published A-icon APK even if the source PNGs have also regressed to A.
+PNG compression differences do not affect the check. Update the fingerprints
+only after visually reviewing an intentional artwork change.
 
 After building locally, install Pillow (for example, `sudo apt-get install
 python3-pil` on Debian/Ubuntu) and run from the repository root, with
@@ -36,6 +37,14 @@ python3 capacitor/verify-android-icons.py capacitor/android/app/build/outputs/ap
 ```
 
 Use the release APK path instead to verify the signed download before publishing.
+
+The CI regression test uses the published 2.1.0 APK as a known A-artwork fixture,
+checks its SHA-256, and verifies that matching source PNGs cannot approve it:
+
+```bash
+gh release download 2.1.0 --pattern keeplore-v2.1.0.apk --dir /tmp/keeplore-icon-test
+python3 capacitor/test-android-icons.py /tmp/keeplore-icon-test/keeplore-v2.1.0.apk
+```
 
 ## Publish 2.1.1
 
