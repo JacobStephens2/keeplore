@@ -16,6 +16,14 @@ original keystore is required to publish an update; a newly generated key cannot
 upgrade the existing installation. The K artwork is ready, but the release is
 still pending the signing setup below.
 
+The publication requested in [#296](https://github.com/JacobStephens2/keeplore/issues/296)
+therefore remains unfinished. The existing
+[`needs-triage` issue #293](https://github.com/JacobStephens2/keeplore/issues/293)
+tracks recovering the original signing key and configuring those secrets. The
+key is also absent from the `capacitor/keystore.jks` and `twa/keystore.jks` paths
+in both local checkouts checked for #296. Someone with custody of the original
+key must complete that handoff; a passing debug build is not a published update.
+
 ## Verify the packaged icon
 
 The **Verify Keeplore Android icons** workflow builds and checks a debug APK on
@@ -76,6 +84,28 @@ gh run list --workflow android-release.yml --limit 1
 gh run watch <run-id> --exit-status
 gh release view 2.1.1
 ```
+
+Then verify the files GitHub actually serves, using a fresh download directory
+and the Android SDK and Pillow setup described below and above:
+
+```bash
+release_dir=$(mktemp -d /tmp/keeplore-2.1.1.XXXXXX)
+gh release download 2.1.1 --repo JacobStephens2/keeplore \
+  --pattern keeplore-v2.1.1.apk --pattern keeplore-v2.1.1.aab \
+  --pattern SHA256SUMS --dir "$release_dir"
+(cd "$release_dir" && sha256sum --check SHA256SUMS)
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
+  "$release_dir/keeplore-v2.1.1.apk"
+python3 capacitor/verify-android-icons.py "$release_dir/keeplore-v2.1.1.apk"
+```
+
+Compare the printed signer certificate SHA-256 digest with the `app.keeplore`
+fingerprint in `ui/.well-known/assetlinks.json` (ignoring colons and letter case).
+Finally, install that APK over an existing 2.1.0 installation and check that the
+app retains its data and shows the K launcher icon. Leave #293 open until this
+signed update is published and the upgrade is verified. As of the check above,
+`gh release view 2.1.1 --repo JacobStephens2/keeplore` returns `release not found`;
+none of these publication or device checks has passed yet.
 
 For later releases, increase `versionCode` in `capacitor/android/app/build.gradle`
 and update `versionName`, `capacitor/package.json` and `capacitor/package-lock.json`
