@@ -99,6 +99,18 @@ class AgentApiDocsTest extends TestCase
         $this->assertStringContainsString('empty', $notes);
     }
 
+    public function test_list_items_documents_the_to_get_rid_of_filter_and_collection_lifecycle_fields(): void
+    {
+        $endpoint = $this->endpointsById()['list-items'];
+        $this->assertContains('to_get_rid_of', $endpoint['body_fields']);
+        $notes = implode(' ', $endpoint['notes']);
+        $this->assertStringContainsString('to_get_rid_of take true or false', $notes);
+        $this->assertStringContainsString('to_get_rid_of is independent of is_kept', $notes);
+        $this->assertStringContainsString('interaction_frequency_days', $notes);
+        $this->assertStringContainsString('null uses the account default use interval', $notes);
+        $this->assertStringContainsString('snoozed_until (YYYY-MM-DD or null)', $notes);
+    }
+
     public function test_players_and_uses_support_filtering_plays_by_person(): void
     {
         $players = $this->endpointsById()['list-players'];
