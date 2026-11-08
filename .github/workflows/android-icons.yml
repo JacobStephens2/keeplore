@@ -1,0 +1,55 @@
+name: Verify Keeplore Android icons
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "capacitor/**"
+      - ".github/workflows/android-icons.yml"
+  push:
+    branches: [main]
+    paths:
+      - "capacitor/**"
+      - ".github/workflows/android-icons.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  icons:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: capacitor/package-lock.json
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install build and icon verification tools
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          sudo apt-get update
+          sudo apt-get install -y python3-pil
+
+      - name: Build and check the Android app
+        working-directory: capacitor
+        run: |
+          npm ci --no-audit --no-fund
+          npx cap sync android
+          cd android
+          ./gradlew --no-daemon test lint assembleDebug
+
+      - name: Verify packaged launcher icons
+        run: python3 capacitor/verify-android-icons.py capacitor/android/app/build/outputs/apk/debug/app-debug.apk

@@ -94,6 +94,9 @@ jobs:
           set -euo pipefail
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
             capacitor/android/app/build/outputs/apk/release/app-release.apk
+          sudo apt-get update
+          sudo apt-get install -y python3-pil
+          python3 capacitor/verify-android-icons.py capacitor/android/app/build/outputs/apk/release/app-release.apk
           mkdir dist
           cp capacitor/android/app/build/outputs/apk/release/app-release.apk "dist/keeplore-v$VERSION.apk"
           cp capacitor/android/app/build/outputs/bundle/release/app-release.aab "dist/keeplore-v$VERSION.aab"
