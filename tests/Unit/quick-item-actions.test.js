@@ -345,7 +345,10 @@ function toGetRidOf() {
 function restoreRow(b, id = 11) {
   const row = keptRow(b, id);
   const page = fs.readFileSync(path.join(project, 'ui/artifacts/to-get-rid-of.php'), 'utf8');
-  const markup = page.match(/<form\b[^>]*>[\s\S]*?class="restore-btn"/)[0];
+  const markup = [...page.matchAll(/<form\b[\s\S]*?<\/form>/g)]
+    .map(([form]) => form)
+    .find((form) => form.includes('class="restore-btn"'));
+  assert.ok(markup, 'the page renders a Restore form');
   const className = markup.split('<button')[0].match(/class="([^"]*)"/)?.[1] || '';
   const form = b.el('form', { className, action: '/artifacts/mark-get-rid-of.php' }, [
     ...Object.entries({ artifact_id: String(id), artifact_name: 'Chess', csrf_token: 'tok',
