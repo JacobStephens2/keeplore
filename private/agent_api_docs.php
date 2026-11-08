@@ -44,7 +44,7 @@ function agent_api_docs($api_origin = null) {
         'summary' => 'List, search, and filter items in the key\'s collection.',
         'body_fields' => [
           'page', 'per_page', 'cursor', 'query', 'tag', 'kept', 'physical', 'digital',
-          'secondary_collection', 'type_id', 'fields', 'include',
+          'secondary_collection', 'to_get_rid_of', 'type_id', 'fields', 'include',
         ],
         'fields_values' => ['basic', 'collection'],
         'include_values' => ['uses_summary'],
@@ -53,9 +53,9 @@ function agent_api_docs($api_origin = null) {
         'notes' => [
           'Agent keys always read their own user; a userid in the body is ignored.',
           'Default page size is 50; maximum is 200. has_more says whether another page exists. Send cursor (null, then next_cursor) to page by id instead of by title.',
-          'Every row carries id, Title, type, type_id, is_kept, is_physical, is_digital, is_in_secondary_collection, and tags.',
-          'kept, physical, digital, and secondary_collection take true or false. type_id takes one id or a list; ids come from GET /types.php.',
-          'fields "collection" adds MnP, MxP, SS (sweet spot), MnT, MxT, Wt, Yr, and Acq.',
+          'Every row carries id, Title, type, type_id, is_kept, is_physical, is_digital, is_in_secondary_collection, to_get_rid_of, and tags. to_get_rid_of is independent of is_kept.',
+          'kept, physical, digital, secondary_collection, and to_get_rid_of take true or false. type_id takes one id or a list; ids come from GET /types.php.',
+          'fields "collection" adds MnP, MxP, SS (sweet spot), MnT, MxT, Wt, Yr, Acq, interaction_frequency_days (the item\'s own interval in days; null uses the account default use interval), and snoozed_until (YYYY-MM-DD or null).',
           'include ["uses_summary"] adds plays (count of recorded uses) and last_use (YYYY-MM-DD or null): the same last use the Interact By page uses, the later of the latest recorded use and any legacy play date.',
           'tag filters to items the owner labelled with that tag (for example beach-safe). Tags are empty until the owner adds them, so an empty tag result does not mean no item fits.',
           'Invalid filter values return 400 with an errors list.',

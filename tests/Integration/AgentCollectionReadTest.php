@@ -123,6 +123,40 @@ final class AgentCollectionReadTest extends TestCase
         $this->assertSame([12, 13], $this->ids($this->listItems(['kept' => false])['items']));
     }
 
+    public function test_to_get_rid_of_is_independent_of_kept_and_filters_the_owners_basic_rows(): void
+    {
+        $this->db->query('UPDATE games SET to_get_rid_of = 1 WHERE id IN (13, 20)');
+        $this->db->query('UPDATE games SET to_get_rid_of = NULL WHERE id = 12');
+
+        $rows = $this->listItems([])['items'];
+        $this->assertSame([12, 11, 10, 13], $this->ids($rows));
+        $this->assertSame([null, 1, 0, 1], array_column($rows, 'to_get_rid_of'));
+        $this->assertSame([11, 13], $this->ids($this->listItems(['to_get_rid_of' => true])['items']));
+        $this->assertSame([12, 10], $this->ids($this->listItems(['to_get_rid_of' => false])['items']));
+        $this->assertSame([11], $this->ids($this->listItems(['to_get_rid_of' => true, 'kept' => true])['items']));
+        $this->assertSame([13], $this->ids($this->listItems(['to_get_rid_of' => true, 'kept' => false])['items']));
+        $this->assertSame([20], $this->ids($this->listItems(['to_get_rid_of' => true], 2)['items']));
+
+        [$status, $response] = list_collection_over_api($this->db, $this->agentKey(1), (object) ['to_get_rid_of' => 'yes']);
+        $this->assertSame(200, $status);
+        $this->assertSame([11, 13], $this->ids($response['artifacts']));
+
+        $first = $this->listItems(['to_get_rid_of' => true, 'cursor' => null, 'per_page' => 1]);
+        $this->assertSame([11], $this->ids($first['items']));
+        $this->assertTrue($first['has_more']);
+        $second = $this->listItems(['to_get_rid_of' => true, 'cursor' => $first['next_cursor'], 'per_page' => 1]);
+        $this->assertSame([13], $this->ids($second['items']));
+        $this->assertFalse($second['has_more']);
+
+        [$status, $response] = list_collection_over_api($this->db, $this->masterKey(), (object) ['to_get_rid_of' => false]);
+        $this->assertSame(400, $status);
+        $this->assertSame(['message' => 'Filters and extra fields need a collection: send userid.'], $response);
+
+        [$status, $response] = list_collection_over_api($this->db, $this->agentKey(1), (object) ['to_get_rid_of' => 'maybe']);
+        $this->assertSame(400, $status);
+        $this->assertSame(['message' => 'Invalid list request.', 'errors' => ['to_get_rid_of must be true or false.']], $response);
+    }
+
     public function test_type_physical_and_secondary_filters_narrow_the_list(): void
     {
         $this->assertSame([12], $this->ids($this->listItems(['type_id' => [2]])['items']));
@@ -160,6 +194,36 @@ final class AgentCollectionReadTest extends TestCase
         $rows = $this->listItems(['include' => 'uses_summary', 'type_id' => 2])['items'];
         $this->assertSame(0, $rows[0]['plays']);
         $this->assertNull($rows[0]['last_use']);
+    }
+
+    public function test_collection_rows_expose_the_items_own_frequency_and_snooze_date_including_nulls(): void
+    {
+        $this->db->query("UPDATE games SET interaction_frequency_days = 14, snoozed_until = '2026-12-01' WHERE id = 10");
+        $this->db->query('UPDATE games SET interaction_frequency_days = NULL, snoozed_until = NULL WHERE id = 11');
+
+        [$status, $response] = list_collection_over_api($this->db, $this->agentKey(1), (object) [
+            'kept' => true, 'fields' => 'collection', 'include' => ['uses_summary'],
+        ]);
+
+        $this->assertSame(200, $status);
+        $this->assertSame([11, 10], $this->ids($response['artifacts']));
+        [$azul, $catan] = $response['artifacts'];
+        $this->assertSame(1, $azul['to_get_rid_of']);
+        $this->assertArrayHasKey('interaction_frequency_days', $azul);
+        $this->assertNull($azul['interaction_frequency_days']);
+        $this->assertArrayHasKey('snoozed_until', $azul);
+        $this->assertNull($azul['snoozed_until']);
+        $this->assertSame(0, $catan['to_get_rid_of']);
+        $this->assertSame(14, $catan['interaction_frequency_days']);
+        $this->assertSame('2026-12-01', $catan['snoozed_until']);
+        $this->assertSame(2, $catan['plays']);
+        $this->assertSame('2026-03-05', $catan['last_use']);
+
+        $basic = $this->listItems(['kept' => true])['items'];
+        foreach ($basic as $row) {
+            $this->assertArrayNotHasKey('interaction_frequency_days', $row);
+            $this->assertArrayNotHasKey('snoozed_until', $row);
+        }
     }
 
     public function test_last_use_counts_a_legacy_play_date_later_than_the_latest_use(): void

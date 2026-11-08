@@ -57,6 +57,29 @@ class CollectionListRequestTest extends TestCase
         $this->assertFalse($request['secondary_collection']);
     }
 
+    public function test_to_get_rid_of_accepts_the_same_optional_booleans_as_other_flags(): void
+    {
+        foreach ([[], ['to_get_rid_of' => null]] as $body) {
+            $request = $this->parse($body);
+            $this->assertSame([], $request['errors']);
+            $this->assertArrayHasKey('to_get_rid_of', $request);
+            $this->assertNull($request['to_get_rid_of']);
+            $this->assertFalse(collection_list_has_filters($request));
+        }
+
+        foreach ([true, 1, '1', 'true', 'yes', false, 0, '0', 'false', 'no'] as $value) {
+            $request = $this->parse(['to_get_rid_of' => $value]);
+            $this->assertSame([], $request['errors']);
+            $this->assertSame(in_array($value, [true, 1, '1', 'true', 'yes'], true), $request['to_get_rid_of']);
+            $this->assertTrue(collection_list_has_filters($request));
+        }
+
+        foreach (['maybe', '', 2, [], (object) []] as $value) {
+            $request = $this->parse(['to_get_rid_of' => $value]);
+            $this->assertSame(['to_get_rid_of must be true or false.'], $request['errors']);
+        }
+    }
+
     public function test_single_type_id_and_include_string_are_accepted(): void
     {
         $request = $this->parse(['type_id' => '26', 'include' => 'uses_summary']);
