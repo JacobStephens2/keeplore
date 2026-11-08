@@ -23,8 +23,13 @@ Android changes without release credentials. Both it and the release workflow
 run `capacitor/verify-android-icons.py` on the built APK. The check compares the
 decoded pixels and dimensions of all six densities of regular, round, foreground
 and background launcher resources with independent approved K fingerprints in
-the verifier, and checks the manifest and adaptive icon references. It rejects
-the published A-icon APK even if the source PNGs have also regressed to A.
+the verifier. It rejects any other configuration of those resources, so a
+closer qualifier cannot replace the K at install time. The application icon and round icon must reference those approved resources.
+A launcher activity or activity-alias must resolve to those same resources,
+including an alias that inherits its target activity's icon. The adaptive-icon
+XML must stay the approved background and foreground insets of 16.7%.
+Mentioning the approved ids on some other component is not enough. It rejects the published A-icon APK even if the source PNGs have
+also regressed to A.
 PNG compression differences do not affect the check. Update the fingerprints
 only after visually reviewing an intentional artwork change.
 

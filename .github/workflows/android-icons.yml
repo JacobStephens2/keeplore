@@ -56,6 +56,9 @@ jobs:
       - name: Verify packaged launcher icons
         run: python3 capacitor/verify-android-icons.py capacitor/android/app/build/outputs/apk/debug/app-debug.apk
 
+      - name: Reject launcher artwork the fingerprint list does not bind
+        run: python3 capacitor/test-android-icon-overrides.py
+
       - name: Reject A artwork even when source artwork matches
         env:
           GH_TOKEN: ${{ github.token }}
