@@ -29,7 +29,7 @@
     <table class="list" id="rid-of-table">
       <thead>
         <tr id="headerRow">
-          <th>Name (<?php echo count($artifacts); ?>)</th>
+          <th>Name (<span id="rid-of-count"><?php echo count($artifacts); ?></span>)</th>
           <th>Type</th>
           <th>Last Interaction</th>
           <th>Tracking Start</th>
@@ -60,7 +60,7 @@
 
             <?php if (!is_guest()) { ?>
             <td>
-              <form method="post" action="<?php echo url_for('/artifacts/mark-get-rid-of.php'); ?>" style="display:inline; margin:0;">
+              <form method="post" action="<?php echo url_for('/artifacts/mark-get-rid-of.php'); ?>" class="restore-form" style="display:inline; margin:0;">
                 <?php echo csrf_input(); ?>
                 <input type="hidden" name="artifact_id" value="<?php echo $id; ?>">
                 <input type="hidden" name="artifact_name" value="<?php echo h($artifact['Title']); ?>">
@@ -93,7 +93,7 @@
   <?php } ?>
 
   <div id="rid-of-toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="<?php echo url_for('/shared/js/quick-item-actions.js'); ?>?v=1"></script>
+  <script src="<?php echo url_for('/shared/js/quick-item-actions.js'); ?>?v=2"></script>
   <script>
     (function () {
       var toastEl = document.getElementById('rid-of-toast');
@@ -111,7 +111,15 @@
         }, 3500);
       }
 
-      QuickItemActions.bindKept(document.getElementById('rid-of-table'), {
+      var table = document.getElementById('rid-of-table');
+      QuickItemActions.bindRemovals(table, {
+        toast: showToast,
+        onRemoved: function (row) {
+          row.remove();
+          document.getElementById('rid-of-count').textContent = table.querySelectorAll('tbody tr').length;
+        },
+      });
+      QuickItemActions.bindKept(table, {
         toast: showToast,
         confirmUnkeep: function (name) {
           return confirm('Remove ' + name + ' from kept?');

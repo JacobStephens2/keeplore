@@ -26,7 +26,7 @@
     var pending = new Set();
     root.addEventListener('submit', async function (event) {
       var form = event.target.closest(kept
-        ? 'form.kept-toggle-form' : 'form.get-rid-of-form, form.untrack-form');
+        ? 'form.kept-toggle-form' : 'form.get-rid-of-form, form.untrack-form, form.restore-form');
       if (!form || !root.contains(form)) return;
       event.preventDefault();
       var itemId = Number(form.querySelector('input[name="artifact_id"]').value);
@@ -39,12 +39,13 @@
       pending.add(itemId);
       var row = form.closest('tr');
       var cell = form.closest('td.kept');
+      var restoring = form.classList.contains('restore-form');
       var controls = Array.prototype.map.call(form.querySelectorAll('button'), function (button) {
         return { button: button, label: button.textContent, disabled: button.disabled };
       });
       controls.forEach(function (control) {
         control.button.disabled = true;
-        if (!kept) control.button.textContent = 'Removing…';
+        if (!kept) control.button.textContent = restoring ? 'Restoring…' : 'Removing…';
       });
       try {
         var response = await request(form.action, {
@@ -71,8 +72,9 @@
           fallback = 'Updated.';
         } else {
           options.onRemoved(row, data);
-          fallback = form.classList.contains('get-rid-of-form')
-            ? 'Marked to get rid of.' : 'Removed from tracked collection.';
+          fallback = restoring ? 'Restored to collection.'
+            : (form.classList.contains('get-rid-of-form')
+              ? 'Marked to get rid of.' : 'Removed from tracked collection.');
         }
         options.toast(data.message || fallback, 'success');
       } catch (error) {
