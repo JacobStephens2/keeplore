@@ -14,10 +14,11 @@ function requestUrl(request) {
   return request.url;
 }
 
-function loadWorker(fetchImpl) {
+function loadWorker(fetchImpl, options = {}) {
   const listeners = {};
   const stores = new Map();
   const pending = new Set();
+  const holdCacheOpens = options.holdCacheOpens;
 
   function track(promise) {
     const settled = Promise.resolve(promise).then(() => {}, () => {});
@@ -51,10 +52,14 @@ function loadWorker(fetchImpl) {
 
   const caches = {
     open(name) {
-      return track(Promise.resolve().then(() => {
+      const openCache = () => {
         if (!stores.has(name)) stores.set(name, new MemoryCache());
         return stores.get(name);
-      }));
+      };
+      const opened = holdCacheOpens
+        ? holdCacheOpens.then(openCache)
+        : Promise.resolve().then(openCache);
+      return track(opened);
     },
     match(request) {
       return track((async () => {
@@ -108,8 +113,28 @@ function loadWorker(fetchImpl) {
     for (const listener of listeners[type] || []) listener(event);
   }
 
+  function startFetch(url, init = {}) {
+    const request = { url, method: 'GET', mode: 'cors', ...init };
+    let responsePromise;
+    const waits = [];
+    const dispatched = dispatch('fetch', {
+      request,
+      respondWith(promise) { responsePromise = promise; },
+      waitUntil(promise) { waits.push(promise); },
+    });
+    return {
+      response: dispatched.then(() => responsePromise),
+      done() {
+        return Promise.resolve(responsePromise).then(() => {}, () => {}).then(() => (
+          Promise.all(waits.map((promise) => Promise.resolve(promise).then(() => {}, () => {})))
+        )).then(() => idle());
+      },
+    };
+  }
+
   return {
     caches,
+    startFetch,
     async install() {
       let done;
       await dispatch('install', {
@@ -119,18 +144,12 @@ function loadWorker(fetchImpl) {
       await idle();
     },
     async fetch(url, init = {}) {
-      const request = { url, method: 'GET', mode: 'cors', ...init };
-      let responsePromise;
-      const waits = [];
-      await dispatch('fetch', {
-        request,
-        respondWith(promise) { responsePromise = promise; },
-        waitUntil(promise) { waits.push(promise); },
-      });
-      const response = responsePromise ? await responsePromise : undefined;
-      await Promise.all(waits.map((promise) => Promise.resolve(promise).then(() => {}, () => {})));
-      await idle();
-      return response;
+      const started = startFetch(url, init);
+      try {
+        return await started.response;
+      } finally {
+        await started.done();
+      }
     },
   };
 }
@@ -292,6 +311,54 @@ function shellResponse(url) {
     headers: { 'Cache-Control': 'max-age=3600' },
   });
 }
+
+test('a service worker cache write that started before logout is dropped and one that starts after the delete is stored', async () => {
+  const staleUrl = PRIVATE_PAGE;
+  const laterUrl = ORIGIN + '/assets/after-logout.png';
+  let releaseOpens;
+  const holdCacheOpens = new Promise((resolve) => {
+    releaseOpens = resolve;
+  });
+  const worker = loadWorker((request) => {
+    const url = requestUrl(request);
+    if (url === staleUrl) {
+      return new Response('secret', {
+        status: 200,
+        headers: { 'Cache-Control': 'max-age=60' },
+      });
+    }
+    if (url === laterUrl) {
+      return new Response('public-after', {
+        status: 200,
+        headers: { 'Cache-Control': 'max-age=60' },
+      });
+    }
+    if (url === ORIGIN + '/logout') {
+      return new Response('', { status: 302, headers: { Location: '/login.php' } });
+    }
+    return shellResponse(url);
+  }, { holdCacheOpens });
+
+  const stale = worker.startFetch(staleUrl);
+  const staleResponse = await stale.response;
+  assert.equal(await body(staleResponse), 'secret');
+  assert.equal(await worker.caches.match(staleUrl), undefined);
+
+  const logout = worker.startFetch(ORIGIN + '/logout', { mode: 'navigate' });
+  const logoutResponse = await logout.response;
+  assert.equal(logoutResponse.status, 302);
+
+  releaseOpens();
+  await stale.done();
+  await logout.done();
+
+  assert.equal(await worker.caches.match(staleUrl), undefined);
+  assert.equal(await body(await worker.caches.match(ORIGIN + '/offline.html')), 'offline-shell');
+
+  const later = await worker.fetch(laterUrl);
+  assert.equal(await body(later), 'public-after');
+  assert.equal(await body(await worker.caches.match(laterUrl)), 'public-after');
+});
 
 test('logout drops stored pages and keeps the offline page', async () => {
   const worker = loadWorker((request) => {

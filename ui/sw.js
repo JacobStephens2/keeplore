@@ -17,6 +17,11 @@ const STATIC_ASSETS = [
 const OFFLINE_PAGE = '/offline.html';
 const PUBLIC_SHELL = [...STATIC_ASSETS, OFFLINE_PAGE];
 
+// A cache write takes this value when it starts and skips its put if logout
+// has advanced it. Logout advances it before deleting the cache, so the put
+// cannot recreate the cache afterward.
+let cacheGeneration = 0;
+
 function isNoStore(response) {
   if (!response || !response.headers) return false;
   const header = response.headers.get('Cache-Control') || '';
@@ -71,8 +76,12 @@ function storeIfCacheable(request, response) {
   if (!response || !response.ok || isNoStore(response) || !responseIsThisOrigin(response, request)) {
     return Promise.resolve();
   }
+  const generation = cacheGeneration;
   const clone = response.clone();
-  return caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+  return caches.open(CACHE_NAME).then(cache => {
+    if (generation !== cacheGeneration) return undefined;
+    return cache.put(request, clone);
+  });
 }
 
 // Install stores nothing unless every public asset loaded. A no-store asset is skipped.
@@ -127,6 +136,7 @@ self.addEventListener('fetch', event => {
   if (isLogoutRequest(request)) {
     const outcome = fetch(request).then(response => {
       if (!logoutReachedServer(response)) return { response, cleared: false };
+      cacheGeneration += 1;
       return caches.delete(CACHE_NAME).then(() => ({ response, cleared: true }));
     });
     event.waitUntil(
