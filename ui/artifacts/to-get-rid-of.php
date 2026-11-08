@@ -2,7 +2,13 @@
   require_once('../../private/initialize.php');
   require_login_or_guest();
 
-  $artifacts = (new Items($db, (int) $_SESSION['user_id']))->list(['to_get_rid_of' => true]);
+  $type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
+  $all_types_selected = count($type_filter['selected']) === count($type_filter['types']);
+  $artifacts = (new Items($db, (int) $_SESSION['user_id']))->list([
+    'to_get_rid_of' => true,
+    // All types keeps items without a type visible too.
+    'type_ids' => $all_types_selected ? null : $type_filter['selected'],
+  ]);
 
   $page_title = 'To Get Rid Of';
   include(SHARED_PATH . '/header.php');
@@ -15,12 +21,28 @@
     <p class="page-lede">Items you have decided to release. They no longer appear in your Interact By list.</p>
   </header>
 
+  <form class="filter-panel" action="<?php echo url_for('/artifacts/to-get-rid-of.php'); ?>" method="post">
+    <?php echo csrf_input(); ?>
+    <fieldset>
+      <legend>Item type</legend>
+      <section id="artifactType" class="type-chip-group">
+        <?php require SHARED_PATH . '/artifact_type_checkboxes.php'; ?>
+      </section>
+    </fieldset>
+    <button type="submit">Apply filters</button>
+  </form>
+
   <?php if ($artifacts === []) { ?>
     <div class="empty-state">
       <p class="section-label">Empty</p>
+      <?php if (!$all_types_selected) { ?>
+      <h2>No items match these types</h2>
+      <p>Select other types or select all to see more items marked to get rid of.</p>
+      <?php } else { ?>
       <h2>Nothing marked to get rid of</h2>
       <p>When an item no longer earns its keep, mark it from the interact-by queue. It will land here.</p>
       <a class="secondary-link" href="<?php echo url_for('/artifacts/useby.php'); ?>">Review interact-by queue</a>
+      <?php } ?>
     </div>
   <?php } else { ?>
 
