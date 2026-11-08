@@ -328,15 +328,97 @@ for (const failure of ['http', 'body', 'json', 'network', 'throw']) {
 
 function toGetRidOf() {
   const b = browser();
-  const table = b.doc.body.appendChild(b.el('table', { id: 'rid-of-table', className: 'list' }));
+  const count = b.el('span', { id: 'rid-of-count', textContent: '2' });
+  const tbody = b.el('tbody');
+  const table = b.doc.body.appendChild(b.el('table', { id: 'rid-of-table', className: 'list' }, [
+    b.el('thead', {}, [b.el('tr', {}, [b.el('th', {}, [count])])]),
+    tbody,
+  ]));
+  const toast = b.doc.body.appendChild(b.el('div', { id: 'rid-of-toast' }));
   b.load('ui/shared/js/quick-item-actions.js');
   const page = fs.readFileSync(path.join(project, 'ui/artifacts/to-get-rid-of.php'), 'utf8');
   const inline = [...page.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   vm.runInContext(inline, b.context);
-  return { ...b, table };
+  return { ...b, table, tbody, count, toast };
 }
 
-test('To get rid of confirms only unkeep, cancellation sends nothing and Restore submits ordinarily', async () => {
+function restoreRow(b, id = 11) {
+  const row = keptRow(b, id);
+  const page = fs.readFileSync(path.join(project, 'ui/artifacts/to-get-rid-of.php'), 'utf8');
+  const markup = page.match(/<form\b[^>]*>[\s\S]*?class="restore-btn"/)[0];
+  const className = markup.split('<button')[0].match(/class="([^"]*)"/)?.[1] || '';
+  const form = b.el('form', { className, action: '/artifacts/mark-get-rid-of.php' }, [
+    ...Object.entries({ artifact_id: String(id), artifact_name: 'Chess', csrf_token: 'tok',
+      value: '0', return_to: 'to-get-rid-of' })
+      .map(([name, value]) => b.el('input', { name, value, type: 'hidden' })),
+    b.el('button', { className: 'restore-btn', type: 'submit', textContent: 'Restore' }),
+  ]);
+  row.appendChild(b.el('td', {}, [form]));
+  b.tbody.appendChild(row);
+  return { row, form, button: form.querySelector('button') };
+}
+
+test('To get rid of restores only the submitted item in place and reports success', async () => {
+  const b = toGetRidOf();
+  const first = restoreRow(b);
+  const second = restoreRow(b, 12);
+  assert.equal(first.form.dispatch('submit').defaultPrevented, true);
+  first.form.dispatch('submit');
+  assert.equal(b.requests.length, 1, 'pending Restore cannot submit twice');
+  assert.equal(first.button.disabled, true);
+  assert.equal(first.button.textContent, 'Restoring…');
+  const { url, options } = b.requests[0];
+  assert.equal(url, '/artifacts/mark-get-rid-of.php');
+  assert.equal(options.method, 'POST');
+  assert.equal(options.headers['X-Requested-With'], 'XMLHttpRequest');
+  assert.equal(options.body.get('value'), '0');
+  assert.equal(options.body.get('csrf_token'), 'tok');
+  assert.equal(options.body.get('return_to'), 'to-get-rid-of');
+  assert.equal(first.row.parentNode, b.tbody, 'keep the row until the save succeeds');
+  b.requests[0].respond({ ok: true, message: 'Chess restored to collection.' });
+  await flush();
+  assert.equal(first.row.parentNode, null);
+  assert.equal(second.row.parentNode, b.tbody);
+  assert.equal(b.count.textContent, '1');
+  assert.equal(b.toast.textContent, 'Chess restored to collection.');
+  assert.equal(b.toast.classList.contains('toast-success'), true);
+  assertKept(second.row, true);
+  assert.deepEqual(b.confirmations, []);
+  second.form.dispatch('submit');
+  b.requests[1].respond({ ok: true, message: 'Chess restored to collection.' });
+  await flush();
+  assert.equal(second.row.parentNode, null);
+  assert.equal(b.count.textContent, '0');
+});
+
+for (const failure of ['http', 'body', 'json', 'network']) {
+  test(`To get rid of Restore ${failure} failure keeps the item and allows retry`, async () => {
+    const b = toGetRidOf();
+    const { row, form, button } = restoreRow(b);
+    form.dispatch('submit');
+    if (failure === 'http') b.requests[0].respond({ ok: false, message: 'Denied' }, false);
+    if (failure === 'body') b.requests[0].respond({ ok: false, message: 'Denied' });
+    if (failure === 'json') b.requests[0].invalidJSON();
+    if (failure === 'network') b.requests[0].reject(new Error('Offline'));
+    await flush();
+    assert.equal(row.parentNode, b.tbody);
+    assert.equal(b.count.textContent, '2');
+    assert.equal(button.disabled, false);
+    assert.equal(button.textContent, 'Restore');
+    assert.equal(b.toast.classList.contains('toast-error'), true);
+    assert.match(b.toast.textContent, /Denied|Invalid JSON|Offline/);
+    form.dispatch('submit');
+    assert.equal(b.requests.length, 2);
+    b.requests[1].respond({ ok: true });
+    await flush();
+    assert.equal(row.parentNode, null);
+    assert.equal(b.count.textContent, '0');
+    assert.equal(b.toast.textContent, 'Restored to collection.');
+    assert.equal(b.toast.classList.contains('toast-success'), true);
+  });
+}
+
+test('To get rid of confirms only unkeep and cancellation sends nothing', async () => {
   const b = toGetRidOf();
   const row = b.table.appendChild(keptRow(b));
   const form = row.querySelector('form');
@@ -356,9 +438,6 @@ test('To get rid of confirms only unkeep, cancellation sends nothing and Restore
   b.requests[1].respond({ ok: true, is_kept: 1 });
   await flush();
   assertKept(row, true);
-  const restore = b.table.appendChild(b.el('form', { action: '/restore.php' }));
-  assert.equal(restore.dispatch('submit').defaultPrevented, false);
-  assert.equal(b.requests.length, 2);
 });
 
 async function keptList(caller, isGuest = false) {
