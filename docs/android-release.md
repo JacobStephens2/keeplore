@@ -16,14 +16,6 @@ original keystore is required to publish an update; a newly generated key cannot
 upgrade the existing installation. The K artwork is ready, but the release is
 still pending the signing setup below.
 
-The publication requested in [#296](https://github.com/JacobStephens2/keeplore/issues/296)
-therefore remains unfinished. The existing
-[`needs-triage` issue #293](https://github.com/JacobStephens2/keeplore/issues/293)
-tracks recovering the original signing key and configuring those secrets. The
-key is also absent from the `capacitor/keystore.jks` and `twa/keystore.jks` paths
-in both local checkouts checked for #296. Someone with custody of the original
-key must complete that handoff; a passing debug build is not a published update.
-
 ## Verify the packaged icon
 
 The **Verify Keeplore Android icons** workflow builds and checks a debug APK on
@@ -112,10 +104,7 @@ The commands reject the AAB unless its signer digest is that same fingerprint.
 `SHA256SUMS` is downloaded from the same release as the files, so a checksum
 match does not say which key signed the bundle. Finally, install that APK over
 an existing 2.1.0 installation and check that the app retains its data and shows
-the K launcher icon. Leave #293 open until this signed update is published and
-the upgrade is verified. As of the check above, `gh release view 2.1.1 --repo
-JacobStephens2/keeplore` returns `release not found`; none of these publication
-or device checks has passed yet.
+the K launcher icon.
 
 For later releases, increase `versionCode` in `capacitor/android/app/build.gradle`
 and update `versionName`, `capacitor/package.json` and `capacitor/package-lock.json`
