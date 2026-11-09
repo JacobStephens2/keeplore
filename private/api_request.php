@@ -1,5 +1,6 @@
 <?php
 
+require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/rate_limiter.php';
 require_once __DIR__ . '/app_logger.php';
 require_once __DIR__ . '/classes/ApiCaller.php';
@@ -49,7 +50,8 @@ function api_request_status_and_fields(mysqli $db, string $endpoint, array $hand
 
 /**
  * The request PHP's globals describe, in answer_api_request()'s shape. The
- * only place that reads the request's credentials and Sec-Fetch-Site.
+ * only place that reads the request's credentials. Sec-Fetch-Site is
+ * sec_fetch_site_header().
  */
 function api_request_from_globals(): array {
   $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
@@ -67,7 +69,7 @@ function api_request_from_globals(): array {
     'body' => json_decode(file_get_contents('php://input')),
     'access_token' => $access_token,
     'authorization' => $authorization === '' ? null : $authorization,
-    'sec_fetch_site' => is_string($_SERVER['HTTP_SEC_FETCH_SITE'] ?? null) ? $_SERVER['HTTP_SEC_FETCH_SITE'] : null,
+    'sec_fetch_site' => sec_fetch_site_header(),
   ];
 }
 

@@ -184,6 +184,17 @@ function run_guest_or_logout(string $action): ?array {
   return null;
 }
 
+// Login and logout both stop on that refusal. What they do when the
+// action is allowed is not the same, so that stays with the caller.
+function exit_on_guest_or_logout_refusal(string $action): void {
+  $refusal = run_guest_or_logout($action);
+  if ($refusal === null) {
+    return;
+  }
+  http_response_code($refusal[0]);
+  exit($refusal[1]['message']);
+}
+
 function start_guest_session() {
   // The Account's access token must not authenticate the next request
   // once the browser is only a guest.
