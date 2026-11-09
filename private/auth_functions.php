@@ -156,6 +156,45 @@ function require_login() {
     }
 }
 
+// Browse as guest, Logout, and Exit guest mode. Reads Sec-Fetch-Site
+// from this request. cross-site is cross_site_request_refusal() and the
+// session stays as it was. same-site, same-origin, and none run the
+// action and return null. Exit guest mode is logout while this session
+// is already a guest. Any other $action is not one of these.
+function run_guest_or_logout(string $action): ?array {
+  if ($action !== 'guest' && $action !== 'logout') {
+    return null;
+  }
+  if ($action === 'guest') {
+    $cannot = 'browse as guest';
+  } elseif (is_guest()) {
+    $cannot = 'exit guest mode';
+  } else {
+    $cannot = 'log out';
+  }
+  $refusal = cross_site_request_refusal(sec_fetch_site_header(), $cannot);
+  if ($refusal !== null) {
+    return $refusal;
+  }
+  if ($action === 'guest') {
+    start_guest_session();
+    return null;
+  }
+  log_out();
+  return null;
+}
+
+// Login and logout both stop on that refusal. What they do when the
+// action is allowed is not the same, so that stays with the caller.
+function exit_on_guest_or_logout_refusal(string $action): void {
+  $refusal = run_guest_or_logout($action);
+  if ($refusal === null) {
+    return;
+  }
+  http_response_code($refusal[0]);
+  exit($refusal[1]['message']);
+}
+
 function start_guest_session() {
   // The Account's access token must not authenticate the next request
   // once the browser is only a guest.

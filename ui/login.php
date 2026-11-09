@@ -52,13 +52,13 @@ if (isset($_REQUEST['action'])) {
 } else {
   $action = '';
 }
+exit_on_guest_or_logout_refusal(is_string($action) ? $action : '');
 if ($action == 'logout') {
-  log_out();
+  // log_out() ended the session. The login form needs a new token.
   session_start();
   generate_csrf_token();
 }
 if ($action == 'guest') {
-  start_guest_session();
   redirect_to(url_for('/index.php'));
 }
 

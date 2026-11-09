@@ -1,5 +1,6 @@
 <?php
 
+require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/classes/ApiCaller.php';
 require_once __DIR__ . '/classes/DailyEmail.php';
 require_once __DIR__ . '/classes/Mailer.php';
@@ -15,10 +16,10 @@ require_once __DIR__ . '/classes/Mailer.php';
  * Returns [status, response fields], with how many items the email told about.
  */
 function send_daily_email_over_api(mysqli $db, ApiCaller $caller, array $query, Mailer $mailer, ?string $fetchSite): array {
-  // A cross-site GET would otherwise carry a cookie the browser still
-  // treats as Lax and send the owner's Daily email.
-  if ($fetchSite === 'cross-site') {
-    return [403, ['message' => 'A cross-site request cannot send the Daily email.']];
+  // Same cross-site refusal as Browse as guest, Logout, and Exit guest mode.
+  $refusal = cross_site_request_refusal($fetchSite, 'send the Daily email');
+  if ($refusal !== null) {
+    return $refusal;
   }
 
   $refusal = $caller->agentKeyRefusal();

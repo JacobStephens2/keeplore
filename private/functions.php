@@ -20,6 +20,24 @@ function validate_csrf_token() {
   return hash_equals($_SESSION['csrf_token'], $_POST['csrf_token']);
 }
 
+// Sec-Fetch-Site as the request sent it, or null when it sent none or
+// sent a value that is not a string. Browsers set this header; a page
+// cannot.
+function sec_fetch_site_header(): ?string {
+  $fetchSite = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? null;
+  return is_string($fetchSite) ? $fetchSite : null;
+}
+
+// A cross-site navigation still carries a Lax session cookie. The Daily
+// email, Browse as guest, Logout, and Exit guest mode share this refusal.
+// same-site, same-origin, and a missing header are not cross-site.
+function cross_site_request_refusal(?string $fetchSite, string $cannot): ?array {
+  if ($fetchSite === 'cross-site') {
+    return [403, ['message' => 'A cross-site request cannot ' . $cannot . '.']];
+  }
+  return null;
+}
+
 function url_for($script_path) {
   // add the leading '/' if not present
   if($script_path[0] != '/') {

@@ -6,8 +6,9 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Seam: api_request_from_globals(), the only read of an HTTP API request's
- * credentials and Sec-Fetch-Site. The request array carries that header
- * for the handler, or null when the browser did not send it.
+ * credentials. Sec-Fetch-Site is sec_fetch_site_header(). The request
+ * array carries that header for the handler, or null when the browser
+ * did not send it.
  */
 class ApiRequestGlobalsTest extends TestCase
 {
