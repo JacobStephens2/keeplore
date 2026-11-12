@@ -253,4 +253,83 @@ final class LoginSessionTest extends TestCase
 
         $this->assertFalse(is_logged_in());
     }
+
+    public function test_restoration_requires_an_existing_account(): void
+    {
+        $_COOKIE['access_token'] = $this->accessToken(time() - 60, 999);
+
+        $this->assertFalse(is_logged_in());
+        $this->assertArrayNotHasKey('user_id', $_SESSION);
+    }
+
+    public function test_restoration_preserves_the_login_fields_and_repairs_the_person_link(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        $previousSession = session_id();
+        $this->db->query("INSERT INTO players (id, user_id, FirstName, LastName, represents_user_id)
+            VALUES (5, 1, 'Sam', 'Lee', 1)");
+        $issuedAt = time() - 3600;
+        $_COOKIE['access_token'] = $this->accessToken($issuedAt);
+
+        $this->assertTrue(is_logged_in());
+        $this->assertNotSame($previousSession, session_id());
+        $this->assertSame(1, $_SESSION['user_id']);
+        $this->assertSame(5, $_SESSION['player_id']);
+        $this->assertSame('Sam Lee', $_SESSION['FullName']);
+        $this->assertSame('ownerusername', $_SESSION['username']);
+        $this->assertSame(1, $_SESSION['user_group']);
+        $this->assertTrue($_SESSION['logged_in']);
+        $this->assertSame($issuedAt, $_SESSION['last_login']);
+
+        // The same Account read repairs the link for subsequent sessions too.
+        unset($_SESSION['player_id']);
+        $this->assertTrue(is_logged_in());
+        $this->assertSame(5, $_SESSION['player_id']);
+    }
+
+    public function test_missing_issued_at_uses_restoration_time_only_without_a_reset(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        $_COOKIE['access_token'] = JWT::encode(['user_id' => 1], JWT_SECRET, 'HS256');
+        $before = time();
+
+        $this->assertTrue(is_logged_in());
+        $this->assertGreaterThanOrEqual($before, $_SESSION['last_login']);
+        $this->assertLessThanOrEqual(time(), $_SESSION['last_login']);
+
+        $_SESSION = [];
+        $this->passwordChangedAt(1, time() - 60);
+        $this->assertFalse(is_logged_in());
+    }
+
+    public function test_zero_issued_at_is_not_replaced_with_restoration_time(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        $_COOKIE['access_token'] = JWT::encode(['user_id' => 1, 'iat' => 0], JWT_SECRET, 'HS256');
+
+        $this->assertTrue(is_logged_in());
+        $this->assertSame(0, $_SESSION['last_login']);
+    }
+
+    public function test_storage_failures_during_restoration_still_return_not_logged_in(): void
+    {
+        $_COOKIE['access_token'] = $this->accessToken(time() - 60);
+        $this->db->query('DROP TABLE users');
+
+        $this->assertFalse(is_logged_in());
+    }
+
+    public function test_account_lookup_failures_during_restoration_still_return_not_logged_in(): void
+    {
+        $_COOKIE['access_token'] = $this->accessToken(time() - 60);
+        $this->db->query('ALTER TABLE users DROP COLUMN first_name');
+
+        $this->assertFalse(is_logged_in());
+    }
 }

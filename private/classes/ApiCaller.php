@@ -1,10 +1,7 @@
 <?php
 
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
-
 require_once __DIR__ . '/AgentKeys.php';
-require_once __DIR__ . '/Accounts.php';
+require_once __DIR__ . '/AccountAccessTokens.php';
 
 /**
  * Who an HTTP API request is, from the credentials it carries, and whose
@@ -42,18 +39,8 @@ final class ApiCaller
     public static function fromCredentials(mysqli $db, ?string $accessToken, ?string $authorization): ?self
     {
         if ($accessToken !== null) {
-            try {
-                $session = JWT::decode($accessToken, new Key(JWT_SECRET, 'HS256'));
-            } catch (Exception $e) {
-                return null;
-            }
-            if (!isset($session->user_id)) {
-                return null;
-            }
-            if (!Accounts::issuedAtAuthenticates($db, (int) $session->user_id, $session->iat ?? null)) {
-                return null;
-            }
-            return self::session($db, (int) $session->user_id);
+            $identity = AccountAccessTokens::authenticate($db, $accessToken);
+            return $identity === null ? null : self::session($db, $identity['user_id']);
         }
         if ($authorization !== null && strncasecmp($authorization, 'Bearer ', 7) === 0) {
             $token = trim(substr($authorization, 7));

@@ -2,6 +2,8 @@
 
 namespace Tests\Unit;
 
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -72,6 +74,26 @@ class AccessTokenCookieTest extends TestCase
         $cookie = $this->accessTokenCookie($this->request('expire')['headers']);
         $this->assertNotNull($cookie);
         $this->assertAccessTokenCookie($cookie, 0);
+    }
+
+    public function test_login_cookie_and_php_session_use_the_issued_token_window(): void
+    {
+        foreach (['login' => 86400, 'login&remember=1' => 2592000] as $mode => $lifetime) {
+            $response = $this->request($mode);
+            $cookie = $this->accessTokenCookie($response['headers']);
+            preg_match('/^access_token=([^;]+)/', $cookie, $token);
+            preg_match('/expires=([^;]+)/i', $cookie, $expires);
+            $claims = JWT::decode(rawurldecode($token[1]), new Key(JWT_SECRET, 'HS256'));
+            $session = json_decode($response['body'], true);
+
+            $this->assertSame($claims->exp, strtotime($expires[1]));
+            $this->assertSame('127.0.0.1', $claims->iss);
+            $this->assertSame($lifetime, $session['gc_lifetime']);
+            $this->assertSame($lifetime, $session['cookie_lifetime']);
+            $this->assertTrue($session['regenerated']);
+            $this->assertSame('kept', $session['existing_field']);
+            $this->assertSame(1, $session['user_id']);
+        }
     }
 
     private function assertAccessTokenCookie(string $cookie, int $maxAge): void
@@ -162,8 +184,16 @@ session_start();
   'user_group' => 1,
 ];
 if (\$mode === 'login') {
+  \$previousSession = session_id();
+  \$_SESSION['existing_field'] = 'kept';
   log_in_user(\$account, (\$_GET['remember'] ?? '') === '1');
-  echo 'login';
+  echo json_encode([
+    'gc_lifetime' => (int) ini_get('session.gc_maxlifetime'),
+    'cookie_lifetime' => session_get_cookie_params()['lifetime'],
+    'regenerated' => session_id() !== \$previousSession,
+    'existing_field' => \$_SESSION['existing_field'] ?? null,
+    'user_id' => \$_SESSION['user_id'] ?? null,
+  ]);
   return true;
 }
 if (\$mode === 'expire') {
