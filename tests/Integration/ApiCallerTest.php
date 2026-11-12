@@ -5,7 +5,8 @@ namespace Tests\Integration;
 use AgentKeys;
 use ApiCaller;
 use Firebase\JWT\JWT;
-use PHPUnit\Framework\TestCase;
+
+require_once __DIR__ . '/MySqlTestCase.php';
 
 /**
  * Seam: ApiCaller, who an HTTP API request is, from the credentials it
@@ -16,27 +17,11 @@ use PHPUnit\Framework\TestCase;
  * owner of the Item the request names. Only an agent key is refused
  * outside reads and the kept toggle (ADR-0002).
  */
-final class ApiCallerTest extends TestCase
+final class ApiCallerTest extends MySqlTestCase
 {
-    private ?\mysqli $db = null;
-    private string $databaseName;
-
     protected function setUp(): void
     {
-        if (!getenv('KEEPLORE_TEST_DB_HOST')) {
-            $this->markTestSkipped('Set KEEPLORE_TEST_DB_HOST to run MySQL integration tests.');
-        }
-        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-        $this->db = new \mysqli(
-            getenv('KEEPLORE_TEST_DB_HOST'),
-            getenv('KEEPLORE_TEST_DB_USER') ?: 'root',
-            getenv('KEEPLORE_TEST_DB_PASSWORD') ?: '',
-            '',
-            (int) (getenv('KEEPLORE_TEST_DB_PORT') ?: 3306)
-        );
-        $this->databaseName = 'keeplore_test_' . bin2hex(random_bytes(6));
-        $this->db->query('CREATE DATABASE ' . $this->databaseName);
-        $this->db->select_db($this->databaseName);
+        parent::setUp();
         $this->db->query('CREATE TABLE users (id INT PRIMARY KEY, password_changed_at INT UNSIGNED NULL)');
         $this->db->query('INSERT INTO users (id) VALUES (1), (2)');
         $this->db->query('CREATE TABLE games (id INT PRIMARY KEY, user_id INT NOT NULL)');
@@ -51,14 +36,6 @@ final class ApiCallerTest extends TestCase
             revoked_at DATETIME NULL DEFAULT NULL
         )');
         require_once PRIVATE_PATH . '/classes/ApiCaller.php';
-    }
-
-    protected function tearDown(): void
-    {
-        if ($this->db !== null) {
-            $this->db->query('DROP DATABASE ' . $this->databaseName);
-            $this->db->close();
-        }
     }
 
     /** A session token for $userId, issued by the same interface as login. */

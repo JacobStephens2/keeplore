@@ -4,40 +4,17 @@ namespace Tests\Integration;
 
 use AccountAccessTokens;
 use Firebase\JWT\JWT;
-use PHPUnit\Framework\TestCase;
 
-final class AccountAccessTokensTest extends TestCase
+require_once __DIR__ . '/MySqlTestCase.php';
+
+final class AccountAccessTokensTest extends MySqlTestCase
 {
-    private ?\mysqli $db = null;
-    private string $databaseName;
-
     protected function setUp(): void
     {
-        if (!getenv('KEEPLORE_TEST_DB_HOST')) {
-            $this->markTestSkipped('Set KEEPLORE_TEST_DB_HOST to run MySQL integration tests.');
-        }
-        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-        $this->db = new \mysqli(
-            getenv('KEEPLORE_TEST_DB_HOST'),
-            getenv('KEEPLORE_TEST_DB_USER') ?: 'root',
-            getenv('KEEPLORE_TEST_DB_PASSWORD') ?: '',
-            '',
-            (int) (getenv('KEEPLORE_TEST_DB_PORT') ?: 3306)
-        );
-        $this->databaseName = 'keeplore_test_' . bin2hex(random_bytes(6));
-        $this->db->query('CREATE DATABASE ' . $this->databaseName);
-        $this->db->select_db($this->databaseName);
+        parent::setUp();
         $this->db->query('CREATE TABLE users (id INT PRIMARY KEY, password_changed_at INT UNSIGNED NULL)');
         $this->db->query('INSERT INTO users (id) VALUES (1), (2)');
         require_once PRIVATE_PATH . '/classes/AccountAccessTokens.php';
-    }
-
-    protected function tearDown(): void
-    {
-        if ($this->db !== null) {
-            $this->db->query('DROP DATABASE ' . $this->databaseName);
-            $this->db->close();
-        }
     }
 
     public function test_only_a_token_issued_after_the_password_reset_authenticates(): void

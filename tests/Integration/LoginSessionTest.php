@@ -3,7 +3,8 @@
 namespace Tests\Integration;
 
 use Firebase\JWT\JWT;
-use PHPUnit\Framework\TestCase;
+
+require_once __DIR__ . '/MySqlTestCase.php';
 
 /**
  * Seam: is_logged_in(), whether the browser's session or access-token
@@ -13,27 +14,11 @@ use PHPUnit\Framework\TestCase;
  * completed the reset. A login after the reset still signs the account in.
  * A guest session is not a login.
  */
-final class LoginSessionTest extends TestCase
+final class LoginSessionTest extends MySqlTestCase
 {
-    private ?\mysqli $db = null;
-    private string $databaseName;
-
     protected function setUp(): void
     {
-        if (!getenv('KEEPLORE_TEST_DB_HOST')) {
-            $this->markTestSkipped('Set KEEPLORE_TEST_DB_HOST to run MySQL integration tests.');
-        }
-        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-        $this->db = new \mysqli(
-            getenv('KEEPLORE_TEST_DB_HOST'),
-            getenv('KEEPLORE_TEST_DB_USER') ?: 'root',
-            getenv('KEEPLORE_TEST_DB_PASSWORD') ?: '',
-            '',
-            (int) (getenv('KEEPLORE_TEST_DB_PORT') ?: 3306)
-        );
-        $this->databaseName = 'keeplore_test_' . bin2hex(random_bytes(6));
-        $this->db->query('CREATE DATABASE ' . $this->databaseName);
-        $this->db->select_db($this->databaseName);
+        parent::setUp();
         $this->db->query('CREATE TABLE users (
             id INT PRIMARY KEY,
             first_name VARCHAR(255),
@@ -67,10 +52,7 @@ final class LoginSessionTest extends TestCase
     {
         $_SESSION = [];
         unset($_COOKIE['access_token']);
-        if ($this->db !== null) {
-            $this->db->query('DROP DATABASE ' . $this->databaseName);
-            $this->db->close();
-        }
+        parent::tearDown();
     }
 
     private function defineAuthConstants(): void
