@@ -12,7 +12,7 @@ final class AccountAccessTokens
      * Issue a credential for 24 hours, or 30 days with Remember me.
      * The expiry and lifetime also govern the login cookie and PHP session.
      *
-     * @return array{token: string, expires_at: int, lifetime: int}
+     * @return array{token: string, issued_at: int, expires_at: int, lifetime: int}
      */
     public static function issue(int $accountId, string $issuer, bool $remember = false): array
     {
@@ -27,6 +27,7 @@ final class AccountAccessTokens
                 'exp' => $expiresAt,
                 'user_id' => $accountId,
             ], JWT_SECRET, 'HS256'),
+            'issued_at' => $issuedAt,
             'expires_at' => $expiresAt,
             'lifetime' => $lifetime,
         ];

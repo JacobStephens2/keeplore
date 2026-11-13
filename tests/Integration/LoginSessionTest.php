@@ -4,8 +4,10 @@ namespace Tests\Integration;
 
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
+use Tests\Support\LocalPhpServer;
 
 require_once __DIR__ . '/MySqlTestCase.php';
+require_once __DIR__ . '/../Support/LocalPhpServer.php';
 
 /**
  * Seam: is_logged_in(), whether the browser's session or access-token
@@ -329,8 +331,9 @@ final class LoginSessionTest extends MySqlTestCase
         $database = $this->db->query('SELECT DATABASE()')->fetch_row()[0];
         $savedDatabase = getenv('KEEPLORE_REVIEW_DB_NAME');
         putenv('KEEPLORE_REVIEW_DB_NAME=' . $database);
-        $server = $this->startLoginCutoffServer();
+        $server = null;
         try {
+            $server = new LocalPhpServer($this->loginCutoffRouter());
             $login = $this->loginCutoffRequest($server, 'login');
             $issuedAt = $this->accessTokenIssuedAt($login['headers']);
             $sessionId = $this->sessionCookie($login['headers']);
@@ -347,7 +350,7 @@ final class LoginSessionTest extends MySqlTestCase
                 . ' reads=' . ($login['body_json']['reads'] ?? 'missing')
             );
         } finally {
-            $this->stopLoginCutoffServer($server);
+            $server?->stop();
             if ($savedDatabase === false) {
                 putenv('KEEPLORE_REVIEW_DB_NAME');
             } else {
@@ -356,91 +359,18 @@ final class LoginSessionTest extends MySqlTestCase
         }
     }
 
-    /** @return array{process: resource, pipes: array<int, resource>, router: string, log: string, port: int, sessions: string} */
-    private function startLoginCutoffServer(): array
-    {
-        $log = tempnam(sys_get_temp_dir(), 'keeplore-login-cutoff-log-');
-        $router = tempnam(sys_get_temp_dir(), 'keeplore-login-cutoff-');
-        unlink($router);
-        $router .= '.php';
-        file_put_contents($router, $this->loginCutoffRouter());
-        $sessions = sys_get_temp_dir() . '/keeplore-login-cutoff-sessions-' . bin2hex(random_bytes(4));
-        mkdir($sessions);
-        $port = $this->freeLoginCutoffPort();
-        $pipes = [];
-        $process = proc_open(
-            [PHP_BINARY, '-d', 'session.save_path=' . $sessions, '-S', '127.0.0.1:' . $port, $router],
-            [
-                0 => ['pipe', 'r'],
-                1 => ['file', $log, 'a'],
-                2 => ['file', $log, 'a'],
-            ],
-            $pipes,
-            PROJECT_PATH
-        );
-        $this->assertIsResource($process);
-        $server = [
-            'process' => $process,
-            'pipes' => $pipes,
-            'router' => $router,
-            'log' => $log,
-            'port' => $port,
-            'sessions' => $sessions,
-        ];
-        $this->waitForLoginCutoffServer($server);
-        return $server;
-    }
-
-    /** @param array{process: resource, pipes: array<int, resource>, router: string, log: string, port: int, sessions: string} $server */
-    private function stopLoginCutoffServer(array $server): void
-    {
-        if (is_resource($server['process'])) {
-            proc_terminate($server['process']);
-            proc_close($server['process']);
-        }
-        foreach ([$server['router'], $server['log']] as $path) {
-            if (is_file($path)) {
-                unlink($path);
-            }
-        }
-        if (is_dir($server['sessions'])) {
-            foreach (glob($server['sessions'] . '/*') ?: [] as $sessionFile) {
-                if (is_file($sessionFile)) {
-                    unlink($sessionFile);
-                }
-            }
-            rmdir($server['sessions']);
-        }
-    }
-
     /**
-     * @param array{process: resource, pipes: array<int, resource>, router: string, log: string, port: int, sessions: string} $server
      * @return array{headers: string, body: string, body_json: array<string, mixed>}
      */
-    private function loginCutoffRequest(array $server, string $mode, ?string $sessionId = null): array
+    private function loginCutoffRequest(LocalPhpServer $server, string $mode, ?string $sessionId = null): array
     {
-        $handle = curl_init('http://127.0.0.1:' . $server['port'] . '/?mode=' . $mode);
-        $options = [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HEADER => true,
-            CURLOPT_TIMEOUT => 10,
-        ];
-        if ($sessionId !== null) {
-            $options[CURLOPT_COOKIE] = 'PHPSESSID=' . $sessionId;
-        }
-        curl_setopt_array($handle, $options);
-        $raw = curl_exec($handle);
-        $status = curl_getinfo($handle, CURLINFO_HTTP_CODE);
-        $error = curl_error($handle);
-        curl_close($handle);
-        $log = is_file($server['log']) ? (string) file_get_contents($server['log']) : '';
-        $this->assertNotFalse($raw, $error . "\n" . $log);
-        $this->assertSame(200, $status, $raw . "\n" . $log);
-        [$headers, $body] = explode("\r\n\r\n", $raw, 2);
-        $decoded = json_decode($body, true);
-        $this->assertIsArray($decoded, $body);
+        $headers = $sessionId === null ? [] : ['Cookie: PHPSESSID=' . $sessionId];
+        $response = $server->request('/?mode=' . $mode, $headers);
+        $this->assertSame(200, $response['status'], $response['body']);
+        $decoded = json_decode($response['body'], true);
+        $this->assertIsArray($decoded, $response['body']);
 
-        return ['headers' => $headers, 'body' => $body, 'body_json' => $decoded];
+        return ['headers' => $response['headers'], 'body' => $response['body'], 'body_json' => $decoded];
     }
 
     private function accessTokenIssuedAt(string $headers): int
@@ -469,32 +399,6 @@ final class LoginSessionTest extends MySqlTestCase
         $this->assertNotNull($sessionId, $headers);
 
         return $sessionId;
-    }
-
-    /** @param array{process: resource, pipes: array<int, resource>, router: string, log: string, port: int, sessions: string} $server */
-    private function waitForLoginCutoffServer(array $server): void
-    {
-        $deadline = microtime(true) + 3;
-        do {
-            $socket = @fsockopen('127.0.0.1', $server['port'], $errno, $errstr, 0.1);
-            if ($socket !== false) {
-                fclose($socket);
-                return;
-            }
-            usleep(50000);
-        } while (microtime(true) < $deadline);
-        $log = is_file($server['log']) ? (string) file_get_contents($server['log']) : '';
-        $this->fail("Login cutoff server did not start.\n" . $log);
-    }
-
-    private function freeLoginCutoffPort(): int
-    {
-        $socket = stream_socket_server('tcp://127.0.0.1:0');
-        $this->assertNotFalse($socket);
-        $address = stream_socket_get_name($socket, false);
-        fclose($socket);
-
-        return (int) substr(strrchr($address, ':'), 1);
     }
 
     private function loginCutoffRouter(): string

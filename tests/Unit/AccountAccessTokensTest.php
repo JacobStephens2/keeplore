@@ -23,6 +23,7 @@ final class AccountAccessTokensTest extends TestCase
             $this->assertSame('login.example.test', $claims->iss);
             $this->assertGreaterThanOrEqual($before, $claims->iat);
             $this->assertLessThanOrEqual($after, $claims->iat);
+            $this->assertSame($claims->iat, $issued['issued_at']);
             $this->assertSame($claims->iat, $claims->nbf);
             $this->assertSame($lifetime, $issued['lifetime']);
             $this->assertSame($lifetime, $claims->exp - $claims->iat);

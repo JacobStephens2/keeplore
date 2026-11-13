@@ -31,7 +31,7 @@ function log_in_user($account, $remember = false) {
   session_regenerate_id();
   put_account_in_session($account);
   // Issued with the token. A later stamp would outlive a reset in the token's second.
-  $_SESSION['last_login'] = $issued['expires_at'] - $issued['lifetime'];
+  $_SESSION['last_login'] = $issued['issued_at'];
 
   // Strict keeps this cookie off a cross-site request, including a top-level GET.
   set_access_token_cookie($issued['token'], $issued['expires_at']);
