@@ -3,6 +3,7 @@
 namespace Tests\Integration;
 
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 require_once __DIR__ . '/MySqlTestCase.php';
 
@@ -313,5 +314,265 @@ final class LoginSessionTest extends MySqlTestCase
         $this->db->query('ALTER TABLE users DROP COLUMN first_name');
 
         $this->assertFalse(is_logged_in());
+    }
+
+    /**
+     * Login issues the access token and then restarts the PHP session before
+     * stamping last-login. Those clocks are one login. A password change at
+     * the token's issued-at second has to end the session too, including when
+     * the restart crosses into the next second. The session handler waits on
+     * its second read so that gap is one second here instead of a race.
+     * CLI does not record setcookie(), so this watches a real local response.
+     */
+    public function test_a_password_reset_at_the_access_token_issued_at_ends_the_login_session(): void
+    {
+        $database = $this->db->query('SELECT DATABASE()')->fetch_row()[0];
+        $savedDatabase = getenv('KEEPLORE_REVIEW_DB_NAME');
+        putenv('KEEPLORE_REVIEW_DB_NAME=' . $database);
+        $server = $this->startLoginCutoffServer();
+        try {
+            $login = $this->loginCutoffRequest($server, 'login');
+            $issuedAt = $this->accessTokenIssuedAt($login['headers']);
+            $sessionId = $this->sessionCookie($login['headers']);
+            $this->passwordChangedAt(1, $issuedAt);
+            $status = $this->loginCutoffRequest($server, 'status', $sessionId);
+            $body = json_decode($status['body'], true);
+
+            $this->assertFalse(
+                $body['logged_in'],
+                'A password reset at the access token issued-at left the login session signed in. '
+                . 'iat=' . $issuedAt
+                . ' last_login=' . ($login['body_json']['last_login'] ?? 'missing')
+                . ' restart_seconds=' . ($login['body_json']['elapsed'] ?? 'missing')
+                . ' reads=' . ($login['body_json']['reads'] ?? 'missing')
+            );
+        } finally {
+            $this->stopLoginCutoffServer($server);
+            if ($savedDatabase === false) {
+                putenv('KEEPLORE_REVIEW_DB_NAME');
+            } else {
+                putenv('KEEPLORE_REVIEW_DB_NAME=' . $savedDatabase);
+            }
+        }
+    }
+
+    /** @return array{process: resource, pipes: array<int, resource>, router: string, log: string, port: int, sessions: string} */
+    private function startLoginCutoffServer(): array
+    {
+        $log = tempnam(sys_get_temp_dir(), 'keeplore-login-cutoff-log-');
+        $router = tempnam(sys_get_temp_dir(), 'keeplore-login-cutoff-');
+        unlink($router);
+        $router .= '.php';
+        file_put_contents($router, $this->loginCutoffRouter());
+        $sessions = sys_get_temp_dir() . '/keeplore-login-cutoff-sessions-' . bin2hex(random_bytes(4));
+        mkdir($sessions);
+        $port = $this->freeLoginCutoffPort();
+        $pipes = [];
+        $process = proc_open(
+            [PHP_BINARY, '-d', 'session.save_path=' . $sessions, '-S', '127.0.0.1:' . $port, $router],
+            [
+                0 => ['pipe', 'r'],
+                1 => ['file', $log, 'a'],
+                2 => ['file', $log, 'a'],
+            ],
+            $pipes,
+            PROJECT_PATH
+        );
+        $this->assertIsResource($process);
+        $server = [
+            'process' => $process,
+            'pipes' => $pipes,
+            'router' => $router,
+            'log' => $log,
+            'port' => $port,
+            'sessions' => $sessions,
+        ];
+        $this->waitForLoginCutoffServer($server);
+        return $server;
+    }
+
+    /** @param array{process: resource, pipes: array<int, resource>, router: string, log: string, port: int, sessions: string} $server */
+    private function stopLoginCutoffServer(array $server): void
+    {
+        if (is_resource($server['process'])) {
+            proc_terminate($server['process']);
+            proc_close($server['process']);
+        }
+        foreach ([$server['router'], $server['log']] as $path) {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+        if (is_dir($server['sessions'])) {
+            foreach (glob($server['sessions'] . '/*') ?: [] as $sessionFile) {
+                if (is_file($sessionFile)) {
+                    unlink($sessionFile);
+                }
+            }
+            rmdir($server['sessions']);
+        }
+    }
+
+    /**
+     * @param array{process: resource, pipes: array<int, resource>, router: string, log: string, port: int, sessions: string} $server
+     * @return array{headers: string, body: string, body_json: array<string, mixed>}
+     */
+    private function loginCutoffRequest(array $server, string $mode, ?string $sessionId = null): array
+    {
+        $handle = curl_init('http://127.0.0.1:' . $server['port'] . '/?mode=' . $mode);
+        $options = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HEADER => true,
+            CURLOPT_TIMEOUT => 10,
+        ];
+        if ($sessionId !== null) {
+            $options[CURLOPT_COOKIE] = 'PHPSESSID=' . $sessionId;
+        }
+        curl_setopt_array($handle, $options);
+        $raw = curl_exec($handle);
+        $status = curl_getinfo($handle, CURLINFO_HTTP_CODE);
+        $error = curl_error($handle);
+        curl_close($handle);
+        $log = is_file($server['log']) ? (string) file_get_contents($server['log']) : '';
+        $this->assertNotFalse($raw, $error . "\n" . $log);
+        $this->assertSame(200, $status, $raw . "\n" . $log);
+        [$headers, $body] = explode("\r\n\r\n", $raw, 2);
+        $decoded = json_decode($body, true);
+        $this->assertIsArray($decoded, $body);
+
+        return ['headers' => $headers, 'body' => $body, 'body_json' => $decoded];
+    }
+
+    private function accessTokenIssuedAt(string $headers): int
+    {
+        $token = null;
+        foreach (preg_split("/\r\n/", $headers) as $line) {
+            if (stripos($line, 'Set-Cookie: access_token=') === 0
+                && preg_match('/^Set-Cookie: access_token=([^;]+)/i', $line, $match) === 1) {
+                $token = rawurldecode($match[1]);
+            }
+        }
+        $this->assertNotNull($token, $headers);
+        $claims = JWT::decode($token, new Key(JWT_SECRET, 'HS256'));
+
+        return (int) $claims->iat;
+    }
+
+    private function sessionCookie(string $headers): string
+    {
+        $sessionId = null;
+        foreach (preg_split("/\r\n/", $headers) as $line) {
+            if (preg_match('/^Set-Cookie: PHPSESSID=([^;]+)/i', $line, $match) === 1) {
+                $sessionId = rawurldecode($match[1]);
+            }
+        }
+        $this->assertNotNull($sessionId, $headers);
+
+        return $sessionId;
+    }
+
+    /** @param array{process: resource, pipes: array<int, resource>, router: string, log: string, port: int, sessions: string} $server */
+    private function waitForLoginCutoffServer(array $server): void
+    {
+        $deadline = microtime(true) + 3;
+        do {
+            $socket = @fsockopen('127.0.0.1', $server['port'], $errno, $errstr, 0.1);
+            if ($socket !== false) {
+                fclose($socket);
+                return;
+            }
+            usleep(50000);
+        } while (microtime(true) < $deadline);
+        $log = is_file($server['log']) ? (string) file_get_contents($server['log']) : '';
+        $this->fail("Login cutoff server did not start.\n" . $log);
+    }
+
+    private function freeLoginCutoffPort(): int
+    {
+        $socket = stream_socket_server('tcp://127.0.0.1:0');
+        $this->assertNotFalse($socket);
+        $address = stream_socket_get_name($socket, false);
+        fclose($socket);
+
+        return (int) substr(strrchr($address, ':'), 1);
+    }
+
+    private function loginCutoffRouter(): string
+    {
+        $auth = var_export(PRIVATE_PATH . '/auth_functions.php', true);
+        $accounts = var_export(PRIVATE_PATH . '/classes/Accounts.php', true);
+        $autoload = var_export(PROJECT_PATH . '/vendor/autoload.php', true);
+
+        return <<<PHP
+<?php
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+defined('ARTIFACTS_DOMAIN') || define('ARTIFACTS_DOMAIN', 'keeplore.app');
+defined('COOKIE_SECURE') || define('COOKIE_SECURE', true);
+defined('JWT_SECRET') || define('JWT_SECRET', 'test-jwt-secret-of-at-least-thirty-two-bytes');
+require_once $autoload;
+require_once $accounts;
+require_once $auth;
+
+\$mode = \$_GET['mode'] ?? '';
+if (!class_exists('LoginSessionReadDelay', false)) {
+    class LoginSessionReadDelay extends SessionHandler {
+        public int \$reads = 0;
+        public function read(\$id): string|false {
+            \$this->reads++;
+            if (\$this->reads >= 2) {
+                sleep(1);
+            }
+            return parent::read(\$id);
+        }
+    }
+}
+\$delay = null;
+if (\$mode === 'login') {
+    \$delay = new LoginSessionReadDelay();
+    session_set_save_handler(\$delay, true);
+} else {
+    session_set_save_handler(new SessionHandler(), true);
+}
+session_start();
+
+\$db = new mysqli(
+    getenv('KEEPLORE_TEST_DB_HOST') ?: '127.0.0.1',
+    getenv('KEEPLORE_TEST_DB_USER') ?: 'root',
+    getenv('KEEPLORE_TEST_DB_PASSWORD') ?: '',
+    getenv('KEEPLORE_REVIEW_DB_NAME') ?: '',
+    (int) (getenv('KEEPLORE_TEST_DB_PORT') ?: 3306)
+);
+\$GLOBALS['db'] = \$db;
+
+if (\$mode === 'login') {
+    \$account = [
+        'id' => 1,
+        'name' => 'Sam Lee',
+        'person_id' => 5,
+        'username' => 'ownerusername',
+        'user_group' => 1,
+    ];
+    \$started = time();
+    log_in_user(\$account, false);
+    \$_SESSION['player_id'] = 5;
+    echo json_encode([
+        'last_login' => \$_SESSION['last_login'] ?? null,
+        'elapsed' => time() - \$started,
+        'reads' => \$delay->reads,
+    ]);
+    session_write_close();
+    return true;
+}
+if (\$mode === 'status') {
+    echo json_encode(['logged_in' => is_logged_in()]);
+    session_write_close();
+    return true;
+}
+http_response_code(404);
+echo json_encode(['missing' => true]);
+return true;
+PHP;
     }
 }
