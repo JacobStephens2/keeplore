@@ -3,7 +3,11 @@
 namespace Tests\Integration;
 
 use Firebase\JWT\JWT;
-use PHPUnit\Framework\TestCase;
+use Firebase\JWT\Key;
+use Tests\Support\LocalPhpServer;
+
+require_once __DIR__ . '/MySqlTestCase.php';
+require_once __DIR__ . '/../Support/LocalPhpServer.php';
 
 /**
  * Seam: is_logged_in(), whether the browser's session or access-token
@@ -13,27 +17,11 @@ use PHPUnit\Framework\TestCase;
  * completed the reset. A login after the reset still signs the account in.
  * A guest session is not a login.
  */
-final class LoginSessionTest extends TestCase
+final class LoginSessionTest extends MySqlTestCase
 {
-    private ?\mysqli $db = null;
-    private string $databaseName;
-
     protected function setUp(): void
     {
-        if (!getenv('KEEPLORE_TEST_DB_HOST')) {
-            $this->markTestSkipped('Set KEEPLORE_TEST_DB_HOST to run MySQL integration tests.');
-        }
-        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-        $this->db = new \mysqli(
-            getenv('KEEPLORE_TEST_DB_HOST'),
-            getenv('KEEPLORE_TEST_DB_USER') ?: 'root',
-            getenv('KEEPLORE_TEST_DB_PASSWORD') ?: '',
-            '',
-            (int) (getenv('KEEPLORE_TEST_DB_PORT') ?: 3306)
-        );
-        $this->databaseName = 'keeplore_test_' . bin2hex(random_bytes(6));
-        $this->db->query('CREATE DATABASE ' . $this->databaseName);
-        $this->db->select_db($this->databaseName);
+        parent::setUp();
         $this->db->query('CREATE TABLE users (
             id INT PRIMARY KEY,
             first_name VARCHAR(255),
@@ -67,10 +55,7 @@ final class LoginSessionTest extends TestCase
     {
         $_SESSION = [];
         unset($_COOKIE['access_token']);
-        if ($this->db !== null) {
-            $this->db->query('DROP DATABASE ' . $this->databaseName);
-            $this->db->close();
-        }
+        parent::tearDown();
     }
 
     private function defineAuthConstants(): void
@@ -252,5 +237,246 @@ final class LoginSessionTest extends TestCase
         $this->passwordChangedAt(1, (int) $_SESSION['last_login']);
 
         $this->assertFalse(is_logged_in());
+    }
+
+    public function test_restoration_requires_an_existing_account(): void
+    {
+        $_COOKIE['access_token'] = $this->accessToken(time() - 60, 999);
+
+        $this->assertFalse(is_logged_in());
+        $this->assertArrayNotHasKey('user_id', $_SESSION);
+    }
+
+    public function test_restoration_preserves_the_login_fields_and_repairs_the_person_link(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        $previousSession = session_id();
+        $this->db->query("INSERT INTO players (id, user_id, FirstName, LastName, represents_user_id)
+            VALUES (5, 1, 'Sam', 'Lee', 1)");
+        $issuedAt = time() - 3600;
+        $_COOKIE['access_token'] = $this->accessToken($issuedAt);
+
+        $this->assertTrue(is_logged_in());
+        $this->assertNotSame($previousSession, session_id());
+        $this->assertSame(1, $_SESSION['user_id']);
+        $this->assertSame(5, $_SESSION['player_id']);
+        $this->assertSame('Sam Lee', $_SESSION['FullName']);
+        $this->assertSame('ownerusername', $_SESSION['username']);
+        $this->assertSame(1, $_SESSION['user_group']);
+        $this->assertTrue($_SESSION['logged_in']);
+        $this->assertSame($issuedAt, $_SESSION['last_login']);
+
+        // The same Account read repairs the link for subsequent sessions too.
+        unset($_SESSION['player_id']);
+        $this->assertTrue(is_logged_in());
+        $this->assertSame(5, $_SESSION['player_id']);
+    }
+
+    public function test_missing_issued_at_uses_restoration_time_only_without_a_reset(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        $_COOKIE['access_token'] = JWT::encode(['user_id' => 1], JWT_SECRET, 'HS256');
+        $before = time();
+
+        $this->assertTrue(is_logged_in());
+        $this->assertGreaterThanOrEqual($before, $_SESSION['last_login']);
+        $this->assertLessThanOrEqual(time(), $_SESSION['last_login']);
+
+        $_SESSION = [];
+        $this->passwordChangedAt(1, time() - 60);
+        $this->assertFalse(is_logged_in());
+    }
+
+    public function test_zero_issued_at_is_not_replaced_with_restoration_time(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        $_COOKIE['access_token'] = JWT::encode(['user_id' => 1, 'iat' => 0], JWT_SECRET, 'HS256');
+
+        $this->assertTrue(is_logged_in());
+        $this->assertSame(0, $_SESSION['last_login']);
+    }
+
+    public function test_storage_failures_during_restoration_still_return_not_logged_in(): void
+    {
+        $_COOKIE['access_token'] = $this->accessToken(time() - 60);
+        $this->db->query('DROP TABLE users');
+
+        $this->assertFalse(is_logged_in());
+    }
+
+    public function test_account_lookup_failures_during_restoration_still_return_not_logged_in(): void
+    {
+        $_COOKIE['access_token'] = $this->accessToken(time() - 60);
+        $this->db->query('ALTER TABLE users DROP COLUMN first_name');
+
+        $this->assertFalse(is_logged_in());
+    }
+
+    /**
+     * Login issues the access token and then restarts the PHP session before
+     * stamping last-login. Those clocks are one login. A password change at
+     * the token's issued-at second has to end the session too, including when
+     * the restart crosses into the next second. The session handler waits on
+     * its second read so that gap is one second here instead of a race.
+     * CLI does not record setcookie(), so this watches a real local response.
+     */
+    public function test_a_password_reset_at_the_access_token_issued_at_ends_the_login_session(): void
+    {
+        $database = $this->db->query('SELECT DATABASE()')->fetch_row()[0];
+        $savedDatabase = getenv('KEEPLORE_REVIEW_DB_NAME');
+        putenv('KEEPLORE_REVIEW_DB_NAME=' . $database);
+        $server = null;
+        try {
+            $server = new LocalPhpServer($this->loginCutoffRouter());
+            $login = $this->loginCutoffRequest($server, 'login');
+            $issuedAt = $this->accessTokenIssuedAt($login['headers']);
+            $sessionId = $this->sessionCookie($login['headers']);
+            $this->passwordChangedAt(1, $issuedAt);
+            $status = $this->loginCutoffRequest($server, 'status', $sessionId);
+            $body = json_decode($status['body'], true);
+
+            $this->assertFalse(
+                $body['logged_in'],
+                'A password reset at the access token issued-at left the login session signed in. '
+                . 'iat=' . $issuedAt
+                . ' last_login=' . ($login['body_json']['last_login'] ?? 'missing')
+                . ' restart_seconds=' . ($login['body_json']['elapsed'] ?? 'missing')
+                . ' reads=' . ($login['body_json']['reads'] ?? 'missing')
+            );
+        } finally {
+            $server?->stop();
+            if ($savedDatabase === false) {
+                putenv('KEEPLORE_REVIEW_DB_NAME');
+            } else {
+                putenv('KEEPLORE_REVIEW_DB_NAME=' . $savedDatabase);
+            }
+        }
+    }
+
+    /**
+     * @return array{headers: string, body: string, body_json: array<string, mixed>}
+     */
+    private function loginCutoffRequest(LocalPhpServer $server, string $mode, ?string $sessionId = null): array
+    {
+        $headers = $sessionId === null ? [] : ['Cookie: PHPSESSID=' . $sessionId];
+        $response = $server->request('/?mode=' . $mode, $headers);
+        $this->assertSame(200, $response['status'], $response['body']);
+        $decoded = json_decode($response['body'], true);
+        $this->assertIsArray($decoded, $response['body']);
+
+        return ['headers' => $response['headers'], 'body' => $response['body'], 'body_json' => $decoded];
+    }
+
+    private function accessTokenIssuedAt(string $headers): int
+    {
+        $token = null;
+        foreach (preg_split("/\r\n/", $headers) as $line) {
+            if (stripos($line, 'Set-Cookie: access_token=') === 0
+                && preg_match('/^Set-Cookie: access_token=([^;]+)/i', $line, $match) === 1) {
+                $token = rawurldecode($match[1]);
+            }
+        }
+        $this->assertNotNull($token, $headers);
+        $claims = JWT::decode($token, new Key(JWT_SECRET, 'HS256'));
+
+        return (int) $claims->iat;
+    }
+
+    private function sessionCookie(string $headers): string
+    {
+        $sessionId = null;
+        foreach (preg_split("/\r\n/", $headers) as $line) {
+            if (preg_match('/^Set-Cookie: PHPSESSID=([^;]+)/i', $line, $match) === 1) {
+                $sessionId = rawurldecode($match[1]);
+            }
+        }
+        $this->assertNotNull($sessionId, $headers);
+
+        return $sessionId;
+    }
+
+    private function loginCutoffRouter(): string
+    {
+        $auth = var_export(PRIVATE_PATH . '/auth_functions.php', true);
+        $accounts = var_export(PRIVATE_PATH . '/classes/Accounts.php', true);
+        $autoload = var_export(PROJECT_PATH . '/vendor/autoload.php', true);
+
+        return <<<PHP
+<?php
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
+defined('ARTIFACTS_DOMAIN') || define('ARTIFACTS_DOMAIN', 'keeplore.app');
+defined('COOKIE_SECURE') || define('COOKIE_SECURE', true);
+defined('JWT_SECRET') || define('JWT_SECRET', 'test-jwt-secret-of-at-least-thirty-two-bytes');
+require_once $autoload;
+require_once $accounts;
+require_once $auth;
+
+\$mode = \$_GET['mode'] ?? '';
+if (!class_exists('LoginSessionReadDelay', false)) {
+    class LoginSessionReadDelay extends SessionHandler {
+        public int \$reads = 0;
+        public function read(\$id): string|false {
+            \$this->reads++;
+            if (\$this->reads >= 2) {
+                sleep(1);
+            }
+            return parent::read(\$id);
+        }
+    }
+}
+\$delay = null;
+if (\$mode === 'login') {
+    \$delay = new LoginSessionReadDelay();
+    session_set_save_handler(\$delay, true);
+} else {
+    session_set_save_handler(new SessionHandler(), true);
+}
+session_start();
+
+\$db = new mysqli(
+    getenv('KEEPLORE_TEST_DB_HOST') ?: '127.0.0.1',
+    getenv('KEEPLORE_TEST_DB_USER') ?: 'root',
+    getenv('KEEPLORE_TEST_DB_PASSWORD') ?: '',
+    getenv('KEEPLORE_REVIEW_DB_NAME') ?: '',
+    (int) (getenv('KEEPLORE_TEST_DB_PORT') ?: 3306)
+);
+\$GLOBALS['db'] = \$db;
+
+if (\$mode === 'login') {
+    \$account = [
+        'id' => 1,
+        'name' => 'Sam Lee',
+        'person_id' => 5,
+        'username' => 'ownerusername',
+        'user_group' => 1,
+    ];
+    \$started = time();
+    log_in_user(\$account, false);
+    \$_SESSION['player_id'] = 5;
+    echo json_encode([
+        'last_login' => \$_SESSION['last_login'] ?? null,
+        'elapsed' => time() - \$started,
+        'reads' => \$delay->reads,
+    ]);
+    session_write_close();
+    return true;
+}
+if (\$mode === 'status') {
+    echo json_encode(['logged_in' => is_logged_in()]);
+    session_write_close();
+    return true;
+}
+http_response_code(404);
+echo json_encode(['missing' => true]);
+return true;
+PHP;
     }
 }

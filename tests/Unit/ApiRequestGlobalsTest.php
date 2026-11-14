@@ -16,11 +16,13 @@ class ApiRequestGlobalsTest extends TestCase
     {
         require_once PRIVATE_PATH . '/api_request.php';
         unset($_SERVER['HTTP_SEC_FETCH_SITE']);
+        unset($_SERVER['HTTP_AUTHORIZATION'], $_COOKIE['access_token']);
     }
 
     protected function tearDown(): void
     {
         unset($_SERVER['HTTP_SEC_FETCH_SITE']);
+        unset($_SERVER['HTTP_AUTHORIZATION'], $_COOKIE['access_token']);
     }
 
     public function test_the_request_carries_sec_fetch_site(): void
@@ -38,5 +40,19 @@ class ApiRequestGlobalsTest extends TestCase
 
         $this->assertArrayHasKey('sec_fetch_site', $request);
         $this->assertNull($request['sec_fetch_site']);
+    }
+
+    public function test_present_empty_invalid_and_array_cookies_are_distinct_from_absent_credentials(): void
+    {
+        $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer ak_example';
+        $this->assertNull(api_request_from_globals()['access_token']);
+
+        foreach (['', 'invalid', ['not-a-token']] as $cookie) {
+            $_COOKIE['access_token'] = $cookie;
+            $request = api_request_from_globals();
+
+            $this->assertSame(is_array($cookie) ? '' : $cookie, $request['access_token']);
+            $this->assertSame('Bearer ak_example', $request['authorization']);
+        }
     }
 }

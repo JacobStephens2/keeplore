@@ -29,6 +29,9 @@ The date of an item's most recent use, or none if it has never been used. The us
 The Keeplore account someone registers and logs in to, holding their name, email, username and password; it owns the people list, items and Preferences. A password reset needs the key emailed to the account's address, which lasts one day and is used up by the reset. A successful reset records when the password changed. A session or access token issued before that time, or in that same second, no longer authenticates the account, including the browser that completed the reset. A login after the reset still signs the account in.
 _Avoid_: User (except in the table's name).
 
+**Access token**:
+The signed credential issued at Account login, carried by the `access_token` cookie and used for session restoration and request authentication, subject to the Account's password-reset cutoff. Distinct from an Agent key and from the PHP session it can restore.
+
 **Agent key**:
 A key the owner issues on Settings so a remote agent can read their items, uses and proposals and flip kept over HTTP, and nothing else (ADR-0002). Its token is shown once, when issued; revoking it stops it working at once.
 _Avoid_: API key (the master key).

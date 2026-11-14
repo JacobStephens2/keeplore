@@ -1,7 +1,6 @@
 <?php
 
-use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
+require_once __DIR__ . '/classes/AccountAccessTokens.php';
 
 // Accounts, sending its mail over SMTP.
 function accounts() {
@@ -12,44 +11,30 @@ function accounts() {
 // Logs in the account Accounts returned: the session, the remember-me
 // window and the JWT cookie.
 function log_in_user($account, $remember = false) {
-  // Renerating the ID protects the admin from session fixation.
-  session_regenerate_id();
+  $issued = AccountAccessTokens::issue($account['id'], $_SERVER['SERVER_NAME'], $remember);
 
-  // 30 days if "Remember me" is checked, otherwise 24 hours
-  $expiry_seconds = $remember ? 2592000 : 86400;
-  $expiry_minutes = $expiry_seconds / 60;
-
-  put_account_in_session($account);
-
-  // Extend PHP session lifetime to match JWT / remember-me window
-  ini_set('session.gc_maxlifetime', $expiry_seconds);
+  // PHP only accepts lifetime settings while the session is inactive.
+  if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+  }
+  ini_set('session.gc_maxlifetime', $issued['lifetime']);
   session_set_cookie_params([
-    'lifetime' => $expiry_seconds,
+    'lifetime' => $issued['lifetime'],
     'path' => '/',
     'domain' => ARTIFACTS_DOMAIN,
     'secure' => COOKIE_SECURE,
     'httponly' => true,
     'samesite' => 'Lax',
   ]);
-
-  // Create JWT access token cookie for response
-  $issuedAt   = new DateTimeImmutable();
-  $jwt_access_token_data = [
-      // Issued at: time when the token was generated
-      'iat'  => $issuedAt->getTimestamp(),
-      'iss'  => $_SERVER['SERVER_NAME'], // Issuer
-      'nbf'  => $issuedAt->getTimestamp(), // Not before
-      'exp'  => $issuedAt->modify('+' . $expiry_minutes . ' minutes')->getTimestamp(),
-      'user_id' => $account['id'],
-  ];
-  $access_token = JWT::encode(
-      $jwt_access_token_data,
-      JWT_SECRET,
-      'HS256'
-  );
+  session_start();
+  // Regenerating the ID protects the account from session fixation.
+  session_regenerate_id();
+  put_account_in_session($account);
+  // Issued with the token. A later stamp would outlive a reset in the token's second.
+  $_SESSION['last_login'] = $issued['issued_at'];
 
   // Strict keeps this cookie off a cross-site request, including a top-level GET.
-  set_access_token_cookie($access_token, time() + $expiry_seconds);
+  set_access_token_cookie($issued['token'], $issued['expires_at']);
   return true;
 }
 
@@ -121,19 +106,15 @@ function is_logged_in() {
   // reset request's own restore look newer than the password change.
   if (isset($_COOKIE['access_token'])) {
     try {
-      $decoded = JWT::decode($_COOKIE['access_token'], new Key(JWT_SECRET, 'HS256'));
-      if (isset($decoded->user_id)) {
-        $issuedAt = $decoded->iat ?? null;
-        if (!Accounts::issuedAtAuthenticates($db, (int) $decoded->user_id, $issuedAt)) {
-          return false;
-        }
-        $account = accounts()->find((int) $decoded->user_id);
+      $identity = AccountAccessTokens::authenticate($db, $_COOKIE['access_token']);
+      if ($identity !== null) {
+        $account = accounts()->find($identity['user_id']);
         if ($account) {
           session_regenerate_id();
           put_account_in_session($account);
           // The restored session was issued when the token was, not now.
-          if ($issuedAt !== null) {
-            $_SESSION['last_login'] = (int) $issuedAt;
+          if ($identity['issued_at'] !== null) {
+            $_SESSION['last_login'] = $identity['issued_at'];
           }
           return true;
         }

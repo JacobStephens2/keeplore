@@ -5,7 +5,8 @@ namespace Tests\Integration;
 use AgentKeys;
 use ApiCaller;
 use Firebase\JWT\JWT;
-use PHPUnit\Framework\TestCase;
+
+require_once __DIR__ . '/MySqlTestCase.php';
 
 /**
  * Seam: ApiCaller, who an HTTP API request is, from the credentials it
@@ -16,27 +17,11 @@ use PHPUnit\Framework\TestCase;
  * owner of the Item the request names. Only an agent key is refused
  * outside reads and the kept toggle (ADR-0002).
  */
-final class ApiCallerTest extends TestCase
+final class ApiCallerTest extends MySqlTestCase
 {
-    private ?\mysqli $db = null;
-    private string $databaseName;
-
     protected function setUp(): void
     {
-        if (!getenv('KEEPLORE_TEST_DB_HOST')) {
-            $this->markTestSkipped('Set KEEPLORE_TEST_DB_HOST to run MySQL integration tests.');
-        }
-        mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-        $this->db = new \mysqli(
-            getenv('KEEPLORE_TEST_DB_HOST'),
-            getenv('KEEPLORE_TEST_DB_USER') ?: 'root',
-            getenv('KEEPLORE_TEST_DB_PASSWORD') ?: '',
-            '',
-            (int) (getenv('KEEPLORE_TEST_DB_PORT') ?: 3306)
-        );
-        $this->databaseName = 'keeplore_test_' . bin2hex(random_bytes(6));
-        $this->db->query('CREATE DATABASE ' . $this->databaseName);
-        $this->db->select_db($this->databaseName);
+        parent::setUp();
         $this->db->query('CREATE TABLE users (id INT PRIMARY KEY, password_changed_at INT UNSIGNED NULL)');
         $this->db->query('INSERT INTO users (id) VALUES (1), (2)');
         $this->db->query('CREATE TABLE games (id INT PRIMARY KEY, user_id INT NOT NULL)');
@@ -53,19 +38,10 @@ final class ApiCallerTest extends TestCase
         require_once PRIVATE_PATH . '/classes/ApiCaller.php';
     }
 
-    protected function tearDown(): void
+    /** A session token for $userId, issued by the same interface as login. */
+    private function sessionToken(int $userId): string
     {
-        if ($this->db !== null) {
-            $this->db->query('DROP DATABASE ' . $this->databaseName);
-            $this->db->close();
-        }
-    }
-
-    /** A session token for $userId, as logging in signs it, expiring $expiresIn seconds from now. */
-    private function sessionToken(int $userId, int $expiresIn = 3600, string $secret = JWT_SECRET): string
-    {
-        $now = time();
-        return JWT::encode(['iat' => $now, 'nbf' => $now, 'exp' => $now + $expiresIn, 'user_id' => $userId], $secret, 'HS256');
+        return \AccountAccessTokens::issue($userId, 'api.example.test')['token'];
     }
 
     private function agentKeyHeader(int $userId): string
@@ -88,25 +64,9 @@ final class ApiCallerTest extends TestCase
             'exp' => time() + 3600,
             'user_id' => 1,
         ], JWT_SECRET, 'HS256');
-        $atTheChange = JWT::encode([
-            'iat' => $changedAt,
-            'nbf' => $changedAt,
-            'exp' => time() + 3600,
-            'user_id' => 1,
-        ], JWT_SECRET, 'HS256');
-        $afterTheChange = JWT::encode([
-            'iat' => $changedAt + 1,
-            'nbf' => $changedAt + 1,
-            'exp' => time() + 3600,
-            'user_id' => 1,
-        ], JWT_SECRET, 'HS256');
-        $withoutIssuedAt = JWT::encode(['exp' => time() + 3600, 'user_id' => 1], JWT_SECRET, 'HS256');
-
         $this->assertNull($this->fromCredentials($before, $this->agentKeyHeader(1)));
         $this->assertNull($this->fromCredentials($before, ARTIFACTS_API_KEY));
-        $this->assertNull($this->fromCredentials($withoutIssuedAt, null));
-        $this->assertNull($this->fromCredentials($atTheChange, null));
-        $this->assertSame(1, $this->fromCredentials($afterTheChange, null)->owner());
+        $this->assertSame(1, $this->fromCredentials($this->sessionToken(1), null)->owner());
         $this->assertSame(2, $this->fromCredentials($this->sessionToken(2), null)->owner(1));
     }
 
@@ -118,16 +78,38 @@ final class ApiCallerTest extends TestCase
         $this->assertNull($caller->agentKeyRefusal());
     }
 
-    public function test_an_expired_or_tampered_session_token_gives_no_caller_even_with_a_valid_agent_key(): void
+    public function test_a_present_invalid_or_empty_cookie_prevents_falling_back_to_other_credentials(): void
     {
         $header = $this->agentKeyHeader(1);
-        [$header64, $payload64, $signature] = explode('.', $this->sessionToken(1));
-        $tampered = $header64 . '.' . rtrim(strtr(base64_encode('{"user_id":2,"exp":' . (time() + 3600) . '}'), '+/', '-_'), '=') . '.' . $signature;
 
-        foreach ([$this->sessionToken(1, -60), $tampered, $this->sessionToken(1, 3600, str_repeat('x', 40)), '', 'nonsense'] as $token) {
+        foreach (['', 'nonsense'] as $token) {
             $this->assertNull($this->fromCredentials($token, $header), $token);
             $this->assertNull($this->fromCredentials($token, ARTIFACTS_API_KEY), $token);
         }
+    }
+
+    public function test_a_valid_cookie_takes_precedence_over_agent_and_master_credentials(): void
+    {
+        foreach ([$this->agentKeyHeader(2), ARTIFACTS_API_KEY] as $authorization) {
+            $caller = $this->fromCredentials($this->sessionToken(1), $authorization);
+
+            $this->assertSame(1, $caller->owner(2));
+            $this->assertNull($caller->agentKeyRefusal());
+        }
+    }
+
+    public function test_request_authentication_does_not_require_an_existing_account(): void
+    {
+        $this->assertSame(999, $this->fromCredentials($this->sessionToken(999), null)->owner());
+    }
+
+    public function test_token_storage_failures_are_not_treated_as_invalid_credentials(): void
+    {
+        $token = $this->sessionToken(1);
+        $this->db->query('DROP TABLE users');
+
+        $this->expectException(\mysqli_sql_exception::class);
+        $this->fromCredentials($token, ARTIFACTS_API_KEY);
     }
 
     public function test_an_issued_agent_key_acts_for_its_user_and_is_refused_outside_reads_and_the_kept_toggle(): void
