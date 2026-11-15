@@ -543,6 +543,23 @@ class EventPlanTest extends TestCase
         $this->assertSame(['Ra', 'Senji'], $this->spareTitles($spare));
     }
 
+    public function test_sweet_spot_direction_does_not_change_which_tied_games_can_stay_home(): void
+    {
+        $items = [
+            $this->item('A', ['SS' => '2,3', 'setting' => 'beach']),
+            $this->item('B', ['SS' => '3,4', 'setting' => 'beach']),
+            $this->item('C', ['SS' => '2,4', 'setting' => 'beach']),
+        ];
+        foreach ([['by' => 'players'], ['by' => 'setting', 'then' => 'players']] as $grouping) {
+            foreach (['asc', 'desc'] as $order) {
+                $spare = $this->spare($items, $grouping + ['order' => $order, 'at_least' => 1]);
+
+                $this->assertSame(['A', 'B'], array_column($spare['needed'], 'Title'));
+                $this->assertSame(['C'], $this->spareTitles($spare));
+            }
+        }
+    }
+
     public function test_groups_are_each_player_count_and_chosen_tag_together(): void
     {
         $spare = $this->spare([

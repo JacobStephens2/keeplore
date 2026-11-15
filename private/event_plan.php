@@ -231,6 +231,10 @@ function event_plan_spare(array $items, array $view, $at_least, array $count_tag
             $in[$i][] = $c;
         }
     }
+    if ($by === 'players' || $then === 'players') {
+        // Break greedy ties in title order, independent of Sweet spot direction.
+        ksort($in, SORT_NUMERIC);
+    }
     $have = array_fill(0, count($cells), 0);
     $chosen = [];
     // Greedy: the game filling the most still-open groups, kept games first.
