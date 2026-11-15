@@ -56,6 +56,7 @@ function event_plan(array $event, array $grouping) {
     $view = [
         'by' => $grouping['by'],
         'then' => $grouping['then'] === $grouping['by'] ? 'none' : $grouping['then'],
+        'order' => $grouping['order'],
         'tags' => event_plan_chosen_tags($grouping['tags']),
         'ages' => event_plan_age_groups(array_column($event['players'], 'age')),
     ];
@@ -99,8 +100,8 @@ function event_plan(array $event, array $grouping) {
  * group's items grouped again by its 'then'. Each group is ['label' => ...,
  * 'items' => [...], 'groups' => [...]], where 'groups' is empty without a
  * second grouping. Items with nothing to group by collect in a last group
- * such as "No sweet spot"; within a group they come first and unlabelled,
- * the way a hand-written list leaves them.
+ * such as "No sweet spot"; within a group they are unlabelled and come
+ * first, except missing Sweet spots still come last.
  *
  * $view's 'tags', when given, are the only tags that make groups, in that
  * order, so "casual, main" splits each player count in two and ignores
@@ -109,6 +110,7 @@ function event_plan(array $event, array $grouping) {
  * $view's 'ages' are the players' age groups (see event_plan_age_groups()).
  * By 'player_age', each distinct child age and "Adults" make a group, and a
  * game shows once, under the youngest of them old enough for it.
+ * $view's 'order' controls Sweet spot groups at both levels.
  */
 function event_plan_groups(array $items, array $view) {
     $groups = [];
@@ -122,15 +124,16 @@ function event_plan_groups(array $items, array $view) {
 }
 
 /**
- * The grouping a request asks for (by, then, tags, at_least, count_tags),
+ * The grouping a request asks for (by, then, tags, at_least, count_tags, order),
  * each part falling back to the saved one and then to "Sweet spot, nothing,
  * no tags, no count". Naming tags with no second grouping sub-groups by tag,
  * since the tags would otherwise do nothing. at_least is the number of games
  * each group should keep and count_tags the tags it holds for (see
  * event_plan_spare()); a blank at_least clears it to 0, meaning none.
+ * order controls only Sweet spot groups: asc by default, or desc.
  */
 function event_plan_grouping(array $request, array $saved) {
-    $saved += ['by' => 'players', 'then' => 'none', 'tags' => '', 'at_least' => 0, 'count_tags' => ''];
+    $saved += ['by' => 'players', 'then' => 'none', 'tags' => '', 'at_least' => 0, 'count_tags' => '', 'order' => 'asc'];
     $dimensions = event_plan_dimensions();
     $pick = function ($key) use ($request, $saved, $dimensions) {
         $value = $request[$key] ?? null;
@@ -156,7 +159,8 @@ function event_plan_grouping(array $request, array $saved) {
     }
     $count_tags = is_string($request['count_tags'] ?? null) ? $request['count_tags'] : (string) $saved['count_tags'];
     $count_tags = implode(', ', event_plan_chosen_tags($count_tags));
-    return ['by' => $by, 'then' => $then, 'tags' => $tags, 'at_least' => $at_least, 'count_tags' => $count_tags];
+    $order = ($request['order'] ?? $saved['order']) === 'desc' ? 'desc' : 'asc';
+    return ['by' => $by, 'then' => $then, 'tags' => $tags, 'at_least' => $at_least, 'count_tags' => $count_tags, 'order' => $order];
 }
 
 /**
@@ -226,6 +230,10 @@ function event_plan_spare(array $items, array $view, $at_least, array $count_tag
         foreach ($cell['members'] as $i) {
             $in[$i][] = $c;
         }
+    }
+    if ($by === 'players' || $then === 'players') {
+        // Break greedy ties in title order, independent of Sweet spot direction.
+        ksort($in, SORT_NUMERIC);
     }
     $have = array_fill(0, count($cells), 0);
     $chosen = [];
@@ -466,8 +474,9 @@ function event_plan_chosen_tags($tags) {
 
 /**
  * Internal. Items (already in title order) split into ordered groups by one
- * dimension, $by, with $view's tags and ages. Items lacking a value form a
- * last, labelled group, or with $is_sub a first, unlabelled one.
+ * dimension, $by, with $view's tags, ages and Sweet spot order. Items lacking
+ * a value form a last, labelled group, or with $is_sub an unlabelled one
+ * that comes first except for Sweet spots, which always come last.
  */
 function event_plan_split(array $items, $by, array $view, $is_sub) {
     if ($by === 'none') {
@@ -487,20 +496,20 @@ function event_plan_split(array $items, $by, array $view, $is_sub) {
             $groups[$sort]['items'][] = $item;
         }
     }
-    if ($by === 'players') {
+    if ($by === 'players' && $view['order'] === 'desc') {
         krsort($groups, SORT_NUMERIC);
-    } elseif ($by === 'age' || $by === 'player_age') {
+    } elseif ($by === 'players' || $by === 'age' || $by === 'player_age') {
         ksort($groups, SORT_NUMERIC);
     } else {
         ksort($groups, SORT_STRING);
     }
     $groups = array_values($groups);
-    if ($missing !== [] && $is_sub) {
+    if ($missing !== [] && $is_sub && $by !== 'players') {
         array_unshift($groups, ['label' => '', 'items' => $missing]);
     } elseif ($missing !== []) {
         $none = ['players' => 'No sweet spot', 'age' => 'No age recorded', 'setting' => 'No setting', 'tag' => 'Untagged',
             'player_age' => $view['ages'] === [] ? 'No player ages recorded' : 'No age recorded'];
-        $groups[] = ['label' => $none[$by], 'items' => $missing];
+        $groups[] = ['label' => $is_sub ? '' : $none[$by], 'items' => $missing];
     }
     return $groups;
 }

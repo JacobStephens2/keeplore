@@ -15,7 +15,7 @@ if ($event === null) {
 $dimensions = event_plan_dimensions();
 $grouping = event_plan_grouping($_GET, $_SESSION['event_grouping'][$id] ?? []);
 $_SESSION['event_grouping'][$id] = $grouping;
-['by' => $by, 'then' => $then, 'tags' => $tags, 'at_least' => $at_least, 'count_tags' => $count_tags] = $grouping;
+['by' => $by, 'then' => $then, 'tags' => $tags, 'at_least' => $at_least, 'count_tags' => $count_tags, 'order' => $order] = $grouping;
 $by_tag = $by === 'tag' || $then === 'tag';
 
 $items = $event['items'];
@@ -159,6 +159,12 @@ include(SHARED_PATH . '/header.php');
                         <?php foreach ($dimensions as $key => $label) { ?>
                             <option value="<?php echo h($key); ?>" <?php echo $then === $key ? 'selected' : ''; ?>><?php echo h($label); ?></option>
                         <?php } ?>
+                    </select>
+                </label>
+                <label>Sweet spot order
+                    <select name="order">
+                        <option value="asc" <?php echo $order === 'asc' ? 'selected' : ''; ?>>Ascending (fewest players first)</option>
+                        <option value="desc" <?php echo $order === 'desc' ? 'selected' : ''; ?>>Descending (most players first)</option>
                     </select>
                 </label>
                 <label>Only these tags

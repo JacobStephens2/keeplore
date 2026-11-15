@@ -55,7 +55,7 @@ class EventPlanTest extends TestCase
         return array_column($group['items'], 'Title');
     }
 
-    public function test_a_game_with_several_sweet_spots_shows_under_each_player_count_largest_first(): void
+    public function test_a_game_with_several_sweet_spots_shows_under_each_player_count_smallest_first(): void
     {
         $groups = $this->planGroups([
             $this->item('Wavelength', ['SS' => '6,8']),
@@ -63,11 +63,12 @@ class EventPlanTest extends TestCase
             $this->item('Sky Team', ['SS' => '2']),
         ], ['by' => 'players']);
 
-        $this->assertSame(['8 players', '6 players', '4 players', '3 players', '2 players'], $this->labels($groups));
-        $this->assertSame(['Wavelength'], $this->titles($groups[0]));
-        $this->assertSame(['Wavelength'], $this->titles($groups[1]));
+        $this->assertSame(['2 players', '3 players', '4 players', '6 players', '8 players'], $this->labels($groups));
+        $this->assertSame(['Sky Team'], $this->titles($groups[0]));
+        $this->assertSame(['Ra'], $this->titles($groups[1]));
         $this->assertSame(['Ra'], $this->titles($groups[2]));
-        $this->assertSame(['Ra'], $this->titles($groups[3]));
+        $this->assertSame(['Wavelength'], $this->titles($groups[3]));
+        $this->assertSame(['Wavelength'], $this->titles($groups[4]));
     }
 
     public function test_items_without_the_grouped_value_collect_in_a_last_group(): void
@@ -79,6 +80,66 @@ class EventPlanTest extends TestCase
 
         $this->assertSame(['2 players', 'No sweet spot'], $this->labels($groups));
         $this->assertSame(['Hive Pocket'], $this->titles($groups[1]));
+    }
+
+    public function test_descending_sweet_spot_order_keeps_every_count_and_missing_values_last(): void
+    {
+        $items = [
+            $this->item('Wavelength', ['SS' => '6,8']),
+            $this->item('Ra', ['SS' => '3-4']),
+            $this->item('Sky Team', ['SS' => '2']),
+            $this->item('Hive Pocket'),
+        ];
+        foreach (['none', 'players'] as $then) {
+            $groups = $this->planGroups($items, ['by' => 'players', 'then' => $then, 'order' => 'desc']);
+
+            $this->assertSame(['8 players', '6 players', '4 players', '3 players', '2 players', 'No sweet spot'], $this->labels($groups));
+            $this->assertSame(['Wavelength'], $this->titles($groups[0]));
+            $this->assertSame(['Wavelength'], $this->titles($groups[1]));
+            $this->assertSame(['Ra'], $this->titles($groups[2]));
+            $this->assertSame(['Ra'], $this->titles($groups[3]));
+            $this->assertSame([], $groups[0]['groups']);
+        }
+    }
+
+    public function test_sweet_spot_order_does_not_change_other_dimensions_at_either_level(): void
+    {
+        $items = [
+            $this->item('Wavelength', ['SS' => '6,8', 'Age' => 10, 'setting' => 'beach', 'tags' => ['party', 'casual']]),
+            $this->item('Ra', ['SS' => '3,4', 'Age' => 12, 'setting' => 'House', 'tags' => ['main']]),
+            $this->item('Sky Team', ['SS' => '2', 'Age' => 8, 'setting' => 'Beach', 'tags' => ['casual']]),
+            $this->item('Hive Pocket'),
+        ];
+        foreach (['age', 'player_age', 'tag', 'setting', 'none'] as $by) {
+            foreach (['age', 'player_age', 'tag', 'setting', 'none'] as $then) {
+                $grouping = ['by' => $by, 'then' => $then, 'at_least' => 2];
+                $players = $this->players([8, 10, 40]);
+
+                $this->assertSame(
+                    $this->plan($items, $grouping + ['order' => 'asc'], $players),
+                    $this->plan($items, $grouping + ['order' => 'desc'], $players),
+                    $by . ' then ' . $then
+                );
+            }
+        }
+    }
+
+    public function test_sweet_spot_sub_groups_follow_the_direction_with_missing_values_last(): void
+    {
+        $items = [
+            $this->item('Wavelength', ['SS' => '6,8', 'setting' => 'beach']),
+            $this->item('Sky Team', ['SS' => '2', 'setting' => 'beach']),
+            $this->item('Hive Pocket', ['setting' => 'beach']),
+            $this->item('Ra', ['SS' => '3,4', 'setting' => 'house']),
+        ];
+        foreach (['asc' => ['2 players', '6 players', '8 players', ''], 'desc' => ['8 players', '6 players', '2 players', '']] as $order => $labels) {
+            $groups = $this->planGroups($items, ['by' => 'setting', 'then' => 'players', 'order' => $order]);
+
+            $this->assertSame(['beach', 'house'], $this->labels($groups));
+            $this->assertSame($labels, $this->labels($groups[0]['groups']));
+            $this->assertSame(['Hive Pocket'], $this->titles($groups[0]['groups'][3]));
+            $this->assertSame($order === 'asc' ? ['3 players', '4 players'] : ['4 players', '3 players'], $this->labels($groups[1]['groups']));
+        }
     }
 
     public function test_items_in_a_group_are_in_title_order(): void
@@ -152,9 +213,9 @@ class EventPlanTest extends TestCase
             $this->item('Senji', ['SS' => '6']),
         ], ['by' => 'players', 'then' => 'tag']);
 
-        $this->assertSame(['8 players', '6 players', '4 players'], $this->labels($groups));
-        $this->assertSame(['casual', 'strategy'], $this->labels($groups[0]['groups']));
-        $this->assertSame(['Wavelength'], $this->titles($groups[0]['groups'][0]));
+        $this->assertSame(['4 players', '6 players', '8 players'], $this->labels($groups));
+        $this->assertSame(['casual', 'strategy'], $this->labels($groups[2]['groups']));
+        $this->assertSame(['Wavelength'], $this->titles($groups[2]['groups'][0]));
         $this->assertSame(['', 'casual', 'strategy'], $this->labels($groups[1]['groups']));
         $this->assertSame(['Senji'], $this->titles($groups[1]['groups'][0]));
     }
@@ -219,13 +280,8 @@ class EventPlanTest extends TestCase
         ], ['by' => 'players', 'then' => 'tag']);
 
         $this->assertSame(
-            "# 8 players\n"
-            . "## strategy\n"
-            . "- [ ] Guards of Atlantis II, 4–8 (4, 6, 8)\n"
-            . "\n"
-            . "# 6 players\n"
-            . "## strategy\n"
-            . "- [ ] Guards of Atlantis II, 4–8 (4, 6, 8)\n"
+            "# 2 players\n"
+            . "- [ ] Sky Team, 2 (2), beach\n"
             . "\n"
             . "# 4 players\n"
             . "## casual\n"
@@ -233,8 +289,13 @@ class EventPlanTest extends TestCase
             . "## strategy\n"
             . "- [ ] Guards of Atlantis II, 4–8 (4, 6, 8)\n"
             . "\n"
-            . "# 2 players\n"
-            . "- [ ] Sky Team, 2 (2), beach\n",
+            . "# 6 players\n"
+            . "## strategy\n"
+            . "- [ ] Guards of Atlantis II, 4–8 (4, 6, 8)\n"
+            . "\n"
+            . "# 8 players\n"
+            . "## strategy\n"
+            . "- [ ] Guards of Atlantis II, 4–8 (4, 6, 8)\n",
             $plan['text']
         );
         $this->assertSame(1, $plan['packed']);
@@ -280,7 +341,7 @@ class EventPlanTest extends TestCase
     public function test_naming_tags_sub_groups_by_tag_when_no_second_grouping_is_chosen(): void
     {
         $this->assertSame(
-            ['by' => 'players', 'then' => 'tag', 'tags' => 'casual, main', 'at_least' => 0, 'count_tags' => ''],
+            ['by' => 'players', 'then' => 'tag', 'tags' => 'casual, main', 'at_least' => 0, 'count_tags' => '', 'order' => 'asc'],
             event_plan_grouping(['by' => 'players', 'then' => 'none', 'tags' => 'Casual,main'], [])
         );
     }
@@ -293,17 +354,30 @@ class EventPlanTest extends TestCase
 
     public function test_the_saved_grouping_fills_in_what_the_request_leaves_out(): void
     {
-        $saved = ['by' => 'age', 'then' => 'tag', 'tags' => 'casual, main', 'at_least' => 2, 'count_tags' => 'main'];
+        $saved = ['by' => 'age', 'then' => 'tag', 'tags' => 'casual, main', 'at_least' => 2, 'count_tags' => 'main', 'order' => 'desc'];
 
         $this->assertSame($saved, event_plan_grouping([], $saved));
-        $this->assertSame(['by' => 'players', 'then' => 'none', 'tags' => '', 'at_least' => 0, 'count_tags' => ''], event_plan_grouping([], []));
+        $this->assertSame(['by' => 'players', 'then' => 'none', 'tags' => '', 'at_least' => 0, 'count_tags' => '', 'order' => 'asc'], event_plan_grouping([], []));
         $this->assertSame('players', event_plan_grouping(['by' => 'colour'], [])['by']);
+    }
+
+    public function test_sweet_spot_order_uses_the_request_then_saved_direction_and_defaults_to_ascending(): void
+    {
+        $this->assertSame('asc', event_plan_grouping([], [])['order']);
+        $this->assertSame('asc', event_plan_grouping([], ['by' => 'age'])['order']);
+        $this->assertSame('desc', event_plan_grouping([], ['order' => 'desc'])['order']);
+        $this->assertSame('desc', event_plan_grouping(['order' => 'desc'], ['order' => 'asc'])['order']);
+        $this->assertSame('asc', event_plan_grouping(['order' => 'asc'], ['order' => 'desc'])['order']);
+        foreach (['', 'sideways', ['desc']] as $invalid) {
+            $this->assertSame('asc', event_plan_grouping(['order' => $invalid], ['order' => 'desc'])['order']);
+            $this->assertSame('asc', event_plan_grouping([], ['order' => $invalid])['order']);
+        }
     }
 
     public function test_clearing_the_tags_keeps_the_chosen_second_grouping(): void
     {
         $this->assertSame(
-            ['by' => 'players', 'then' => 'none', 'tags' => '', 'at_least' => 0, 'count_tags' => ''],
+            ['by' => 'players', 'then' => 'none', 'tags' => '', 'at_least' => 0, 'count_tags' => '', 'order' => 'asc'],
             event_plan_grouping(['by' => 'players', 'then' => 'none', 'tags' => ''], ['by' => 'players', 'then' => 'tag', 'tags' => 'casual'])
         );
     }
@@ -469,6 +543,23 @@ class EventPlanTest extends TestCase
         $this->assertSame(['Ra', 'Senji'], $this->spareTitles($spare));
     }
 
+    public function test_sweet_spot_direction_does_not_change_which_tied_games_can_stay_home(): void
+    {
+        $items = [
+            $this->item('A', ['SS' => '2,3', 'setting' => 'beach']),
+            $this->item('B', ['SS' => '3,4', 'setting' => 'beach']),
+            $this->item('C', ['SS' => '2,4', 'setting' => 'beach']),
+        ];
+        foreach ([['by' => 'players'], ['by' => 'setting', 'then' => 'players']] as $grouping) {
+            foreach (['asc', 'desc'] as $order) {
+                $spare = $this->spare($items, $grouping + ['order' => $order, 'at_least' => 1]);
+
+                $this->assertSame(['A', 'B'], array_column($spare['needed'], 'Title'));
+                $this->assertSame(['C'], $this->spareTitles($spare));
+            }
+        }
+    }
+
     public function test_groups_are_each_player_count_and_chosen_tag_together(): void
     {
         $spare = $this->spare([
@@ -505,7 +596,34 @@ class EventPlanTest extends TestCase
             $this->item('Wavelength', ['SS' => '8']),
         ], ['by' => 'players', 'at_least' => 2]);
 
-        $this->assertSame(['8 players', '2 players'], array_column($spare['short'], 'label'));
+        $this->assertSame(['2 players', '8 players'], array_column($spare['short'], 'label'));
+    }
+
+    public function test_checklists_smaller_lists_and_short_groups_share_the_sweet_spot_direction(): void
+    {
+        $items = [
+            $this->item('Wavelength', ['SS' => '6,8', 'setting' => 'beach']),
+            $this->item('Senji', ['SS' => '6', 'setting' => 'beach']),
+            $this->item('Ra', ['SS' => '3,4', 'setting' => 'beach']),
+            $this->item('Catan', ['SS' => '3,4', 'setting' => 'beach']),
+            $this->item('Sky Team', ['SS' => '2', 'setting' => 'beach']),
+            $this->item('Hive Pocket', ['SS' => '2', 'setting' => 'beach']),
+            $this->item('Unrecorded game', ['setting' => 'beach']),
+        ];
+        foreach (['asc' => ['2 players', '3 players', '4 players', '6 players', '8 players'],
+                  'desc' => ['8 players', '6 players', '4 players', '3 players', '2 players']] as $order => $labels) {
+            foreach ([['by' => 'players'], ['by' => 'setting', 'then' => 'players']] as $grouping) {
+                $plan = $this->plan($items, $grouping + ['order' => $order, 'at_least' => 3]);
+
+                preg_match_all('/^#{1,2} ([0-9]+ players)$/m', $plan['text'], $checklist);
+                preg_match_all('/^#{1,2} ([0-9]+ players)$/m', $plan['spare']['text'], $smaller);
+                $this->assertSame($labels, $checklist[1]);
+                $this->assertSame($labels, $smaller[1]);
+                $prefix = $grouping['by'] === 'setting' ? 'beach · ' : '';
+                $this->assertSame(array_map(fn($label) => $prefix . $label, $labels), array_column($plan['spare']['short'], 'label'));
+                $this->assertSame(['Unrecorded game'], $this->spareTitles($plan['spare']));
+            }
+        }
     }
 
     public function test_a_kept_game_stays_ahead_of_one_to_buy(): void
