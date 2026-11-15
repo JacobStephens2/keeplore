@@ -12,6 +12,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class RateLimiterTest extends TestCase
 {
+    private const LOGIN_LIMIT = 5;
+
     private ?\mysqli $db = null;
     private string $databaseName;
 
@@ -60,17 +62,6 @@ final class RateLimiterTest extends TestCase
         $this->assertSame('1', $this->countFor('api'));
     }
 
-    public function test_a_recorded_attempt_stores_the_connection_peer_address_not_x_forwarded_for(): void
-    {
-        $_SERVER['REMOTE_ADDR'] = '203.0.113.10';
-        $_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.20, 203.0.113.10';
-
-        $limiter = new \RateLimiter($this->db);
-        $limiter->recordAttempt('login');
-
-        $this->assertSame('203.0.113.10', $this->recordedAddress('login'));
-    }
-
     public function test_a_check_counts_the_connection_peer_address_not_x_forwarded_for(): void
     {
         $_SERVER['REMOTE_ADDR'] = '203.0.113.10';
@@ -88,7 +79,7 @@ final class RateLimiterTest extends TestCase
     public function test_two_addresses_in_one_ipv6_64_share_a_count(): void
     {
         $limiter = new \RateLimiter($this->db);
-        $this->recordLoginAttemptsFrom($limiter, '2001:db8:a:b::1', 5);
+        $this->recordLoginAttemptsFrom($limiter, '2001:db8:a:b::1', self::LOGIN_LIMIT);
 
         $this->assertTrue($this->loginIsRateLimitedFor($limiter, '2001:db8:a:b:ffff:ffff:ffff:ffff'));
     }
@@ -96,27 +87,28 @@ final class RateLimiterTest extends TestCase
     public function test_addresses_in_different_ipv6_64s_do_not_share_a_count(): void
     {
         $limiter = new \RateLimiter($this->db);
-        $this->recordLoginAttemptsFrom($limiter, '2001:db8:a:a:ffff:ffff:ffff:ffff', 5);
+        $this->recordLoginAttemptsFrom($limiter, '2001:db8:a:a:ffff:ffff:ffff:ffff', self::LOGIN_LIMIT);
 
         $this->assertFalse($this->loginIsRateLimitedFor($limiter, '2001:db8:a:b::1'));
     }
 
-    public function test_an_ipv4_mapped_peer_shares_its_ipv4_addresss_count(): void
+    public function test_an_ipv4_mapped_peer_shares_a_count_with_its_ipv4_address(): void
     {
         $limiter = new \RateLimiter($this->db);
         $this->recordLoginAttemptsFrom($limiter, '203.0.113.7', 3);
-        $this->recordLoginAttemptsFrom($limiter, '::ffff:203.0.113.7', 2);
+        $this->recordLoginAttemptsFrom($limiter, '::ffff:203.0.113.7', self::LOGIN_LIMIT - 3);
 
         $this->assertTrue($this->loginIsRateLimitedFor($limiter, '::ffff:203.0.113.7'));
         $this->assertTrue($this->loginIsRateLimitedFor($limiter, '203.0.113.7'));
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('peerKeyProvider')]
-    public function test_a_recorded_attempt_stores_the_peers_key(string $peer, string $key): void
+    public function test_a_recorded_attempt_stores_the_peers_key_not_x_forwarded_for(string $peer, string $key): void
     {
+        $_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.20';
         $this->recordLoginAttemptsFrom(new \RateLimiter($this->db), $peer, 1);
 
-        $this->assertSame($key, $this->recordedAddress('login'));
+        $this->assertSame($key, $this->recordedKey('login'));
     }
 
     public static function peerKeyProvider(): array
@@ -140,7 +132,7 @@ final class RateLimiterTest extends TestCase
     {
         $_SERVER['REMOTE_ADDR'] = $peer;
 
-        return $limiter->isRateLimited('login', 5, 900);
+        return $limiter->isRateLimited('login', self::LOGIN_LIMIT, 900);
     }
 
     private function insertAttempts(string $address, string $endpoint, int $count): void
@@ -155,7 +147,7 @@ final class RateLimiterTest extends TestCase
         $statement->close();
     }
 
-    private function recordedAddress(string $endpoint): string
+    private function recordedKey(string $endpoint): string
     {
         return $this->scalarFor($endpoint, 'SELECT ip_address FROM rate_limits WHERE endpoint = ?');
     }

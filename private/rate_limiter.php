@@ -29,14 +29,14 @@ class RateLimiter {
   // address. Any other peer, IPv4 included, is keyed as its address.
   private function connectionPeerKey() {
     $peer = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-    $address = inet_pton($peer);
-    if ($address === false || strlen($address) !== 16) {
+    $packed = inet_pton($peer);
+    if ($packed === false || strlen($packed) !== 16) {
       return $peer;
     }
-    if (str_starts_with($address, self::IPV4_MAPPED_PREFIX)) {
-      return inet_ntop(substr($address, 12));
+    if (str_starts_with($packed, self::IPV4_MAPPED_PREFIX)) {
+      return inet_ntop(substr($packed, 12));
     }
-    return inet_ntop(substr($address, 0, 8) . str_repeat("\0", 8)) . '/64';
+    return inet_ntop(substr($packed, 0, 8) . str_repeat("\0", 8)) . '/64';
   }
 
   public function recordAttempt($endpoint) {
