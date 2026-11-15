@@ -1,6 +1,9 @@
 <?php
 
 class RateLimiter {
+  // The first 12 bytes of an IPv4-mapped IPv6 address, ::ffff:a.b.c.d.
+  private const IPV4_MAPPED_PREFIX = "\0\0\0\0\0\0\0\0\0\0\xff\xff";
+
   private $db;
   private $table_name = 'rate_limits';
 
@@ -19,23 +22,35 @@ class RateLimiter {
     )");
   }
 
-  // X-Forwarded-For is client-supplied and is not a rate-limit key.
-  private function connectionPeerAddress() {
-    return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+  // The connection peer's attempts are counted under this key. X-Forwarded-For
+  // is client-supplied and is not part of it. An IPv6 peer is keyed on its /64
+  // network, such as 2001:db8:a:b::/64, so every address in that /64 shares
+  // one count. An IPv4-mapped peer (::ffff:a.b.c.d) is keyed as its IPv4
+  // address. Any other peer, IPv4 included, is keyed as its address.
+  private function connectionPeerKey() {
+    $peer = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    $address = inet_pton($peer);
+    if ($address === false || strlen($address) !== 16) {
+      return $peer;
+    }
+    if (str_starts_with($address, self::IPV4_MAPPED_PREFIX)) {
+      return inet_ntop(substr($address, 12));
+    }
+    return inet_ntop(substr($address, 0, 8) . str_repeat("\0", 8)) . '/64';
   }
 
   public function recordAttempt($endpoint) {
-    $peer = $this->connectionPeerAddress();
+    $key = $this->connectionPeerKey();
     $stmt = $this->db->prepare(
       "INSERT INTO rate_limits (ip_address, endpoint, attempted_at) VALUES (?, ?, NOW())"
     );
-    $stmt->bind_param("ss", $peer, $endpoint);
+    $stmt->bind_param("ss", $key, $endpoint);
     $stmt->execute();
     $stmt->close();
   }
 
   public function isRateLimited($endpoint, $max_attempts, $window_seconds) {
-    $peer = $this->connectionPeerAddress();
+    $key = $this->connectionPeerKey();
 
     // Only this endpoint. Another endpoint's rows stay, even past this window.
     $stmt = $this->db->prepare(
@@ -51,7 +66,7 @@ class RateLimiter {
        WHERE ip_address = ? AND endpoint = ?
        AND attempted_at > DATE_SUB(NOW(), INTERVAL ? SECOND)"
     );
-    $stmt->bind_param("ssi", $peer, $endpoint, $window_seconds);
+    $stmt->bind_param("ssi", $key, $endpoint, $window_seconds);
     $stmt->execute();
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();

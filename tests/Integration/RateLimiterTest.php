@@ -7,7 +7,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * Seams: RateLimiter::isRateLimited() and RateLimiter::recordAttempt().
  * A check deletes expired rate_limits rows only for the endpoint passed in.
- * Counts and inserts use the connection peer address, not X-Forwarded-For.
+ * Counts and inserts key the connection peer, not X-Forwarded-For: an IPv6
+ * peer on its /64 network, an IPv4-mapped peer as its IPv4 address.
  */
 final class RateLimiterTest extends TestCase
 {
@@ -82,6 +83,64 @@ final class RateLimiterTest extends TestCase
         $this->insertAttempts('203.0.113.10', 'login', 5);
 
         $this->assertTrue($limiter->isRateLimited('login', 5, 900));
+    }
+
+    public function test_two_addresses_in_one_ipv6_64_share_a_count(): void
+    {
+        $limiter = new \RateLimiter($this->db);
+        $this->recordLoginAttemptsFrom($limiter, '2001:db8:a:b::1', 5);
+
+        $this->assertTrue($this->loginIsRateLimitedFor($limiter, '2001:db8:a:b:ffff:ffff:ffff:ffff'));
+    }
+
+    public function test_addresses_in_different_ipv6_64s_do_not_share_a_count(): void
+    {
+        $limiter = new \RateLimiter($this->db);
+        $this->recordLoginAttemptsFrom($limiter, '2001:db8:a:a:ffff:ffff:ffff:ffff', 5);
+
+        $this->assertFalse($this->loginIsRateLimitedFor($limiter, '2001:db8:a:b::1'));
+    }
+
+    public function test_an_ipv4_mapped_peer_shares_its_ipv4_addresss_count(): void
+    {
+        $limiter = new \RateLimiter($this->db);
+        $this->recordLoginAttemptsFrom($limiter, '203.0.113.7', 3);
+        $this->recordLoginAttemptsFrom($limiter, '::ffff:203.0.113.7', 2);
+
+        $this->assertTrue($this->loginIsRateLimitedFor($limiter, '::ffff:203.0.113.7'));
+        $this->assertTrue($this->loginIsRateLimitedFor($limiter, '203.0.113.7'));
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('peerKeyProvider')]
+    public function test_a_recorded_attempt_stores_the_peers_key(string $peer, string $key): void
+    {
+        $this->recordLoginAttemptsFrom(new \RateLimiter($this->db), $peer, 1);
+
+        $this->assertSame($key, $this->recordedAddress('login'));
+    }
+
+    public static function peerKeyProvider(): array
+    {
+        return [
+            'an IPv4 peer keeps its address' => ['203.0.113.10', '203.0.113.10'],
+            'an IPv6 peer is its /64 in CIDR form' => ['2001:db8:a:b:1:2:3:4', '2001:db8:a:b::/64'],
+            'an IPv4-mapped peer is its IPv4 address' => ['::ffff:203.0.113.7', '203.0.113.7'],
+        ];
+    }
+
+    private function recordLoginAttemptsFrom(\RateLimiter $limiter, string $peer, int $count): void
+    {
+        $_SERVER['REMOTE_ADDR'] = $peer;
+        for ($i = 0; $i < $count; $i++) {
+            $limiter->recordAttempt('login');
+        }
+    }
+
+    private function loginIsRateLimitedFor(\RateLimiter $limiter, string $peer): bool
+    {
+        $_SERVER['REMOTE_ADDR'] = $peer;
+
+        return $limiter->isRateLimited('login', 5, 900);
     }
 
     private function insertAttempts(string $address, string $endpoint, int $count): void
