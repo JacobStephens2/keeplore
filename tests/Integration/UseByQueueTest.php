@@ -3,6 +3,7 @@
 namespace Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use UseByQueue;
 
 final class UseByQueueTest extends TestCase
@@ -28,6 +29,7 @@ final class UseByQueueTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         require_once PRIVATE_PATH . '/classes/UseByQueue.php';
     }
 
@@ -111,6 +113,89 @@ final class UseByQueueTest extends TestCase
         $this->assertSame('upcoming', $entry['status']);
     }
 
+    public static function itemSchemas(): array
+    {
+        return ['legacy casing' => [false], 'canonical schema' => [true]];
+    }
+
+    #[DataProvider('itemSchemas')]
+    public function test_entries_preserve_the_stored_fields_and_only_the_queue_projection(bool $canonicalSchema): void
+    {
+        if ($canonicalSchema) {
+            $this->db->query('DROP TABLE games');
+            $schema = file_get_contents(PROJECT_PATH . '/database/local-schema.sql');
+            preg_match('/CREATE TABLE IF NOT EXISTS games \(.*?\) ENGINE=[^;]*;/s', $schema, $match);
+            $this->runSql($match[0]);
+        } else {
+            $this->db->query('DELETE FROM games');
+            $this->db->query('ALTER TABLE games MODIFY interaction_frequency_days DECIMAL(8,2)');
+        }
+        $this->db->query("INSERT INTO games (id, user_id, Title, Acq, interaction_frequency_days, type_id, type,
+                is_kept, is_in_secondary_collection, to_get_rid_of, mnp, mxp, mnt, mxt, Candidate, UsedRecUserCt, ss, Age)
+            VALUES (10, 1, 'Catan', NULL, 10.50, 1, 'legacy type', 1, 0, 0, 2, 4, NULL, 45, ' 0 ', '007', '03,04', 8)");
+        $this->db->query("INSERT INTO item_tags (user_id, artifact_id, tag) VALUES (1, 10, 'private tag')");
+
+        $expected = [
+            'id' => 10,
+            'Title' => 'Catan',
+            'Acq' => null,
+            'interaction_frequency_days' => '10.50',
+            'type_id' => 1,
+            'type' => 'board-game',
+            'user_id' => 1,
+            'is_kept' => 1,
+            'is_in_secondary_collection' => 0,
+            'to_get_rid_of' => 0,
+            'snoozed_until' => null,
+            'mnp' => 2,
+            'mxp' => 4,
+            'mnt' => null,
+            'mxt' => 45,
+            'Candidate' => ' 0 ',
+            'UsedRecUserCt' => $canonicalSchema ? '007' : 7,
+            'ss' => '03,04',
+            'age' => 8,
+            'last_use' => '2026-02-01',
+            'interval' => 10.5,
+            'use_by_date' => '2026-02-22',
+            'days_until' => -99,
+            'status' => 'overdue',
+            'is_snoozed' => false,
+        ];
+        $queue = $this->queue();
+        $this->assertSame([$expected], $queue->entries());
+        $this->assertSame($expected, $queue->entry(10));
+
+        require_once PRIVATE_PATH . '/interact_by.php';
+        $row = interact_by_present_row($queue->entry(10));
+        $this->assertSame([3, 23, 8, '03,04', '2', '4', false], [
+            $row['sws'], $row['avg_time'], $row['age'], $row['ss'], $row['mnp'], $row['mxp'], $row['candidate'],
+        ]);
+
+        require_once PRIVATE_PATH . '/record_use.php';
+        $this->assertSame([
+            'ok' => true,
+            'message' => 'The interaction with Catan with 0 people was recorded.',
+            'artifact_id' => 10,
+            'artifact_name' => 'Catan',
+            'artifact_type' => 'board-game',
+            'use_id' => 42,
+            'use_date' => '2026-02-01',
+            'new_use_by_date' => '2026-02-22',
+            'most_recent_use_date' => '2026-02-01',
+            'is_overdue' => true,
+        ], record_use_ajax_payload([
+            'artifact' => ['id' => 10, 'name' => 'Catan'], 'useDate' => '2026-02-01',
+        ], 42, $queue->entry(10)));
+    }
+
+    public function test_an_absent_joined_type_stays_null_instead_of_using_legacy_type_text(): void
+    {
+        $this->db->query("UPDATE games SET type_id = 999, type = 'legacy type' WHERE id = 10");
+        $this->assertNull($this->queue()->entry(10)['type']);
+        $this->assertNull($this->queue()->entries()[0]['type']);
+    }
+
     public function test_a_legacy_play_date_later_than_the_latest_use_is_the_last_use(): void
     {
         $this->db->query("INSERT INTO uses (artifact_id, user_id, use_date) VALUES (10, 1, '2026-01-15')");
@@ -165,6 +250,35 @@ final class UseByQueueTest extends TestCase
         $this->assertSame([12], $this->ids($queue->entries(['include_secondary_collection' => true, 'type_ids' => [2]])));
         $this->assertSame([12, 10], $this->ids($queue->entries(['include_secondary_collection' => true, 'type_ids' => null])));
         $this->assertSame([], $queue->entries(['include_secondary_collection' => true, 'type_ids' => []]));
+        foreach (['1', 1, false] as $typeIds) {
+            $this->assertSame([12, 10], $this->ids($queue->entries(['include_secondary_collection' => true, 'type_ids' => $typeIds])));
+        }
+        $this->assertSame([10], $this->ids($queue->entries(['type_ids' => ['1']])));
+    }
+
+    public function test_only_zero_or_null_removal_flags_allow_kept_or_secondary_items(): void
+    {
+        foreach (['NULL', '0', '1', '2', '-1'] as $removal) {
+            $this->db->query("UPDATE games SET to_get_rid_of = $removal WHERE id IN (10, 12)");
+            $this->assertSame(in_array($removal, ['NULL', '0']) ? [10] : [], $this->ids($this->queue()->entries()), $removal);
+            $this->assertSame(in_array($removal, ['NULL', '0']) ? [12, 10] : [],
+                $this->ids($this->queue()->entries(['include_secondary_collection' => true])), $removal);
+        }
+        $this->db->query('UPDATE games SET to_get_rid_of = 0, is_kept = 2, is_in_secondary_collection = -1 WHERE id IN (10, 12)');
+        $this->assertSame([], $this->queue()->entries(['include_secondary_collection' => true]));
+        $this->db->query('UPDATE games SET is_in_secondary_collection = 1 WHERE id = 12');
+        $this->assertSame([12], $this->ids($this->queue()->entries(['include_secondary_collection' => true])));
+    }
+
+    public function test_format_flags_do_not_change_queue_membership(): void
+    {
+        foreach (['NULL', '0', '1', '2', '-1'] as $physical) {
+            foreach (['NULL', '0', '1', '2', '-1'] as $digital) {
+                $this->db->query("UPDATE games SET is_physical = $physical, is_digital = $digital");
+                $this->assertSame([10], $this->ids($this->queue()->entries()), "$physical / $digital");
+                $this->assertSame([12, 10], $this->ids($this->queue()->entries(['include_secondary_collection' => true])), "$physical / $digital");
+            }
+        }
     }
 
     public function test_items_without_a_use_by_date_sort_last(): void
@@ -186,6 +300,54 @@ final class UseByQueueTest extends TestCase
         $entries = $this->queue()->entries();
         $this->assertSame(['2026-07-31', '2026-07-31'], array_column($entries, 'use_by_date'));
         $this->assertSame([16, 10], $this->ids($entries));
+    }
+
+    public function test_equal_use_by_and_last_use_dates_sort_by_item_id_including_undated_items(): void
+    {
+        $this->db->query("DELETE FROM uses");
+        $this->db->query("UPDATE games SET Acq = NULL WHERE id = 10");
+        $this->db->query("INSERT INTO games (id, user_id, Title, Acq) VALUES
+            (14, 1, 'Z first by id', '2026-01-01'), (15, 1, 'A last by id', '2026-01-01'),
+            (16, 1, 'A undated', NULL)");
+        $this->assertSame([14, 15, 10, 16], $this->ids($this->queue()->entries()));
+    }
+
+    public function test_minimum_age_matches_the_prepared_mysql_comparison_on_nullable_integer_ages(): void
+    {
+        $this->db->query('UPDATE games SET is_kept = 1, to_get_rid_of = 0,
+            Age = CASE id WHEN 10 THEN NULL WHEN 11 THEN -2 WHEN 12 THEN 0 ELSE 8 END');
+        $this->db->query("INSERT INTO games (id, user_id, Title, Age) VALUES (14, 1, 'Age 9', 9), (15, 1, 'Age 10', 10)");
+        foreach (['', 0, '0', null, 9, '9', 8.5, '8.5', -2, '-1.5', ' 9', '9 years',
+            '8.5 years', '-1.5 years', '8e1years', '8.5e1years', 'nine', '00', '0.0', 0.0,
+            false, true, '1e1', '+8.5', '  ', '-0', '.5'] as $minimumAge) {
+            // The old prepared numeric comparison is the oracle for the
+            // coercion moving out of SQL, including strict disabled values.
+            $active = !in_array($minimumAge, ['', 0, '0', null], true);
+            $stmt = $this->db->prepare('SELECT id FROM games WHERE user_id = 1'
+                . ($active ? ' AND age >= ?' : '') . ' ORDER BY id');
+            if ($active) {
+                $value = (string) $minimumAge;
+                $stmt->bind_param('s', $value);
+            }
+            $stmt->execute();
+            $expected = array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'id');
+            $stmt->close();
+            $actual = $this->ids($this->queue()->entries(['minimum_age' => $minimumAge]));
+            sort($actual);
+            $this->assertSame($expected, $actual, var_export($minimumAge, true));
+        }
+    }
+
+    public function test_minimum_age_preserves_decimals_and_legacy_malformed_text_coercion(): void
+    {
+        $this->db->query('UPDATE games SET Age = 8 WHERE id = 10');
+        $this->assertSame([], $this->queue()->entries(['minimum_age' => '8.5']));
+        // MySQL's prepared INT comparison retains decimals for numeric
+        // values, but reads only the integer prefix of malformed text.
+        $this->assertSame([10], $this->ids($this->queue()->entries(['minimum_age' => '8.5 years'])));
+        $this->db->query('UPDATE games SET Age = 9 WHERE id = 10');
+        $this->assertSame([10], $this->ids($this->queue()->entries(['minimum_age' => '8.5'])));
+        $this->assertSame([10], $this->ids($this->queue()->entries(['minimum_age' => '8.5 years'])));
     }
 
     public function test_sweet_spot_and_minimum_age_filters(): void
@@ -243,6 +405,11 @@ final class UseByQueueTest extends TestCase
         $this->assertSame('2026-04-01', $former['use_by_date']);
         $this->assertSame('overdue', $former['status']);
         $this->assertSame('Azul', $queue->entry(11)['Title']);
+        $this->db->query("UPDATE games SET is_kept = 0, is_in_secondary_collection = 1,
+            to_get_rid_of = 2, snoozed_until = '2027-01-01' WHERE id = 10");
+        $this->assertSame([], $queue->entries(['include_secondary_collection' => true, 'type_ids' => [1]]));
+        $this->assertSame('Catan', $queue->entry(10)['Title']);
+        $this->assertTrue($queue->entry(10)['is_snoozed']);
     }
 
     public function test_entry_is_null_for_another_owners_item_or_no_item(): void

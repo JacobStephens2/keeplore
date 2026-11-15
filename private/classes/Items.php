@@ -38,7 +38,7 @@ final class Items
      * artifact_id = games.id; it isn't owner-scoped, so the query joining it
      * must scope games to the owner.
      */
-    public const LAST_USE = "(SELECT artifact_id, DATE(MAX(used_on)) AS last_use
+    private const LAST_USE = "(SELECT artifact_id, DATE(MAX(used_on)) AS last_use
         FROM (SELECT artifact_id, use_date AS used_on FROM " . self::OWNERS_USES . "
             UNION ALL SELECT Title, PlayDate FROM responses) item_dates
         GROUP BY artifact_id)";

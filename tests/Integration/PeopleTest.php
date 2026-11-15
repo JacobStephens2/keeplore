@@ -35,6 +35,7 @@ final class PeopleTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         $this->runSql('ALTER TABLE players
             MODIFY id INT AUTO_INCREMENT,
             ADD COLUMN FullName VARCHAR(255) DEFAULT NULL,
@@ -577,7 +578,7 @@ final class PeopleTest extends TestCase
 
     private function lastUse(int $itemId): ?string
     {
-        return $this->db->query('SELECT last_use FROM ' . \Items::LAST_USE . ' item_last_use WHERE artifact_id = ' . $itemId)->fetch_row()[0] ?? null;
+        return (new \Items($this->db, 1))->list(['ids' => [$itemId]])[0]['last_use'] ?? null;
     }
 
     private function accountLink(int $userId = 1): ?int
