@@ -64,9 +64,14 @@ final class UseByQueue
         ]);
         $minimumAge = $filters['minimum_age'] ?? '';
         $filterAge = !in_array($minimumAge, ['', 0, '0', null], true);
-        // Decision 6 of #312 requires floating numeric-prefix conversion,
-        // including decimals and scalar values such as false.
-        $ageThreshold = (float) (string) $minimumAge;
+        // Preserve the old prepared INT comparison: numeric values keep
+        // their decimals; malformed text contributes only an integer prefix.
+        $ageValue = (string) $minimumAge;
+        $ageThreshold = (float) $ageValue;
+        if (!is_numeric($ageValue)) {
+            preg_match('/^\s*([+-]?\d+)/', $ageValue, $prefix);
+            $ageThreshold = (float) ($prefix[1] ?? 0);
+        }
         // A whole number of 1 or more, read as the Items page reads its count.
         $sweetSpot = (string) ($filters['sweet_spot'] ?? '');
         $filterSweetSpot = preg_match('/^\s*[1-9]\d*\s*$/', $sweetSpot);

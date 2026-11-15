@@ -318,7 +318,8 @@ final class UseByQueueTest extends TestCase
             Age = CASE id WHEN 10 THEN NULL WHEN 11 THEN -2 WHEN 12 THEN 0 ELSE 8 END');
         $this->db->query("INSERT INTO games (id, user_id, Title, Age) VALUES (14, 1, 'Age 9', 9), (15, 1, 'Age 10', 10)");
         foreach (['', 0, '0', null, 9, '9', 8.5, '8.5', -2, '-1.5', ' 9', '9 years',
-            'nine', '00', '0.0', 0.0, false, true, '1e1', '+8.5', '  ', '-0', '.5'] as $minimumAge) {
+            '8.5 years', '-1.5 years', '8e1years', '8.5e1years', 'nine', '00', '0.0', 0.0,
+            false, true, '1e1', '+8.5', '  ', '-0', '.5'] as $minimumAge) {
             // The old prepared numeric comparison is the oracle for the
             // coercion moving out of SQL, including strict disabled values.
             $active = !in_array($minimumAge, ['', 0, '0', null], true);
@@ -337,13 +338,15 @@ final class UseByQueueTest extends TestCase
         }
     }
 
-    public function test_minimum_age_keeps_fractional_numeric_prefixes_as_specified(): void
+    public function test_minimum_age_preserves_decimals_and_legacy_malformed_text_coercion(): void
     {
         $this->db->query('UPDATE games SET Age = 8 WHERE id = 10');
-        // Decision 6 explicitly requires a floating prefix. MySQL 8.4's
-        // old prepared INT comparison truncates malformed decimal text.
-        $this->assertSame([], $this->queue()->entries(['minimum_age' => '8.5 years']));
+        $this->assertSame([], $this->queue()->entries(['minimum_age' => '8.5']));
+        // MySQL's prepared INT comparison retains decimals for numeric
+        // values, but reads only the integer prefix of malformed text.
+        $this->assertSame([10], $this->ids($this->queue()->entries(['minimum_age' => '8.5 years'])));
         $this->db->query('UPDATE games SET Age = 9 WHERE id = 10');
+        $this->assertSame([10], $this->ids($this->queue()->entries(['minimum_age' => '8.5'])));
         $this->assertSame([10], $this->ids($this->queue()->entries(['minimum_age' => '8.5 years'])));
     }
 
