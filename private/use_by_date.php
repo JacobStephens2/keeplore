@@ -20,7 +20,7 @@ require_once __DIR__ . '/app_day.php';
  * - `status`: `overdue`, `due_today`, `upcoming`, or null without one
  * - `is_snoozed`: its snoozed-until date is after $today, so an item snoozed
  *   until today shows again today. The Use-by queue's "hide snoozed" filter
- *   applies the same rule in SQL.
+ *   reads this status.
  */
 function use_by_status(array $item, $default_interval, string $today): array {
     $frequency = $item['interaction_frequency_days'] ?? null;

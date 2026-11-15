@@ -39,6 +39,7 @@ final class DailyEmailApiTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         require_once PRIVATE_PATH . '/daily_email_api.php';
         defined('DOMAIN') || define('DOMAIN', 'keeplore.app');
         defined('DEV_EMAIL') || define('DEV_EMAIL', 'dev@keeplore.app');

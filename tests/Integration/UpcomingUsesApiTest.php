@@ -34,6 +34,7 @@ final class UpcomingUsesApiTest extends TestCase
         $this->db->select_db($this->databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->runSql(file_get_contents(PROJECT_PATH . '/database/migrations/add-item-tags.sql'));
         require_once PRIVATE_PATH . '/api_request.php';
         require_once PRIVATE_PATH . '/upcoming_uses_api.php';
     }
@@ -81,6 +82,7 @@ final class UpcomingUsesApiTest extends TestCase
         $this->addItemUsed(31, 'Upcoming', 30, 30);
         $this->addItemUsed(32, 'Far off', 100, 1);
         $this->addItemUsed(40, 'Someone else', 10, 15, 2);
+        $this->db->query("INSERT INTO item_tags (user_id, artifact_id, tag) VALUES (1, 30, 'private tag')");
         $this->db->query('UPDATE users SET native_notify_hour = 7, native_notify_lead_days = 2, native_notify_past_due = 0 WHERE id = 1');
 
         [$status, $fields] = list_upcoming_uses_over_api($this->db, $this->session());

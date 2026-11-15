@@ -12,13 +12,21 @@ require_once __DIR__ . '/Preferences.php';
  * whether it is overdue, due today or upcoming. Every page, email and
  * notification that shows what is due reads it from here.
  *
- * Each entry is the item's own columns plus `type`, `last_use` (Y-m-d or
- * null) and use_by_status()'s answer on the queue's day: `interval`,
+ * Each entry keeps the queue's stored fields, with `type`, `last_use` (Y-m-d
+ * or null) and use_by_status()'s answer on the queue's day: `interval`,
  * `use_by_date`, `days_until`, `status` and `is_snoozed`. How soon counts as
  * "due soon" is each caller's choice.
  */
 final class UseByQueue
 {
+    /** The queue's stored fields, in their existing order and casing. */
+    private const STORED_FIELDS = [
+        'id', 'Title', 'Acq', 'interaction_frequency_days', 'type_id', 'type',
+        'user_id', 'is_kept', 'is_in_secondary_collection', 'to_get_rid_of',
+        'snoozed_until', 'mnp', 'mxp', 'mnt', 'mxt', 'Candidate', 'UsedRecUserCt',
+        'ss', 'age', 'last_use',
+    ];
+
     private string $today;
 
     /** $today is a Y-m-d day; the App day (app_today()) when omitted. */
@@ -49,43 +57,42 @@ final class UseByQueue
             return [];
         }
 
-        $where = ['(games.to_get_rid_of = 0 OR games.to_get_rid_of IS NULL)'];
-        $types = '';
-        $params = [];
-
-        $where[] = empty($filters['include_secondary_collection'])
-            ? 'games.is_kept = 1'
-            : '(games.is_kept = 1 OR games.is_in_secondary_collection = 1)';
-
-        if (!empty($filters['hide_snoozed'])) {
-            // use_by_status()'s is_snoozed rule, kept in SQL so hidden rows are never fetched.
-            $where[] = '(games.snoozed_until IS NULL OR games.snoozed_until <= ?)';
-            $types .= 's';
-            $params[] = $this->today;
-        }
-
+        $includeSecondary = !empty($filters['include_secondary_collection']);
+        $rows = (new Items($this->db, $this->userId))->list([
+            'type_ids' => is_array($typeIds) ? $typeIds : null,
+            'kept' => $includeSecondary ? null : true,
+        ]);
         $minimumAge = $filters['minimum_age'] ?? '';
-        if ($minimumAge !== '' && $minimumAge !== 0 && $minimumAge !== '0' && $minimumAge !== null) {
-            $where[] = 'games.age >= ?';
-            $types .= 's';
-            $params[] = (string) $minimumAge;
-        }
-
-        if (is_array($typeIds)) {
-            $where[] = 'games.type_id IN (' . implode(',', array_fill(0, count($typeIds), '?')) . ')';
-            $types .= str_repeat('s', count($typeIds));
-            array_push($params, ...array_map('strval', array_values($typeIds)));
-        }
-
-        $rows = $this->rows(implode(' AND ', $where), $types, $params);
+        $filterAge = !in_array($minimumAge, ['', 0, '0', null], true);
+        // Decision 6 of #312 requires floating numeric-prefix conversion,
+        // including decimals and scalar values such as false.
+        $ageThreshold = (float) (string) $minimumAge;
         // A whole number of 1 or more, read as the Items page reads its count.
         $sweetSpot = (string) ($filters['sweet_spot'] ?? '');
-        if (preg_match('/^\s*[1-9]\d*\s*$/', $sweetSpot)) {
-            $rows = array_filter($rows, fn (array $row) => item_plays_best_at($row, (int) $sweetSpot));
-        }
-
+        $filterSweetSpot = preg_match('/^\s*[1-9]\d*\s*$/', $sweetSpot);
         $interval = $filters['default_interval'] ?? $this->defaultUseInterval();
-        $entries = array_map(fn (array $row) => $this->present($row, $interval), $rows);
+        $entries = [];
+        foreach ($rows as $row) {
+            $entry = $this->present($row, $interval);
+            if (!artifact_is_kept($entry) && !($includeSecondary && artifact_is_in_secondary_collection($entry))) {
+                continue;
+            }
+            // Only zero or null is eligible; the generic false-flag filter
+            // also accepts anomalous non-one values that this queue excludes.
+            if ($entry['to_get_rid_of'] !== null && $entry['to_get_rid_of'] != 0) {
+                continue;
+            }
+            if ($filterAge && ($entry['age'] === null || (float) $entry['age'] < $ageThreshold)) {
+                continue;
+            }
+            if ($filterSweetSpot && !item_plays_best_at($entry, (int) $sweetSpot)) {
+                continue;
+            }
+            if (!empty($filters['hide_snoozed']) && $entry['is_snoozed']) {
+                continue;
+            }
+            $entries[] = $entry;
+        }
         usort($entries, fn (array $a, array $b) =>
             [$a['use_by_date'] === null, $a['use_by_date'], $a['last_use'], (int) $a['id']]
             <=> [$b['use_by_date'] === null, $b['use_by_date'], $b['last_use'], (int) $b['id']]);
@@ -95,7 +102,7 @@ final class UseByQueue
     /** One of the owner's items as a queue entry, whatever its kept state, or null. */
     public function entry(int $itemId): ?array
     {
-        $row = $this->rows('games.id = ?', 'i', [$itemId])[0] ?? null;
+        $row = (new Items($this->db, $this->userId))->list(['ids' => [$itemId]])[0] ?? null;
         return $row === null ? null : $this->present($row, $this->defaultUseInterval());
     }
 
@@ -106,30 +113,11 @@ final class UseByQueue
 
     private function present(array $row, $defaultInterval): array
     {
-        return $row + use_by_status($row, $defaultInterval, $this->today);
-    }
-
-    /**
-     * The owner's items matching $where, with their last use read from
-     * Items' last-use rule so no row repeats.
-     */
-    private function rows(string $where, string $types, array $params): array
-    {
-        $stmt = $this->db->prepare(
-            "SELECT games.id, games.Title, games.Acq, games.interaction_frequency_days, games.type_id,
-                types.objectType AS type, games.user_id, games.is_kept, games.is_in_secondary_collection,
-                games.to_get_rid_of, games.snoozed_until, games.mnp, games.mxp, games.mnt, games.mxt,
-                games.Candidate, games.UsedRecUserCt, games.ss, games.age,
-                item_last_use.last_use
-             FROM games
-                LEFT JOIN types ON types.id = games.type_id
-                LEFT JOIN " . Items::LAST_USE . " item_last_use ON item_last_use.artifact_id = games.id
-             WHERE games.user_id = ? AND $where"
-        );
-        $stmt->bind_param('i' . $types, $this->userId, ...$params);
-        $stmt->execute();
-        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
-        return $rows;
+        $columns = array_change_key_case($row, CASE_LOWER);
+        $entry = [];
+        foreach (self::STORED_FIELDS as $field) {
+            $entry[$field] = $columns[$field === 'type' ? 'type_name' : strtolower($field)];
+        }
+        return $entry + use_by_status($entry, $defaultInterval, $this->today);
     }
 }
