@@ -11,107 +11,13 @@ require_once PROJECT_PATH . '/private/record_use.php';
  *
  * record_use_input() is the one map Record Use, Quick record, Edit User,
  * Edit Use, and the HTTP record use for the Item, date, Setting, notes,
- * and People. The AJAX body, return URL, and participants stay on this
- * module and still read the Record Use post. The Setting a new use opens
- * with is read through the Uses module (tests/Integration/UsesTest.php).
+ * and People. Participant defaults and form prefill remain shared helpers.
+ * Submission answers and Use groups are covered through RecordUse::submit
+ * in tests/Integration/RecordUseTest.php. The Setting a new use opens with
+ * is read through Uses (tests/Integration/UsesTest.php).
  */
 class RecordUseTest extends TestCase
 {
-    public function test_ajax_payload_includes_the_new_use_for_the_table(): void
-    {
-        $payload = record_use_ajax_payload(
-            [
-                'artifact' => ['id' => '2807', 'name' => 'Catan'],
-                'user' => [['id' => 2, 'name' => 'Sam Lee']],
-                'useDate' => '2026-09-21',
-            ],
-            42,
-            [
-                'type' => 'board-game',
-                'last_use' => '2026-09-21',
-                'use_by_date' => '2027-03-20',
-                'days_until' => 180,
-                'status' => 'upcoming',
-            ]
-        );
-
-        $this->assertSame(true, $payload['ok']);
-        $this->assertSame(42, $payload['use_id']);
-        $this->assertSame('2026-09-21', $payload['use_date']);
-        $this->assertSame(2807, $payload['artifact_id']);
-        $this->assertSame('Catan', $payload['artifact_name']);
-        $this->assertSame('board-game', $payload['artifact_type']);
-        $this->assertSame('2027-03-20', $payload['new_use_by_date']);
-        $this->assertSame('2026-09-21', $payload['most_recent_use_date']);
-        $this->assertFalse($payload['is_overdue']);
-        $this->assertSame(
-            'The interaction with Catan with 1 person was recorded.',
-            $payload['message']
-        );
-    }
-
-    public function test_ajax_payload_marks_an_overdue_entry(): void
-    {
-        $payload = record_use_ajax_payload(
-            ['artifact' => ['id' => 1, 'name' => 'Azul'], 'useDate' => '2026-09-20'],
-            7,
-            ['type' => 'board-game', 'last_use' => '2026-01-01', 'use_by_date' => '2026-06-30', 'days_until' => -82, 'status' => 'overdue']
-        );
-
-        $this->assertTrue($payload['is_overdue']);
-        $this->assertSame('2026-01-01', $payload['most_recent_use_date']);
-    }
-
-    public function test_ajax_payload_says_people_when_more_than_one_participant(): void
-    {
-        $payload = record_use_ajax_payload(
-            [
-                'artifact' => ['id' => 1, 'name' => 'Azul'],
-                'user' => [
-                    ['id' => 2, 'name' => 'Sam Lee'],
-                    ['id' => 1, 'name' => 'Local Dev'],
-                ],
-                'useDate' => '2026-09-20',
-            ],
-            7,
-            null
-        );
-
-        $this->assertSame('', $payload['artifact_type']);
-        $this->assertNull($payload['new_use_by_date']);
-        $this->assertFalse($payload['is_overdue']);
-        $this->assertSame(
-            'The interaction with Azul with 2 people was recorded.',
-            $payload['message']
-        );
-    }
-
-    public function test_return_path_sends_user_edit_saves_back_to_that_user(): void
-    {
-        $this->assertSame(
-            '/users/edit.php?id=23',
-            record_use_return_path(
-                ['return_to' => 'user-edit', 'return_player_id' => '23'],
-                '/uses/record-new.php'
-            )
-        );
-    }
-
-    public function test_return_path_keeps_the_default_without_a_user_edit_return(): void
-    {
-        $this->assertSame(
-            '/uses/record-new.php',
-            record_use_return_path([], '/uses/record-new.php')
-        );
-        $this->assertSame(
-            '/uses/record-new.php',
-            record_use_return_path(
-                ['return_to' => 'user-edit', 'return_player_id' => '0'],
-                '/uses/record-new.php'
-            )
-        );
-    }
-
     public function test_participants_are_the_edited_player_and_you_when_different(): void
     {
         $this->assertSame(
@@ -148,37 +54,6 @@ class RecordUseTest extends TestCase
         }
         $this->assertFalse(function_exists('most_recent_use_setting'));
     }
-    public function test_use_count_defaults_to_one(): void
-    {
-        $this->assertSame(1, record_use_count([]));
-        $this->assertSame(1, record_use_count(['useCount' => '']));
-        $this->assertSame(1, record_use_count(['useCount' => 'abc']));
-    }
-
-    public function test_use_count_reads_the_number_of_uses(): void
-    {
-        $this->assertSame(2, record_use_count(['useCount' => '2']));
-    }
-
-    public function test_use_count_is_clamped_to_one_through_the_max(): void
-    {
-        $this->assertSame(1, record_use_count(['useCount' => '0']));
-        $this->assertSame(1, record_use_count(['useCount' => '-3']));
-        $this->assertSame(\Uses::MAX_COUNT, record_use_count(['useCount' => '500']));
-    }
-
-    public function test_success_message_names_how_many_uses_when_more_than_one(): void
-    {
-        $this->assertSame(
-            'The interaction with Old Maid with 1 person was recorded 2 times.',
-            record_use_success_message([
-                'artifact' => ['name' => 'Old Maid'],
-                'user' => [['id' => 2, 'name' => 'Sam Lee']],
-                'useCount' => '2',
-            ])
-        );
-    }
-
     public function test_input_maps_the_record_use_post_onto_the_uses_module(): void
     {
         $this->assertSame([
@@ -320,46 +195,6 @@ class RecordUseTest extends TestCase
             'notes' => '',
             'player_ids' => [],
         ], record_use_input([]));
-    }
-
-    public function test_group_keeps_the_people_date_and_setting_of_a_recorded_use(): void
-    {
-        $group = record_use_group([
-            'artifact' => ['id' => '12', 'name' => 'Old Maid'],
-            'user' => [
-                ['id' => '1', 'name' => 'Local Dev'],
-                ['id' => '2', 'name' => ' Sam Lee '],
-            ],
-            'useDate' => '2026-10-02',
-            'Note' => 'Grandma\'s',
-            'NotesTwo' => 'Close game',
-            'useCount' => '2',
-        ], '2026-10-03');
-
-        $this->assertSame([
-            'people' => [
-                ['id' => 1, 'name' => 'Local Dev'],
-                ['id' => 2, 'name' => 'Sam Lee'],
-            ],
-            'useDate' => '2026-10-02',
-            'Note' => 'Grandma\'s',
-            'savedOn' => '2026-10-03',
-        ], $group);
-    }
-
-    public function test_group_drops_blank_and_repeated_people(): void
-    {
-        $group = record_use_group([
-            'user' => [
-                ['id' => '', 'name' => 'Typed but not picked'],
-                ['id' => '2', 'name' => 'Sam Lee'],
-                ['id' => '2', 'name' => 'Sam Lee'],
-            ],
-        ], '2026-10-03');
-
-        $this->assertSame([['id' => 2, 'name' => 'Sam Lee']], $group['people']);
-        $this->assertSame('', $group['useDate']);
-        $this->assertSame('', $group['Note']);
     }
 
     public function test_form_opens_with_the_group_when_recording_again(): void

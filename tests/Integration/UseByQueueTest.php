@@ -172,21 +172,6 @@ final class UseByQueueTest extends TestCase
             $row['sws'], $row['avg_time'], $row['age'], $row['ss'], $row['mnp'], $row['mxp'], $row['candidate'],
         ]);
 
-        require_once PRIVATE_PATH . '/record_use.php';
-        $this->assertSame([
-            'ok' => true,
-            'message' => 'The interaction with Catan with 0 people was recorded.',
-            'artifact_id' => 10,
-            'artifact_name' => 'Catan',
-            'artifact_type' => 'board-game',
-            'use_id' => 42,
-            'use_date' => '2026-02-01',
-            'new_use_by_date' => '2026-02-22',
-            'most_recent_use_date' => '2026-02-01',
-            'is_overdue' => true,
-        ], record_use_ajax_payload([
-            'artifact' => ['id' => 10, 'name' => 'Catan'], 'useDate' => '2026-02-01',
-        ], 42, $queue->entry(10)));
     }
 
     public function test_an_absent_joined_type_stays_null_instead_of_using_legacy_type_text(): void
