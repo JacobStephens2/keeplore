@@ -1,25 +1,141 @@
 <?php
 
 /**
- * Record-use write seam.
+ * Record Use submission and shared form helpers.
  *
  * Record Use, Quick record, Edit User, Edit Use, and the HTTP record share
  * record_use_input() for the Item, date, Setting, notes, and People. The
- * pages also share the AJAX body, the post-save redirect, and who is listed
- * as a participant. The Setting a new use opens with is the Uses module's
- * lastSetting(), falling back to the default Setting Preference.
+ * browser submit owns saving, the answer and remembered Use group. The
+ * Setting a new use opens with is the Uses module's lastSetting(), falling
+ * back to the default Setting Preference.
  */
 
 require_once __DIR__ . '/classes/Uses.php';
+require_once __DIR__ . '/classes/UseByQueue.php';
+require_once __DIR__ . '/app_day.php';
 
-/**
- * How many identical uses one Record Use submit writes. Pages without the
- * Number of uses field post nothing and record one.
- */
-function record_use_count(array $post): int
+/** The browser Record Use save and answer workflow, scoped to its trusted owner. */
+final class RecordUse
 {
-    $count = (int) ($post['useCount'] ?? 1);
-    return max(1, min(Uses::MAX_COUNT, $count));
+    private string $today;
+
+    public function __construct(private mysqli $db, private int $userId, ?string $today = null)
+    {
+        $this->today = $today ?? app_today();
+    }
+
+    /**
+     * Save the posted Uses and return the complete browser answer. Session
+     * keys absent from the update map must be left untouched by the emitter.
+     * Only recording validation/not-found errors become answers; unexpected
+     * failures propagate, including a queue read after the write committed.
+     *
+     * @return array{status: int, json: ?array, redirect: ?string, session: array}
+     */
+    public function submit(array $post, bool $ajax): array
+    {
+        try {
+            $ids = (new Uses($this->db, $this->userId))->record(record_use_input($post));
+        } catch (InvalidArgumentException | OutOfBoundsException $error) {
+            return $ajax ? [
+                'status' => $error instanceof OutOfBoundsException ? 404 : 400,
+                'json' => ['ok' => false, 'message' => $error->getMessage()],
+                'redirect' => null,
+                'session' => [],
+            ] : [
+                'status' => 302,
+                'json' => null,
+                'redirect' => $this->returnPath($post),
+                'session' => ['message' => $error->getMessage()],
+            ];
+        }
+        if ($ajax) {
+            $entry = (new UseByQueue($this->db, $this->userId, $this->today))->entry((int) $post['artifact']['id']);
+            return [
+                'status' => 200,
+                'json' => $this->ajaxPayload($post, $ids, $entry),
+                'redirect' => null,
+                'session' => [],
+            ];
+        }
+        $session = ['message' => $this->successMessage($post, count($ids))];
+        if (($post['return_to'] ?? '') !== 'user-edit') {
+            $session['record_use_group'] = $this->group($post);
+        }
+        return [
+            'status' => 302,
+            'json' => null,
+            'redirect' => $this->returnPath($post),
+            'session' => $session,
+        ];
+    }
+
+    private function returnPath(array $post): string
+    {
+        $personId = (int) ($post['return_player_id'] ?? 0);
+        return ($post['return_to'] ?? '') === 'user-edit' && $personId > 0
+            ? '/users/edit.php?id=' . $personId
+            : '/uses/record-new.php';
+    }
+
+    private function successMessage(array $post, int $useCount): string
+    {
+        $userCount = count($post['user'] ?? []);
+        $word = $userCount === 1 ? 'person' : 'people';
+        $times = $useCount > 1 ? " $useCount times" : '';
+        return 'The interaction with ' . ($post['artifact']['name'] ?? '')
+            . " with $userCount $word was recorded$times.";
+    }
+
+    /** Keep the submitted date separate from the queue's authoritative Last use. */
+    private function ajaxPayload(array $post, array $ids, ?array $entry): array
+    {
+        return [
+            'ok' => true,
+            'message' => $this->successMessage($post, count($ids)),
+            'artifact_id' => (int) ($post['artifact']['id'] ?? 0),
+            'artifact_name' => $post['artifact']['name'] ?? '',
+            'artifact_type' => (string) ($entry['type'] ?? ''),
+            'use_id' => end($ids),
+            'use_date' => $post['useDate'] ?? '',
+            'new_use_by_date' => $entry['use_by_date'] ?? null,
+            'most_recent_use_date' => $entry['last_use'] ?? null,
+            'is_overdue' => ($entry['status'] ?? null) === 'overdue',
+        ];
+    }
+
+    private function group(array $post): array
+    {
+        $people = [];
+        foreach ($post['user'] ?? [] as $person) {
+            $id = (int) ($person['id'] ?? 0);
+            if ($id <= 0 || isset($people[$id])) {
+                continue;
+            }
+            $people[$id] = ['id' => $id, 'name' => trim((string) ($person['name'] ?? ''))];
+        }
+        return [
+            'people' => array_values($people),
+            'useDate' => (string) ($post['useDate'] ?? ''),
+            'Note' => (string) ($post['Note'] ?? ''),
+            'savedOn' => $this->today,
+        ];
+    }
+}
+
+/** Apply only the returned session updates, then send the browser answer. */
+function emit_record_use_response(array $answer): never
+{
+    foreach ($answer['session'] as $key => $value) {
+        $_SESSION[$key] = $value;
+    }
+    if ($answer['json'] !== null) {
+        http_response_code($answer['status']);
+        header('Content-Type: application/json');
+        echo json_encode($answer['json']);
+        exit;
+    }
+    redirect_to(url_for($answer['redirect']));
 }
 
 /**
@@ -83,42 +199,6 @@ function record_use_input(array $post): array
     return $input;
 }
 
-function record_use_success_message(array $post): string
-{
-    $user_count = count($post['user'] ?? []);
-    $user_count_word = $user_count === 1 ? 'person' : 'people';
-    $use_count = record_use_count($post);
-    $times = $use_count > 1 ? " $use_count times" : '';
-    return 'The interaction with ' . ($post['artifact']['name'] ?? '')
-        . " with $user_count $user_count_word was recorded$times.";
-}
-
-/** The quick-record JSON, with the item's use-by status from its Use-by queue entry. */
-function record_use_ajax_payload(array $post, int $use_id, ?array $entry): array
-{
-    return [
-        'ok' => true,
-        'message' => record_use_success_message($post),
-        'artifact_id' => (int) ($post['artifact']['id'] ?? 0),
-        'artifact_name' => $post['artifact']['name'] ?? '',
-        'artifact_type' => (string) ($entry['type'] ?? ''),
-        'use_id' => $use_id,
-        'use_date' => $post['useDate'] ?? '',
-        'new_use_by_date' => $entry['use_by_date'] ?? null,
-        'most_recent_use_date' => $entry['last_use'] ?? null,
-        'is_overdue' => ($entry['status'] ?? null) === 'overdue',
-    ];
-}
-
-function record_use_return_path(array $post, string $default_path): string
-{
-    $return_player_id = (int) ($post['return_player_id'] ?? 0);
-    if (($post['return_to'] ?? '') === 'user-edit' && $return_player_id > 0) {
-        return url_for('/users/edit.php?id=' . $return_player_id);
-    }
-    return $default_path;
-}
-
 function record_use_participants(
     int $player_id,
     string $player_name,
@@ -132,29 +212,6 @@ function record_use_participants(
         $people[] = ['id' => $session_player_id, 'name' => $session_name];
     }
     return $people;
-}
-
-/**
- * The group a use was recorded with: who was there, when, and where. Record
- * Use keeps it after a save so "Record another use with this group" can
- * reopen the form with only the item left to pick.
- */
-function record_use_group(array $post, string $today): array
-{
-    $people = [];
-    foreach ($post['user'] ?? [] as $person) {
-        $id = (int) ($person['id'] ?? 0);
-        if ($id <= 0 || isset($people[$id])) {
-            continue;
-        }
-        $people[$id] = ['id' => $id, 'name' => trim((string) ($person['name'] ?? ''))];
-    }
-    return [
-        'people' => array_values($people),
-        'useDate' => (string) ($post['useDate'] ?? ''),
-        'Note' => (string) ($post['Note'] ?? ''),
-        'savedOn' => $today,
-    ];
 }
 
 /**

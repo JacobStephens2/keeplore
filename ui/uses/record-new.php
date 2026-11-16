@@ -9,67 +9,8 @@
 
   if(is_post_request()) {
 
-    /* Sample post request body
-
-      $_POST: Array 
-      (
-        [useDate] => 2023-01-12
-        [artifact] => Array
-          (
-              [name] => Age of Empires IV
-              [id] => 2807
-          )
-
-        [user] => Array
-          (
-            [0] => Array
-                (
-                    [name] => Jacob Stephens
-                    [id] => 141
-                )
-
-            [1] => Array
-                (
-                    [name] => Luke Boerman
-                    [id] => 91
-                )
-
-          )
-      )
-    */
-
     $is_ajax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
-    $after_record = record_use_return_path($_POST, url_for('/uses/' . $formProcessingFile));
-
-    try {
-      $ids = (new Uses($db, (int) $_SESSION['user_id']))->record(record_use_input($_POST));
-    } catch (InvalidArgumentException | OutOfBoundsException $error) {
-      if ($is_ajax) {
-        header('Content-Type: application/json');
-        http_response_code($error instanceof OutOfBoundsException ? 404 : 400);
-        echo json_encode(['ok' => false, 'message' => $error->getMessage()]);
-        exit;
-      }
-      $_SESSION['message'] = $error->getMessage();
-      redirect_to($after_record);
-    }
-
-    $message = record_use_success_message($_POST);
-
-    if ($is_ajax) {
-      $entry = (new UseByQueue($db, (int) $_SESSION['user_id']))->entry((int) $_POST['artifact']['id']);
-      header('Content-Type: application/json');
-      echo json_encode(record_use_ajax_payload($_POST, end($ids), $entry));
-      exit;
-    }
-
-    // Only this page's own form offers its group again; quick records
-    // from the dashboard, Use By, and Edit User post here by AJAX.
-    if (($_POST['return_to'] ?? '') !== 'user-edit') {
-      $_SESSION['record_use_group'] = record_use_group($_POST, app_today());
-    }
-    $_SESSION['message'] = $message;
-    redirect_to($after_record);
+    emit_record_use_response((new RecordUse($db, (int) $_SESSION['user_id']))->submit($_POST, $is_ajax));
 
   }
 
