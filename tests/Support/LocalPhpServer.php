@@ -43,15 +43,20 @@ final class LocalPhpServer
     }
 
     /** @return array{status: int, headers: string, body: string} */
-    public function request(string $path, array $headers = []): array
+    public function request(string $path, array $headers = [], string $method = 'GET', ?string $body = null): array
     {
         $handle = curl_init('http://127.0.0.1:' . $this->port . $path);
-        curl_setopt_array($handle, [
+        $options = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER => true,
             CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_TIMEOUT => 10,
-        ]);
+        ];
+        if ($body !== null) {
+            $options[CURLOPT_POSTFIELDS] = $body;
+        }
+        curl_setopt_array($handle, $options);
         $raw = curl_exec($handle);
         $status = curl_getinfo($handle, CURLINFO_HTTP_CODE);
         $error = curl_error($handle);
@@ -59,8 +64,13 @@ final class LocalPhpServer
         if ($raw === false) {
             throw new \RuntimeException($error . "\n" . $this->serverLog());
         }
-        [$responseHeaders, $body] = explode("\r\n\r\n", $raw, 2);
-        return ['status' => $status, 'headers' => $responseHeaders, 'body' => $body];
+        [$responseHeaders, $responseBody] = explode("\r\n\r\n", $raw, 2);
+        return ['status' => $status, 'headers' => $responseHeaders, 'body' => $responseBody];
+    }
+
+    public function port(): int
+    {
+        return $this->port;
     }
 
     public function stop(): void
