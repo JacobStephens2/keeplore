@@ -49,10 +49,10 @@ function api_request_status_and_fields(mysqli $db, string $endpoint, array $hand
     return [405, ['message' => 'Method not allowed. Supported methods: ' . implode(', ', array_keys($handlers))]];
   }
 
-  if (api_request_content_length_exceeds_limit($request['content_length'] ?? null)) {
-    return [413, ['message' => 'Request body too large.']];
-  }
   if (!array_key_exists('body', $request)) {
+    if (api_request_content_length_exceeds_limit($request['content_length'] ?? null)) {
+      return [413, ['message' => 'Request body too large.']];
+    }
     $source = array_key_exists('body_stream', $request) ? $request['body_stream'] : 'php://input';
     $raw = api_request_read_body($source);
     if ($raw === null) {

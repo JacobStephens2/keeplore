@@ -94,13 +94,17 @@ final class ApiRequestTest extends TestCase
         ];
     }
 
-    /** A handler map whose GET answers 200 and counts its runs. */
-    private function counted(int &$runs): array
+    /** A handler map whose $methods answer 200 and count their runs. */
+    private function counted(int &$runs, array $methods = ['GET']): array
     {
-        return ['GET' => function () use (&$runs) {
-            $runs++;
-            return [200, ['ok' => true]];
-        }];
+        $handlers = [];
+        foreach ($methods as $method) {
+            $handlers[$method] = function () use (&$runs) {
+                $runs++;
+                return [200, ['ok' => true]];
+            };
+        }
+        return $handlers;
     }
 
     /** Fills this IP's API rate limit window. */
@@ -300,70 +304,51 @@ final class ApiRequestTest extends TestCase
     {
         $handlers = ['POST' => fn () => [200, []]];
 
-        // 401: invalid credential (both metered and unmetered)
-        $stream401 = $this->bodyStream('{invalid');
-        [$status401] = answer_api_request($this->db, 'test', $handlers, $this->streamRequest('POST', $stream401, null, [null, null]));
-        $this->assertSame(401, $status401);
-        $this->assertSame(0, ftell($stream401));
-        $this->assertNotSame(JSON_ERROR_SYNTAX, json_last_error());
+        $this->assertDeferredRejectionLeavesBodyUnreadAndUndecoded(401, $handlers, 'POST', [null, null]);
+        $this->assertDeferredRejectionLeavesBodyUnreadAndUndecoded(401, $handlers, 'POST', [null, null], metered: false);
+        $this->assertDeferredRejectionLeavesBodyUnreadAndUndecoded(405, $handlers, 'PUT');
+        $this->assertDeferredRejectionLeavesBodyUnreadAndUndecoded(405, $handlers, 'PUT', [null, ARTIFACTS_API_KEY], metered: false);
 
-        $stream401Unmetered = $this->bodyStream('{invalid');
-        json_decode('[[', true, 1);
-        [$status401Unmetered] = answer_api_request($this->db, 'test', $handlers, $this->streamRequest('POST', $stream401Unmetered, null, [null, null]), metered: false);
-        $this->assertSame(401, $status401Unmetered);
-        $this->assertSame(0, ftell($stream401Unmetered));
-        $this->assertSame(JSON_ERROR_DEPTH, json_last_error());
-
-        // 405: unsupported method
-        $stream405 = $this->bodyStream('{invalid');
-        [$status405] = answer_api_request($this->db, 'test', $handlers, $this->streamRequest('PUT', $stream405));
-        $this->assertSame(405, $status405);
-        $this->assertSame(0, ftell($stream405));
-        $this->assertNotSame(JSON_ERROR_SYNTAX, json_last_error());
-
-        $stream405Unmetered = $this->bodyStream('{invalid');
-        json_decode('[[', true, 1);
-        [$status405Unmetered] = answer_api_request($this->db, 'test', $handlers, $this->streamRequest('PUT', $stream405Unmetered, null, [null, ARTIFACTS_API_KEY]), metered: false);
-        $this->assertSame(405, $status405Unmetered);
-        $this->assertSame(0, ftell($stream405Unmetered));
-        $this->assertSame(JSON_ERROR_DEPTH, json_last_error());
-
-        // 429: rate limit exceeded
         $this->fillTheWindow();
-        $stream429 = $this->bodyStream('{invalid');
-        [$status429] = answer_api_request($this->db, 'test', $handlers, $this->streamRequest('POST', $stream429));
-        $this->assertSame(429, $status429);
-        $this->assertSame(0, ftell($stream429));
-        $this->assertNotSame(JSON_ERROR_SYNTAX, json_last_error());
+        $this->assertDeferredRejectionLeavesBodyUnreadAndUndecoded(429, $handlers, 'POST');
+    }
+
+    private function assertDeferredRejectionLeavesBodyUnreadAndUndecoded(
+        int $expectedStatus,
+        array $handlers,
+        string $method,
+        ?array $credentials = null,
+        bool $metered = true
+    ): void {
+        $stream = $this->bodyStream('{invalid');
+        if (!$metered) {
+            json_decode('[[', true, 1);
+        }
+        [$status] = answer_api_request(
+            $this->db,
+            'test',
+            $handlers,
+            $this->streamRequest($method, $stream, null, $credentials),
+            metered: $metered
+        );
+
+        $this->assertSame($expectedStatus, $status);
+        $this->assertSame(0, ftell($stream));
+        if ($metered) {
+            $this->assertNotSame(JSON_ERROR_SYNTAX, json_last_error());
+        } else {
+            $this->assertSame(JSON_ERROR_DEPTH, json_last_error());
+        }
     }
 
     public function test_oversized_content_length_returns_413_without_reading_or_decoding(): void
     {
         $runs = 0;
-        $handlers = [];
-        foreach (['GET', 'POST', 'PUT'] as $method) {
-            $handlers[$method] = function () use (&$runs) {
-                $runs++;
-                return [200, []];
-            };
-        }
+        $handlers = $this->counted($runs, ['GET', 'POST', 'PUT']);
 
         foreach (['GET', 'POST', 'PUT'] as $method) {
             foreach (['262145', '99999999999999999999999999'] as $contentLength) {
-                $stream = $this->bodyStream('{invalid');
-                json_decode('[[', true, 1);
-                [$status, $body] = answer_api_request(
-                    $this->db,
-                    'test',
-                    $handlers,
-                    $this->streamRequest($method, $stream, $contentLength, [null, ARTIFACTS_API_KEY]),
-                    metered: false
-                );
-
-                $this->assertSame(413, $status, "$method $contentLength");
-                $this->assertEquals((object) ['message' => 'Request body too large.'], $body);
-                $this->assertSame(0, ftell($stream));
-                $this->assertSame(JSON_ERROR_DEPTH, json_last_error());
+                $this->assertTooLargeWithoutDecoding($method, '{invalid', $contentLength, 0, $handlers, "$method $contentLength");
             }
         }
         $this->assertSame(0, $runs);
@@ -372,13 +357,7 @@ final class ApiRequestTest extends TestCase
     public function test_oversized_streamed_body_returns_413_without_decoding_after_limit_plus_one_bytes(): void
     {
         $runs = 0;
-        $handlers = [];
-        foreach (['GET', 'POST', 'PUT'] as $method) {
-            $handlers[$method] = function () use (&$runs) {
-                $runs++;
-                return [200, []];
-            };
-        }
+        $handlers = $this->counted($runs, ['GET', 'POST', 'PUT']);
 
         $cases = [
             'exact limit plus one' => ['{invalid' . str_repeat(' ', 262145 - 8), null],
@@ -386,23 +365,34 @@ final class ApiRequestTest extends TestCase
         ];
         foreach (['GET', 'POST', 'PUT'] as $method) {
             foreach ($cases as $label => [$payload, $contentLength]) {
-                $stream = $this->bodyStream($payload);
-                json_decode('[[', true, 1);
-                [$status, $body] = answer_api_request(
-                    $this->db,
-                    'test',
-                    $handlers,
-                    $this->streamRequest($method, $stream, $contentLength, [null, ARTIFACTS_API_KEY]),
-                    metered: false
-                );
-
-                $this->assertSame(413, $status, "$method $label");
-                $this->assertEquals((object) ['message' => 'Request body too large.'], $body);
-                $this->assertSame(262145, ftell($stream));
-                $this->assertSame(JSON_ERROR_DEPTH, json_last_error());
+                $this->assertTooLargeWithoutDecoding($method, $payload, $contentLength, 262145, $handlers, "$method $label");
             }
         }
         $this->assertSame(0, $runs);
+    }
+
+    private function assertTooLargeWithoutDecoding(
+        string $method,
+        string $payload,
+        ?string $contentLength,
+        int $expectedBytesRead,
+        array $handlers,
+        string $label
+    ): void {
+        $stream = $this->bodyStream($payload);
+        json_decode('[[', true, 1);
+        [$status, $body] = answer_api_request(
+            $this->db,
+            'test',
+            $handlers,
+            $this->streamRequest($method, $stream, $contentLength, [null, ARTIFACTS_API_KEY]),
+            metered: false
+        );
+
+        $this->assertSame(413, $status, $label);
+        $this->assertEquals((object) ['message' => 'Request body too large.'], $body);
+        $this->assertSame($expectedBytesRead, ftell($stream));
+        $this->assertSame(JSON_ERROR_DEPTH, json_last_error());
     }
 
     public function test_body_exactly_at_256_kib_limit_succeeds_across_get_post_and_put(): void
@@ -449,8 +439,7 @@ final class ApiRequestTest extends TestCase
     {
         $server = new LocalPhpServer($this->httpApiRouter());
         try {
-            $auth = 'Authorization: ' . ARTIFACTS_API_KEY;
-            $baseHeaders = [$auth, 'Content-Type: application/json', 'Expect:'];
+            $baseHeaders = ['Authorization: ' . ARTIFACTS_API_KEY, 'Content-Type: application/json'];
 
             // Valid bodies within limit (including exact 262,144 bytes) across GET, POST, PUT
             $prefix = '{"pad":"';
@@ -478,16 +467,16 @@ final class ApiRequestTest extends TestCase
             }
 
             // Oversized chunked request (no Content-Length) -> 413; within-limit chunked -> 200
-            $chunkedOk = $this->sendChunkedRequest($server->port(), 'POST', ARTIFACTS_API_KEY, '{"tag":"chunked"}');
+            $chunkedOk = $server->requestChunked('/', $baseHeaders, 'POST', '{"tag":"chunked"}');
             $this->assertSame(200, $chunkedOk['status'], $chunkedOk['body']);
             $this->assertSame('chunked', json_decode($chunkedOk['body'], true)['tag']);
 
-            $chunkedTooLarge = $this->sendChunkedRequest($server->port(), 'POST', ARTIFACTS_API_KEY, $oversizedBody);
+            $chunkedTooLarge = $server->requestChunked('/', $baseHeaders, 'POST', $oversizedBody);
             $this->assertSame(413, $chunkedTooLarge['status'], $chunkedTooLarge['body']);
             $this->assertSame('{"message":"Request body too large."}', $chunkedTooLarge['body']);
 
             // 401 and 405 still happen before 413 even with an oversized body
-            $unauth = $server->request('/', ['Content-Type: application/json', 'Expect:'], 'POST', $oversizedBody);
+            $unauth = $server->request('/', ['Content-Type: application/json'], 'POST', $oversizedBody);
             $this->assertSame(401, $unauth['status'], $unauth['body']);
 
             $wrongMethod = $server->request('/', $baseHeaders, 'DELETE', $oversizedBody);
@@ -500,33 +489,6 @@ final class ApiRequestTest extends TestCase
         } finally {
             $server->stop();
         }
-    }
-
-    /** @return array{status: int, body: string} */
-    private function sendChunkedRequest(int $port, string $method, string $authorization, string $payload): array
-    {
-        $socket = fsockopen('127.0.0.1', $port, $errno, $errstr, 5);
-        $this->assertIsResource($socket, "$errstr ($errno)");
-        try {
-            $request = "$method / HTTP/1.1\r\n"
-                . "Host: 127.0.0.1:$port\r\n"
-                . "Authorization: $authorization\r\n"
-                . "Content-Type: application/json\r\n"
-                . "Transfer-Encoding: chunked\r\n"
-                . "Connection: close\r\n\r\n";
-            fwrite($socket, $request);
-            foreach (str_split($payload, 65536) as $chunk) {
-                fwrite($socket, dechex(strlen($chunk)) . "\r\n" . $chunk . "\r\n");
-            }
-            fwrite($socket, "0\r\n\r\n");
-            $raw = stream_get_contents($socket);
-        } finally {
-            fclose($socket);
-        }
-        $this->assertIsString($raw);
-        [$headers, $body] = explode("\r\n\r\n", $raw, 2);
-        preg_match('#^HTTP/\S+\s+(\d{3})#', $headers, $match);
-        return ['status' => (int) ($match[1] ?? 0), 'body' => $body];
     }
 
     private function httpApiRouter(): string
