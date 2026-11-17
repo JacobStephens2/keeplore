@@ -15,11 +15,12 @@ require_once __DIR__ . '/classes/Mailer.php';
  * is refused before the email is sent. same-site, or none, still sends.
  * Enforces a per-Account cooldown of at most one accepted request per
  * 15 minutes (900 seconds), returning 429 when limited; refused requests do
- * not consume the cooldown.
+ * not consume the cooldown. $now is a Y-m-d H:i:s time for the cooldown
+ * clock, or current database time when omitted.
  *
  * Returns [status, response fields], with how many items the email told about.
  */
-function send_daily_email_over_api(mysqli $db, ApiCaller $caller, array $query, Mailer $mailer, ?string $fetchSite): array {
+function send_daily_email_over_api(mysqli $db, ApiCaller $caller, array $query, Mailer $mailer, ?string $fetchSite, ?string $now = null): array {
   // Same cross-site refusal as Browse as guest, Logout, and Exit guest mode.
   $refusal = cross_site_request_refusal($fetchSite, 'send the Daily email');
   if ($refusal !== null) {
@@ -37,7 +38,7 @@ function send_daily_email_over_api(mysqli $db, ApiCaller $caller, array $query, 
     return [403, ['message' => 'You may only send this email to yourself.']];
   }
 
-  if (!(new RateLimiter($db))->checkAndRecordForAccount($owner, 'daily_email', 1, 900)) {
+  if (!(new RateLimiter($db))->checkAndRecordForAccount($owner, 'daily_email', 1, 900, $now)) {
     return [429, ['message' => 'Please wait 15 minutes before sending the Daily email again.']];
   }
 

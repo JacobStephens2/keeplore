@@ -257,6 +257,14 @@ final class DailyEmailTest extends TestCase
         ]);
     }
 
+    public function test_a_single_letter_tld_or_ip_literal_address_gets_nothing(): void
+    {
+        $this->assertAddressesSendNothing([
+            'user@host.x',
+            'user@[127.0.0.1]',
+        ]);
+    }
+
     private function assertAddressesSendNothing(array $addresses): void
     {
         $this->addItem(30, 'Ticket to Ride', '2026-05-01');

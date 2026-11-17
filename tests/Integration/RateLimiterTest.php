@@ -132,7 +132,6 @@ final class RateLimiterTest extends TestCase
 
         $_SERVER['REMOTE_ADDR'] = '198.51.100.99';
         $this->assertFalse($limiter->checkAndRecordForAccount(1, 'daily_email', 1, 900));
-        $this->assertSame('1', $this->countFor('daily_email'));
         $this->assertTrue($limiter->checkAndRecord('api', 1, 60));
     }
 
@@ -140,17 +139,14 @@ final class RateLimiterTest extends TestCase
     {
         $limiter = new \RateLimiter($this->db);
 
-        $this->assertTrue($limiter->checkAndRecordForAccount(1, 'daily_email', 1, 900));
-        $this->assertTrue($limiter->checkAndRecordForAccount(2, 'daily_email', 1, 900));
-        $this->assertFalse($limiter->checkAndRecordForAccount(2, 'daily_email', 1, 900));
+        $this->assertTrue($limiter->checkAndRecordForAccount(1, 'daily_email', 1, 900, '2026-08-01 12:00:00'));
+        $this->assertTrue($limiter->checkAndRecordForAccount(2, 'daily_email', 1, 900, '2026-08-01 12:05:00'));
+        $this->assertFalse($limiter->checkAndRecordForAccount(1, 'daily_email', 1, 900, '2026-08-01 12:14:59'));
+        $this->assertFalse($limiter->checkAndRecordForAccount(2, 'daily_email', 1, 900, '2026-08-01 12:14:59'));
 
-        $this->db->query(
-            "UPDATE rate_limits SET attempted_at = DATE_SUB(NOW(), INTERVAL 901 SECOND)
-             WHERE ip_address = 'account:1' AND endpoint = 'daily_email'"
-        );
-
-        $this->assertTrue($limiter->checkAndRecordForAccount(1, 'daily_email', 1, 900));
-        $this->assertFalse($limiter->checkAndRecordForAccount(2, 'daily_email', 1, 900));
+        // Exact 900-second expiry from 12:00:00 proves the blocked 12:14:59 check did not extend cooldown.
+        $this->assertTrue($limiter->checkAndRecordForAccount(1, 'daily_email', 1, 900, '2026-08-01 12:15:00'));
+        $this->assertFalse($limiter->checkAndRecordForAccount(2, 'daily_email', 1, 900, '2026-08-01 12:15:00'));
     }
 
     private function recordLoginAttemptsFrom(\RateLimiter $limiter, string $peer, int $count): void

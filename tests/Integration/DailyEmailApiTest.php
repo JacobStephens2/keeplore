@@ -170,19 +170,14 @@ final class DailyEmailApiTest extends TestCase
 
     public function test_another_account_can_send_during_cooldown_and_cooled_down_account_sends_after_expiry(): void
     {
-        $this->assertSame(200, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, null)[0]);
-        $this->assertSame(429, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, null)[0]);
-
-        [$otherStatus, $otherFields] = send_daily_email_over_api($this->db, $this->session(2), ['userID' => '2'], $this->mailer, null);
+        $this->assertSame(200, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, null, '2026-08-01 12:00:00')[0]);
+        [$otherStatus, $otherFields] = send_daily_email_over_api($this->db, $this->session(2), ['userID' => '2'], $this->mailer, null, '2026-08-01 12:05:00');
         $this->assertSame(200, $otherStatus);
         $this->assertSame(['userID' => 2, 'count_to_notify_about' => 1], $otherFields);
+        $this->assertSame(429, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, null, '2026-08-01 12:14:59')[0]);
 
-        $this->db->query(
-            'UPDATE rate_limits SET attempted_at = DATE_SUB(NOW(), INTERVAL 901 SECOND) ORDER BY id ASC LIMIT 1'
-        );
-
-        $this->assertSame(200, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, null)[0]);
-        $this->assertSame(429, send_daily_email_over_api($this->db, $this->session(2), ['userID' => '2'], $this->mailer, null)[0]);
+        $this->assertSame(200, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, null, '2026-08-01 12:15:00')[0]);
+        $this->assertSame(429, send_daily_email_over_api($this->db, $this->session(2), ['userID' => '2'], $this->mailer, null, '2026-08-01 12:15:00')[0]);
         $this->assertCount(3, $this->mailer->sent);
         $this->assertSame('owner@keeplore.app', $this->mailer->sent[0][0]);
         $this->assertSame('other@keeplore.app', $this->mailer->sent[1][0]);

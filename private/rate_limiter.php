@@ -53,25 +53,26 @@ class RateLimiter {
 
   // Account-keyed limits use a distinct non-IP prefix in rate_limits.ip_address
   // so per-Account cooldowns persist across requests without altering IP limits.
-  public function checkAndRecordForAccount(int $accountId, string $endpoint, int $max_attempts = 1, int $window_seconds = 900): bool {
-    return $this->checkAndRecordForKey('account:' . $accountId, $endpoint, $max_attempts, $window_seconds);
+  // $now is a Y-m-d H:i:s timestamp for deterministic tests; MySQL NOW() when omitted.
+  public function checkAndRecordForAccount(int $accountId, string $endpoint, int $max_attempts = 1, int $window_seconds = 900, ?string $now = null): bool {
+    return $this->checkAndRecordForKey('account:' . $accountId, $endpoint, $max_attempts, $window_seconds, $now);
   }
 
-  private function recordAttemptForKey(string $key, string $endpoint): void {
+  private function recordAttemptForKey(string $key, string $endpoint, ?string $now = null): void {
     $stmt = $this->db->prepare(
-      "INSERT INTO rate_limits (ip_address, endpoint, attempted_at) VALUES (?, ?, NOW())"
+      "INSERT INTO rate_limits (ip_address, endpoint, attempted_at) VALUES (?, ?, COALESCE(?, NOW()))"
     );
-    $stmt->bind_param("ss", $key, $endpoint);
+    $stmt->bind_param("sss", $key, $endpoint, $now);
     $stmt->execute();
     $stmt->close();
   }
 
-  private function isRateLimitedForKey(string $key, string $endpoint, int $max_attempts, int $window_seconds): bool {
+  private function isRateLimitedForKey(string $key, string $endpoint, int $max_attempts, int $window_seconds, ?string $now = null): bool {
     // Only this endpoint. Another endpoint's rows stay, even past this window.
     $stmt = $this->db->prepare(
-      "DELETE FROM rate_limits WHERE endpoint = ? AND attempted_at < DATE_SUB(NOW(), INTERVAL ? SECOND)"
+      "DELETE FROM rate_limits WHERE endpoint = ? AND attempted_at < DATE_SUB(COALESCE(?, NOW()), INTERVAL ? SECOND)"
     );
-    $stmt->bind_param("si", $endpoint, $window_seconds);
+    $stmt->bind_param("ssi", $endpoint, $now, $window_seconds);
     $stmt->execute();
     $stmt->close();
 
@@ -79,9 +80,9 @@ class RateLimiter {
     $stmt = $this->db->prepare(
       "SELECT COUNT(*) as attempts FROM rate_limits
        WHERE ip_address = ? AND endpoint = ?
-       AND attempted_at > DATE_SUB(NOW(), INTERVAL ? SECOND)"
+       AND attempted_at > DATE_SUB(COALESCE(?, NOW()), INTERVAL ? SECOND)"
     );
-    $stmt->bind_param("ssi", $key, $endpoint, $window_seconds);
+    $stmt->bind_param("sssi", $key, $endpoint, $now, $window_seconds);
     $stmt->execute();
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
@@ -90,11 +91,11 @@ class RateLimiter {
     return $row['attempts'] >= $max_attempts;
   }
 
-  private function checkAndRecordForKey(string $key, string $endpoint, int $max_attempts, int $window_seconds): bool {
-    if ($this->isRateLimitedForKey($key, $endpoint, $max_attempts, $window_seconds)) {
+  private function checkAndRecordForKey(string $key, string $endpoint, int $max_attempts, int $window_seconds, ?string $now = null): bool {
+    if ($this->isRateLimitedForKey($key, $endpoint, $max_attempts, $window_seconds, $now)) {
       return false;
     }
-    $this->recordAttemptForKey($key, $endpoint);
+    $this->recordAttemptForKey($key, $endpoint, $now);
     return true;
   }
 }
