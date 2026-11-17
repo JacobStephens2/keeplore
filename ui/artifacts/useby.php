@@ -13,15 +13,14 @@
 
 <?php // process form submission and initialize variables
   require_once PRIVATE_PATH . '/interact_by.php';
-  $type_filter = type_filter($db, (int) $_SESSION['user_id'], $_SERVER['REQUEST_METHOD'], $_POST, $_SESSION);
-
   $user_id = $_SESSION['user_id'];
-  $default_use_interval = (new Preferences($db, (int) $user_id))->get()['default_use_interval'];
-  $filters = interact_by_filters_from_request($_SERVER['REQUEST_METHOD'], $_POST, $_SESSION, $default_use_interval);
-  $entries = (new UseByQueue($db, (int) $user_id))->entries(interact_by_queue_options($filters, $type_filter['selected']));
-  $rows = array_map('interact_by_present_row', $entries);
-  $table = interact_by_table($filters, is_guest());
-  $total_overdue = count(array_filter($rows, fn (array $row) => $row['overdue']));
+  [
+    'type_filter' => $type_filter,
+    'filters' => $filters,
+    'rows' => $rows,
+    'table' => $table,
+    'total_overdue' => $total_overdue,
+  ] = (new InteractByPage($db, (int) $user_id))->read($_SERVER['REQUEST_METHOD'], $_POST, $_SESSION, is_guest());
 ?>
 
 <main class="useby-page">
