@@ -40,7 +40,24 @@ class RateLimiter {
   }
 
   public function recordAttempt($endpoint) {
-    $key = $this->connectionPeerKey();
+    $this->recordAttemptForKey($this->connectionPeerKey(), $endpoint);
+  }
+
+  public function isRateLimited($endpoint, $max_attempts, $window_seconds) {
+    return $this->isRateLimitedForKey($this->connectionPeerKey(), $endpoint, $max_attempts, $window_seconds);
+  }
+
+  public function checkAndRecord($endpoint, $max_attempts = 10, $window_seconds = 900) {
+    return $this->checkAndRecordForKey($this->connectionPeerKey(), $endpoint, $max_attempts, $window_seconds);
+  }
+
+  // Account-keyed limits use a distinct non-IP prefix in rate_limits.ip_address
+  // so per-Account cooldowns persist across requests without altering IP limits.
+  public function checkAndRecordForAccount(int $accountId, string $endpoint, int $max_attempts = 1, int $window_seconds = 900): bool {
+    return $this->checkAndRecordForKey('account:' . $accountId, $endpoint, $max_attempts, $window_seconds);
+  }
+
+  private function recordAttemptForKey(string $key, string $endpoint): void {
     $stmt = $this->db->prepare(
       "INSERT INTO rate_limits (ip_address, endpoint, attempted_at) VALUES (?, ?, NOW())"
     );
@@ -49,9 +66,7 @@ class RateLimiter {
     $stmt->close();
   }
 
-  public function isRateLimited($endpoint, $max_attempts, $window_seconds) {
-    $key = $this->connectionPeerKey();
-
+  private function isRateLimitedForKey(string $key, string $endpoint, int $max_attempts, int $window_seconds): bool {
     // Only this endpoint. Another endpoint's rows stay, even past this window.
     $stmt = $this->db->prepare(
       "DELETE FROM rate_limits WHERE endpoint = ? AND attempted_at < DATE_SUB(NOW(), INTERVAL ? SECOND)"
@@ -75,11 +90,11 @@ class RateLimiter {
     return $row['attempts'] >= $max_attempts;
   }
 
-  public function checkAndRecord($endpoint, $max_attempts = 10, $window_seconds = 900) {
-    if ($this->isRateLimited($endpoint, $max_attempts, $window_seconds)) {
+  private function checkAndRecordForKey(string $key, string $endpoint, int $max_attempts, int $window_seconds): bool {
+    if ($this->isRateLimitedForKey($key, $endpoint, $max_attempts, $window_seconds)) {
       return false;
     }
-    $this->recordAttempt($endpoint);
+    $this->recordAttemptForKey($key, $endpoint);
     return true;
   }
 }

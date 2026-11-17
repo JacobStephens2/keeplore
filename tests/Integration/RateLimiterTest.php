@@ -5,10 +5,12 @@ namespace Tests\Integration;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Seams: RateLimiter::isRateLimited() and RateLimiter::recordAttempt().
+ * Seams: RateLimiter::isRateLimited(), RateLimiter::recordAttempt(), and
+ * RateLimiter::checkAndRecordForAccount().
  * A check deletes expired rate_limits rows only for the endpoint passed in.
- * Counts and inserts key the connection peer, not X-Forwarded-For: an IPv6
- * peer on its /64 network, an IPv4-mapped peer as its IPv4 address.
+ * Peer-keyed counts and inserts key the connection peer, not X-Forwarded-For:
+ * an IPv6 peer on its /64 network, an IPv4-mapped peer as its IPv4 address.
+ * Account-keyed checks key by Account ID regardless of connection peer.
  */
 final class RateLimiterTest extends TestCase
 {
@@ -118,6 +120,37 @@ final class RateLimiterTest extends TestCase
             'an IPv6 peer is its /64 in CIDR form' => ['2001:db8:a:b:1:2:3:4', '2001:db8:a:b::/64'],
             'an IPv4-mapped peer is its IPv4 address' => ['::ffff:203.0.113.7', '203.0.113.7'],
         ];
+    }
+
+    public function test_account_rate_limit_blocks_across_remote_addrs_without_affecting_ip_limits(): void
+    {
+        $limiter = new \RateLimiter($this->db);
+        $_SERVER['REMOTE_ADDR'] = '203.0.113.10';
+
+        $this->assertTrue($limiter->checkAndRecordForAccount(1, 'daily_email', 1, 900));
+        $this->assertSame('account:1', $this->recordedKey('daily_email'));
+
+        $_SERVER['REMOTE_ADDR'] = '198.51.100.99';
+        $this->assertFalse($limiter->checkAndRecordForAccount(1, 'daily_email', 1, 900));
+        $this->assertSame('1', $this->countFor('daily_email'));
+        $this->assertTrue($limiter->checkAndRecord('api', 1, 60));
+    }
+
+    public function test_account_rate_limit_isolates_accounts_and_resets_after_window_expires(): void
+    {
+        $limiter = new \RateLimiter($this->db);
+
+        $this->assertTrue($limiter->checkAndRecordForAccount(1, 'daily_email', 1, 900));
+        $this->assertTrue($limiter->checkAndRecordForAccount(2, 'daily_email', 1, 900));
+        $this->assertFalse($limiter->checkAndRecordForAccount(2, 'daily_email', 1, 900));
+
+        $this->db->query(
+            "UPDATE rate_limits SET attempted_at = DATE_SUB(NOW(), INTERVAL 901 SECOND)
+             WHERE ip_address = 'account:1' AND endpoint = 'daily_email'"
+        );
+
+        $this->assertTrue($limiter->checkAndRecordForAccount(1, 'daily_email', 1, 900));
+        $this->assertFalse($limiter->checkAndRecordForAccount(2, 'daily_email', 1, 900));
     }
 
     private function recordLoginAttemptsFrom(\RateLimiter $limiter, string $peer, int $count): void

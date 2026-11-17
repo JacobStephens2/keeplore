@@ -295,7 +295,8 @@ final class Accounts
             $errors[] = 'Email cannot be blank.';
         } elseif (mb_strlen($email) > 255) {
             $errors[] = 'Email must be at most 255 characters.';
-        } elseif (preg_match('/\A[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\z/i', $email) !== 1) {
+        } elseif (filter_var($email, FILTER_VALIDATE_EMAIL) === false
+            || preg_match('/\A[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\z/i', $email) !== 1) {
             $errors[] = 'Email must be a valid format.';
         } elseif ($this->taken('email', $email, $id)) {
             $errors[] = $id === self::NEW_ACCOUNT

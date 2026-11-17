@@ -80,9 +80,10 @@ final class DailyEmail
     }
 
     /**
-     * The owner's address, or null when they have none or it is on a
-     * reserved TLD (RFC 2606, such as the seeded demo@artifact.example):
-     * those always bounce, which erodes the domain's sender reputation.
+     * The owner's address, or null when they have none, it is not a valid
+     * email address, or it is on a reserved TLD (RFC 2606, such as the
+     * seeded demo@artifact.example): those always bounce or fail delivery,
+     * which erodes the domain's sender reputation.
      */
     private function address(): ?string
     {
@@ -91,7 +92,9 @@ final class DailyEmail
         $stmt->execute();
         $address = trim((string) ($stmt->get_result()->fetch_row()[0] ?? ''));
         $stmt->close();
-        if ($address === '' || preg_match('/\.(example|test|invalid|localhost)$/i', $address)) {
+        if ($address === ''
+            || filter_var($address, FILTER_VALIDATE_EMAIL) === false
+            || preg_match('/\.(example|test|invalid|localhost)$/i', $address)) {
             return null;
         }
         return $address;

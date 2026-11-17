@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/rate_limiter.php';
 require_once __DIR__ . '/classes/ApiCaller.php';
 require_once __DIR__ . '/classes/DailyEmail.php';
 require_once __DIR__ . '/classes/Mailer.php';
@@ -12,6 +13,9 @@ require_once __DIR__ . '/classes/Mailer.php';
  * refused the same way. Agent keys are refused (ADR-0002). $fetchSite is
  * the request's Sec-Fetch-Site header, or null when it sent none. cross-site
  * is refused before the email is sent. same-site, or none, still sends.
+ * Enforces a per-Account cooldown of at most one accepted request per
+ * 15 minutes (900 seconds), returning 429 when limited; refused requests do
+ * not consume the cooldown.
  *
  * Returns [status, response fields], with how many items the email told about.
  */
@@ -31,6 +35,10 @@ function send_daily_email_over_api(mysqli $db, ApiCaller $caller, array $query, 
   $requested_user_id = isset($query['userID']) ? (int) $query['userID'] : null;
   if ($owner === null || $owner !== $requested_user_id) {
     return [403, ['message' => 'You may only send this email to yourself.']];
+  }
+
+  if (!(new RateLimiter($db))->checkAndRecordForAccount($owner, 'daily_email', 1, 900)) {
+    return [429, ['message' => 'Please wait 15 minutes before sending the Daily email again.']];
   }
 
   return [200, [
