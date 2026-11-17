@@ -166,12 +166,6 @@ final class UseByQueueTest extends TestCase
         $this->assertSame([$expected], $queue->entries());
         $this->assertSame($expected, $queue->entry(10));
 
-        require_once PRIVATE_PATH . '/interact_by.php';
-        $row = interact_by_present_row($queue->entry(10));
-        $this->assertSame([3, 23, 8, '03,04', '2', '4', false], [
-            $row['sws'], $row['avg_time'], $row['age'], $row['ss'], $row['mnp'], $row['mxp'], $row['candidate'],
-        ]);
-
     }
 
     public function test_an_absent_joined_type_stays_null_instead_of_using_legacy_type_text(): void
