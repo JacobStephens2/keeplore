@@ -446,7 +446,7 @@ Tracks API and login request attempts for rate limiting. Rows are automatically 
 | Column | Type (inferred) | Nullable | Description |
 |---|---|---|---|
 | `id` | INT, AUTO_INCREMENT | NO | Primary key |
-| `ip_address` | VARCHAR(45) | NO | Rate-limit key for the connection peer (`REMOTE_ADDR`). An IPv6 peer is keyed on its /64 network in CIDR form, such as `2001:db8:a:b::/64`, so every address in that /64 shares one count. An IPv4-mapped peer (`::ffff:a.b.c.d`) is keyed as its IPv4 address. Any other peer, IPv4 included, is keyed as its address |
+| `ip_address` | VARCHAR(45) | NO | Rate-limit key: for peer-keyed endpoints, the connection peer (`REMOTE_ADDR`) — an IPv6 peer on its /64 network in CIDR form (`2001:db8:a:b::/64`), an IPv4-mapped peer (`::ffff:a.b.c.d`) as its IPv4 address, or any other peer as its address; for Account-keyed endpoints, `account:<id>` |
 | `endpoint` | VARCHAR(255) | NO | The endpoint or action being rate-limited |
 | `attempted_at` | DATETIME | NO | Timestamp of the attempt (defaults to `CURRENT_TIMESTAMP`) |
 

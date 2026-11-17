@@ -238,8 +238,37 @@ final class DailyEmailTest extends TestCase
 
     public function test_an_address_on_a_reserved_tld_gets_nothing(): void
     {
+        $this->assertAddressesSendNothing([
+            'demo@artifact.example',
+            'a@b.test',
+            'a@b.INVALID',
+            'a@localhost.localhost',
+        ]);
+    }
+
+    public function test_an_invalid_address_gets_nothing(): void
+    {
+        $this->assertAddressesSendNothing([
+            'not-an-email',
+            'user@',
+            'a..b@keeplore.app',
+            'user @keeplore.app',
+            "owner@keeplore.app\r\nBcc:other@keeplore.app",
+        ]);
+    }
+
+    public function test_a_single_letter_tld_or_ip_literal_address_gets_nothing(): void
+    {
+        $this->assertAddressesSendNothing([
+            'user@host.x',
+            'user@[127.0.0.1]',
+        ]);
+    }
+
+    private function assertAddressesSendNothing(array $addresses): void
+    {
         $this->addItem(30, 'Ticket to Ride', '2026-05-01');
-        foreach (['demo@artifact.example', 'a@b.test', 'a@b.INVALID', 'a@localhost.localhost'] as $address) {
+        foreach ($addresses as $address) {
             $stmt = $this->db->prepare('UPDATE users SET email = ? WHERE id = 1');
             $stmt->bind_param('s', $address);
             $stmt->execute();

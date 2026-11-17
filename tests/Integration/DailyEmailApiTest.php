@@ -52,6 +52,7 @@ final class DailyEmailApiTest extends TestCase
 
     protected function tearDown(): void
     {
+        $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
         if ($this->db !== null) {
             $this->db->query('DROP DATABASE ' . $this->databaseName);
             $this->db->close();
@@ -149,5 +150,55 @@ final class DailyEmailApiTest extends TestCase
         $this->assertSame(403, $status);
         $this->assertSame('You may only send this email to yourself.', $fields['message']);
         $this->assertSame([], $this->mailer->sent);
+    }
+
+    public function test_repeated_requests_for_the_same_account_return_429_regardless_of_remote_addr(): void
+    {
+        $_SERVER['REMOTE_ADDR'] = '203.0.113.10';
+        [$firstStatus, $firstFields] = send_daily_email_over_api($this->db, $this->session(), ['userID' => '1'], $this->mailer, null);
+
+        $_SERVER['REMOTE_ADDR'] = '198.51.100.20';
+        [$secondStatus, $secondFields] = send_daily_email_over_api($this->db, $this->session(), ['userID' => '1'], $this->mailer, null);
+
+        $this->assertSame(200, $firstStatus);
+        $this->assertSame(['userID' => 1, 'count_to_notify_about' => 1], $firstFields);
+        $this->assertSame(429, $secondStatus);
+        $this->assertIsString($secondFields['message'] ?? null);
+        $this->assertNotSame('', $secondFields['message']);
+        $this->assertCount(1, $this->mailer->sent);
+    }
+
+    public function test_another_account_can_send_during_cooldown_and_cooled_down_account_sends_after_expiry(): void
+    {
+        $this->assertSame(200, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, null, '2026-08-01 12:00:00')[0]);
+        [$otherStatus, $otherFields] = send_daily_email_over_api($this->db, $this->session(2), ['userID' => '2'], $this->mailer, null, '2026-08-01 12:05:00');
+        $this->assertSame(200, $otherStatus);
+        $this->assertSame(['userID' => 2, 'count_to_notify_about' => 1], $otherFields);
+        $this->assertSame(429, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, null, '2026-08-01 12:14:59')[0]);
+
+        $this->assertSame(200, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, null, '2026-08-01 12:15:00')[0]);
+        $this->assertSame(429, send_daily_email_over_api($this->db, $this->session(2), ['userID' => '2'], $this->mailer, null, '2026-08-01 12:15:00')[0]);
+        $this->assertCount(3, $this->mailer->sent);
+        $this->assertSame('owner@keeplore.app', $this->mailer->sent[0][0]);
+        $this->assertSame('other@keeplore.app', $this->mailer->sent[1][0]);
+        $this->assertSame('owner@keeplore.app', $this->mailer->sent[2][0]);
+    }
+
+    public function test_refused_requests_do_not_consume_the_accounts_cooldown(): void
+    {
+        $this->assertSame(403, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, 'cross-site')[0]);
+        $this->assertSame(403, send_daily_email_over_api($this->db, $this->agentKey(1), ['userID' => '1'], $this->mailer, null)[0]);
+        $this->assertSame(403, send_daily_email_over_api($this->db, $this->masterKey(), ['userID' => '1'], $this->mailer, null)[0]);
+        $this->assertSame(403, send_daily_email_over_api($this->db, $this->session(1), ['userID' => '2'], $this->mailer, null)[0]);
+        $this->assertSame(403, send_daily_email_over_api($this->db, $this->session(2), ['userID' => '1'], $this->mailer, null)[0]);
+        $this->assertSame([], $this->mailer->sent);
+
+        [$status, $fields] = send_daily_email_over_api($this->db, $this->session(1), ['userID' => '1'], $this->mailer, null);
+        $this->assertSame(200, $status);
+        $this->assertSame(['userID' => 1, 'count_to_notify_about' => 1], $fields);
+        $this->assertCount(1, $this->mailer->sent);
+
+        $this->assertSame(200, send_daily_email_over_api($this->db, $this->session(2), ['userID' => '2'], $this->mailer, null)[0]);
+        $this->assertCount(2, $this->mailer->sent);
     }
 }
