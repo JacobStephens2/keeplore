@@ -4,29 +4,22 @@
   global $db;
   require_login_or_guest();
 
-  list($default_use_interval, $type_ids_by_name) = items_list_load_filter_defaults($_SESSION['user_id']);
-
-  $filters = items_list_filters_from_request(
-    $_GET,
-    $_POST,
+  $metadata = (new ItemsPage($db, (int) $_SESSION['user_id']))->metadata(
     $_SERVER['REQUEST_METHOD'],
-    $default_use_interval,
-    $type_ids_by_name
+    $_GET,
+    $_POST
   );
+  $filters = $metadata['filters'];
   $kept = $filters['kept'];
-  $type = $filters['type'];
   $players = $filters['players'];
   $age = $filters['age'];
   $age_unknown = $filters['ageUnknown'];
   $showAttributes = $filters['showAttributes'];
   $tagFilter = $filters['tagFilter'];
 
-  $filter_heading = items_list_heading($players, $age);
-  $bgg_reviewers = (new BggRatings($db, (int) $_SESSION['user_id']))->reviewers();
-  $columns = items_list_columns($filters, $bgg_reviewers);
-
-  $page_title = $filter_heading ?? 'Items';
-  if ($kept === 'secondary_only') { $page_title .= ' (Secondary Only)'; }
+  $filter_heading = $metadata['heading'];
+  $columns = $metadata['columns'];
+  $page_title = $metadata['page_title'];
   include(SHARED_PATH . '/header.php');
 ?>
 
@@ -88,47 +81,28 @@
     </script>
 
     <?php
-      // Every link and carried field keeps the filters it doesn't change.
-      $filter_query = fn (array $changes = []) => items_list_filter_query($filters, $type_ids_by_name, $default_use_interval, $changes);
       $items_url = fn (array $query) => url_for('/artifacts/index.php' . ($query ? '?' . http_build_query($query) : ''));
-      $kept_switch_options = [
-        'all' => 'All',
-        'yes' => 'Kept',
-        'no' => 'Not kept',
-      ];
-      $kept_switch_active = $kept === 'secondary_only' ? null : ($kept === 'allkeptandnot' ? 'all' : $kept);
     ?>
     <nav class="kept-switch" aria-label="Kept visibility">
-      <?php foreach ($kept_switch_options as $switch_value => $switch_label) { ?>
-        <a href="<?php echo h($items_url($filter_query(['kept' => $switch_value === 'all' ? null : $switch_value]))); ?>"
-          <?php if ($kept_switch_active === $switch_value) { echo 'aria-current="true"'; } ?>
-          >
-          <?php echo h($switch_label); ?>
-        </a>
-      <?php } ?>
-    </nav>
-
-    <?php
-      // One click to games only, or to Other (items still waiting for a real
-      // type). Each link keeps every other filter.
-      $type_switch = items_list_type_switch($type_ids_by_name, $type);
-    ?>
-    <nav class="kept-switch type-switch" aria-label="Item type">
-      <?php foreach ($type_switch['options'] as $switch_value => $switch_option) { ?>
-        <a href="<?php echo h($items_url($filter_query(['type' => $switch_value === 'all' ? null : $switch_option['type_ids']]))); ?>"
-          <?php if ($type_switch['active'] === $switch_value) { echo 'aria-current="true"'; } ?>
+      <?php foreach ($metadata['kept_switch']['options'] as $switch_option) { ?>
+        <a href="<?php echo h($items_url($switch_option['query'])); ?>"
+          <?php if ($switch_option['active']) { echo 'aria-current="true"'; } ?>
           >
           <?php echo h($switch_option['label']); ?>
         </a>
       <?php } ?>
     </nav>
 
-    <?php
-      // The picker is a plain GET form, so a count or age can be bookmarked. It
-      // carries the other filters as hidden fields, so choosing one keeps them.
-      // Clear is the same query: the other filters with no count or age.
-      $picker_carry = $filter_query(['players' => null, 'age' => null, 'ageUnknown' => null]);
-    ?>
+    <nav class="kept-switch type-switch" aria-label="Item type">
+      <?php foreach ($metadata['type_switch']['options'] as $switch_option) { ?>
+        <a href="<?php echo h($items_url($switch_option['query'])); ?>"
+          <?php if ($switch_option['active']) { echo 'aria-current="true"'; } ?>
+          >
+          <?php echo h($switch_option['label']); ?>
+        </a>
+      <?php } ?>
+    </nav>
+
     <form class="player-picker" method="get" action="<?php echo url_for('/artifacts/index.php'); ?>">
       <label>Best at <input type="number" name="players" min="1" inputmode="numeric"
         value="<?php echo $players === null ? '' : h((string) $players); ?>"> players</label>
@@ -136,12 +110,12 @@
         value="<?php echo $age === null ? '' : h((string) $age); ?>"></label>
       <label title="With a youngest age, also show items that have no recorded minimum age."><input type="checkbox" name="age_unknown" value="yes"
         <?php if ($age_unknown) { echo 'checked'; } ?>> Include unknown ages</label>
-      <?php foreach (items_list_hidden_fields($picker_carry) as [$carry_name, $carry_value]) { ?>
+      <?php foreach ($metadata['picker']['hidden_fields'] as [$carry_name, $carry_value]) { ?>
         <input type="hidden" name="<?php echo h($carry_name); ?>" value="<?php echo h($carry_value); ?>">
       <?php } ?>
       <button type="submit">Show</button>
       <?php if ($players !== null || $age !== null) { ?>
-        <a class="all-counts" href="<?php echo h($items_url($picker_carry)); ?>">Clear</a>
+        <a class="all-counts" href="<?php echo h($items_url($metadata['picker']['clear_query'])); ?>">Clear</a>
       <?php } ?>
     </form>
 
@@ -215,8 +189,7 @@
 
       </section>
 
-      <?php // The panel sets what it shows and carries every other filter.
-        foreach (items_list_hidden_fields($filter_query(ITEMS_LIST_FILTER_PANEL_CHANGES)) as [$carry_name, $carry_value]) { ?>
+      <?php foreach ($metadata['filter_panel_hidden_fields'] as [$carry_name, $carry_value]) { ?>
         <input type="hidden" name="<?php echo h($carry_name); ?>" value="<?php echo h($carry_value); ?>">
       <?php } ?>
 
@@ -240,10 +213,8 @@
       >
 
       <?php
-        // Both id lists are in the owner's Type order, so they compare as is.
-        $current_type_ids = type_filter_owned($type_ids_by_name, $type ?? []);
-        $type_filter = ['types' => $type_ids_by_name, 'selected' => $current_type_ids];
-        $type_filter_active = !empty($current_type_ids) && $current_type_ids !== type_filter_owned($type_ids_by_name, $type_ids_by_name);
+        $type_filter = $metadata['type_filter'];
+        $type_filter_active = $metadata['type_filter_active'];
         $type_filter_shortcuts = 'trimmed';
       ?>
       <section id="artifactType" class="type-chip-group">
@@ -306,13 +277,13 @@
     <script src="<?php echo url_for('/artifacts/items-table-sort.js'); ?>?v=1"></script>
     <script type="application/json" id="items-list-config"><?php
       echo json_encode([
-        'dataUrl' => url_for('/artifacts/items-data.php') . '?' . http_build_query($filter_query()),
+        'dataUrl' => url_for('/artifacts/items-data.php') . '?' . http_build_query($metadata['data_query']),
         'itemUrlPrefix' => url_for('/artifacts/' . (is_guest() ? 'show' : 'edit') . '.php?id='),
         'keptToggleUrl' => url_for('/artifacts/set-tracked.php'),
         'csrfToken' => generate_csrf_token(),
         'isGuest' => is_guest(),
         'columns' => array_column($columns, 'key'),
-        'emptyMessage' => $filter_heading === null ? 'No items yet.' : 'No items are ' . lcfirst($filter_heading) . '.',
+        'emptyMessage' => $metadata['empty_message'],
         'pageLength' => 100,
       ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES);
     ?></script>

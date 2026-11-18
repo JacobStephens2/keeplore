@@ -31,6 +31,8 @@ final class ItemsReadSeamTest extends TestCase
         $this->db->select_db($databaseName);
         $this->db->set_charset('utf8mb4');
         $this->runSql(file_get_contents(__DIR__ . '/fixtures/proposals.sql'));
+        $this->db->query('ALTER TABLE types ADD COLUMN user_id INT NULL');
+        $this->db->query('UPDATE types SET user_id = 1');
         require_once PRIVATE_PATH . '/database.php';
         require_once PRIVATE_PATH . '/kept_status.php';
         require_once PRIVATE_PATH . '/classes/Items.php';
@@ -62,16 +64,10 @@ final class ItemsReadSeamTest extends TestCase
 
     private function payload(string $kept): array
     {
-        return items_list_payload($this->db, [
+        return (new \ItemsPage($this->db, 1))->data([
             'kept' => $kept,
-            'type' => [],
-            'interval' => 90,
-            'players' => null,
-            'age' => null,
-            'ageUnknown' => false,
-            'showAttributes' => 'no',
-            'tagFilter' => '',
-        ], 1);
+            'type' => [''],
+        ])['items'];
     }
 
     private function payloadIds(string $kept): array

@@ -35,7 +35,6 @@ final class TypeListsTest extends TestCase
         $this->db->query('UPDATE types SET user_id = 1');
         $this->db->query("INSERT INTO types (id, objectType, user_id) VALUES (3, 'table game', 2)");
         require_once PRIVATE_PATH . '/classes/Types.php';
-        require_once PRIVATE_PATH . '/items_list.php';
         require_once PRIVATE_PATH . '/type_filter.php';
         $GLOBALS['db'] = $this->db;
         $_SESSION = ['user_id' => 2];
@@ -49,13 +48,6 @@ final class TypeListsTest extends TestCase
             $this->db->query('DROP DATABASE ' . $this->databaseName);
             $this->db->close();
         }
-    }
-
-    public function test_the_items_filter_defaults_to_only_the_owners_types(): void
-    {
-        [, $types] = items_list_load_filter_defaults(2);
-
-        $this->assertSame(['table game' => 3], $types);
     }
 
     public function test_the_type_checkboxes_offer_only_the_session_owners_types(): void

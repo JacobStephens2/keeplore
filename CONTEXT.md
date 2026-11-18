@@ -12,6 +12,9 @@ _Avoid_: Game (when referring to all supported item types).
 One of the owner's own categories for items, such as table game, book or film. Each item has at most one. Deleting a type moves its items to another of the owner's types or leaves them without one.
 _Avoid_: Artifact type, ObjectType.
 
+**Items page**:
+The owner's browsing page, whose filters determine its controls, navigation, columns and asynchronously loaded Item rows. Empty or blank Type choices on the initial form are omitted from its later data request, which selects all the owner's Types again: with Types it excludes untyped Items, while without Types it can include them; a direct data request with an explicit blank Type choice can include untyped Items.
+
 **Item tag**:
 One of the owner's free-form labels on an item, such as portable or beach-safe, stored lowercase with spaces collapsed and at most 64 characters. Distinct from BoardGameGeek's own categories. Every read and write of them goes through the Items module, scoped to the owner.
 _Avoid_: Category.
