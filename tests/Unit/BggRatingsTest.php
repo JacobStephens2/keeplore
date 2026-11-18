@@ -6,7 +6,6 @@ use PHPUnit\Framework\TestCase;
 
 require_once PROJECT_PATH . '/private/kept_status.php';
 require_once PROJECT_PATH . '/private/bgg_ratings.php';
-require_once PROJECT_PATH . '/private/items_list.php';
 
 /**
  * Seams:
@@ -15,7 +14,6 @@ require_once PROJECT_PATH . '/private/items_list.php';
  * - bgg_rating_from_collection_json(): one collection body is false (not an answer),
  *   null (an answer with no entry), or the entry
  * - bgg_rating_from_input(): a rating typed on Edit Item
- * - items_list_present_row(): carries each imported BGG rating to /artifacts/
  */
 class BggRatingsTest extends TestCase
 {
@@ -136,42 +134,6 @@ class BggRatingsTest extends TestCase
     public function test_item_page_without_imported_ratings_shows_nothing(): void
     {
         $this->assertSame('', item_bgg_ratings_html([]));
-    }
-
-    public function test_list_row_carries_imported_ratings_by_reviewer(): void
-    {
-        $row = items_list_present_row([
-            'id' => 7,
-            'Title' => 'Blue Moon Legends',
-            'is_kept' => 1,
-            'Acq' => '2024-01-10',
-            'bgg_ratings' => [
-                'Gyges' => [
-                    'rating' => 9.5,
-                    'comment' => 'The best card game ever.',
-                    'url' => 'https://boardgamegeek.com/boardgame/147154/blue-moon-legends',
-                ],
-            ],
-        ], 90, '2024-06-01');
-
-        $this->assertSame([
-            'Gyges' => [
-                'rating' => 9.5,
-                'comment' => 'The best card game ever.',
-                'url' => 'https://boardgamegeek.com/boardgame/147154/blue-moon-legends',
-                'score_text' => '9.5',
-                'sort' => 9.5,
-                'site_name' => 'BoardGameGeek',
-            ],
-        ], $row['bgg_ratings']);
-    }
-
-    public function test_list_row_without_ratings_has_an_empty_object(): void
-    {
-        $row = items_list_present_row(['id' => 8, 'Title' => 'Chess', 'Acq' => '2024-01-10'], 90, '2024-06-01');
-
-        $this->assertEquals(new \stdClass(), $row['bgg_ratings']);
-        $this->assertSame('{}', json_encode($row['bgg_ratings']));
     }
 
     public function test_edit_item_offers_an_editor_for_each_imported_reviewer(): void

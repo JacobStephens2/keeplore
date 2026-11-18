@@ -249,7 +249,7 @@
     dialog.showModal();
   }
 
-  // One cell per key in config.columns, the list items_list_columns() gives
+  // One cell per key in config.columns, supplied by ItemsPage metadata.
   // the page, so headings and cells never fall out of step.
   function renderCell(item, config, key) {
     if (key.indexOf(BGG_RATING_KEY) === 0) {
@@ -265,7 +265,7 @@
             href: config.itemUrlPrefix + encodeURIComponent(item.id),
             text: item.title,
           }),
-          // "Azul, 2–4 (2), 8 yrs" for sharing, from items_list_copy_text().
+          // "Azul, 2–4 (2), 8 yrs" for sharing, from ItemsPage data.
           item.copy_text ? el('button', {
             type: 'button',
             className: 'copy-item-btn',
