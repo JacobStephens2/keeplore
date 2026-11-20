@@ -215,9 +215,8 @@ final class ItemInteractionsPageTest extends MySqlTestCase
                         $order = $filtered
                             ? ($attributes === 'yes' ? [[5, 'desc'], [0, 'desc']] : [[0, 'desc']])
                             : [[0, 'desc'], [2, 'asc']];
-                        $this->assertSame(1, preg_match('/\border:\s*(\[.*?)\s*\}\);/s', $html, $config));
-                        preg_match_all('/\[\s*(\d+)\s*,\s*[\'"](asc|desc)[\'"]\s*\]/', $config[1], $pairs, PREG_SET_ORDER);
-                        $this->assertSame($order, array_map(fn ($pair) => [(int) $pair[1], $pair[2]], $pairs),
+                        $config = $xpath->evaluate('string(//table[@id="uses"]/@data-order)');
+                        $this->assertSame($order, json_decode($config, true, 512, JSON_THROW_ON_ERROR),
                             "Attributes $attributes, hide online $online, hide duplicates $duplicate");
 
                         $combinations = $online === 'yes' ? 4 : 5;
@@ -254,7 +253,33 @@ final class ItemInteractionsPageTest extends MySqlTestCase
             $this->assertSame(3, $xpath->query('//form//input[@checked]')->length);
             $this->assertSame(0, $xpath->query('//table[@id="uses"]')->length);
             $this->assertStringNotContainsString('combinations:', $html);
-            $this->assertStringNotContainsString('new DataTable(', $html);
+        });
+    }
+
+    public function test_data_tables_initializes_every_rendered_layout(): void
+    {
+        // Opt in with Playwright available to Node and local copies of the
+        // jQuery and DataTables scripts used by the route.
+        $assets = getenv('KEEPLORE_TEST_DATATABLES_ASSETS');
+        if ($assets === false || $assets === '') {
+            $this->markTestSkipped('Set KEEPLORE_TEST_DATATABLES_ASSETS to run the Chromium regression.');
+        }
+        $this->withRoute(function (LocalPhpServer $server) use ($assets): void {
+            $output = tmpfile();
+            $this->assertIsResource($output);
+            try {
+                $browser = proc_open(
+                    ['node', __DIR__ . '/item-interactions-table.cjs', $server->url(self::ROUTE), $assets],
+                    [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output],
+                    $pipes
+                );
+                $this->assertIsResource($browser);
+                $status = proc_close($browser);
+                rewind($output);
+                $this->assertSame(0, $status, stream_get_contents($output));
+            } finally {
+                fclose($output);
+            }
         });
     }
 

@@ -75,7 +75,7 @@
       ];
     ?>
     <div class="table-scroll">
-      <table class="list" id="uses" data-page-length="100">
+      <table class="list" id="uses" data-page-length="100" data-order="<?php echo h(json_encode($table['order'], JSON_THROW_ON_ERROR)); ?>">
         <thead>
           <tr id="headerRow">
             <?php foreach ($table['columns'] as $column => $label) {
@@ -115,9 +115,7 @@
     <p>Group and setting combinations: <?php echo h($table['group_and_setting_count']); ?></p>
 
     <script>
-      new DataTable('#uses', {
-        order: <?php echo json_encode($table['order'], JSON_THROW_ON_ERROR); ?>
-      });
+      new DataTable('#uses');
     </script>
     <?php } ?>
 
