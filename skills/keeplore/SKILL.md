@@ -1,73 +1,33 @@
 ---
 name: keeplore
-description: Read a Keeplore collection, use-by queue, uses, people, and proposal outcomes, or toggle whether an item is kept over the Agent HTTP API (KEEPLORE_API_KEY).
+description: Use Keeplore's Agent HTTP API to find collection items, check what is due for use, look up uses or people, read proposal outcomes, or change whether an item is kept.
 ---
 
 # Keeplore Agent API
 
-Use the bundled zero-dependency Python 3 helper (`scripts/keeplore.py`, resolved relative to this skill directory) to query `https://api.keeplore.app` (or `KEEPLORE_API_URL`) with `KEEPLORE_API_KEY` (`ak_…`). Live endpoint contract: `https://keeplore.app/api-docs?format=json`.
+Use the owner's agent key from `KEEPLORE_API_KEY` as a Bearer token for `https://api.keeplore.app`. The owner issues keys in [Settings → Agent API keys](https://keeplore.app/settings/agent-keys.php). Keep the key in the environment. The [public API guide](https://keeplore.app/api-docs) and [JSON catalog](https://keeplore.app/api-docs?format=json) define live endpoints, filters, and payloads.
 
-## 1. Snapshot the collection
+## Read the collection
 
-Verify that `KEEPLORE_API_KEY` is present in the environment without printing its value, then dump a complete local snapshot in one cursor pass:
+For known item IDs, run `python3 skills/keeplore/scripts/keeplore.py get 123` from the repository root. If the skill is installed separately, resolve `scripts/keeplore.py` relative to this file. Add `--out` to save full item records, including notes. For a narrow search, send `POST /artifacts.php` with the relevant filters. Resolve type IDs from the owner's `GET /types.php`. For an exhaustive read, start with `"cursor": null` and follow `next_cursor` until `has_more` is false. The maximum page size is 200.
 
-```bash
-python3 /path/to/skills/keeplore/scripts/keeplore.py snapshot \
-  --out /tmp/keeplore-snapshot.json
-```
-
-`snapshot` pages `POST /artifacts.php` (`cursor` mode, `per_page: 200`, `fields: "collection"`, `include: ["uses_summary"]`) and fetches `GET /types.php`, `GET /upcoming-interactions.php`, `GET /proposals.php?include_other=1`, and `GET /players.php` in ~25 requests (well under the 60 requests / 60 seconds per-IP rate limit). Answer collection, play-count, tag, and curation questions from the saved JSON file rather than re-querying the API.
-
-**Completion:** `/tmp/keeplore-snapshot.json` exists and the receipt reports total items, kept items (`is_kept == 1`), use-by queue counts (`past_due`, `due_today`, `due_soon`, `upcoming`), and any duplicate titles.
-
-## 2. Reconcile the use-by queue and single-item fields
-
-Cross-reference the bulk item list against the use-by queue (`upcoming.items`) using these three rules:
-
-1. **Use-by date math (`America/New_York` app day):**
-   - When `last_use` is `null` or earlier than `Acq`: `use_by_date = Acq + interval_days`.
-   - When `last_use >= Acq`: `use_by_date = last_use + (2 × interval_days)`. The default `182.5`-day interval gives a **365-day** window after `last_use`; a `365`-day interval gives a **730-day (2-year)** window after `last_use`.
-2. **Bulk list vs. single-item fields:**
-   - `POST /artifacts.php` returns `id`, `Title`, `type`, `type_id`, `is_kept`, `is_physical`, `is_digital`, `is_in_secondary_collection`, `tags`, `MnP`, `MxP`, `SS`, `MnT`, `MxT`, `Wt`, `Yr`, `Acq`, `plays`, and `last_use`.
-   - `to_get_rid_of`, `interaction_frequency_days`, `snoozed_until`, and `Notes` are returned only by `GET /artifact.php?id=<id>`.
-3. **Hidden kept items (`is_kept = 1` absent from `/upcoming-interactions.php`):**
-   - `/upcoming-interactions.php` lists kept items due within 60 days **excluding** items flagged `to_get_rid_of = 1`.
-   - Any kept item (`is_kept = 1`) whose `last_use` (or `Acq` when `plays == 0`) is older than `today - (2 × default_interval_days)` yet absent from `upcoming.items` has either `to_get_rid_of = 1`, a custom `interaction_frequency_days > default_interval_days`, or an active `snoozed_until`. Inspect specific candidates in batches with `get`:
+Use one snapshot for a collection-wide review that also needs the use-by queue, proposal counts, or people.
 
 ```bash
-python3 /path/to/skills/keeplore/scripts/keeplore.py get 1830 3038 4028
+snapshot_dir=$(mktemp -d)
+python3 skills/keeplore/scripts/keeplore.py snapshot --out "$snapshot_dir/collection.json"
 ```
 
-**Completion:** Every kept item in scope is classified as active (within its interval), due/overdue in `upcoming.items`, or excluded from `upcoming.items` (`to_get_rid_of = 1`, custom `interaction_frequency_days`, or `snoozed_until`).
+Add `--kept-only` when the item list should cover only the primary collection. Inspect the receipt and use the saved JSON for subsequent analysis. A snapshot contains private collection and people data. Store it outside the repository. The API allows 60 requests per 60 seconds per IP.
 
-## 3. Toggle kept or report UI-only edits
+- For packing and similar plans, filter with `"kept": true` and `"physical": true`. Secondary collection membership is independent, and item tags are optional owner labels. Confirm details such as condition or portability from a relevant item record or the owner when they affect the recommendation.
+- For use-by questions, read `GET /upcoming-interactions.php` or the snapshot's `upcoming.items`. The current endpoint covers dated kept items through its reported `horizon_days` and excludes items flagged To get rid of. For an item missing from the queue, check its acquisition date, last use, interaction frequency, and removal flag. Read the item detail when a field is absent from the collection response. See [Use-by date and App day](https://github.com/JacobStephens2/keeplore/blob/main/CONTEXT.md#use-by-date) for the calculation. Bulk `last_use` can reflect a legacy play even when `plays` is zero.
+- For who used an item, query `GET /uses.php` by `artifact_id` or the person's `player_id` from `GET /players.php`. For proposal outcomes, query `GET /proposals.php`. Base use-by dates on the item's use history and acquisition date.
 
-Agent keys have scope **reads plus the kept toggle** (`ADR-0002`):
+## Verify item references in plans
 
-- **Flip `is_kept` (`0` or `1`)** via `POST /artifact-kept.php` after confirming the target item IDs with the user:
-  ```bash
-  python3 /path/to/skills/keeplore/scripts/keeplore.py set-kept --kept 0 1830 1951
-  ```
-- **All other mutations return `403` for agent keys:** changing `interaction_frequency_days`, `to_get_rid_of`, `type`, `is_physical`, `is_digital`, `is_in_secondary_collection`, or `tags`, recording a use, or merging duplicate items (`/artifacts/edit.php?id=<survivor_id>` -> *Merge another item into this one*) must be listed with exact item `#id` and `Title` for the owner to apply in the web UI.
+Cite each item in the form `` **Title** (`#123`) `` so the verifier checks both its title and ID. Run `python3 skills/keeplore/scripts/keeplore.py verify-markdown PLAN.md --snapshot "$snapshot_dir/collection.json"`. Check that the reported reference count matches the references you intended to verify and that the command exits successfully.
 
-**Completion:** Every requested `is_kept` change is confirmed by a `200` response from `/artifact-kept.php`, and every UI-only change names the exact `#id`, `Title`, and target field value.
+## Change Kept
 
-## 4. Verify item IDs in written plans
-
-When writing or updating a Markdown document that cites Keeplore items (such as `**Title** (\`#123\`)` or `\`#123 Title\``), run `verify-markdown` against the snapshot before finishing:
-
-```bash
-python3 /path/to/skills/keeplore/scripts/keeplore.py verify-markdown \
-  /path/to/plan.md --snapshot /tmp/keeplore-snapshot.json
-```
-
-**Completion:** `verify-markdown` exits `0` with zero missing IDs, zero title mismatches, and zero unintended `is_kept = 0` items.
-
-## Domain vocabulary
-
-Use Keeplore's canonical terms from `CONTEXT.md`:
-
-- **Item**: any tracked possession (`table game`, `book`, `clothing`, `equipment`, `dance`, `instrument`, etc.).
-- **Kept** (`is_kept`): chosen for the primary collection. Independent of **Secondary collection** (`is_in_secondary_collection`), **Physical item** (`is_physical`), **Digital item** (`is_digital`), and **To get rid of** (`to_get_rid_of`).
-- **Use** (`plays`, `last_use`): an actual recorded interaction that restarts time since last use.
-- **Item proposal** (`explicit_declines`, `chose_something_else`): a suggestion to use an item. Unsuccessful proposals never count as uses and never change `last_use` or `use_by_date`.
+The [agent key scope](https://github.com/JacobStephens2/keeplore/blob/main/docs/adr/0002-agent-access-http-read-kept-toggle.md) permits one write. When the owner requests a Kept change, resolve each item to its exact title and ID, then set the requested value with `set-kept --kept 0 123` or `set-kept --kept 1 123` on the helper. Report the result for each ID. If a batch stops partway through, read the current values before retrying. Route other requested changes to the Keeplore web UI and identify the item and intended edit.
