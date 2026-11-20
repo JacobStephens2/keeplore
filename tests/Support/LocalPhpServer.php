@@ -42,13 +42,18 @@ final class LocalPhpServer
         }
     }
 
+    public function url(string $path): string
+    {
+        return 'http://127.0.0.1:' . $this->port . $path;
+    }
+
     /** @return array{status: int, headers: string, body: string} */
     public function request(string $path, array $headers = [], string $method = 'GET', ?string $body = null): array
     {
         if ($body !== null && !$this->hasHeader($headers, 'Expect')) {
             $headers[] = 'Expect:';
         }
-        $handle = curl_init('http://127.0.0.1:' . $this->port . $path);
+        $handle = curl_init($this->url($path));
         $options = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HEADER => true,
