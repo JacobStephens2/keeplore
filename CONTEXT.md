@@ -22,6 +22,9 @@ _Avoid_: Category.
 **Use**:
 A recorded occasion when an item was used, on a date, optionally with people, a Setting (where it was used) and notes. One Record Use submit can record several identical uses at once through its Number of uses. Every read of an owner's uses, their people, their use counts and the Setting of their most recently recorded use goes through one module, scoped to the owner. Distinct from an item proposal, which is never a use.
 
+**Item Interactions page**:
+The owner's recorded Uses filtered by Type and minimum date, with optional Item attributes and counts for distinct group-and-Setting and group/Setting/Item combinations.
+
 **Use count**:
 The number of an item's uses in a period, or in all recorded history: the owner's uses of it plus the legacy plays their own person took part in. Explore's uses by item pages show it.
 
