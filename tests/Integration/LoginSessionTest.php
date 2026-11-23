@@ -15,7 +15,8 @@ require_once __DIR__ . '/../Support/LocalPhpServer.php';
  * time and an access token its issued-at time. Either issued before the
  * password last changed does not authenticate, including the browser that
  * completed the reset. A login after the reset still signs the account in.
- * A guest session is not a login.
+ * A guest session is not a login. Recording an Account clears guest mode
+ * and the guest Interact By filters for Type and hiding snoozed items.
  */
 final class LoginSessionTest extends MySqlTestCase
 {
@@ -188,6 +189,33 @@ final class LoginSessionTest extends MySqlTestCase
 
         $this->assertTrue(is_logged_in());
         $this->assertTrue(is_guest());
+    }
+
+    public function test_recording_an_account_clears_guest_mode_and_the_guest_interact_by_filters(): void
+    {
+        $_SESSION = [
+            'user_id' => 99,
+            'guest_mode' => true,
+            'FullName' => 'Guest',
+            'username' => 'Guest',
+            'logged_in' => false,
+            'user_group' => 0,
+            'type' => ['4', '9'],
+            'hideSnoozed' => 'no',
+            'message' => 'kept',
+        ];
+
+        put_account_in_session($this->account());
+
+        $this->assertFalse(is_guest());
+        $this->assertArrayNotHasKey('guest_mode', $_SESSION);
+        $this->assertArrayNotHasKey('type', $_SESSION);
+        $this->assertArrayNotHasKey('hideSnoozed', $_SESSION);
+        $this->assertSame('kept', $_SESSION['message']);
+        $this->assertTrue(is_logged_in());
+        $this->assertSame(1, $_SESSION['user_id']);
+        $this->assertSame('Sam Lee', $_SESSION['FullName']);
+        $this->assertTrue($_SESSION['logged_in']);
     }
 
     public function test_a_login_after_the_reset_signs_the_account_in(): void

@@ -72,8 +72,15 @@ function log_out() {
 }
 
 // Records the account as the session's owner, with its person_id as the
-// person who is the owner themself.
+// person who is the owner themself. A guest session is not this Account:
+// guest mode, and the Type and hide-snoozed filters that session remembered
+// for Interact By, do not carry over. An Account's own remembered filters
+// are left as they are.
 function put_account_in_session($account) {
+  if (!empty($_SESSION['guest_mode'])) {
+    unset($_SESSION['type'], $_SESSION['hideSnoozed']);
+  }
+  unset($_SESSION['guest_mode']);
   $_SESSION['FullName'] = $account['name'];
   $_SESSION['user_id'] = $account['id'];
   $_SESSION['player_id'] = $account['person_id'];
