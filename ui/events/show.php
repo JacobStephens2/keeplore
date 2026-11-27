@@ -6,26 +6,22 @@ require_once(PRIVATE_PATH . '/event_plan.php');
 
 $plans = new EventPlans($db, (int) $_SESSION['user_id']);
 $id = filter_var($_GET['id'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-$event = $id ? $plans->find($id) : null;
-if ($event === null) {
+$page = $id ? $plans->page($id, $_GET, $_SESSION['event_grouping'][$id] ?? []) : null;
+if ($page === null) {
     error_404();
 }
 
+['event' => $event, 'grouping' => $grouping, 'dimensions' => $dimensions, 'plan' => $plan, 'by_tag' => $by_tag,
+    'items_to_add' => $to_add, 'players_to_add' => $players_to_add, 'dates' => $dates] = $page;
 // The grouping chosen last for this event stays until changed.
-$dimensions = event_plan_dimensions();
-$grouping = event_plan_grouping($_GET, $_SESSION['event_grouping'][$id] ?? []);
 $_SESSION['event_grouping'][$id] = $grouping;
 ['by' => $by, 'then' => $then, 'tags' => $tags, 'at_least' => $at_least, 'count_tags' => $count_tags, 'order' => $order] = $grouping;
-$by_tag = $by === 'tag' || $then === 'tag';
 
 $items = $event['items'];
 $players = $event['players'];
 ['groups' => $groups, 'text' => $text, 'packed' => $packed, 'shopping' => $shopping, 'spare' => $spare,
-    'player_ages' => $player_ages_label, 'settings' => $settings] = event_plan($event, $grouping);
+    'player_ages' => $player_ages_label, 'settings' => $settings] = $plan;
 $not_kept = count($shopping['items']);
-$to_add = $plans->itemsToAdd($id);
-$players_to_add = $plans->playersToAdd($id);
-$dates = event_dates_label($event['starts_on'], $event['ends_on']);
 
 $page_title = $event['name'];
 include(SHARED_PATH . '/header.php');

@@ -1,6 +1,7 @@
 <?php
 
 require_once dirname(__DIR__) . '/app_day.php';
+require_once dirname(__DIR__) . '/event_plan.php';
 require_once dirname(__DIR__) . '/item_facts.php';
 require_once dirname(__DIR__) . '/item_types.php';
 require_once dirname(__DIR__) . '/kept_status.php';
@@ -55,72 +56,65 @@ final class EventPlans
      */
     public function find(int $id): ?array
     {
-        $event = $this->rows(
-            'SELECT id, name, starts_on, ends_on, notes FROM events WHERE id = ? AND user_id = ?',
-            'ii', [$id, $this->userId]
-        )[0] ?? null;
+        $event = $this->eventHeader($id);
         if ($event === null) {
             return null;
         }
-        $event['id'] = (int) $event['id'];
-        $event['notes'] = (string) $event['notes'];
+
         $planned = $this->plannedItems($id);
-        $number = fn ($value) => $value === null ? null : (int) $value;
         // Items leaves out a planned item that isn't the owner's.
-        $event['items'] = array_map(function ($item) use ($planned, $number) {
-            $plan = $planned[$item['id']];
-            return [
-                'id' => (int) $item['id'],
-                'Title' => $item['Title'],
-                'MnP' => $number($item['MnP']),
-                'MxP' => $number($item['MxP']),
-                'SS' => (string) $item['SS'],
-                'Age' => $number($item['Age']),
-                'MnT' => $number($item['MnT']),
-                'MxT' => $number($item['MxT']),
-                'is_kept' => artifact_is_kept($item),
-                'setting' => $plan['setting'],
-                'note' => $plan['note'],
-                'is_packed' => (bool) $plan['is_packed'],
-                'tags' => $item['tags'],
-            ];
-        }, $this->items->list(['ids' => array_keys($planned)]));
-        $players = $this->players($id, true, $this->year($event['starts_on']));
-        // Unknown ages last, then youngest first; usort is stable (PHP 8), so
-        // players of one age stay in name order.
-        $key = fn($player) => [$player['age'] === null, $player['age']];
-        usort($players, fn($a, $b) => $key($a) <=> $key($b));
-        $event['players'] = $players;
+        $event['items'] = array_map(
+            fn ($item) => $this->plannedItem($item, $planned[$item['id']]),
+            $this->items->list(['ids' => array_keys($planned)])
+        );
+        $event['players'] = $this->eventPlayers($id, $this->year($event['starts_on']))['attending'];
         return $event;
     }
 
     /**
-     * Every item the owner has in Keeplore not yet planned for the event, kept
-     * or not, so a game being considered for purchase can be tried in the
-     * plan. In title order, each with its play facts line, whether it is
-     * kept, and whether its type is a game.
+     * The owner's Event page, including the plan under the effective grouping
+     * and the Items and players available to add, or null for an absent Event.
+     * The caller supplies the grouping saved for this Event and can remember
+     * the normalized grouping returned under 'grouping'.
      */
-    public function itemsToAdd(int $eventId): array
+    public function page(int $id, array $request, array $savedGrouping): ?array
     {
-        $planned = $this->plannedItems($eventId);
-        $items = array_filter($this->items->list(), fn ($item) => !isset($planned[$item['id']]));
-        return array_map(fn($item) => [
-            'id' => (int) $item['id'],
-            'Title' => $item['Title'],
-            // Players, sweet spot and age, without the play time.
-            'facts' => item_play_facts($item, false),
-            'is_kept' => artifact_is_kept($item),
-            'is_game' => item_type_is_game($item['type_name']),
-        ], array_values($items));
-    }
+        $event = $this->eventHeader($id);
+        if ($event === null) {
+            return null;
+        }
 
-    /** The owner's players not yet coming to the event, in name order. */
-    public function playersToAdd(int $eventId): array
-    {
-        $startsOn = $this->rows(
-            'SELECT starts_on FROM events WHERE id = ? AND user_id = ?', 'ii', [$eventId, $this->userId]
-        )[0]['starts_on'] ?? null;
-        return $this->players($eventId, false, $this->year($startsOn));
+        $planned = $this->plannedItems($id);
+        $event['items'] = [];
+        $itemsToAdd = [];
+        foreach ($this->items->list() as $item) {
+            if (isset($planned[$item['id']])) {
+                $event['items'][] = $this->plannedItem($item, $planned[$item['id']]);
+            } else {
+                $itemsToAdd[] = [
+                    'id' => (int) $item['id'],
+                    'Title' => $item['Title'],
+                    'facts' => item_play_facts($item, false),
+                    'is_kept' => artifact_is_kept($item),
+                    'is_game' => item_type_is_game($item['type_name']),
+                ];
+            }
+        }
+
+        $players = $this->eventPlayers($id, $this->year($event['starts_on']), includeCandidates: true);
+        $event['players'] = $players['attending'];
+        $grouping = event_plan_grouping($request, $savedGrouping);
+
+        return [
+            'event' => $event,
+            'grouping' => $grouping,
+            'dimensions' => event_plan_dimensions(),
+            'plan' => event_plan($event, $grouping),
+            'dates' => event_dates_label($event['starts_on'], $event['ends_on']),
+            'by_tag' => $grouping['by'] === 'tag' || $grouping['then'] === 'tag',
+            'items_to_add' => $itemsToAdd,
+            'players_to_add' => $players['candidates'],
+        ];
     }
 
     /** Creates the event, or renames and redates it with $id. Returns its id. */
@@ -226,25 +220,73 @@ final class EventPlans
         )->close();
     }
 
-    /**
-     * The owner's players coming to the event, or with $coming false those
-     * not, named "First Last", in name order (find() reorders by age). Each age is the one the player
-     * turns in $year, or null without a birth year.
-     */
-    private function players(int $eventId, bool $coming, int $year): array
+    private function eventHeader(int $id): ?array
     {
+        $event = $this->rows(
+            'SELECT id, name, starts_on, ends_on, notes FROM events WHERE id = ? AND user_id = ?',
+            'ii', [$id, $this->userId]
+        )[0] ?? null;
+        if ($event !== null) {
+            $event['id'] = (int) $event['id'];
+            $event['notes'] = (string) $event['notes'];
+        }
+        return $event;
+    }
+
+    /** The Item's play facts and tags with the Event's details. */
+    private function plannedItem(array $item, array $plan): array
+    {
+        $number = fn ($value) => $value === null ? null : (int) $value;
+        return [
+            'id' => (int) $item['id'],
+            'Title' => $item['Title'],
+            'MnP' => $number($item['MnP']),
+            'MxP' => $number($item['MxP']),
+            'SS' => (string) $item['SS'],
+            'Age' => $number($item['Age']),
+            'MnT' => $number($item['MnT']),
+            'MxT' => $number($item['MxT']),
+            'is_kept' => artifact_is_kept($item),
+            'setting' => $plan['setting'],
+            'note' => $plan['note'],
+            'is_packed' => (bool) $plan['is_packed'],
+            'tags' => $item['tags'],
+        ];
+    }
+
+    /** The owner's attending players and, when requested, candidates in name order. */
+    private function eventPlayers(int $eventId, int $year, bool $includeCandidates = false): array
+    {
+        $membershipFilter = $includeCandidates ? '' : ' AND ep.player_id IS NOT NULL';
         $players = $this->rows(
-            "SELECT p.id, TRIM(CONCAT(COALESCE(p.FirstName, ''), ' ', COALESCE(p.LastName, ''))) AS name, p.birth_year
+            "SELECT p.id, TRIM(CONCAT(COALESCE(p.FirstName, ''), ' ', COALESCE(p.LastName, ''))) AS name,
+                p.birth_year, ep.player_id IS NOT NULL AS attending
              FROM players p LEFT JOIN event_players ep ON ep.player_id = p.id AND ep.event_id = ?
-             WHERE p.user_id = ? AND (ep.player_id IS NOT NULL) = ?
+             WHERE p.user_id = ?{$membershipFilter}
              ORDER BY p.FirstName ASC, p.LastName ASC, p.id ASC",
-            'iii', [$eventId, $this->userId, (int) $coming]
+            'ii', [$eventId, $this->userId]
         );
-        return array_map(fn($player) => [
-            'id' => (int) $player['id'],
-            'name' => $player['name'],
-            'age' => $player['birth_year'] === null ? null : $year - (int) $player['birth_year'],
-        ], $players);
+
+        $attending = [];
+        $candidates = [];
+        foreach ($players as $row) {
+            $player = [
+                'id' => (int) $row['id'],
+                'name' => $row['name'],
+                'age' => $row['birth_year'] === null ? null : $year - (int) $row['birth_year'],
+            ];
+            if ($row['attending']) {
+                $attending[] = $player;
+            } else {
+                $candidates[] = $player;
+            }
+        }
+
+        // Unknown ages last, then youngest first; usort is stable (PHP 8), so
+        // players of one age stay in name order.
+        $key = fn ($player) => [$player['age'] === null, $player['age']];
+        usort($attending, fn ($a, $b) => $key($a) <=> $key($b));
+        return ['attending' => $attending, 'candidates' => $candidates];
     }
 
     /** The year an event starting on $startsOn is counted in: that year, or the app day's year when undated. */
