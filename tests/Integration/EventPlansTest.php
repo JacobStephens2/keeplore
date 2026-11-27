@@ -193,6 +193,8 @@ final class EventPlansTest extends TestCase
         $id = $this->plans()->save(['name' => 'Beach week']);
 
         $this->assertNull($this->plans(2)->find($id));
+        $this->assertNull($this->plans(2)->page($id, ['by' => 'setting'], []));
+        $this->assertNull($this->plans()->page($id + 1, [], []));
         $this->assertSame([], $this->plans(2)->all());
         foreach ([
             fn() => $this->plans(2)->save(['name' => 'Mine now'], $id),
@@ -220,19 +222,54 @@ final class EventPlansTest extends TestCase
         $this->assertSame([], $this->plans()->all());
     }
 
+    public function test_the_event_page_read_uses_one_plan_for_its_groups_and_checklists(): void
+    {
+        $plans = $this->plans();
+        $id = $plans->save(['name' => 'Beach week', 'starts_on' => '2027-07-03', 'ends_on' => '2027-07-10']);
+        $plans->addItems($id, [13, 10]);
+        $plans->updateItem($id, 10, ['setting' => 'Porch', 'note' => 'Bring sleeves', 'is_packed' => true]);
+        $this->runSql("UPDATE games SET SS = '3,4', Age = 8 WHERE id = 13;
+            INSERT INTO event_items (event_id, artifact_id) VALUES ($id, 20), ($id, 99);
+            INSERT INTO item_tags (user_id, artifact_id, tag) VALUES (1, 10, 'casual'), (1, 13, 'casual')");
+
+        $page = $plans->page($id, ['order' => 'desc', 'tags' => ' Casual, CASUAL ', 'at_least' => '01'], []);
+
+        $this->assertSame(['Catan', 'Former possession'], array_column($page['event']['items'], 'Title'));
+        $this->assertSame(['Arrival', 'Azul'], array_column($page['items_to_add'], 'Title'));
+        $this->assertSame('Jul 3 – Jul 10, 2027', $page['dates']);
+        $this->assertSame('Tag', $page['dimensions']['tag']);
+        $this->assertTrue($page['by_tag']);
+        $this->assertSame([
+            'by' => 'players', 'then' => 'tag', 'tags' => 'casual', 'at_least' => 1, 'count_tags' => '', 'order' => 'desc',
+        ], $page['grouping']);
+
+        $plan = $page['plan'];
+        $this->assertSame(['4 players', '3 players'], array_column($plan['groups'], 'label'));
+        $this->assertSame('casual', $plan['groups'][0]['groups'][0]['label']);
+        $this->assertSame(1, $plan['packed']);
+        $catan = '- [x] Catan, 3–4 (3, 4), 10 yrs, 60–120 min, Porch, Bring sleeves';
+        $this->assertSame(
+            "# 4 players\n## casual\n$catan\n- [ ] Former possession, best 3, 4, 8 yrs, not kept\n\n"
+            . "# 3 players\n## casual\n$catan\n- [ ] Former possession, best 3, 4, 8 yrs, not kept\n",
+            $plan['text']
+        );
+        $this->assertSame("# 4 players\n## casual\n$catan\n\n# 3 players\n## casual\n$catan\n", $plan['spare']['text']);
+        $this->assertSame("- [ ] Former possession, best 3, 4, 8 yrs\n", $plan['shopping']['text']);
+    }
+
     public function test_items_to_add_are_all_the_owners_items_not_yet_planned_in_title_order(): void
     {
         $id = $this->plans()->save(['name' => 'Beach week']);
         $this->plans()->addItems($id, [11]);
 
-        $candidates = $this->plans()->itemsToAdd($id);
+        $candidates = $this->plans()->page($id, [], [])['items_to_add'];
 
         // A game not kept, such as one being considered for purchase, can be planned too.
         $this->assertSame(['Arrival', 'Catan', 'Former possession'], array_column($candidates, 'Title'));
         $this->assertSame([false, true, false], array_column($candidates, 'is_kept'));
         $this->assertSame('3–4 players, best 3, 4 · Age 10+', $candidates[1]['facts']);
         $this->runSql("UPDATE types SET objectType = 'table game' WHERE id = 1");
-        $this->assertSame([false, true, true], array_column($this->plans()->itemsToAdd($id), 'is_game'));
+        $this->assertSame([false, true, true], array_column($this->plans()->page($id, [], [])['items_to_add'], 'is_game'));
     }
 
     public function test_a_candidate_with_only_a_legacy_type_string_is_not_a_game(): void
@@ -240,7 +277,7 @@ final class EventPlansTest extends TestCase
         $id = $this->plans()->save(['name' => 'Beach week']);
         $this->runSql("UPDATE games SET type_id = NULL, type = 'table game' WHERE id = 10");
 
-        $candidates = array_column($this->plans()->itemsToAdd($id), 'is_game', 'Title');
+        $candidates = array_column($this->plans()->page($id, [], [])['items_to_add'], 'is_game', 'Title');
 
         $this->assertFalse($candidates['Catan']);
     }
@@ -288,10 +325,20 @@ final class EventPlansTest extends TestCase
 
     public function test_players_to_add_are_the_owners_players_not_yet_coming(): void
     {
-        $id = $this->plans()->save(['name' => 'Beach week']);
+        $this->runSql("INSERT INTO players (id, user_id, FirstName, LastName, birth_year) VALUES
+            (102, 1, 'Al', NULL, 2015), (103, 1, 'Zo', 'Young', 2020)");
+        $id = $this->plans()->save(['name' => 'Beach week', 'starts_on' => '2027-07-03']);
         $this->plans()->addPlayers($id, [101]);
+        $this->runSql("INSERT INTO event_players VALUES ($id, 200), ($id, 999)");
 
-        $this->assertSame([['id' => 100, 'name' => 'Sam Lee', 'age' => null]], $this->plans()->playersToAdd($id));
+        $page = $this->plans()->page($id, [], []);
+
+        $this->assertSame([['id' => 101, 'name' => 'Jo Smith', 'age' => null]], $page['event']['players']);
+        $this->assertSame([
+            ['id' => 102, 'name' => 'Al', 'age' => 12],
+            ['id' => 100, 'name' => 'Sam Lee', 'age' => null],
+            ['id' => 103, 'name' => 'Zo Young', 'age' => 7],
+        ], $page['players_to_add']);
     }
 
     public function test_owner_can_remove_a_player_from_an_event(): void
@@ -364,8 +411,9 @@ final class EventPlansTest extends TestCase
         $this->plans()->addPlayers($dated, [100, 101]);
 
         $this->assertSame([12, null], array_column($this->plans()->find($dated)['players'], 'age'));
-        // An undated event counts from this year.
-        $this->assertSame(app_year() - 2015, $this->plans()->playersToAdd($undated)[1]['age']);
+        $this->assertSame([null, app_year() - 2015], array_column($this->plans()->page($undated, [], [])['players_to_add'], 'age'));
+        $this->plans()->addPlayers($undated, [100, 101]);
+        $this->assertSame([app_year() - 2015, null], array_column($this->plans()->page($undated, [], [])['event']['players'], 'age'));
     }
 
     public function test_an_events_players_come_back_youngest_first_and_unknown_ages_last(): void
@@ -376,9 +424,8 @@ final class EventPlansTest extends TestCase
         $id = $this->plans()->save(['name' => 'Beach week', 'starts_on' => '2027-07-03']);
         $this->plans()->addPlayers($id, [100, 101, 102, 103]);
 
-        $this->assertSame(
-            ['Al Young', 'Bo Twin', 'Sam Lee', 'Jo Smith'],
-            array_column($this->plans()->find($id)['players'], 'name')
-        );
+        $names = ['Al Young', 'Bo Twin', 'Sam Lee', 'Jo Smith'];
+        $this->assertSame($names, array_column($this->plans()->find($id)['players'], 'name'));
+        $this->assertSame($names, array_column($this->plans()->page($id, [], [])['event']['players'], 'name'));
     }
 }
