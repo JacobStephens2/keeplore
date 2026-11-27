@@ -5,9 +5,10 @@ namespace Tests\Integration;
 use DOMDocument;
 use DOMXPath;
 use Tests\Support\LocalPhpServer;
+use Tests\Support\LocalUiRoute;
 
 require_once __DIR__ . '/MySqlTestCase.php';
-require_once __DIR__ . '/../Support/LocalPhpServer.php';
+require_once __DIR__ . '/../Support/LocalUiRoute.php';
 
 final class EventPageTest extends MySqlTestCase
 {
@@ -137,57 +138,16 @@ final class EventPageTest extends MySqlTestCase
 
     private function withRoute(callable $exercise): void
     {
-        $root = sys_get_temp_dir() . '/keeplore-event-' . bin2hex(random_bytes(6));
-        mkdir($root . '/ui/events', 0777, true);
-        mkdir($root . '/private');
-        $server = null;
-        try {
-            copy(PRIVATE_PATH . '/initialize.php', $root . '/private/initialize.php');
-            foreach (glob(PRIVATE_PATH . '/*.php') as $source) {
-                $file = basename($source);
-                if (!in_array($file, ['initialize.php', 'environment_variables.php'], true)) {
-                    symlink($source, $root . '/private/' . $file);
-                }
+        // Only the first request seeds login. Reopening the same session through
+        // the real route lets its grouping writes survive between requests.
+        $session = <<<'PHP'
+            <?php
+            if (($_SERVER['HTTP_X_TEST_LOGIN'] ?? '') === 'owner') {
+                session_start();
+                $_SESSION = ['user_id' => 1, 'user_group' => 1, 'player_id' => 100, 'logged_in' => true, 'username' => 'Owner'];
+                session_write_close();
             }
-            foreach (['classes', 'shared'] as $directory) {
-                symlink(PRIVATE_PATH . '/' . $directory, $root . '/private/' . $directory);
-            }
-            symlink(PROJECT_PATH . '/vendor', $root . '/private/vendor');
-            $config = [
-                'DB_SERVER' => getenv('KEEPLORE_TEST_DB_HOST'),
-                'DB_USER' => getenv('KEEPLORE_TEST_DB_USER') ?: 'root',
-                'DB_PASS' => getenv('KEEPLORE_TEST_DB_PASSWORD') ?: '',
-                'DB_NAME' => $this->db->query('SELECT DATABASE()')->fetch_row()[0],
-                'DB_PORT' => (int) (getenv('KEEPLORE_TEST_DB_PORT') ?: 3306),
-                'COOKIE_SECURE' => false,
-                'ARTIFACTS_DOMAIN' => '',
-                'API_ORIGIN' => '127.0.0.1',
-            ];
-            $environment = '<?php foreach (' . var_export($config, true) . ' as $name => $value) define($name, $value);';
-            file_put_contents($root . '/private/environment_variables.php', $environment);
-            // Only the first request seeds login. Reopening the same session through
-            // the real route lets its grouping writes survive between requests.
-            $session = <<<'PHP'
-                <?php
-                if (($_SERVER['HTTP_X_TEST_LOGIN'] ?? '') === 'owner') {
-                    session_start();
-                    $_SESSION = ['user_id' => 1, 'user_group' => 1, 'player_id' => 100, 'logged_in' => true, 'username' => 'Owner'];
-                    session_write_close();
-                }
-                PHP;
-            $server = new LocalPhpServer($session . 'chdir(' . var_export($root . '/ui/events', true) . ');'
-                . 'require ' . var_export(PROJECT_PATH . '/ui' . self::ROUTE, true) . ';');
-            $exercise($server);
-        } finally {
-            $server?->stop();
-            foreach (glob($root . '/private/*') as $file) {
-                unlink($file);
-            }
-            foreach (['/cache', '/logs', '/ui/events', '/ui', '/private', ''] as $directory) {
-                if (is_dir($root . $directory)) {
-                    rmdir($root . $directory);
-                }
-            }
-        }
+            PHP;
+        LocalUiRoute::run(self::ROUTE, $this->db, $session, $exercise);
     }
 }
