@@ -7,7 +7,8 @@ require_once __DIR__ . '/LocalPhpServer.php';
 /** Run a real UI route with the application bootstrap and a disposable database. */
 final class LocalUiRoute
 {
-    public static function run(string $route, \mysqli $db, string $session, callable $exercise): void
+    /** An open PHP block starting with <?php runs before the route on each request. */
+    public static function run(string $route, \mysqli $db, string $sessionBootstrapPhp, callable $exercise): void
     {
         $root = sys_get_temp_dir() . '/keeplore-ui-' . bin2hex(random_bytes(6));
         $routeDirectory = $root . '/ui' . dirname($route);
@@ -40,7 +41,7 @@ final class LocalUiRoute
             ];
             $environment = '<?php foreach (' . var_export($config, true) . ' as $name => $value) define($name, $value);';
             file_put_contents($root . '/private/environment_variables.php', $environment);
-            $server = new LocalPhpServer($session . "\nchdir(" . var_export($routeDirectory, true) . ');'
+            $server = new LocalPhpServer($sessionBootstrapPhp . "\nchdir(" . var_export($routeDirectory, true) . ');'
                 . 'require ' . var_export(PROJECT_PATH . '/ui' . $route, true) . ';');
             $exercise($server);
         } finally {
